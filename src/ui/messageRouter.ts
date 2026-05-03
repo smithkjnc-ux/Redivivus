@@ -296,23 +296,50 @@ export function attachMessageRouter(
           location: vscode.ProgressLocation.Notification,
           title: `CHASSIS Vault: AI categorizing ${otherItems.length} items tagged "other"...`,
           cancellable: false,
-        }, async (progress) => {
+        }, async () => {
           try {
             const recategorized = await vaultService.aiCategorize(otherItems, routingService!);
             let updated = 0;
+            const stillOther: any[] = [];
+
             for (const item of recategorized) {
               const original = otherItems.find((i: any) => i.id === item.id);
+              const isStillOther = item.tags.every((t: string) => t === 'other') || item.tags.length === 0;
+              if (isStillOther) {
+                stillOther.push(item);
+                continue;
+              }
               const changed = JSON.stringify(original?.tags.sort()) !== JSON.stringify(item.tags.sort());
               if (changed) {
                 vaultService.updateItemTags(item.id, item.tags, true);
                 updated++;
               }
             }
+
+            // Report successfully categorized
             if (updated > 0) {
-              vscode.window.showInformationMessage(`✓ Re-categorized ${updated} of ${otherItems.length} vault items.`);
-            } else {
-              vscode.window.showInformationMessage(`AI reviewed ${otherItems.length} items — no category changes needed.`);
+              vscode.window.showInformationMessage(`✓ Re-categorized ${updated} vault item${updated !== 1 ? 's' : ''}.`);
             }
+
+            // Handle items AI couldn't place — offer to delete
+            if (stillOther.length > 0) {
+              const preview = stillOther.slice(0, 5).map((i: any) => `• ${i.block.name} (${i.block.type})`).join('\n');
+              const moreNote = stillOther.length > 5 ? `\n  ...and ${stillOther.length - 5} more` : '';
+              const action = await vscode.window.showWarningMessage(
+                `AI could not categorize ${stillOther.length} item${stillOther.length !== 1 ? 's' : ''} — they remain tagged "other".\n\n${preview}${moreNote}\n\nDelete them? They cannot be used if uncategorized.`,
+                { modal: true },
+                'Delete All Uncategorized', 'Keep Them'
+              );
+              if (action === 'Delete All Uncategorized') {
+                const deleted = vaultService.deleteItems(stillOther.map((i: any) => i.id), true);
+                vscode.window.showInformationMessage(`🗑 Deleted ${deleted} uncategorized vault item${deleted !== 1 ? 's' : ''}.`);
+              }
+            }
+
+            if (updated === 0 && stillOther.length === 0) {
+              vscode.window.showInformationMessage('AI reviewed all items — categories are already correct.');
+            }
+
             refresh();
           } catch (e) {
             vscode.window.showErrorMessage('Re-categorization failed: ' + (e as Error).message);

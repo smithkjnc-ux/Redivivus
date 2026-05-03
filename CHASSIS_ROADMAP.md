@@ -211,4 +211,10 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Rule change: roadmap update required after EVERY change, no exceptions*
+## [2026-05-03 08:19] — Vault uncategorized item handling
+- **`vaultService.ts`:** Added `deleteItems(itemIds, global)` bulk delete method.
+- **`messageRouter.ts` `vaultRecategorize` handler:** After AI categorization, items still tagged "other" are separated from successfully categorized items. User is shown a modal with a preview list (up to 5 names) and asked "Delete All Uncategorized" or "Keep Them". If deleted, `deleteItems()` is called and count is reported. Items AI genuinely couldn't place no longer silently remain in vault as dead weight.
+
+---
+
+*Last updated: May 3, 2026 — Vault: delete uncategorizable items after AI Fix Categories pass*

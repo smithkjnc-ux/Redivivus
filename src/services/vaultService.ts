@@ -110,6 +110,15 @@ export class VaultService {
     if (fs.existsSync(p)) { fs.unlinkSync(p); }
   }
 
+  deleteItems(itemIds: string[], global = false): number {
+    let count = 0;
+    for (const id of itemIds) {
+      const p = this.itemPath(id, global);
+      if (fs.existsSync(p)) { fs.unlinkSync(p); count++; }
+    }
+    return count;
+  }
+
   listItems(global = false): VaultItem[] {
     this.ensureVaultDirs();
     const dir = global ? this.globalDir : this.localDir;
