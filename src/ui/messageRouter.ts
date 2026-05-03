@@ -251,23 +251,39 @@ export function attachMessageRouter(
           vscode.window.showInformationMessage('No saved vault items to re-categorize.');
           break;
         }
+        // Only recategorize items currently tagged 'other'
+        const otherItems = allItems.filter((i: any) => i.tags.includes('other') || i.tags.length === 0);
+        if (otherItems.length === 0) {
+          vscode.window.showInformationMessage('All vault items already have proper categories.');
+          break;
+        }
+        // Check Gemini key before starting
+        const geminiKey = vscode.workspace.getConfiguration('chassis').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY;
+        if (!geminiKey) {
+          vscode.window.showErrorMessage('No Gemini API key set. Add it in CHASSIS Settings (Files & AI tab) to use AI categorization.');
+          break;
+        }
         await vscode.window.withProgress({
           location: vscode.ProgressLocation.Notification,
-          title: `CHASSIS Vault: Re-categorizing ${allItems.length} saved items with AI...`,
+          title: `CHASSIS Vault: AI categorizing ${otherItems.length} items tagged "other"...`,
           cancellable: false,
         }, async (progress) => {
           try {
-            const recategorized = await vaultService.aiCategorize(allItems, routingService!);
+            const recategorized = await vaultService.aiCategorize(otherItems, routingService!);
             let updated = 0;
             for (const item of recategorized) {
-              const original = allItems.find(i => i.id === item.id);
-              const changed = JSON.stringify(original?.tags) !== JSON.stringify(item.tags);
+              const original = otherItems.find((i: any) => i.id === item.id);
+              const changed = JSON.stringify(original?.tags.sort()) !== JSON.stringify(item.tags.sort());
               if (changed) {
                 vaultService.updateItemTags(item.id, item.tags, true);
                 updated++;
               }
             }
-            vscode.window.showInformationMessage(`Re-categorized ${updated} vault item${updated === 1 ? '' : 's'}.`);
+            if (updated > 0) {
+              vscode.window.showInformationMessage(`✓ Re-categorized ${updated} of ${otherItems.length} vault items.`);
+            } else {
+              vscode.window.showInformationMessage(`AI reviewed ${otherItems.length} items — no category changes needed.`);
+            }
             refresh();
           } catch (e) {
             vscode.window.showErrorMessage('Re-categorization failed: ' + (e as Error).message);
