@@ -105,6 +105,20 @@ export class WizardPanel {
     const reviews = getReviews(this.chassis);
     const vaultItems = getVaultItems(this.vaultService);
 
+    // Read build timestamp for visual verification
+    let buildTimestamp = '';
+    const buildInfoPath = path.join(this.chassis.chassisDir, 'build-info.json');
+    if (fs.existsSync(buildInfoPath)) {
+      try {
+        const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8'));
+        const date = new Date(buildInfo.timestamp);
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        buildTimestamp = `<div style="font-size: 10px; color: var(--vscode-descriptionForeground);">Built: ${timeStr}</div>`;
+      } catch (e) {
+        // Ignore errors reading build info
+      }
+    }
+
     let badges = '';
     if (initialized) {
       const parts: string[] = [];
@@ -142,7 +156,7 @@ export class WizardPanel {
     }
 
     this.panel.webview.html = `<!DOCTYPE html><html><head><style>${getStyles()}</style></head><body>
-      <div class="header"><h1>C H A S S I S</h1><div class="sub">The frame everything bolts to</div><div class="project">${projectName}</div></div>
+      <div class="header"><h1>C H A S S I S</h1><div class="sub">The frame everything bolts to</div><div class="project">${projectName}</div>${buildTimestamp}</div>
       ${badges}${content}<div class="footer">CHASSIS v0.2.0 &mdash; Built by PapaJoe</div>
       <script>${getScripts()}</script></body></html>`;
   }

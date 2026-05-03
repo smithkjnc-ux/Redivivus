@@ -8,6 +8,11 @@ const path = require('path');
 const workspaceRoot = process.cwd();
 const configPath = path.join(workspaceRoot, '.chassis', 'config.json');
 
+// Write build timestamp for visual verification
+const buildTimestamp = new Date().toISOString();
+const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
+fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: '0.2.0' }, null, 2));
+
 try {
   // Check if CHASSIS is initialized
   if (!fs.existsSync(configPath)) {
