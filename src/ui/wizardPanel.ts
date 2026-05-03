@@ -127,13 +127,22 @@ export class WizardPanel {
       }
     }
 
+    // Check actual available AI vs configured AI
+    const availableAI = this.routingService.getAvailableAI();
+    const aiBadgeLabel = availableAI.ai === 'none'
+      ? 'No AI Key Set'
+      : availableAI.ai !== currentAI
+        ? `AI: ${currentAI.toUpperCase()} → using ${availableAI.label}`
+        : `AI: ${currentAI.toUpperCase()}`;
+    const aiBadgeColor = availableAI.ai === 'none' ? 'red' : availableAI.ai !== currentAI ? 'yellow' : 'blue';
+
     let badges = '';
     if (initialized) {
       const parts: string[] = [];
       if (blueprintLocked) parts.push('<span class="badge green">Blueprint Locked</span>');
       else if (hasBlueprint) parts.push('<span class="badge yellow">Blueprint Draft</span>');
       if (sessionActive) parts.push('<span class="badge green">Session Active</span>');
-      parts.push('<span class="badge blue">AI: ' + currentAI.toUpperCase() + '</span>');
+      parts.push(`<span class="badge ${aiBadgeColor}">${aiBadgeLabel}</span>`);
       badges = '<div class="badges">' + parts.join('') + '</div>';
     }
 

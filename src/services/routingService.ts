@@ -12,8 +12,25 @@ interface AIResponse {
 
 export class RoutingService {
 
+  // Returns which AI is available and where the key came from
+  getAvailableAI(): { ai: string; source: 'chassis-settings' | 'env' | 'none'; label: string } {
+    const config = vscode.workspace.getConfiguration('chassis');
+    // Check Gemini
+    const geminiSettings = config.get<string>('geminiApiKey') || '';
+    if (geminiSettings) return { ai: 'gemini', source: 'chassis-settings', label: 'Gemini' };
+    if (process.env.GEMINI_API_KEY) return { ai: 'gemini', source: 'env', label: 'Gemini (env)' };
+    // Check Claude
+    const claudeSettings = config.get<string>('claudeApiKey') || '';
+    if (claudeSettings) return { ai: 'claude', source: 'chassis-settings', label: 'Claude' };
+    if (process.env.ANTHROPIC_API_KEY) return { ai: 'claude', source: 'env', label: 'Claude (env)' };
+    // Check Kimi
+    const kimiSettings = config.get<string>('kimiApiKey') || '';
+    if (kimiSettings) return { ai: 'kimi', source: 'chassis-settings', label: 'Kimi' };
+    if (process.env.MOONSHOT_API_KEY) return { ai: 'kimi', source: 'env', label: 'Kimi (env)' };
+    return { ai: 'none', source: 'none', label: 'No AI' };
+  }
+
   async analyzeFile(filePath: string, content: string, instruction: string, cancelToken?: import('vscode').CancellationToken): Promise<AIResponse> {
-    // For now, Gemini only — Claude and others added in Phase 2b
     const key = this.getGeminiKey();
     if (!key) {
       return { text: '', model: 'none', success: false, error: 'No Gemini API key. Set it in CHASSIS settings or via GEMINI_API_KEY env var.' };
@@ -22,9 +39,20 @@ export class RoutingService {
   }
 
   private getGeminiKey(): string | null {
-    // check VS Code settings first, then env
     const config = vscode.workspace.getConfiguration('chassis');
     const key = config.get<string>('geminiApiKey') || process.env.GEMINI_API_KEY || '';
+    return key || null;
+  }
+
+  private getClaudeKey(): string | null {
+    const config = vscode.workspace.getConfiguration('chassis');
+    const key = config.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY || '';
+    return key || null;
+  }
+
+  private getKimiKey(): string | null {
+    const config = vscode.workspace.getConfiguration('chassis');
+    const key = config.get<string>('kimiApiKey') || process.env.MOONSHOT_API_KEY || '';
     return key || null;
   }
 
@@ -108,27 +136,76 @@ Return ONLY the modified code. No explanation before or after. No markdown fence
   }
 
 
-  async prompt(text: string): Promise<AIResponse> {
-    const key = this.getGeminiKey();
-    if (!key) {
-      return { text: '', model: 'none', success: false, error: 'No Gemini API key configured.' };
+  async prompt(text: string): Promise<AIResponse & { usingFallback?: string }> {
+    const available = this.getAvailableAI();
+    if (available.ai === 'none') {
+      return { text: '', model: 'none', success: false, error: 'No AI key configured. Add a Gemini, Claude, or Kimi API key in CHASSIS Settings.' };
     }
-    try {
-      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
-      const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }] });
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
-      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
-      clearTimeout(timeoutId);
-      const data = await response.json() as any;
-      if (!response.ok) {
-        return { text: '', model: 'gemini-2.5-flash', success: false, error: data.error?.message || 'API error ' + response.status };
+
+    const defaultAI = vscode.workspace.getConfiguration('chassis').get<string>('defaultAI') || 'gemini';
+    const usingFallback = available.ai !== defaultAI ? available.label : undefined;
+
+    if (available.ai === 'gemini') {
+      const key = this.getGeminiKey()!;
+      try {
+        const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
+        const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }] });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
+        clearTimeout(timeoutId);
+        const data = await response.json() as any;
+        if (!response.ok) {
+          return { text: '', model: 'gemini-2.5-flash', success: false, error: data.error?.message || 'API error ' + response.status };
+        }
+        const result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        return { text: result.trim(), model: 'gemini-2.5-flash', success: true, usingFallback };
+      } catch (err: any) {
+        return { text: '', model: 'gemini-2.5-flash', success: false, error: err.message || 'Network error' };
       }
-      const result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      return { text: result.trim(), model: 'gemini-2.5-flash', success: true };
-    } catch (err: any) {
-      return { text: '', model: 'gemini-2.5-flash', success: false, error: err.message || 'Network error' };
     }
+
+    if (available.ai === 'claude') {
+      const key = this.getClaudeKey()!;
+      try {
+        const url = 'https://api.anthropic.com/v1/messages';
+        const body = JSON.stringify({ model: 'claude-3-5-haiku-20241022', max_tokens: 1024, messages: [{ role: 'user', content: text }] });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body, signal: controller.signal });
+        clearTimeout(timeoutId);
+        const data = await response.json() as any;
+        if (!response.ok) {
+          return { text: '', model: 'claude-3-5-haiku', success: false, error: data.error?.message || 'API error ' + response.status };
+        }
+        const result = data.content?.[0]?.text || '';
+        return { text: result.trim(), model: 'claude-3-5-haiku', success: true, usingFallback };
+      } catch (err: any) {
+        return { text: '', model: 'claude-3-5-haiku', success: false, error: err.message || 'Network error' };
+      }
+    }
+
+    if (available.ai === 'kimi') {
+      const key = this.getKimiKey()!;
+      try {
+        const url = 'https://api.moonshot.cn/v1/chat/completions';
+        const body = JSON.stringify({ model: 'moonshot-v1-8k', messages: [{ role: 'user', content: text }] });
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body, signal: controller.signal });
+        clearTimeout(timeoutId);
+        const data = await response.json() as any;
+        if (!response.ok) {
+          return { text: '', model: 'kimi', success: false, error: data.error?.message || 'API error ' + response.status };
+        }
+        const result = data.choices?.[0]?.message?.content || '';
+        return { text: result.trim(), model: 'kimi', success: true, usingFallback };
+      } catch (err: any) {
+        return { text: '', model: 'kimi', success: false, error: err.message || 'Network error' };
+      }
+    }
+
+    return { text: '', model: 'none', success: false, error: 'No AI available.' };
   }
 
     private getCommentStyle(filePath: string): { single: string; block?: [string, string]; example: string } {

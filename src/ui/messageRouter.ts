@@ -257,10 +257,10 @@ export function attachMessageRouter(
           vscode.window.showInformationMessage('All vault items already have proper categories.');
           break;
         }
-        // Check Gemini key before starting
-        const geminiKey = vscode.workspace.getConfiguration('chassis').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY;
-        if (!geminiKey) {
-          vscode.window.showErrorMessage('No Gemini API key set. Add it in CHASSIS Settings (Files & AI tab) to use AI categorization.');
+        // Check if any AI is available
+        const aiCheck = routingService.getAvailableAI();
+        if (aiCheck.ai === 'none') {
+          vscode.window.showErrorMessage('No AI key configured. Add a Gemini, Claude, or Kimi API key in CHASSIS Settings to use AI categorization.');
           break;
         }
         await vscode.window.withProgress({
