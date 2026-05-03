@@ -121,6 +121,10 @@
       {
         "command": "chassis.autoCommit",
         "title": "CHASSIS: Auto-commit (build checkpoint)"
+      },
+      {
+        "command": "chassis.buildFromVault",
+        "title": "CHASSIS: Build from Vault"
       }
     ],
     "menus": {

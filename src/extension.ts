@@ -16,6 +16,7 @@ import { AnalyzerService } from './services/analyzerService.js';
 import { AnnotationService } from './services/annotationService.js';
 import { VaultService } from './services/vaultService.js';
 import { VaultContextService } from './services/vaultContextService.js';
+import { BuildFromVaultService } from './services/buildFromVaultService.js';
 import { StatusBar } from './ui/statusBar.js';
 import { SidebarProvider } from './ui/sidebarProvider.js';
 
@@ -27,6 +28,7 @@ import { registerReviewCommands } from './commands/review.js';
 import { registerRestructureCommands } from './commands/restructure.js';
 import { registerRetrofitCommands } from './commands/retrofit.js';
 import { registerVaultCommands } from './commands/vault.js';
+import { registerBuildFromVaultCommand } from './commands/buildFromVault.js';
 import { registerMiscCommands } from './commands/misc.js';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -46,6 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
   const vaultService = new VaultService(context);
   const vaultContextService = new VaultContextService(vaultService);
   routingService.setVaultContextService(vaultContextService);
+  const buildFromVaultService = new BuildFromVaultService(vaultService, routingService);
   const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker);
   const wizardService = new WizardService(chassisService, sessionService);
   const wizardPanel = new WizardPanel(chassisService, sessionService, context);
@@ -82,6 +85,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerRestructureCommands(context, chassisService, routingService, measureTwice, changeTracker, refreshAll);
   registerRetrofitCommands(context, chassisService, retrofitService, refreshAll);
   registerVaultCommands(context, chassisService, vaultService, refreshAll);
+  registerBuildFromVaultCommand(context, buildFromVaultService);
   registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, wizardPanel, refreshAll);
 
   console.log('[CHASSIS] Activated — Phase 1 + Phase 2 + commands split');

@@ -258,4 +258,12 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Vault context injected into AI prompts before code generation*
+## [2026-05-03 11:49] — Build from Vault command
+- **`buildFromVaultService.ts` (new):** Full build pipeline — (1) user describes task in plain English, (2) vault searched by task keywords with stop-word filtering and exact name boost, (3) AI asked to plan: which vault items to use + what gaps need new code, (4) plan shown to user for approval with vault items and gaps listed, (5) AI assembles final code using vault items verbatim + writes only the gaps, (6) result opened in new editor tab with option to save to target file.
+- **`buildFromVault.ts` (new command):** Registers `chassis.buildFromVault` command.
+- **`extension.ts`:** `BuildFromVaultService` instantiated and command registered.
+- **`package.json`:** `chassis.buildFromVault` — "CHASSIS: Build from Vault" added to command palette.
+
+---
+
+*Last updated: May 3, 2026 — Build from Vault: describe task, CHASSIS assembles from vault + fills gaps*
