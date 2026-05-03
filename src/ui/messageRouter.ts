@@ -241,6 +241,40 @@ export function attachMessageRouter(
         refresh();
         break;
       }
+      case 'vaultRecategorize': {
+        if (!routingService) {
+          vscode.window.showErrorMessage('No AI routing service available for re-categorization.');
+          break;
+        }
+        const allItems = vaultService.listItems(true);
+        if (allItems.length === 0) {
+          vscode.window.showInformationMessage('No saved vault items to re-categorize.');
+          break;
+        }
+        await vscode.window.withProgress({
+          location: vscode.ProgressLocation.Notification,
+          title: `CHASSIS Vault: Re-categorizing ${allItems.length} saved items with AI...`,
+          cancellable: false,
+        }, async (progress) => {
+          try {
+            const recategorized = await vaultService.aiCategorize(allItems, routingService!);
+            let updated = 0;
+            for (const item of recategorized) {
+              const original = allItems.find(i => i.id === item.id);
+              const changed = JSON.stringify(original?.tags) !== JSON.stringify(item.tags);
+              if (changed) {
+                vaultService.updateItemTags(item.id, item.tags, true);
+                updated++;
+              }
+            }
+            vscode.window.showInformationMessage(`Re-categorized ${updated} vault item${updated === 1 ? '' : 's'}.`);
+            refresh();
+          } catch (e) {
+            vscode.window.showErrorMessage('Re-categorization failed: ' + (e as Error).message);
+          }
+        });
+        break;
+      }
       case 'vaultScanCancel':
         state.vaultScanMode = false;
         state.vaultScanItems = [];

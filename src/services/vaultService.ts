@@ -555,6 +555,15 @@ ${listStr}`;
     return { items, fileCount, filteredCount: totalFiltered };
   }
 
+  // ── Update all tags for an item ──
+  updateItemTags(itemId: string, tags: string[], global = false): void {
+    const item = this.getItem(itemId, global);
+    if (item) {
+      item.tags = tags;
+      this.saveItem(item, global);
+    }
+  }
+
   // ── Category manager ──
   addToCategory(itemId: string, category: VaultCategory, global = false): void {
     const item = this.getItem(itemId, global);

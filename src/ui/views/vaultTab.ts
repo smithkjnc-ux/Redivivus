@@ -120,6 +120,7 @@ export function renderVaultTab(
       </div>
       <div style="display:flex; gap:8px;">
         <button id="vault-scan-btn" style="padding:6px 12px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">📂 Scan Codebase</button>
+        <button id="vault-recategorize-btn" style="padding:6px 12px; background:transparent; color:var(--fg,#e6edf3); border:1px solid var(--border,#334455); border-radius:4px; cursor:pointer; font-size:12px;" title="Use AI to re-assign categories for all saved items tagged as 'other'">🤖 Fix Categories</button>
         <button id="vault-save-btn" style="padding:6px 12px; background:transparent; color:var(--fg,#e6edf3); border:1px solid var(--border,#334455); border-radius:4px; cursor:pointer; font-size:12px;">💾 Save from Project</button>
       </div>
     </div>`;

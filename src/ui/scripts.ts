@@ -315,6 +315,12 @@ export function getScripts(): string {
         vscode.postMessage({ type: 'vaultSaveFromProject' });
       });
     }
+    const vaultRecategorizeBtn = document.getElementById('vault-recategorize-btn');
+    if (vaultRecategorizeBtn) {
+      vaultRecategorizeBtn.addEventListener('click', () => {
+        vscode.postMessage({ type: 'vaultRecategorize' });
+      });
+    }
     document.querySelectorAll('.vault-open-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         e.stopPropagation();
