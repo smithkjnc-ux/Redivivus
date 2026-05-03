@@ -119,6 +119,14 @@ export function getScripts(): string {
       });
     }
 
+    // ── API Keys: intercept external links (webview can't open href directly) ──
+    document.querySelectorAll('.ai-key-link').forEach(a => {
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        vscode.postMessage({ type: 'openExternal', url: a.dataset.url });
+      });
+    });
+
     // ── API Keys form handlers ──
     const apiKeysForm = document.getElementById('api-keys-form');
     const apiKeysCard = document.querySelector('[data-action="showApiKeysForm"]');

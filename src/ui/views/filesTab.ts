@@ -93,18 +93,30 @@ export function renderFilesTab(
     </div>`;
 
   function keyRow(id: string, label: string, tier: string, placeholder: string, link: string, hasKey?: boolean): string {
-    const tierColor = tier === 'Free' ? '#4ec959' : '#f5a623';
-    const status = hasKey ? ' <span style="color:#4ec959; font-size:10px;">✓ set</span>' : '';
+    const isFree = tier === 'Free';
+    const tierBg    = isFree ? '#1a3a1a' : '#3a2a0a';
+    const tierColor = isFree ? '#4ec959' : '#f5a623';
+    const tierIcon  = isFree ? '🟢' : '🟡';
+    const tierNote  = isFree ? 'FREE — no credit card needed' : 'PAID — requires billing account';
+    const borderColor = hasKey ? '#4ec959' : 'var(--border,#334455)';
     return `
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">
-        ${label}${status}
-        <span style="font-weight:normal; font-size:10px; color:${tierColor}; margin-left:4px;">${tier}</span>
-        <a href="${link}" style="font-weight:normal; font-size:10px; color:var(--vscode-textLink-foreground,#58a6ff); margin-left:6px;">Get key ↗</a>
-      </label>
-      <div style="display:flex; gap:6px; margin-bottom:10px;">
-        <input id="key-${id}" type="password" placeholder="${placeholder}" style="flex:1; padding:7px 10px; background:var(--input-bg,#0d1117); color:var(--fg,#e6edf3); border:1px solid ${hasKey ? '#4ec959' : 'var(--border,#334455)'}; border-radius:4px; font-size:12px; font-family:monospace;" />
-        <button class="api-key-save-btn" data-ai="${id}" style="padding:6px 14px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">Save</button>
-        ${hasKey ? `<button class="api-key-clear-btn" data-ai="${id}" style="padding:6px 10px; background:transparent; color:#f85149; border:1px solid #f85149; border-radius:4px; cursor:pointer; font-size:12px;">Clear</button>` : ''}
+      <div style="margin-bottom:14px; padding:12px; background:var(--input-bg,#0d1117); border-radius:6px; border:1px solid ${borderColor};">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span style="font-size:13px; font-weight:bold;">${label}</span>
+            ${hasKey ? '<span style="background:#1a3a1a; color:#4ec959; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:bold;">✓ Connected</span>' : ''}
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="background:${tierBg}; color:${tierColor}; padding:3px 10px; border-radius:10px; font-size:11px; font-weight:bold;">${tierIcon} ${tierNote}</span>
+            <a class="ai-key-link" data-url="${link}" href="#" style="padding:4px 10px; background:#1f6feb; color:#fff; border-radius:4px; font-size:11px; font-weight:bold; text-decoration:none; white-space:nowrap;">🔗 Sign up / Get key</a>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <input id="key-${id}" type="password" placeholder="${placeholder}" style="flex:1; padding:7px 10px; background:var(--card-bg,#1e293b); color:var(--fg,#e6edf3); border:1px solid var(--border,#334455); border-radius:4px; font-size:12px; font-family:monospace;" />
+          <button class="api-key-save-btn" data-ai="${id}" style="padding:6px 16px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:bold;">Save</button>
+          ${hasKey ? `<button class="api-key-clear-btn" data-ai="${id}" style="padding:6px 10px; background:transparent; color:#f85149; border:1px solid #f85149; border-radius:4px; cursor:pointer; font-size:12px;">Remove</button>` : ''}
+        </div>
+        ${!hasKey ? `<p style="margin:6px 0 0 0; font-size:10px; color:var(--vscode-descriptionForeground);">Paste your API key above and click Save. Your key stays on this computer only.</p>` : ''}
       </div>`;
   }
 

@@ -116,6 +116,9 @@ export function attachMessageRouter(
         await sessions.endSessionWithData(msg.data);
         refresh();
         break;
+      case 'openExternal':
+        if (msg.url) vscode.env.openExternal(vscode.Uri.parse(msg.url));
+        break;
       case 'switchAI': {
         const aiCfg = vscode.workspace.getConfiguration('chassis');
         await aiCfg.update('defaultAI', msg.ai, true);
