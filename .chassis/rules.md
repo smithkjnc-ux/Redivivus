@@ -23,17 +23,25 @@ Use these tags in code comments to mark intent:
 - Do not build features outside the WHAT scope
 - The blueprint is in .chassis/config.json. Do not contradict it.
 
-## MANDATORY — Documentation Protocol (NON-NEGOTIABLE)
-These rules apply to EVERY AI working on this project, every session, no exceptions:
+## MANDATORY — Documentation Protocol
+**NO EXCEPTIONS. This applies to every change — code, comments, config, a single line edit, anything.**
 
-1. **READ FIRST:** Before writing any code, read `CHASSIS_ROADMAP.md` in full.
-2. **UPDATE ON END:** When ending a session (Done for Now / Stop Working), `CHASSIS_ROADMAP.md` MUST be updated. CHASSIS does this automatically via the session end hook. If working outside a CHASSIS session, update it manually.
-3. **WHAT TO ADD to Recent Fixes:**
-   - Every file modified and why
-   - Every bug fixed and root cause
-   - Every new feature added
-   - Any architectural decisions made
-4. **UPDATE "Last updated" LINE** at the bottom of `CHASSIS_ROADMAP.md` with today's date and session goal.
-5. **NEVER end a session without doing steps 2–4.** This is how the next AI session (or next human) knows what happened. Skipping it breaks the entire project history chain.
+### BEFORE touching any file:
+1. Read `CHASSIS_ROADMAP.md` in full.
 
-> CHASSIS enforces this automatically: the "Done for Now" button writes a session summary block to `CHASSIS_ROADMAP.md` before closing the session. `postcompile.js` warns if the roadmap is more than 1 day stale during every build.
+### AFTER EVERY change — no matter how small:
+2. Open `CHASSIS_ROADMAP.md` and add an entry under "Recent Fixes":
+   - Which file was changed and exactly what was changed
+   - Why the change was made
+   - Any risk introduced
+3. Update the `*Last updated:*` line at the bottom with today's date and what you did.
+
+### This means:
+- Fixed a typo in a comment? Update the roadmap.
+- Changed a variable name? Update the roadmap.
+- Added a single log line? Update the roadmap.
+- **There is no change too small to skip this step.**
+
+> If CHASSIS is installed: "Done for Now" writes this automatically.
+> If CHASSIS is NOT installed: update `CHASSIS_ROADMAP.md` manually before you stop.
+> **Failure to do this breaks the project history chain for every future AI and human working on this project.**

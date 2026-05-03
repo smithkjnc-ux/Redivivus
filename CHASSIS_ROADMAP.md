@@ -204,4 +204,11 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Session: CHASSIS-independent rule enforcement + session-end roadmap auto-update*
+## [2026-05-03 08:05] — Rule change
+- **`chassisService.ts` `buildRulesContent()`:** Documentation protocol tightened — now explicitly states every change no matter how small requires a roadmap update. No exceptions language added.
+- **`.chassis/rules.md`:** Same protocol update applied.
+- **All shim files** (`.windsurfrules`, `.cursorrules`, `CLAUDE.md`, `.clinerules`, `.github/copilot-instructions.md`): Protocol section updated to match.
+
+---
+
+*Last updated: May 3, 2026 — Rule change: roadmap update required after EVERY change, no exceptions*
