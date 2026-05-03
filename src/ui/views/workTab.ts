@@ -35,6 +35,10 @@ export function renderWorkTab(
         <div class="card-icon">✨</div>
         <div class="card-body"><div class="card-title">Clean Up File</div><div class="card-desc">AI adds notes and warnings to code.</div></div>
       </div>
+      <div class="card" data-cmd="chassis.buildFromVault">
+        <div class="card-icon">🏗️</div>
+        <div class="card-body"><div class="card-title">Build from Vault</div><div class="card-desc">Describe a feature — CHASSIS assembles it from saved code.</div></div>
+      </div>
     </div>
     <div class="section-title">Switch Projects</div>
     <div class="cards cols-3">

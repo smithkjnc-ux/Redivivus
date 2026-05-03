@@ -334,7 +334,7 @@ export function attachMessageRouter(
               const origSorted = [...(originalTags.get(item.id) ?? [])].sort().join(',');
               const newSorted  = [...item.tags].sort().join(',');
               if (origSorted !== newSorted) {
-                vaultService.updateItemTags(item.id, item.tags, true);
+                vaultService.updateItemTags(item.id, item.tags, true, item.subcategory);
                 updated++;
               }
             }
@@ -410,7 +410,11 @@ export function attachMessageRouter(
       case 'vaultDeleteItem':
         vaultService.deleteItem(msg.itemId, msg.global);
         if (state.vaultCategory) {
-          state.vaultItems = vaultService.listByCategory(state.vaultCategory as VaultCategory, state.vaultGlobal);
+          if (state.vaultSubcategory) {
+            state.vaultItems = vaultService.listBySubcategory(state.vaultCategory as VaultCategory, state.vaultSubcategory, state.vaultGlobal);
+          } else {
+            state.vaultItems = vaultService.listByCategory(state.vaultCategory as VaultCategory, state.vaultGlobal);
+          }
         }
         refresh();
         break;

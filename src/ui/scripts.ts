@@ -288,11 +288,11 @@ export function getScripts(): string {
         if (filePath) { vscode.postMessage({ type: 'openFile', path: filePath }); }
       });
     });
-    function showTab(name) {
+    function showTab(name, e) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
       document.getElementById('tab-' + name)?.classList.add('active');
-      event.target.classList.add('active');
+      if (e && e.target) e.target.classList.add('active');
     }
 
     // ── Vault handlers ──
@@ -407,7 +407,7 @@ export function getScripts(): string {
     });
     document.querySelectorAll('.list-item[data-vaultid]').forEach(el => {
       el.addEventListener('click', (e) => {
-        if (e.target.closest('.vault-import-btn, .vault-delete-btn')) return;
+        if (e.target.closest('.vault-import-btn, .vault-delete-btn, .vault-open-btn')) return;
         console.log('[vault] open item', el.dataset.vaultid, el.dataset.vaultglobal);
         vscode.postMessage({
           type: 'vaultOpenItem',

@@ -594,10 +594,11 @@ ${listStr}`;
   }
 
   // ── Update all tags for an item ──
-  updateItemTags(itemId: string, tags: string[], global = false): void {
+  updateItemTags(itemId: string, tags: string[], global = false, subcategory?: string): void {
     const item = this.getItem(itemId, global);
     if (item) {
       item.tags = tags;
+      if (subcategory !== undefined) { item.subcategory = subcategory; }
       this.saveItem(item, global);
     }
   }
