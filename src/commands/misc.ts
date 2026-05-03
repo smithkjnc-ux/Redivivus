@@ -110,4 +110,64 @@ export function registerMiscCommands(
       wizardPanel.show();
     })
   );
+
+  // Auto-commit on successful build
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.autoCommit', async () => {
+      const config = chassis.loadConfig();
+      if (!config) {
+        vscode.window.showErrorMessage('CHASSIS not initialized');
+        return;
+      }
+      const mode = config.autoCommit || 'prompt';
+      if (mode === 'off') {
+        vscode.window.showInformationMessage('Auto-commit is off. Commit manually.');
+        return;
+      }
+
+      // Check if there are changes to commit
+      const { execSync } = require('child_process');
+      try {
+        const status = execSync('git status --porcelain', { encoding: 'utf-8', cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+        if (!status.trim()) {
+          vscode.window.showInformationMessage('No changes to commit.');
+          return;
+        }
+      } catch (e) {
+        vscode.window.showErrorMessage('Git check failed: ' + (e as Error).message);
+        return;
+      }
+
+      // Generate commit message
+      const timestamp = new Date().toISOString();
+      const sessionService = new SessionService(chassis);
+      const sessionGoal = sessionService.isActive ? sessionService.session?.goal || 'no session' : 'no session';
+      const commitMessage = `CHASSIS checkpoint: ${timestamp} — ${sessionGoal}`;
+
+      if (mode === 'auto') {
+        try {
+          execSync(`git add -A`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+          execSync(`git commit -m "${commitMessage}"`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+          vscode.window.showInformationMessage('Auto-committed successfully.');
+        } catch (e) {
+          vscode.window.showErrorMessage('Auto-commit failed: ' + (e as Error).message);
+        }
+      } else if (mode === 'prompt') {
+        const result = await vscode.window.showInputBox({
+          prompt: 'Commit message (CHASSIS checkpoint)',
+          value: commitMessage,
+          ignoreFocusOut: true,
+        });
+        if (result) {
+          try {
+            execSync(`git add -A`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+            execSync(`git commit -m "${result}"`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+            vscode.window.showInformationMessage('Committed successfully.');
+          } catch (e) {
+            vscode.window.showErrorMessage('Commit failed: ' + (e as Error).message);
+          }
+        }
+      }
+    })
+  );
 }

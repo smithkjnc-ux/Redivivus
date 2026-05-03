@@ -117,6 +117,10 @@
       {
         "command": "chassis.generateRules",
         "title": "CHASSIS: Generate AI Editor Rules"
+      },
+      {
+        "command": "chassis.autoCommit",
+        "title": "CHASSIS: Auto-commit (build checkpoint)"
       }
     ],
     "menus": {
@@ -189,6 +193,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "postcompile": "node scripts/postcompile.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",

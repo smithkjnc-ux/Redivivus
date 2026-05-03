@@ -55,6 +55,7 @@ export interface ChassisConfig {
   version: string;
   blueprint: Blueprint;
   sessions: string[];  // session IDs
+  autoCommit?: 'auto' | 'prompt' | 'off';  // auto-commit on successful build
 }
 
 // Annotation tag types
