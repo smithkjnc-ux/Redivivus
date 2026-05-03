@@ -108,6 +108,29 @@ Return ONLY the modified code. No explanation before or after. No markdown fence
   }
 
 
+  async prompt(text: string): Promise<AIResponse> {
+    const key = this.getGeminiKey();
+    if (!key) {
+      return { text: '', model: 'none', success: false, error: 'No Gemini API key configured.' };
+    }
+    try {
+      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
+      const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }] });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
+      clearTimeout(timeoutId);
+      const data = await response.json() as any;
+      if (!response.ok) {
+        return { text: '', model: 'gemini-2.5-flash', success: false, error: data.error?.message || 'API error ' + response.status };
+      }
+      const result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      return { text: result.trim(), model: 'gemini-2.5-flash', success: true };
+    } catch (err: any) {
+      return { text: '', model: 'gemini-2.5-flash', success: false, error: err.message || 'Network error' };
+    }
+  }
+
     private getCommentStyle(filePath: string): { single: string; block?: [string, string]; example: string } {
       const ext = filePath.split('.').pop()?.toLowerCase() || '';
       const styles: Record<string, { single: string; block?: [string, string]; example: string }> = {

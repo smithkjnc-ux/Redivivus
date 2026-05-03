@@ -192,8 +192,7 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "postcompile": "node scripts/postcompile.js",
+    "compile": "tsc -p ./ && node scripts/postcompile.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",

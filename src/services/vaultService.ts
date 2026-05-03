@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
+import { RoutingService } from './routingService.js';
 
 // ── Vault categories ──
 export const VAULT_CATEGORIES = [
@@ -457,6 +458,64 @@ export class VaultService {
   // ── Extract from single file ──
   extractFromFile(filePath: string, content: string): { items: VaultItem[], filteredCount: number } {
     return this.extractBlocks(filePath, content);
+  }
+
+  // ── AI Categorize items ──
+  async aiCategorize(items: VaultItem[], routingService: RoutingService): Promise<VaultItem[]> {
+    const BATCH = 20;
+    const validCategories = VAULT_CATEGORIES as readonly string[];
+    const result = [...items];
+
+    for (let i = 0; i < result.length; i += BATCH) {
+      const batch = result.slice(i, i + BATCH);
+      const listStr = batch.map((item, idx) =>
+        `${idx + 1}. name="${item.block.name}" type="${item.block.type}" file="${path.basename(item.block.filePath)}" code_preview="${item.block.code.slice(0, 120).replace(/\n/g, ' ')}"`
+      ).join('\n');
+
+      const prompt = `You are a code librarian. Categorize each code block into exactly ONE of these categories:
+${validCategories.join(', ')}
+
+Rules:
+- component: UI components, React/Vue/Svelte components
+- utility: helper functions, formatters, converters
+- algorithm: sorting, searching, data processing logic
+- pattern: design patterns, factories, builders, observers
+- config: configuration, constants, environment setup
+- api: HTTP calls, REST/GraphQL endpoints, fetch wrappers
+- database: DB queries, ORM models, migrations, schema
+- auth: authentication, authorization, JWT, sessions
+- validation: input validation, schema validation, sanitization
+- error: error handling, error classes, error boundaries
+- testing: test utilities, mocks, fixtures
+- other: anything that doesn't fit above
+
+Respond with ONLY a JSON array of numbers (one per item) matching the category. Example for 3 items: ["utility","component","api"]
+
+Items:
+${listStr}`;
+
+      const response = await routingService.prompt(prompt);
+      if (response.success && response.text) {
+        try {
+          let raw = response.text.trim();
+          // Strip markdown fences if present
+          raw = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+          const categories: string[] = JSON.parse(raw);
+          batch.forEach((item, idx) => {
+            const suggested = categories[idx]?.toLowerCase();
+            if (suggested && validCategories.includes(suggested)) {
+              // Replace 'other' tag or add the AI-suggested category
+              const filtered = item.tags.filter(t => t !== 'other');
+              if (!filtered.includes(suggested)) filtered.push(suggested);
+              item.tags = filtered.length > 0 ? filtered : [suggested];
+            }
+          });
+        } catch (e) {
+          // AI response parse failed — keep existing tags
+        }
+      }
+    }
+    return result;
   }
 
   // ── Scan codebase ──

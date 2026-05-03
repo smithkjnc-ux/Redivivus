@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Post-compile script: triggers CHASSIS auto-commit if configured
+// Post-compile script: packages extension and installs to Windsurf
 
 const { execSync } = require('child_process');
 const fs = require('fs');
@@ -13,30 +13,48 @@ const buildTimestamp = new Date().toISOString();
 const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
 fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: '0.2.0' }, null, 2));
 
+// Package extension with vsce
 try {
-  // Check if CHASSIS is initialized
+  console.log('Packaging extension with vsce...');
+  execSync('npx vsce package --allow-missing-repository', { cwd: workspaceRoot, stdio: 'inherit' });
+  console.log('✓ Extension packaged');
+} catch (e) {
+  console.error('Failed to package extension:', e.message);
+  process.exit(0);
+}
+
+// Install to Windsurf
+try {
+  console.log('Installing to Windsurf...');
+  execSync('windsurf --install-extension chassis-0.2.0.vsix --force', { cwd: workspaceRoot, stdio: 'inherit' });
+  console.log('✓ Installed to Windsurf');
+} catch (e) {
+  console.error('Failed to install to Windsurf:', e.message);
+  process.exit(0);
+}
+
+// Auto-commit logic
+try {
   if (!fs.existsSync(configPath)) {
-    process.exit(0); // No CHASSIS config, skip auto-commit
+    process.exit(0);
   }
 
   const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
   const mode = config.autoCommit || 'prompt';
 
   if (mode === 'off') {
-    process.exit(0); // Auto-commit disabled
+    process.exit(0);
   }
 
-  // Check if there are changes to commit
   try {
     const status = execSync('git status --porcelain', { encoding: 'utf-8', cwd: workspaceRoot });
     if (!status.trim()) {
-      process.exit(0); // No changes to commit
+      process.exit(0);
     }
   } catch (e) {
-    process.exit(0); // Git check failed, skip
+    process.exit(0);
   }
 
-  // Generate commit message
   const timestamp = new Date().toISOString();
   const sessionsDir = path.join(workspaceRoot, '.chassis', 'sessions');
   let sessionGoal = 'no session';
@@ -67,5 +85,5 @@ try {
   }
 } catch (e) {
   console.error('Post-compile error:', e.message);
-  process.exit(0); // Don't fail the build
+  process.exit(0);
 }

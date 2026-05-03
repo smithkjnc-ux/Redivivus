@@ -7,6 +7,7 @@ import * as os from 'os';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
 import { VaultService, VaultCategory } from '../services/vaultService.js';
+import { RoutingService } from '../services/routingService.js';
 
 export interface WizardPanelState {
   wizardStep: 'welcome' | 'blueprint' | 'nameLocation' | 'creating';
@@ -31,7 +32,8 @@ export function attachMessageRouter(
   vaultService: VaultService,
   context: vscode.ExtensionContext | undefined,
   state: WizardPanelState,
-  refresh: () => void
+  refresh: () => void,
+  routingService?: RoutingService
 ): void {
   webview.onDidReceiveMessage(async (msg) => {
     if (!msg.type && msg.command) { msg.type = 'command'; }
@@ -197,8 +199,19 @@ export function attachMessageRouter(
             else { newItems.push(item); }
           }
 
+          // AI categorize new items — replaces 'other' tags with AI-suggested categories
+          let categorized = newItems;
+          if (routingService && newItems.length > 0) {
+            progress.report({ message: `AI categorizing ${newItems.length} blocks...` });
+            try {
+              categorized = await vaultService.aiCategorize(newItems, routingService);
+            } catch (e) {
+              console.warn('[CHASSIS] AI categorization failed:', e);
+            }
+          }
+
           state.vaultScanMode = true;
-          state.vaultScanItems = newItems;
+          state.vaultScanItems = categorized;
           state.vaultScanDuplicates = duplicates;
           state.vaultScanFileCount = result.fileCount;
           state.vaultScanFilteredCount = result.filteredCount;

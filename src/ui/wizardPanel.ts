@@ -1,3 +1,4 @@
+// // BUILD_TIMESTAMP: 2026-05-03T05:06:16.083Z
 // CHASSIS DESIGN RULE: Every user-facing message MUST be plain English.
 // No raw tag names, no jargon, no code terms. If a non-developer can't
 // understand it in 3 seconds, rewrite it.
@@ -9,6 +10,7 @@ import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
 import { VaultService, VaultItem, VaultCategory } from '../services/vaultService.js';
+import { RoutingService } from '../services/routingService.js';
 import { getStyles } from './styles.js';
 import { getScripts } from './scripts.js';
 import { renderWelcomeView, renderRetrofitPendingView } from './views/welcomeView.js';
@@ -30,6 +32,7 @@ export class WizardPanel {
   private disposables: vscode.Disposable[] = [];
   public static activePanel: WizardPanel | undefined;
   private vaultService: VaultService;
+  private routingService: RoutingService;
 
   constructor(
     private chassis: ChassisService,
@@ -37,6 +40,7 @@ export class WizardPanel {
     private context: vscode.ExtensionContext
   ) {
     this.vaultService = new VaultService(context);
+    this.routingService = new RoutingService();
     WizardPanel.activePanel = this;
   }
 
@@ -44,7 +48,7 @@ export class WizardPanel {
     if (this.panel) { this.panel.reveal(); this.updateContent(); return; }
     this.panel = vscode.window.createWebviewPanel('chassisWizard', 'CHASSIS', vscode.ViewColumn.Two, { enableScripts: true });
     this.panel.onDidDispose(() => { this.panel = undefined; });
-    attachMessageRouter(this.panel.webview, this.chassis, this.sessions, this.vaultService, this.context, this.state, () => this.updateContent());
+    attachMessageRouter(this.panel.webview, this.chassis, this.sessions, this.vaultService, this.context, this.state, () => this.updateContent(), this.routingService);
     this.updateContent();
   }
 
@@ -108,14 +112,18 @@ export class WizardPanel {
     // Read build timestamp for visual verification
     let buildTimestamp = '';
     const buildInfoPath = path.join(this.chassis.chassisDir, 'build-info.json');
+    console.log('[CHASSIS] Looking for build info at:', buildInfoPath);
+    console.log('[CHASSIS] chassisDir:', this.chassis.chassisDir);
+    console.log('[CHASSIS] File exists:', fs.existsSync(buildInfoPath));
     if (fs.existsSync(buildInfoPath)) {
       try {
         const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8'));
+        console.log('[CHASSIS] Build info loaded:', buildInfo);
         const date = new Date(buildInfo.timestamp);
-        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-        buildTimestamp = `<div style="font-size: 10px; color: var(--vscode-descriptionForeground);">Built: ${timeStr}</div>`;
+        const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        buildTimestamp = `<div style="font-size: 11px; color: #4ec959; font-weight: 600; margin-top: 4px;">Built: ${timeStr}</div>`;
       } catch (e) {
-        // Ignore errors reading build info
+        console.error('[CHASSIS] Error reading build info:', e);
       }
     }
 
@@ -156,8 +164,8 @@ export class WizardPanel {
     }
 
     this.panel.webview.html = `<!DOCTYPE html><html><head><style>${getStyles()}</style></head><body>
-      <div class="header"><h1>C H A S S I S</h1><div class="sub">The frame everything bolts to</div><div class="project">${projectName}</div>${buildTimestamp}</div>
-      ${badges}${content}<div class="footer">CHASSIS v0.2.0 &mdash; Built by PapaJoe</div>
+      <div class="header"><h1>C H A S S I S ✅</h1><div class="sub">The frame everything bolts to</div><div class="project">${projectName}</div>${buildTimestamp}</div>
+      ${badges}${content}<div class="footer">CHASSIS v0.2.0 &mdash; Built by PapaJoe — ${new Date().toLocaleTimeString()}</div>
       <script>${getScripts()}</script></body></html>`;
   }
 }
