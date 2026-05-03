@@ -454,6 +454,11 @@ export class VaultService {
     return tags;
   }
 
+  // ── Extract from single file ──
+  extractFromFile(filePath: string, content: string): { items: VaultItem[], filteredCount: number } {
+    return this.extractBlocks(filePath, content);
+  }
+
   // ── Scan codebase ──
   async scanCodebase(
     root: string,

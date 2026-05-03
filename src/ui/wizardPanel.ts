@@ -34,9 +34,9 @@ export class WizardPanel {
   constructor(
     private chassis: ChassisService,
     private sessions: SessionService,
-    private context?: vscode.ExtensionContext
+    private context: vscode.ExtensionContext
   ) {
-    this.vaultService = new VaultService(chassis);
+    this.vaultService = new VaultService(context);
     WizardPanel.activePanel = this;
   }
 

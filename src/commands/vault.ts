@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
-import { VaultService, VAULT_CATEGORIES } from '../services/vaultService.js';
+import { VaultService, VAULT_CATEGORIES, VaultItem, VaultCategory } from '../services/vaultService.js';
 import { WizardPanel } from '../ui/wizardPanel.js';
 
 export function registerVaultCommands(
@@ -22,50 +22,17 @@ export function registerVaultCommands(
       }
       const content = editor.document.getText();
       const filePath = editor.document.uri.fsPath;
-      const blocks = vaultService.extractBlocks(filePath, content);
-      if (blocks.length === 0) {
-        vscode.window.showInformationMessage('No extractable functions or classes found in this file.');
+      const result = vaultService.extractFromFile(filePath, content);
+      if (result.items.length === 0) {
+        vscode.window.showInformationMessage('No extractable blocks found in this file.');
         return;
       }
-      for (const block of blocks) {
-        const keep = await vscode.window.showQuickPick(
-          ['Save to Vault', 'Skip', 'Stop Review'],
-          { placeHolder: `${block.name} (${block.type}) — ${block.lines[0]}-${block.lines[1]}` }
-        );
-        if (keep === 'Stop Review') break;
-        if (keep === 'Save to Vault') {
-          const cat = vaultService.suggestCategory(block);
-          const catPick = await vscode.window.showQuickPick<{ label: string; detail: string }>(
-            VAULT_CATEGORIES.map((c: { icon: string; label: string; key: string }) => ({ label: `${c.icon} ${c.label}`, detail: c.key })),
-            { placeHolder: `Category: ${cat} (auto-detected). Change if needed.` }
-          );
-          if (!catPick) continue;
-          const name = await vscode.window.showInputBox({
-            prompt: 'Name this vault item',
-            value: block.name,
-            ignoreFocusOut: true,
-          });
-          if (!name) continue;
-          const desc = await vscode.window.showInputBox({
-            prompt: 'Short description (what does this do?)',
-            value: `${block.type} from ${path.basename(filePath)}`,
-            ignoreFocusOut: true,
-          });
-          if (desc === undefined) continue;
-          const projName = chassis.loadConfig()?.projectName || path.basename(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'Project');
-          const id = `vault_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-          const item = {
-            id, name, category: catPick.detail as VaultCategory,
-            description: desc,
-            code: block.code, language: block.language,
-            source: { projectName: projName, filePath, extractedAt: new Date().toISOString() },
-            tags: vaultService.generateTags(block),
-            provenance: { createdAt: new Date().toISOString(), tested: false, timesImported: 0, notes: '' },
-          };
-          vaultService.saveItem(item, true);
-        }
+      // Show batch summary in wizard panel
+      if (!WizardPanel.activePanel) {
+        await vscode.commands.executeCommand('chassis.openWizard');
       }
-      vscode.window.showInformationMessage('Vault save complete.');
+      const panel = WizardPanel.activePanel!;
+      panel.setVaultScanResults(result.items, 1, result.filteredCount);
     })
   );
 
@@ -79,7 +46,7 @@ export function registerVaultCommands(
         title: 'CHASSIS Vault: Scanning codebase...',
         cancellable: true,
       }, async (progress, token) => {
-        const scanned = await vaultService.scanCodebase(root, (msg: string) => {
+        const scanned = await vaultService.scanCodebase(root, undefined, undefined, (msg: string) => {
           if (!token.isCancellationRequested) progress.report({ message: msg });
         });
         if (token.isCancellationRequested) return null;
@@ -94,7 +61,7 @@ export function registerVaultCommands(
         await vscode.commands.executeCommand('chassis.openWizard');
       }
       const panel = WizardPanel.activePanel!;
-      panel.setVaultScanResults(result.items, result.fileCount, result.filteredCount ?? 0);
+      panel.setVaultScanResults(result.items, result.fileCount, result.filteredCount);
     })
   );
 }

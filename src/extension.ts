@@ -42,7 +42,7 @@ export function activate(context: vscode.ExtensionContext) {
   const measureTwice = new MeasureTwiceService();
   const changeTracker = new ChangeTracker(chassisService);
   const rulesService = new RulesService(chassisService);
-  const vaultService = new VaultService(chassisService);
+  const vaultService = new VaultService(context);
   const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker);
   const wizardService = new WizardService(chassisService, sessionService);
   const wizardPanel = new WizardPanel(chassisService, sessionService, context);

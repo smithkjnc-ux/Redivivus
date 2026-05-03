@@ -185,7 +185,7 @@ export function attachMessageRouter(
         }, async (progress, token) => {
           const scanRoot = msg.root || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (!scanRoot) { vscode.window.showErrorMessage('No workspace to scan.'); return; }
-          const result = await vaultService.scanCodebase(scanRoot, (m: string) => {
+          const result = await vaultService.scanCodebase(scanRoot, undefined, undefined, (m: string) => {
             if (!token.isCancellationRequested) progress.report({ message: m });
           });
           if (token.isCancellationRequested) return;
@@ -202,7 +202,7 @@ export function attachMessageRouter(
           state.vaultScanDuplicates = duplicates;
           state.vaultScanFileCount = result.fileCount;
           state.vaultScanFilteredCount = result.filteredCount;
-          state.vaultScanTotalFound = result.totalFound;
+          state.vaultScanTotalFound = result.items.length;
           state.activeTab = 'vault';
           refresh();
         });
@@ -249,9 +249,9 @@ New blocks saved:     ${saved}` +
         break;
       case 'vaultOpenItem': {
         try {
-          const openItem = vaultService.loadItem(msg.itemId, msg.global);
+          const openItem = vaultService.getItem(msg.itemId, msg.global);
           if (openItem) {
-            const d = await vscode.workspace.openTextDocument({ content: openItem.code, language: openItem.language });
+            const d = await vscode.workspace.openTextDocument({ content: openItem.block.code, language: openItem.block.language });
             await vscode.window.showTextDocument(d, vscode.ViewColumn.Two);
           } else {
             vscode.window.showErrorMessage(`Vault item not found: ${msg.itemId}`);
@@ -262,13 +262,10 @@ New blocks saved:     ${saved}` +
         break;
       }
       case 'vaultImportItem': {
-        const vItem = vaultService.loadItem(msg.itemId, msg.global);
+        const vItem = vaultService.getItem(msg.itemId, msg.global);
         if (vItem) {
-          const result = await vaultService.importItem(vItem, msg.targetDir);
-          vscode.window.showInformationMessage(
-            `Imported ${result.importedItems.length} item(s) to ${result.targetPath}` +
-            (result.failedItems.length ? ` — ${result.failedItems.length} failed.` : '')
-          );
+          const result = await vaultService.importItems(JSON.stringify([vItem]), msg.global);
+          vscode.window.showInformationMessage(`Imported ${result} item(s)`);
         }
         break;
       }
