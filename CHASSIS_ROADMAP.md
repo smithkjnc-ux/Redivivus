@@ -266,4 +266,21 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
+## [PLANNED] — Community Vault (GitHub-backed, free/paid tier)
+- **Concept:** Replace local-only vault with a GitHub-backed community vault as the default for free tier. Paid tier gets full local vault save + private team vault.
+- **Free tier:** Read + contribute to `chassis-community-vault` public GitHub repo. Local vault is read-only (scan and view, not save permanently).
+- **Paid tier:** Full local vault save (private), private team-scoped vault repo, vault analytics.
+- **Tier check:** GitHub Sponsors API or license key — TBD. GitHub Sponsors preferred (ties to existing GitHub auth, zero backend needed).
+- **Quality gate:** GitHub Actions on `chassis-community-vault` repo — secret scanning, JSON schema validation, minimum line count, no duplicate hash. Human PR review merges accepted items.
+- **Chassis-only lock:** JSON schema requires `chassisVersion`, `contentHash`, `[SCOPE]` annotation — items without CHASSIS provenance are rejected by the Actions workflow.
+- **Build order:**
+  1. `communityVaultService.ts` — fetch/search GitHub raw API, 24h local cache, merge into `buildFromVault`
+  2. Contribution flow — AI pre-screen → format JSON → GitHub PR via API with contributor credit
+  3. Tier check gate — block local vault save on free tier, show upgrade prompt
+  4. Community repo setup — `chassis-community-vault` + GitHub Actions gating workflow + auto-index
+
+**Status: DEFERRED** — polish and bug-fix chassis first, implement after.
+
+---
+
 *Last updated: May 3, 2026 — Build from Vault: describe task, CHASSIS assembles from vault + fills gaps*
