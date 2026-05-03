@@ -217,16 +217,6 @@ export function attachMessageRouter(
         const dupCount = state.vaultScanDuplicates.length;
         const totalNew = state.vaultScanItems.length;
         const unchecked = totalNew - saved;
-        const report = `Vault Scan Report
-─────────────────
-Files scanned:        ${state.vaultScanFileCount}
-Blocks found:         ${state.vaultScanTotalFound || totalNew + dupCount}
-Filtered (trivial):   ${state.vaultScanFilteredCount || 0}
-Duplicates:           ${dupCount}
-New blocks saved:     ${saved}` +
-          (unchecked > 0 ? `\nUnchecked:          ${unchecked}` : '');
-        const doc = await vscode.workspace.openTextDocument({ content: report, language: 'markdown' });
-        await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
         vscode.window.showInformationMessage(`Saved ${saved} new blocks. Skipped ${dupCount} duplicates.`);
         state.vaultScanMode = false;
         state.vaultScanItems = [];
