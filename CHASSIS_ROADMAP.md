@@ -224,4 +224,9 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Vault scan: fix silent categorization skip + prompt typo*
+## [2026-05-03 08:24] — Fix Categories rescan bug fixes
+- **`messageRouter.ts` `vaultRecategorize`:** Fixed mutation bug — `original?.tags.sort()` was mutating the original tags array in place before comparison, causing `changed` to always be `false` even when AI did recategorize. Now uses spread copies: `[...original.tags].sort().join(',')` vs `[...item.tags].sort().join(',')`. This was silently preventing any vault updates from being written to disk even when AI returned correct categories.
+
+---
+
+*Last updated: May 3, 2026 — Fix Categories rescan: fix sort() mutation bug blocking writes*

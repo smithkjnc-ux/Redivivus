@@ -309,13 +309,15 @@ export function attachMessageRouter(
 
             for (const item of recategorized) {
               const original = otherItems.find((i: any) => i.id === item.id);
-              const isStillOther = item.tags.every((t: string) => t === 'other') || item.tags.length === 0;
+              const isStillOther = item.tags.length === 0 || item.tags.every((t: string) => t === 'other');
               if (isStillOther) {
                 stillOther.push(item);
                 continue;
               }
-              const changed = JSON.stringify(original?.tags.sort()) !== JSON.stringify(item.tags.sort());
-              if (changed) {
+              // Use copies to avoid sort() mutating original arrays
+              const origSorted = [...(original?.tags ?? [])].sort().join(',');
+              const newSorted  = [...item.tags].sort().join(',');
+              if (origSorted !== newSorted) {
                 vaultService.updateItemTags(item.id, item.tags, true);
                 updated++;
               }
