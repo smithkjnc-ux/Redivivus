@@ -25,7 +25,7 @@ export class WizardPanel {
   private panel: vscode.WebviewPanel | undefined;
   private state: WizardPanelState = {
     wizardStep: 'welcome', wizardData: {},
-    vaultView: 'categories', vaultCategory: null, vaultItems: [], vaultGlobal: true,
+    vaultView: 'categories', vaultCategory: null, vaultSubcategory: null, vaultItems: [], vaultGlobal: true,
     activeTab: 'work',
     vaultScanMode: false, vaultScanItems: [], vaultScanDuplicates: [], vaultScanFileCount: 0, vaultScanFilteredCount: 0, vaultScanTotalFound: 0,
   };
@@ -178,7 +178,7 @@ export class WizardPanel {
       content += renderHistoryTab(sessions, reviews, this.state.activeTab === 'history');
       content += this.state.vaultScanMode
         ? renderVaultScanSummary(this.state.vaultScanItems, this.state.vaultScanDuplicates, this.state.vaultScanFileCount, this.state.vaultScanFilteredCount, this.state.activeTab === 'vault')
-        : renderVaultTab(vaultItems, this.state.vaultView, this.state.vaultCategory as VaultCategory | null, this.state.vaultGlobal, this.vaultService, this.state.activeTab === 'vault');
+        : renderVaultTab(vaultItems, this.state.vaultView, this.state.vaultCategory as VaultCategory | null, this.state.vaultGlobal, this.vaultService, this.state.activeTab === 'vault', this.state.vaultSubcategory);
     }
 
     this.panel.webview.html = `<!DOCTYPE html><html><head><style>${getStyles()}</style></head><body>

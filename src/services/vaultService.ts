@@ -35,6 +35,7 @@ export interface VaultItem {
   id: string;
   block: ExtractedBlock;
   tags: string[];
+  subcategory?: string;      // AI-suggested domain subcategory e.g. 'video', 'payments', 'geolocation'
   contentHash?: string;
   lines?: [number, number];
 }
@@ -132,6 +133,24 @@ export class VaultService {
 
   listByCategory(category: VaultCategory, global = false): VaultItem[] {
     return this.listItems(global).filter(i => i.tags.includes(category));
+  }
+
+  listBySubcategory(category: VaultCategory, subcategory: string, global = false): VaultItem[] {
+    return this.listItems(global).filter(i =>
+      i.tags.includes(category) && i.subcategory === subcategory
+    );
+  }
+
+  getSubcategoriesForCategory(category: VaultCategory, global = false): { name: string; count: number }[] {
+    const items = this.listByCategory(category, global);
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      const sub = item.subcategory || 'general';
+      counts.set(sub, (counts.get(sub) || 0) + 1);
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
   }
 
   searchItems(query: string, global = false): VaultItem[] {
@@ -469,7 +488,7 @@ export class VaultService {
     return this.extractBlocks(filePath, content);
   }
 
-  // ── AI Categorize items ──
+  // ── AI Categorize items — returns category + subcategory in one pass ──
   async aiCategorize(items: VaultItem[], routingService: RoutingService): Promise<VaultItem[]> {
     const BATCH = 20;
     const validCategories = VAULT_CATEGORIES as readonly string[];
@@ -478,27 +497,31 @@ export class VaultService {
     for (let i = 0; i < result.length; i += BATCH) {
       const batch = result.slice(i, i + BATCH);
       const listStr = batch.map((item, idx) =>
-        `${idx + 1}. name="${item.block.name}" type="${item.block.type}" file="${path.basename(item.block.filePath)}" code_preview="${item.block.code.slice(0, 120).replace(/\n/g, ' ')}"`
+        `${idx + 1}. name="${item.block.name}" type="${item.block.type}" file="${path.basename(item.block.filePath)}" preview="${item.block.code.slice(0, 120).replace(/\n/g, ' ')}"`
       ).join('\n');
 
-      const prompt = `You are a code librarian. Categorize each code block into exactly ONE of these categories:
-${validCategories.join(', ')}
+      const prompt = `You are a code librarian. For each code block return TWO things:
+1. category — exactly ONE of: ${validCategories.join(', ')}
+2. subcategory — a short domain label (1-2 words, lowercase, e.g. "video", "payments", "geolocation", "messaging", "auth", "notifications", "contacts", "feed", "search", "p2p", "crypto", "backup", "general")
 
-Rules:
-- component: UI components, React/Vue/Svelte components
-- utility: helper functions, formatters, converters
-- algorithm: sorting, searching, data processing logic
-- pattern: design patterns, factories, builders, observers
-- config: configuration, constants, environment setup
-- api: HTTP calls, REST/GraphQL endpoints, fetch wrappers
-- database: DB queries, ORM models, migrations, schema
-- auth: authentication, authorization, JWT, sessions
+Category rules:
+- component: UI components, React/Vue/Svelte/React Native components
+- utility: helper functions, formatters, converters, mappers (rowTo*, parsers)
+- algorithm: sorting, searching, data processing, hashing, geohash
+- pattern: design patterns, stores, slices, state interfaces, factories
+- config: configuration, constants, environment setup, feature flags
+- api: HTTP calls, REST/GraphQL endpoints, fetch wrappers, Firebase calls
+- database: DB queries, SQLite, ORM models, migrations, schema
+- auth: authentication, authorization, JWT, sessions, OTP, tokens
 - validation: input validation, schema validation, sanitization
 - error: error handling, error classes, error boundaries
 - testing: test utilities, mocks, fixtures
-- other: anything that doesn't fit above
+- other: truly cannot be categorized
 
-Respond with ONLY a JSON array of strings (one per item) matching the category. Example for 3 items: ["utility","component","api"]
+Subcategory examples by domain: video, audio, messaging, payments, geolocation, notifications, contacts, feed, listings, reputation, p2p, crypto, backup, restore, onboarding, settings, permissions, general
+
+Respond with ONLY a JSON array of objects, one per item:
+[{"category":"api","subcategory":"notifications"},{"category":"component","subcategory":"feed"}]
 
 Items:
 ${listStr}`;
@@ -510,18 +533,20 @@ ${listStr}`;
       }
       try {
         let raw = response.text.trim();
-        // Strip markdown fences if present
         raw = raw.replace(/^```[a-zA-Z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-        // Strip any leading/trailing text outside the JSON array
         const arrayMatch = raw.match(/\[[\s\S]*\]/);
         if (arrayMatch) { raw = arrayMatch[0]; }
-        const categories: string[] = JSON.parse(raw);
+        const results: { category: string; subcategory: string }[] = JSON.parse(raw);
         batch.forEach((item, idx) => {
-          const suggested = categories[idx]?.toLowerCase().trim();
-          if (suggested && validCategories.includes(suggested)) {
+          const r = results[idx];
+          if (!r) { return; }
+          const cat = r.category?.toLowerCase().trim();
+          const sub = r.subcategory?.toLowerCase().trim().replace(/[^a-z0-9 _-]/g, '') || 'general';
+          if (cat && validCategories.includes(cat)) {
             const filtered = item.tags.filter((t: string) => t !== 'other');
-            if (!filtered.includes(suggested)) { filtered.push(suggested); }
-            item.tags = filtered.length > 0 ? filtered : [suggested];
+            if (!filtered.includes(cat)) { filtered.push(cat); }
+            item.tags = filtered.length > 0 ? filtered : [cat];
+            item.subcategory = sub;
           }
         });
       } catch (e) {

@@ -296,15 +296,26 @@ export function getScripts(): string {
     }
 
     // ── Vault handlers ──
+    // Level 1 → Level 2: category card clicked → show subcategories
     document.querySelectorAll('.vault-cat-card').forEach(el => {
       el.addEventListener('click', () => {
-        vscode.postMessage({ type: 'vaultSetView', view: 'items', category: el.dataset.category });
+        vscode.postMessage({ type: 'vaultSetView', view: 'subcategories', category: el.dataset.category });
       });
     });
+    // Level 2 → Level 3: subcategory card clicked → show items
+    document.querySelectorAll('.vault-subcat-card').forEach(el => {
+      el.addEventListener('click', () => {
+        const sub = el.dataset.subcategory || '';
+        vscode.postMessage({ type: 'vaultSetView', view: 'items', category: el.dataset.category, subcategory: sub });
+      });
+    });
+    // Smart back button: reads data-backview to go to correct level
     const vaultBackBtn = document.getElementById('vault-back-btn');
     if (vaultBackBtn) {
       vaultBackBtn.addEventListener('click', () => {
-        vscode.postMessage({ type: 'vaultSetView', view: 'categories' });
+        const backView = vaultBackBtn.dataset.backview || 'categories';
+        const category = vaultBackBtn.dataset.category || null;
+        vscode.postMessage({ type: 'vaultSetView', view: backView, category });
       });
     }
     const vaultScanBtn = document.getElementById('vault-scan-btn');

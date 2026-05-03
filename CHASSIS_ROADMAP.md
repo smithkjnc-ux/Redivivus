@@ -242,4 +242,13 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Vault Fix Categories: fix shallow copy mutation — tags now write to disk correctly*
+## [2026-05-03 08:47] — Vault subcategory drill-down (3-level navigation)
+- **`vaultService.ts`:** Added `subcategory` field to `VaultItem`. Added `listBySubcategory()`, `getSubcategoriesForCategory()`. Updated `aiCategorize()` prompt to return `{category, subcategory}` objects per item — subcategory is AI-inferred domain label (e.g. "p2p", "contacts", "listings", "notifications", "geolocation"). Not hardcoded — AI suggests from codebase context.
+- **`vaultTab.ts`:** Full 3-level UI — Level 1: category grid with icons, Level 2: subcategory grid per category, Level 3: items list with breadcrumb. Back button is smart — knows which level to return to. "All [category]" tile on subcategory screen shows everything without subcategory filter.
+- **`messageRouter.ts`:** Added `vaultSubcategory` to state. `vaultSetView` now handles `subcategories` view and routes `listBySubcategory` vs `listByCategory` based on whether subcategory is set.
+- **`scripts.ts`:** Added `.vault-subcat-card` click handler. Smart back button reads `data-backview` attribute.
+- **`wizardPanel.ts`:** State initialized with `vaultSubcategory: null`. Passes subcategory to `renderVaultTab`.
+
+---
+
+*Last updated: May 3, 2026 — Vault: 3-level drill-down with AI-inferred subcategories*

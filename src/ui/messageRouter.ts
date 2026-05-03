@@ -12,8 +12,9 @@ import { RoutingService } from '../services/routingService.js';
 export interface WizardPanelState {
   wizardStep: 'welcome' | 'blueprint' | 'nameLocation' | 'creating';
   wizardData: { blueprint?: any, projectName?: string, folder?: string, parentFolder?: string };
-  vaultView: 'categories' | 'items' | 'detail';
+  vaultView: 'categories' | 'subcategories' | 'items' | 'detail';
   vaultCategory: string | null;
+  vaultSubcategory: string | null;
   vaultItems: any[];
   vaultGlobal: boolean;
   activeTab: string;
@@ -189,10 +190,18 @@ export function attachMessageRouter(
       case 'vaultSetView':
         state.vaultView = msg.view || 'categories';
         state.vaultCategory = msg.category || null;
+        state.vaultSubcategory = msg.subcategory || null;
         state.vaultGlobal = msg.global !== undefined ? msg.global : state.vaultGlobal;
-        // Always re-read from disk when entering a category — never use stale cached state
-        if (state.vaultCategory && state.vaultView === 'items') {
-          state.vaultItems = vaultService.listByCategory(state.vaultCategory as VaultCategory, state.vaultGlobal);
+        // Always re-read from disk — never use stale cached state
+        if (state.vaultView === 'items' && state.vaultCategory) {
+          if (state.vaultSubcategory) {
+            // Drill-down: category → subcategory → items
+            state.vaultItems = vaultService.listBySubcategory(
+              state.vaultCategory as VaultCategory, state.vaultSubcategory, state.vaultGlobal
+            );
+          } else {
+            state.vaultItems = vaultService.listByCategory(state.vaultCategory as VaultCategory, state.vaultGlobal);
+          }
         } else {
           state.vaultItems = [];
         }
@@ -357,6 +366,7 @@ export function attachMessageRouter(
             // Reset to category grid so user sees fresh counts, not stale item list
             state.vaultView = 'categories';
             state.vaultCategory = null;
+            state.vaultSubcategory = null;
             state.vaultItems = [];
             state.activeTab = 'vault';
             refresh();
