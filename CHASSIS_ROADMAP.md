@@ -229,4 +229,11 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Fix Categories rescan: fix sort() mutation bug blocking writes*
+## [2026-05-03 08:29] — Vault UI stale cache bug
+- **Root cause:** After Fix Categories ran and wrote updated tags to disk, the UI stayed on `vaultView: 'items'` with `state.vaultItems` holding the old pre-categorization list. User clicked category cards and saw nothing because `state.vaultItems` was never refreshed.
+- **`messageRouter.ts` `vaultRecategorize`:** After completion, resets `vaultView` to `'categories'`, clears `vaultCategory` and `vaultItems` — forces the grid to re-render with fresh counts from disk.
+- **`messageRouter.ts` `vaultSetView`:** Now always re-reads from disk via `listByCategory()` when entering a category view. Never uses cached `state.vaultItems`. Stale state is cleared when returning to grid view.
+
+---
+
+*Last updated: May 3, 2026 — Vault: fix stale cache bug preventing recategorized items from appearing*

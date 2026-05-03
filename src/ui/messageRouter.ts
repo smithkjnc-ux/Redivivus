@@ -190,10 +190,13 @@ export function attachMessageRouter(
         state.vaultView = msg.view || 'categories';
         state.vaultCategory = msg.category || null;
         state.vaultGlobal = msg.global !== undefined ? msg.global : state.vaultGlobal;
+        // Always re-read from disk when entering a category — never use stale cached state
         if (state.vaultCategory && state.vaultView === 'items') {
           state.vaultItems = vaultService.listByCategory(state.vaultCategory as VaultCategory, state.vaultGlobal);
-          state.activeTab = 'vault';
+        } else {
+          state.vaultItems = [];
         }
+        state.activeTab = 'vault';
         refresh();
         break;
       case 'vaultScanCodebase':
@@ -347,6 +350,11 @@ export function attachMessageRouter(
               vscode.window.showInformationMessage('AI reviewed all items — categories are already correct.');
             }
 
+            // Reset to category grid so user sees fresh counts, not stale item list
+            state.vaultView = 'categories';
+            state.vaultCategory = null;
+            state.vaultItems = [];
+            state.activeTab = 'vault';
             refresh();
           } catch (e) {
             vscode.window.showErrorMessage('Re-categorization failed: ' + (e as Error).message);
