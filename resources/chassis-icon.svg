@@ -1,14 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Outer frame — the "chassis" -->
-  <rect x="2" y="2" width="20" height="20" rx="3"/>
-  <!-- Top-left corner bolt -->
-  <circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none"/>
-  <!-- Top-right corner bolt -->
-  <circle cx="18.5" cy="5.5" r="1" fill="currentColor" stroke="none"/>
-  <!-- Bottom-left corner bolt -->
-  <circle cx="5.5" cy="18.5" r="1" fill="currentColor" stroke="none"/>
-  <!-- Bottom-right corner bolt -->
-  <circle cx="18.5" cy="18.5" r="1" fill="currentColor" stroke="none"/>
-  <!-- Center C shape — the "C" in CHASSIS -->
-  <path d="M15 8.5 C15 8.5 10 8 9 12 C8 16 13 15.5 15 15.5" stroke-width="2"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="3"/><circle cx="5.5" cy="5.5" r="1"/><circle cx="18.5" cy="5.5" r="1"/><circle cx="5.5" cy="18.5" r="1"/><circle cx="18.5" cy="18.5" r="1"/><path d="M15 9c-1-1.5-3-2-4.5-1.2C9 8.5 8.5 10 9 12s2 3 3.5 3c1 0 2-.3 2.5-1"/></svg>
