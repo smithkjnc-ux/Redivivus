@@ -127,6 +127,18 @@
         "title": "CHASSIS: Build from Vault"
       }
     ],
+    "viewsWelcome": [
+      {
+        "view": "chassisPanel",
+        "contents": "Welcome to CHASSIS\n\n[Open CHASSIS Dashboard](command:chassis.wizard)\n\n[Initialize Project](command:chassis.init)",
+        "when": "!chassis.initialized"
+      },
+      {
+        "view": "chassisPanel",
+        "contents": "[Open CHASSIS Dashboard](command:chassis.wizard)",
+        "when": "chassis.initialized"
+      }
+    ],
     "menus": {
       "commandPalette": [
         {
@@ -159,6 +171,14 @@
         },
         {
           "command": "chassis.openBlueprint",
+          "when": "chassis.initialized"
+        },
+        {
+          "command": "chassis.wizard",
+          "when": "chassis.initialized"
+        },
+        {
+          "command": "chassis.buildFromVault",
           "when": "chassis.initialized"
         }
       ]
