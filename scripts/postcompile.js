@@ -27,26 +27,6 @@ const buildTimestamp = new Date().toISOString();
 const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
 fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: '0.2.0' }, null, 2));
 
-// Package extension with vsce
-try {
-  console.log('Packaging extension with vsce...');
-  execSync('npx vsce package --allow-missing-repository', { cwd: workspaceRoot, stdio: 'inherit' });
-  console.log('✓ Extension packaged');
-} catch (e) {
-  console.error('Failed to package extension:', e.message);
-  process.exit(0);
-}
-
-// Install to Windsurf
-try {
-  console.log('Installing to Windsurf...');
-  execSync('windsurf --install-extension chassis-0.2.0.vsix --force', { cwd: workspaceRoot, stdio: 'inherit' });
-  console.log('✓ Installed to Windsurf');
-} catch (e) {
-  console.error('Failed to install to Windsurf:', e.message);
-  process.exit(0);
-}
-
 // Auto-commit logic
 try {
   if (!fs.existsSync(configPath)) {
