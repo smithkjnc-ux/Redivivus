@@ -257,10 +257,22 @@ export function attachMessageRouter(
           vscode.window.showInformationMessage('All vault items already have proper categories.');
           break;
         }
-        // Check if any AI is available
+        // Check if any AI is available — if not, offer clipboard fallback for editor AI
         const aiCheck = routingService.getAvailableAI();
         if (aiCheck.ai === 'none') {
-          vscode.window.showErrorMessage('No AI key configured. Add a Gemini, Claude, or Kimi API key in CHASSIS Settings to use AI categorization.');
+          const categories = ['component','utility','algorithm','pattern','config','api','database','auth','validation','error','testing','other'];
+          const listStr = otherItems.map((item: any, idx: number) =>
+            `${idx + 1}. name="${item.block.name}" type="${item.block.type}" file="${path.basename(item.block.filePath)}" preview="${item.block.code.slice(0, 80).replace(/\n/g, ' ')}"`
+          ).join('\n');
+          const clipboardPrompt = `Categorize each code block below into exactly ONE of: ${categories.join(', ')}\n\nRespond with ONLY a JSON array of strings, one per item. Example: ["utility","component","api"]\n\nItems:\n${listStr}`;
+          await vscode.env.clipboard.writeText(clipboardPrompt);
+          const action = await vscode.window.showWarningMessage(
+            'No API key set. CHASSIS copied a categorization prompt to your clipboard — paste it into your AI chat (Windsurf/Cursor/Claude), then paste the JSON result back here.',
+            'Open AI Chat', 'Dismiss'
+          );
+          if (action === 'Open AI Chat') {
+            await vscode.commands.executeCommand('workbench.action.chat.open');
+          }
           break;
         }
         await vscode.window.withProgress({
