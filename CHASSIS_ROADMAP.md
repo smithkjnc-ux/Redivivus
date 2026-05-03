@@ -251,4 +251,11 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Vault: 3-level drill-down with AI-inferred subcategories*
+## [2026-05-03 11:42] — Vault context injection before AI code generation
+- **`vaultContextService.ts` (new):** `VaultContextService` — given a file path + content, extracts keyword signals (from path parts, imports, identifier names) and scores all vault items against them. Returns top-N most relevant items as a formatted `contextBlock` string. Scoring weights: language match (+3), subcategory keyword hit (+3), category tag hit (+2), item name part hit (+2), source path hit (+1), code preview keyword hit (capped +3).
+- **`routingService.ts`:** Added `setVaultContextService()` injection method. `analyzeFile()` now calls `findRelevantItems()` before sending to AI — if relevant vault items exist, their code is prepended to the instruction as a `=== CHASSIS VAULT ===` block telling the AI to prefer/adapt existing code over writing from scratch.
+- **`extension.ts`:** `VaultContextService` instantiated after `VaultService`, injected into `RoutingService` immediately. Applies to all retrofit, restructure, review, and file analysis operations automatically.
+
+---
+
+*Last updated: May 3, 2026 — Vault context injected into AI prompts before code generation*

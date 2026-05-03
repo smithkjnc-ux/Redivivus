@@ -15,6 +15,7 @@ import { GuideService } from './services/guideService.js';
 import { AnalyzerService } from './services/analyzerService.js';
 import { AnnotationService } from './services/annotationService.js';
 import { VaultService } from './services/vaultService.js';
+import { VaultContextService } from './services/vaultContextService.js';
 import { StatusBar } from './ui/statusBar.js';
 import { SidebarProvider } from './ui/sidebarProvider.js';
 
@@ -43,6 +44,8 @@ export function activate(context: vscode.ExtensionContext) {
   const changeTracker = new ChangeTracker(chassisService);
   const rulesService = new RulesService(chassisService);
   const vaultService = new VaultService(context);
+  const vaultContextService = new VaultContextService(vaultService);
+  routingService.setVaultContextService(vaultContextService);
   const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker);
   const wizardService = new WizardService(chassisService, sessionService);
   const wizardPanel = new WizardPanel(chassisService, sessionService, context);

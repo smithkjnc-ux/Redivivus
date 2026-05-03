@@ -1,6 +1,7 @@
 // [SCOPE] AI Routing Service — sends code to AI backends for analysis
 
 import * as vscode from 'vscode';
+import { VaultContextService } from './vaultContextService.js';
 
 interface AIResponse {
   text: string;
@@ -11,6 +12,12 @@ interface AIResponse {
 }
 
 export class RoutingService {
+  private vaultContext?: VaultContextService;
+
+  // Inject vault context service after construction (avoids circular dep)
+  setVaultContextService(svc: VaultContextService): void {
+    this.vaultContext = svc;
+  }
 
   // Returns which AI is available, preferring the configured defaultAI then falling back
   getAvailableAI(): { ai: string; source: 'chassis-settings' | 'env' | 'none'; label: string } {
@@ -43,7 +50,17 @@ export class RoutingService {
     if (!key) {
       return { text: '', model: 'none', success: false, error: 'No Gemini API key. Set it in CHASSIS settings or via GEMINI_API_KEY env var.' };
     }
-    return this.callGemini(key, filePath, content, instruction, cancelToken);
+
+    // Prepend vault context to instruction if relevant items exist
+    let enrichedInstruction = instruction;
+    if (this.vaultContext) {
+      const ctx = this.vaultContext.findRelevantItems(filePath, content);
+      if (ctx.hitCount > 0) {
+        enrichedInstruction = ctx.contextBlock + '\n\n' + instruction;
+      }
+    }
+
+    return this.callGemini(key, filePath, content, enrichedInstruction, cancelToken);
   }
 
   private getGeminiKey(): string | null {
