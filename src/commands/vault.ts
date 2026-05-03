@@ -29,7 +29,7 @@ export function registerVaultCommands(
       }
       // Show batch summary in wizard panel
       if (!WizardPanel.activePanel) {
-        await vscode.commands.executeCommand('chassis.openWizard');
+        await vscode.commands.executeCommand('chassis.wizard');
       }
       const panel = WizardPanel.activePanel!;
       panel.setVaultScanResults(result.items, 1, result.filteredCount);
@@ -58,7 +58,7 @@ export function registerVaultCommands(
       }
       // Open wizard panel if needed and show batch summary
       if (!WizardPanel.activePanel) {
-        await vscode.commands.executeCommand('chassis.openWizard');
+        await vscode.commands.executeCommand('chassis.wizard');
       }
       const panel = WizardPanel.activePanel!;
       panel.setVaultScanResults(result.items, result.fileCount, result.filteredCount);
