@@ -236,4 +236,10 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Vault: fix stale cache bug preventing recategorized items from appearing*
+## [2026-05-03 08:40] — Fix vault tag write root cause: shallow copy mutation
+- **Root cause:** `aiCategorize()` does `result = [...items]` — a shallow copy. The objects inside are the same references as `otherItems`. When `aiCategorize` mutates `item.tags`, it also mutates `otherItems[idx].tags` simultaneously. The comparison `origSorted === newSorted` was always true because both sides pointed to the same already-mutated array. `updateItemTags` never fired.
+- **`messageRouter.ts` `vaultRecategorize`:** Now snapshots `originalTags` into a `Map<id, string[]>` using spread copies BEFORE calling `aiCategorize`. Comparison uses the snapshot, not the live object reference.
+
+---
+
+*Last updated: May 3, 2026 — Vault Fix Categories: fix shallow copy mutation — tags now write to disk correctly*

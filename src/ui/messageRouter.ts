@@ -306,19 +306,23 @@ export function attachMessageRouter(
           cancellable: false,
         }, async () => {
           try {
+            // Snapshot original tags BEFORE aiCategorize — it mutates item objects in place (shallow copy)
+            const originalTags = new Map<string, string[]>();
+            for (const item of otherItems) {
+              originalTags.set(item.id, [...item.tags]);
+            }
+
             const recategorized = await vaultService.aiCategorize(otherItems, routingService!);
             let updated = 0;
             const stillOther: any[] = [];
 
             for (const item of recategorized) {
-              const original = otherItems.find((i: any) => i.id === item.id);
               const isStillOther = item.tags.length === 0 || item.tags.every((t: string) => t === 'other');
               if (isStillOther) {
                 stillOther.push(item);
                 continue;
               }
-              // Use copies to avoid sort() mutating original arrays
-              const origSorted = [...(original?.tags ?? [])].sort().join(',');
+              const origSorted = [...(originalTags.get(item.id) ?? [])].sort().join(',');
               const newSorted  = [...item.tags].sort().join(',');
               if (origSorted !== newSorted) {
                 vaultService.updateItemTags(item.id, item.tags, true);
