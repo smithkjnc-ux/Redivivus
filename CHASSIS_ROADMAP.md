@@ -283,4 +283,18 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Build from Vault: describe task, CHASSIS assembles from vault + fills gaps*
+## [2026-05-03 12:02] — Full codebase audit pass
+Bugs found and fixed:
+- **`guardianService.ts`:** Regex patterns used single-quoted strings with `\'` escapes causing TypeScript parse errors. Fixed by switching to double-quoted strings.
+- **`messageRouter.ts` `vaultDeleteItem`:** After delete, always re-fetched via `listByCategory` ignoring active subcategory. Fixed to use `listBySubcategory` when `vaultSubcategory` is set.
+- **`messageRouter.ts` `vaultRecategorize`:** `updateItemTags` call was not passing `subcategory` — Fix Categories wrote tags but lost subcategory. Fixed.
+- **`vaultService.ts` `updateItemTags`:** Added optional `subcategory` parameter so callers can persist subcategory in one write.
+- **`scripts.ts` `showTab`:** Implicit global `event` reference would throw in strict mode. Fixed to accept `e` parameter.
+- **`scripts.ts` list-item click:** Row click handler excluded `vault-import-btn` and `vault-delete-btn` but not `vault-open-btn` — clicking Open triggered a double open. Fixed.
+- **`workTab.ts`:** Added "Build from Vault" card to Work tab for discoverability.
+- **`vaultScanSaveAll`:** Confirmed `saveItem` already persists `subcategory` since `aiCategorize` sets it on the object in place — no fix needed.
+- **`vaultImportItem`:** Confirmed `importItems()` exists and works correctly.
+
+---
+
+*Last updated: May 3, 2026 — Full audit pass: 7 bugs fixed, Build from Vault added to Work tab*
