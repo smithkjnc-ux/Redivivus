@@ -218,13 +218,18 @@ export function attachMessageRouter(
 
           // AI categorize new items — replaces 'other' tags with AI-suggested categories
           let categorized = newItems;
-          if (routingService && newItems.length > 0) {
-            progress.report({ message: `AI categorizing ${newItems.length} blocks...` });
+          const aiAvailable = routingService?.getAvailableAI();
+          if (routingService && aiAvailable?.ai !== 'none' && newItems.length > 0) {
+            progress.report({ message: `AI categorizing ${newItems.length} blocks via ${aiAvailable?.label}...` });
             try {
               categorized = await vaultService.aiCategorize(newItems, routingService);
             } catch (e) {
               console.warn('[CHASSIS] AI categorization failed:', e);
             }
+          } else if (newItems.length > 0) {
+            vscode.window.showWarningMessage(
+              `CHASSIS found ${newItems.length} vault items but no AI key is set — all saved as "other". Add an API key in Files & AI → API Keys, then use Fix Categories.`
+            );
           }
 
           state.vaultScanMode = true;

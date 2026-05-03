@@ -217,4 +217,11 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 
 ---
 
-*Last updated: May 3, 2026 — Vault: delete uncategorizable items after AI Fix Categories pass*
+## [2026-05-03 08:22] — Vault scan categorization bug fixes
+- **Root cause identified:** Ryppel vault items saved as "other" because no API key was configured at scan time. `if (routingService && newItems.length > 0)` silently skipped AI when key was missing.
+- **`vaultService.ts` `aiCategorize()`:** Fixed prompt typo — said "array of numbers" but meant "array of strings" (confusing AI). Added regex to extract JSON array from any surrounding text. Per-batch error logging with response preview on parse failure. Cleaner `continue` on failed batch instead of silent skip.
+- **`messageRouter.ts` scan handler:** Now calls `getAvailableAI()` before categorizing. If no key, shows explicit warning: "found N items but no AI key set — all saved as 'other'. Add key then use Fix Categories." Also shows which AI is being used during categorization progress message.
+
+---
+
+*Last updated: May 3, 2026 — Vault scan: fix silent categorization skip + prompt typo*

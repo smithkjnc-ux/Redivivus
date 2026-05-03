@@ -498,30 +498,34 @@ Rules:
 - testing: test utilities, mocks, fixtures
 - other: anything that doesn't fit above
 
-Respond with ONLY a JSON array of numbers (one per item) matching the category. Example for 3 items: ["utility","component","api"]
+Respond with ONLY a JSON array of strings (one per item) matching the category. Example for 3 items: ["utility","component","api"]
 
 Items:
 ${listStr}`;
 
       const response = await routingService.prompt(prompt);
-      if (response.success && response.text) {
-        try {
-          let raw = response.text.trim();
-          // Strip markdown fences if present
-          raw = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-          const categories: string[] = JSON.parse(raw);
-          batch.forEach((item, idx) => {
-            const suggested = categories[idx]?.toLowerCase();
-            if (suggested && validCategories.includes(suggested)) {
-              // Replace 'other' tag or add the AI-suggested category
-              const filtered = item.tags.filter(t => t !== 'other');
-              if (!filtered.includes(suggested)) filtered.push(suggested);
-              item.tags = filtered.length > 0 ? filtered : [suggested];
-            }
-          });
-        } catch (e) {
-          // AI response parse failed — keep existing tags
-        }
+      if (!response.success || !response.text) {
+        console.warn(`[CHASSIS] aiCategorize batch ${i}-${i+BATCH} failed: ${response.error || 'no response'}`);
+        continue;
+      }
+      try {
+        let raw = response.text.trim();
+        // Strip markdown fences if present
+        raw = raw.replace(/^```[a-zA-Z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+        // Strip any leading/trailing text outside the JSON array
+        const arrayMatch = raw.match(/\[[\s\S]*\]/);
+        if (arrayMatch) { raw = arrayMatch[0]; }
+        const categories: string[] = JSON.parse(raw);
+        batch.forEach((item, idx) => {
+          const suggested = categories[idx]?.toLowerCase().trim();
+          if (suggested && validCategories.includes(suggested)) {
+            const filtered = item.tags.filter((t: string) => t !== 'other');
+            if (!filtered.includes(suggested)) { filtered.push(suggested); }
+            item.tags = filtered.length > 0 ? filtered : [suggested];
+          }
+        });
+      } catch (e) {
+        console.warn(`[CHASSIS] aiCategorize batch ${i}-${i+BATCH} parse failed:`, response.text.slice(0, 200));
       }
     }
     return result;
