@@ -1,0 +1,207 @@
+{
+  "name": "chassis",
+  "displayName": "CHASSIS",
+  "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
+  "version": "0.2.0",
+  "publisher": "papajoe",
+  "engines": {
+    "vscode": "^1.110.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "workspaceContains:.chassis",
+    "onView:chassisPanel"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activityBar": [
+        {
+          "id": "chassisView",
+          "title": "CHASSIS",
+          "icon": "resources/chassis-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "chassisView": [
+        {
+          "id": "chassisPanel",
+          "name": "CHASSIS"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "chassis.init",
+        "title": "CHASSIS: Initialize Project"
+      },
+      {
+        "command": "chassis.startSession",
+        "title": "CHASSIS: Start Session"
+      },
+      {
+        "command": "chassis.endSession",
+        "title": "CHASSIS: End Session"
+      },
+      {
+        "command": "chassis.blueprint",
+        "title": "CHASSIS: Run Blueprint Interview"
+      },
+      {
+        "command": "chassis.progress",
+        "title": "CHASSIS: Show Progress Map"
+      },
+      {
+        "command": "chassis.log",
+        "title": "CHASSIS: Open Work Log"
+      },
+      {
+        "command": "chassis.deadends",
+        "title": "CHASSIS: Open Dead End Log"
+      },
+      {
+        "command": "chassis.openBlueprint",
+        "title": "CHASSIS: Open Blueprint"
+      },
+      {
+        "command": "chassis.analyzeFile",
+        "title": "CHASSIS: Check Current File"
+      },
+      {
+        "command": "chassis.analyze",
+        "title": "CHASSIS: Analyze Project"
+      },
+      {
+        "command": "chassis.refreshPanel",
+        "title": "CHASSIS: Refresh Panel"
+      },
+      {
+        "command": "chassis.guide",
+        "title": "CHASSIS: Getting Started"
+      },
+      {
+        "command": "chassis.restructureFile",
+        "title": "CHASSIS: Restructure Current File"
+      },
+      {
+        "command": "chassis.reviewFile",
+        "title": "CHASSIS: Review Current File"
+      },
+      {
+        "command": "chassis.retrofit",
+        "title": "CHASSIS: Retrofit Project"
+      },
+      {
+        "command": "chassis.confirmRetrofit",
+        "title": "CHASSIS: Confirm Retrofit"
+      },
+      {
+        "command": "chassis.revertRetrofit",
+        "title": "CHASSIS: Revert Retrofit"
+      },
+      {
+        "command": "chassis.wizard",
+        "title": "CHASSIS: Wizard"
+      },
+      {
+        "command": "chassis.wizardRetrofit",
+        "title": "CHASSIS: Wizard — Retrofit Existing Project"
+      },
+      {
+        "command": "chassis.switchAI",
+        "title": "CHASSIS: Switch AI"
+      },
+      {
+        "command": "chassis.generateRules",
+        "title": "CHASSIS: Generate AI Editor Rules"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "chassis.init",
+          "when": "!chassis.initialized"
+        },
+        {
+          "command": "chassis.startSession",
+          "when": "chassis.initialized"
+        },
+        {
+          "command": "chassis.endSession",
+          "when": "chassis.sessionActive"
+        },
+        {
+          "command": "chassis.blueprint",
+          "when": "chassis.initialized"
+        },
+        {
+          "command": "chassis.progress",
+          "when": "chassis.initialized"
+        },
+        {
+          "command": "chassis.log",
+          "when": "chassis.initialized"
+        },
+        {
+          "command": "chassis.deadends",
+          "when": "chassis.initialized"
+        },
+        {
+          "command": "chassis.openBlueprint",
+          "when": "chassis.initialized"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "CHASSIS",
+      "properties": {
+        "chassis.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Gemini API key for AI routing (or set GEMINI_API_KEY env var)"
+        },
+        "chassis.defaultAI": {
+          "type": "string",
+          "default": "gemini",
+          "enum": [
+            "gemini",
+            "claude",
+            "kimi"
+          ],
+          "description": "Which AI to use for CHASSIS operations"
+        },
+        "chassis.claudeApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Anthropic API key for Claude routing"
+        },
+        "chassis.kimiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Moonshot API key for Kimi routing"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "@types/vscode": "^1.70.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.1"
+  }
+}

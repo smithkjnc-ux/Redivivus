@@ -1,0 +1,8 @@
+out
+dist
+node_modules
+.vscode-test/
+*.vsix
+
+# CHASSIS session data (blueprints and logs are tracked)
+.chassis/sessions/

@@ -1,0 +1,139 @@
+// [SCOPE] CHASSIS Restructure command — AI adds CHASSIS annotations to current file
+
+import * as vscode from 'vscode';
+import * as path from 'path';
+import { ChassisService } from '../services/chassisService.js';
+import { RoutingService } from '../services/routingService.js';
+import { MeasureTwiceService } from '../services/measureTwiceService.js';
+import { ChangeTracker } from '../services/changeTracker.js';
+
+export function registerRestructureCommands(
+  context: vscode.ExtensionContext,
+  chassis: ChassisService,
+  routingService: RoutingService,
+  measureTwice: MeasureTwiceService,
+  changeTracker: ChangeTracker,
+  refreshAll: () => void
+): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.restructureFile', async (pickedPath?: string) => {
+      let doc: vscode.TextDocument;
+      let filePath: string;
+      if (pickedPath) {
+        filePath = pickedPath;
+        const uri = vscode.Uri.file(path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, pickedPath));
+        doc = await vscode.workspace.openTextDocument(uri);
+      } else {
+        const editor = vscode.window.activeTextEditor;
+        if (!editor) {
+          vscode.window.showErrorMessage('Open a file first.');
+          return;
+        }
+        doc = editor.document;
+        filePath = vscode.workspace.asRelativePath(doc.uri);
+      }
+
+      // stub restructure if no API key
+      const hasKey = !!(vscode.workspace.getConfiguration('chassis').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY);
+      if (!hasKey) {
+        vscode.window.showInformationMessage(
+          'Clean Up File requires a Gemini API key. Set it in CHASSIS settings or the GEMINI_API_KEY env variable.',
+          'Open Settings'
+        );
+        return;
+      }
+
+      const lineCount = doc.getText().split('\n').length;
+      let msg = 'CHASSIS will read through ' + filePath + ' and add notes about what each section does, flag anything risky, and mark work that still needs doing.';
+      if (lineCount > 500) {
+        msg += '\n\n⚠️ This file is ' + lineCount + ' lines — AI processing may take a while.';
+      }
+      const confirm = await vscode.window.showInformationMessage(
+        msg,
+        { modal: true },
+        'Restructure', 'Cancel'
+      );
+      if (confirm !== 'Restructure') { return; }
+
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: 'CHASSIS: Restructuring ' + filePath,
+        cancellable: true,
+      }, async (progress, token) => {
+        progress.report({ message: 'Sending to AI...' });
+        const content = doc.getText();
+        const lineCount = content.split('\n').length;
+        progress.report({ message: 'Sending ' + lineCount + ' lines to Gemini...' });
+        const result = await routingService.analyzeFile(
+          filePath, content,
+          'Add CHASSIS annotations to this file. Add [SCOPE] at top, convert TODOs, flag warnings.',
+          token
+        );
+        progress.report({ message: 'Processing response...' });
+
+        if (!result.success) {
+          vscode.window.showErrorMessage('CHASSIS routing error: ' + result.error);
+          return;
+        }
+
+        // show diff in a new tab
+        const original = doc.uri;
+        const modified = vscode.Uri.parse('untitled:' + filePath + '.chassis-restructured');
+        const newDoc = await vscode.workspace.openTextDocument({ content: result.text, language: doc.languageId });
+        await vscode.window.showTextDocument(newDoc, { preview: false });
+
+        // ── Measure Twice, Cut Once ──
+        const validation = measureTwice.validate(content, result.text, filePath);
+        const validReport = measureTwice.formatReport(validation, filePath);
+
+        let applyMsg = '';
+        if (validation.passed) {
+          applyMsg = '✅ Measure Twice PASSED. Apply changes to the original?';
+        } else {
+          applyMsg = '❌ Measure Twice FAILED — issues found. Apply anyway?';
+        }
+        if (validation.warnings.length > 0) {
+          applyMsg += '\n\n⚠️ ' + validation.warnings.length + ' warning(s)';
+        }
+
+        const apply = await vscode.window.showInformationMessage(
+          applyMsg,
+          { modal: true, detail: validation.issues.concat(validation.warnings).join('\n') || 'No issues found.' },
+          'Apply', 'View Report', 'Discard'
+        );
+
+        if (apply === 'View Report') {
+          const reportDoc = await vscode.workspace.openTextDocument({ content: validReport, language: 'markdown' });
+          await vscode.window.showTextDocument(reportDoc, { preview: false });
+          return;
+        }
+
+        if (apply === 'Apply') {
+          const edit = new vscode.WorkspaceEdit();
+          const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(content.length));
+          edit.replace(doc.uri, fullRange, result.text);
+          await vscode.workspace.applyEdit(edit);
+          await doc.save();
+
+          const changeSummary = changeTracker.summarize(filePath, content, result.text, result.model, 'Restructure File');
+          changeTracker.log(changeSummary);
+          vscode.window.showInformationMessage('CHASSIS: ' + changeTracker.formatNotification(changeSummary));
+          refreshAll();
+          const nextAction = await vscode.window.showInformationMessage(
+          filePath + ' has been cleaned up and saved.\n\n' +
+          'The AI added notes throughout your code explaining what each part does, ' +
+          'flagged anything that looks risky, and marked remaining work.\n\n' +
+          'What next?',
+          { modal: true },
+          'Check the File', 'AI Review', 'Done'
+        );
+        if (nextAction === 'Check the File') {
+          await vscode.commands.executeCommand('chassis.analyzeFile');
+        } else if (nextAction === 'AI Review') {
+          await vscode.commands.executeCommand('chassis.reviewFile');
+        }
+        }
+      });
+    })
+  );
+}
