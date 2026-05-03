@@ -12,21 +12,29 @@ interface AIResponse {
 
 export class RoutingService {
 
-  // Returns which AI is available and where the key came from
+  // Returns which AI is available, preferring the configured defaultAI then falling back
   getAvailableAI(): { ai: string; source: 'chassis-settings' | 'env' | 'none'; label: string } {
     const config = vscode.workspace.getConfiguration('chassis');
-    // Check Gemini
-    const geminiSettings = config.get<string>('geminiApiKey') || '';
-    if (geminiSettings) return { ai: 'gemini', source: 'chassis-settings', label: 'Gemini' };
-    if (process.env.GEMINI_API_KEY) return { ai: 'gemini', source: 'env', label: 'Gemini (env)' };
-    // Check Claude
-    const claudeSettings = config.get<string>('claudeApiKey') || '';
-    if (claudeSettings) return { ai: 'claude', source: 'chassis-settings', label: 'Claude' };
-    if (process.env.ANTHROPIC_API_KEY) return { ai: 'claude', source: 'env', label: 'Claude (env)' };
-    // Check Kimi
-    const kimiSettings = config.get<string>('kimiApiKey') || '';
-    if (kimiSettings) return { ai: 'kimi', source: 'chassis-settings', label: 'Kimi' };
-    if (process.env.MOONSHOT_API_KEY) return { ai: 'kimi', source: 'env', label: 'Kimi (env)' };
+    const defaultAI = config.get<string>('defaultAI') || 'gemini';
+
+    const checks: Array<{ id: string; label: string; key: () => string | null }> = [
+      { id: 'gemini', label: 'Gemini',  key: () => this.getGeminiKey() },
+      { id: 'claude', label: 'Claude',  key: () => this.getClaudeKey() },
+      { id: 'openai', label: 'GPT-4o',  key: () => this.getOpenAIKey() },
+      { id: 'groq',   label: 'Groq',    key: () => this.getGroqKey() },
+      { id: 'xai',    label: 'Grok',    key: () => this.getXAIKey() },
+      { id: 'kimi',   label: 'Kimi',    key: () => this.getKimiKey() },
+    ];
+
+    // Try defaultAI first
+    const preferred = checks.find(c => c.id === defaultAI);
+    if (preferred && preferred.key()) {
+      return { ai: preferred.id, source: 'chassis-settings', label: preferred.label };
+    }
+    // Fall back to first available
+    for (const c of checks) {
+      if (c.key()) return { ai: c.id, source: 'chassis-settings', label: c.label + ' (fallback)' };
+    }
     return { ai: 'none', source: 'none', label: 'No AI' };
   }
 
@@ -46,14 +54,27 @@ export class RoutingService {
 
   private getClaudeKey(): string | null {
     const config = vscode.workspace.getConfiguration('chassis');
-    const key = config.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY || '';
-    return key || null;
+    return config.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY || null;
+  }
+
+  private getOpenAIKey(): string | null {
+    const config = vscode.workspace.getConfiguration('chassis');
+    return config.get<string>('openaiApiKey') || process.env.OPENAI_API_KEY || null;
+  }
+
+  private getGroqKey(): string | null {
+    const config = vscode.workspace.getConfiguration('chassis');
+    return config.get<string>('groqApiKey') || process.env.GROQ_API_KEY || null;
+  }
+
+  private getXAIKey(): string | null {
+    const config = vscode.workspace.getConfiguration('chassis');
+    return config.get<string>('xaiApiKey') || process.env.XAI_API_KEY || null;
   }
 
   private getKimiKey(): string | null {
     const config = vscode.workspace.getConfiguration('chassis');
-    const key = config.get<string>('kimiApiKey') || process.env.MOONSHOT_API_KEY || '';
-    return key || null;
+    return config.get<string>('kimiApiKey') || process.env.MOONSHOT_API_KEY || null;
   }
 
   private async callGemini(key: string, filePath: string, content: string, instruction: string, cancelToken?: import('vscode').CancellationToken): Promise<AIResponse> {
@@ -139,73 +160,99 @@ Return ONLY the modified code. No explanation before or after. No markdown fence
   async prompt(text: string): Promise<AIResponse & { usingFallback?: string }> {
     const available = this.getAvailableAI();
     if (available.ai === 'none') {
-      return { text: '', model: 'none', success: false, error: 'No AI key configured. Add a Gemini, Claude, or Kimi API key in CHASSIS Settings.' };
+      return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in CHASSIS Settings (Files & AI tab).' };
     }
 
     const defaultAI = vscode.workspace.getConfiguration('chassis').get<string>('defaultAI') || 'gemini';
     const usingFallback = available.ai !== defaultAI ? available.label : undefined;
 
-    if (available.ai === 'gemini') {
+    return this.callProvider(available.ai, text, usingFallback);
+  }
+
+  private async callProvider(ai: string, text: string, usingFallback?: string): Promise<AIResponse & { usingFallback?: string }> {
+    if (ai === 'gemini') {
       const key = this.getGeminiKey()!;
       try {
         const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
         const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }] });
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal: controller.signal });
-        clearTimeout(timeoutId);
-        const data = await response.json() as any;
-        if (!response.ok) {
-          return { text: '', model: 'gemini-2.5-flash', success: false, error: data.error?.message || 'API error ' + response.status };
-        }
-        const result = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-        return { text: result.trim(), model: 'gemini-2.5-flash', success: true, usingFallback };
-      } catch (err: any) {
-        return { text: '', model: 'gemini-2.5-flash', success: false, error: err.message || 'Network error' };
-      }
+        const res = await this.fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
+        const data = await res.json() as any;
+        if (!res.ok) return { text: '', model: 'gemini-2.5-flash', success: false, error: data.error?.message || 'API error ' + res.status };
+        return { text: (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim(), model: 'gemini-2.5-flash', success: true, usingFallback };
+      } catch (err: any) { return { text: '', model: 'gemini-2.5-flash', success: false, error: err.message }; }
     }
 
-    if (available.ai === 'claude') {
+    if (ai === 'claude') {
       const key = this.getClaudeKey()!;
       try {
         const url = 'https://api.anthropic.com/v1/messages';
         const body = JSON.stringify({ model: 'claude-3-5-haiku-20241022', max_tokens: 1024, messages: [{ role: 'user', content: text }] });
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body, signal: controller.signal });
-        clearTimeout(timeoutId);
-        const data = await response.json() as any;
-        if (!response.ok) {
-          return { text: '', model: 'claude-3-5-haiku', success: false, error: data.error?.message || 'API error ' + response.status };
-        }
-        const result = data.content?.[0]?.text || '';
-        return { text: result.trim(), model: 'claude-3-5-haiku', success: true, usingFallback };
-      } catch (err: any) {
-        return { text: '', model: 'claude-3-5-haiku', success: false, error: err.message || 'Network error' };
-      }
+        const res = await this.fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body });
+        const data = await res.json() as any;
+        if (!res.ok) return { text: '', model: 'claude-3-5-haiku', success: false, error: data.error?.message || 'API error ' + res.status };
+        return { text: (data.content?.[0]?.text || '').trim(), model: 'claude-3-5-haiku', success: true, usingFallback };
+      } catch (err: any) { return { text: '', model: 'claude-3-5-haiku', success: false, error: err.message }; }
     }
 
-    if (available.ai === 'kimi') {
+    if (ai === 'openai') {
+      const key = this.getOpenAIKey()!;
+      try {
+        const url = 'https://api.openai.com/v1/chat/completions';
+        const body = JSON.stringify({ model: 'gpt-4o-mini', messages: [{ role: 'user', content: text }] });
+        const res = await this.fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
+        const data = await res.json() as any;
+        if (!res.ok) return { text: '', model: 'gpt-4o-mini', success: false, error: data.error?.message || 'API error ' + res.status };
+        return { text: (data.choices?.[0]?.message?.content || '').trim(), model: 'gpt-4o-mini', success: true, usingFallback };
+      } catch (err: any) { return { text: '', model: 'gpt-4o-mini', success: false, error: err.message }; }
+    }
+
+    if (ai === 'groq') {
+      const key = this.getGroqKey()!;
+      try {
+        const url = 'https://api.groq.com/openai/v1/chat/completions';
+        const body = JSON.stringify({ model: 'llama-3.3-70b-versatile', messages: [{ role: 'user', content: text }] });
+        const res = await this.fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
+        const data = await res.json() as any;
+        if (!res.ok) return { text: '', model: 'llama-3.3-70b', success: false, error: data.error?.message || 'API error ' + res.status };
+        return { text: (data.choices?.[0]?.message?.content || '').trim(), model: 'llama-3.3-70b', success: true, usingFallback };
+      } catch (err: any) { return { text: '', model: 'llama-3.3-70b', success: false, error: err.message }; }
+    }
+
+    if (ai === 'xai') {
+      const key = this.getXAIKey()!;
+      try {
+        const url = 'https://api.x.ai/v1/chat/completions';
+        const body = JSON.stringify({ model: 'grok-3-mini', messages: [{ role: 'user', content: text }] });
+        const res = await this.fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
+        const data = await res.json() as any;
+        if (!res.ok) return { text: '', model: 'grok-3-mini', success: false, error: data.error?.message || 'API error ' + res.status };
+        return { text: (data.choices?.[0]?.message?.content || '').trim(), model: 'grok-3-mini', success: true, usingFallback };
+      } catch (err: any) { return { text: '', model: 'grok-3-mini', success: false, error: err.message }; }
+    }
+
+    if (ai === 'kimi') {
       const key = this.getKimiKey()!;
       try {
         const url = 'https://api.moonshot.cn/v1/chat/completions';
         const body = JSON.stringify({ model: 'moonshot-v1-8k', messages: [{ role: 'user', content: text }] });
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-        const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body, signal: controller.signal });
-        clearTimeout(timeoutId);
-        const data = await response.json() as any;
-        if (!response.ok) {
-          return { text: '', model: 'kimi', success: false, error: data.error?.message || 'API error ' + response.status };
-        }
-        const result = data.choices?.[0]?.message?.content || '';
-        return { text: result.trim(), model: 'kimi', success: true, usingFallback };
-      } catch (err: any) {
-        return { text: '', model: 'kimi', success: false, error: err.message || 'Network error' };
-      }
+        const res = await this.fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
+        const data = await res.json() as any;
+        if (!res.ok) return { text: '', model: 'kimi', success: false, error: data.error?.message || 'API error ' + res.status };
+        return { text: (data.choices?.[0]?.message?.content || '').trim(), model: 'kimi', success: true, usingFallback };
+      } catch (err: any) { return { text: '', model: 'kimi', success: false, error: err.message }; }
     }
 
-    return { text: '', model: 'none', success: false, error: 'No AI available.' };
+    return { text: '', model: 'none', success: false, error: 'Unknown AI provider: ' + ai };
+  }
+
+  private async fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(id);
+    }
   }
 
     private getCommentStyle(filePath: string): { single: string; block?: [string, string]; example: string } {

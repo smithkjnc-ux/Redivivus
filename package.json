@@ -162,30 +162,49 @@
     "configuration": {
       "title": "CHASSIS",
       "properties": {
-        "chassis.geminiApiKey": {
-          "type": "string",
-          "default": "",
-          "description": "Gemini API key for AI routing (or set GEMINI_API_KEY env var)"
-        },
         "chassis.defaultAI": {
           "type": "string",
           "default": "gemini",
-          "enum": [
-            "gemini",
-            "claude",
-            "kimi"
+          "enum": ["gemini", "claude", "openai", "groq", "xai", "kimi"],
+          "enumDescriptions": [
+            "Google Gemini (free tier available)",
+            "Anthropic Claude (paid)",
+            "OpenAI GPT-4o / GPT-4o Mini (paid)",
+            "Groq — Llama 3 (free tier)",
+            "xAI Grok (paid)",
+            "Moonshot Kimi (paid)"
           ],
-          "description": "Which AI to use for CHASSIS operations"
+          "description": "Which AI provider to use for CHASSIS operations"
+        },
+        "chassis.geminiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Google Gemini API key — free at aistudio.google.com (or set GEMINI_API_KEY env var)"
         },
         "chassis.claudeApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic API key for Claude routing"
+          "description": "Anthropic Claude API key — console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
+        },
+        "chassis.openaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenAI API key for GPT-4o — platform.openai.com (or set OPENAI_API_KEY env var)"
+        },
+        "chassis.groqApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Groq API key — free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
+        },
+        "chassis.xaiApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "xAI Grok API key — console.x.ai (or set XAI_API_KEY env var)"
         },
         "chassis.kimiApiKey": {
           "type": "string",
           "default": "",
-          "description": "Moonshot API key for Kimi routing"
+          "description": "Moonshot Kimi API key — platform.moonshot.cn (or set MOONSHOT_API_KEY env var)"
         }
       }
     }

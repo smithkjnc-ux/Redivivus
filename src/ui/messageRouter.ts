@@ -125,7 +125,7 @@ export function attachMessageRouter(
       }
       case 'saveApiKey': {
         const keyCfg = vscode.workspace.getConfiguration('chassis');
-        const keyMap: Record<string, string> = { gemini: 'geminiApiKey', claude: 'claudeApiKey', kimi: 'kimiApiKey' };
+        const keyMap: Record<string, string> = { gemini: 'geminiApiKey', claude: 'claudeApiKey', openai: 'openaiApiKey', groq: 'groqApiKey', xai: 'xaiApiKey', kimi: 'kimiApiKey' };
         const setting = keyMap[msg.ai];
         if (!setting) break;
         await keyCfg.update(setting, msg.key || '', vscode.ConfigurationTarget.Global);

@@ -169,6 +169,9 @@ export class WizardPanel {
       const aiKeys = {
         gemini: !!(chassisCfg.get<string>('geminiApiKey') || process.env.GEMINI_API_KEY),
         claude: !!(chassisCfg.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY),
+        openai: !!(chassisCfg.get<string>('openaiApiKey') || process.env.OPENAI_API_KEY),
+        groq:   !!(chassisCfg.get<string>('groqApiKey')   || process.env.GROQ_API_KEY),
+        xai:    !!(chassisCfg.get<string>('xaiApiKey')    || process.env.XAI_API_KEY),
         kimi:   !!(chassisCfg.get<string>('kimiApiKey')   || process.env.MOONSHOT_API_KEY),
       };
       content += renderFilesTab(projectName, blueprintLocked, hasBlueprint, config?.blueprint, this.state.activeTab === 'files', aiKeys);
