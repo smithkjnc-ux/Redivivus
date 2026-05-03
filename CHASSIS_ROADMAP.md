@@ -107,7 +107,9 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 - Needs proper activitybar contribution with custom icon
 
 ### 5. Vault Tab
-- Save useful functions and logic blocks for reuse across projects
+- [x] Save useful functions and logic blocks for reuse across projects
+- [x] Batch scan with AI categorization
+- [x] Re-categorize saved items with AI (Fix Categories button)
 
 ### 6. Scope Creep Detection
 - Flag when code drifts from blueprint intent
@@ -128,6 +130,14 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 - One-click from finding a problem → assigning the fix
 - CHASSIS writes the work order; the editor AI executes it
 - Includes: file path, line range, tag type, existing annotation text, 3 lines of context above/below
+
+### 11. Auto-commit on successful build
+- [x] After every successful compile, CHASSIS prompts or auto-commits with a generated message
+- [x] Options: "auto" (no prompt), "prompt" (pre-filled message box), "off" (manual)
+- [x] Default: "prompt"
+- [x] Message format: `CHASSIS checkpoint: {timestamp} — {active session goal or 'no session'}`
+- [x] Configured via `autoCommit` field in `.chassis/config.json`
+- [x] `postcompile.js` script handles packaging and Windsurf installation automatically
 
 ---
 
@@ -173,7 +183,13 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 - **Split extension.ts:** Extracted 23 command handlers into 9 modules under `src/commands/` (init, session, blueprint, analysis, review, restructure, retrofit, vault, misc). `extension.ts` reduced from 826 lines to 90 lines.
 - **Split wizardPanel.ts:** Extracted view renderers into 6 modules under `src/ui/views/` (welcomeView, workTab, filesTab, historyTab, vaultTab, wizardSteps) plus `styles.ts`, `scripts.ts`, and `messageRouter.ts`. `wizardPanel.ts` reduced from 1,267 lines to 132 lines. View generation (~900 lines of HTML/CSS/JS) fully extracted.
 - **Vault scan UX improvement:** Batch save with automatic duplicate detection. Scan results show summary count ("Found 47 extractable blocks across 23 files — 41 new · 6 already in vault"). Duplicates marked with "Already in vault" badge and excluded from save. Big green "Save All New" button saves everything non-duplicate in one click. Individual checkboxes allow cherry-picking. Report: "Saved 41 new blocks. Skipped 6 duplicates."
+- **Vault AI categorization:** After scan, new items are sent to Gemini in batches of 20 to assign proper categories instead of defaulting to "other". `RoutingService.prompt()` added as a generic AI call method.
+- **Vault Fix Categories button:** 🤖 Fix Categories button in vault header rescans all already-saved items and updates their tags using AI. Only items whose tags changed are written to disk. `VaultService.updateItemTags()` added.
+- **Auto-commit on build:** `postcompile.js` runs after every `npm run compile`. In "prompt" mode (default) it shows the pre-filled commit message in terminal. In "auto" mode it commits silently. Configured via `.chassis/config.json` `autoCommit` field.
+- **Build timestamp in header:** CHASSIS header shows "Built: HH:MM:SS" using `.chassis/build-info.json` written at compile time — confirms changes are deployed.
+- **Vault scan command fix:** Was calling non-existent `chassis.openWizard`. Fixed to use correct `chassis.wizard` command.
+- **Windsurf deployment:** Confirmed Windsurf uses its own extension directory `~/.windsurf/extensions/`. Must use `vsce package + windsurf --install-extension chassis-0.2.0.vsix --force` to deploy, NOT VS Code's `code --install-extension`.
 
 ---
 
-*Last updated: May 2, 2026 — Session: Fixed scaffoldAt + self-annotation pass + split extension.ts + split wizardPanel.ts.*
+*Last updated: May 3, 2026 — Session: Vault AI categorization + Fix Categories rescan + auto-commit on build + Windsurf deployment fix.*
