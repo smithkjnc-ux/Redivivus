@@ -119,6 +119,41 @@ export function getScripts(): string {
       });
     }
 
+    // ── API Keys form handlers ──
+    const apiKeysForm = document.getElementById('api-keys-form');
+    const apiKeysCard = document.querySelector('[data-action="showApiKeysForm"]');
+    if (apiKeysCard) {
+      apiKeysCard.addEventListener('click', () => {
+        if (apiKeysForm) apiKeysForm.style.display = 'block';
+        apiKeysCard.style.display = 'none';
+      });
+    }
+    document.querySelectorAll('.api-key-save-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ai = btn.dataset.ai;
+        const input = document.getElementById('key-' + ai);
+        const val = input ? input.value.trim() : '';
+        if (!val) { alert('Enter a key first.'); return; }
+        vscode.postMessage({ type: 'saveApiKey', ai, key: val });
+        if (input) input.value = '';
+      });
+    });
+    document.querySelectorAll('.api-key-clear-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const ai = btn.dataset.ai;
+        if (confirm('Clear ' + ai.charAt(0).toUpperCase() + ai.slice(1) + ' API key?')) {
+          vscode.postMessage({ type: 'saveApiKey', ai, key: '' });
+        }
+      });
+    });
+    const apiKeysCloseBtn = document.getElementById('api-keys-close-btn');
+    if (apiKeysCloseBtn) {
+      apiKeysCloseBtn.addEventListener('click', () => {
+        if (apiKeysForm) apiKeysForm.style.display = 'none';
+        if (apiKeysCard) apiKeysCard.style.display = '';
+      });
+    }
+
     // __ Blueprint form handlers __
     const bpForm = document.getElementById('blueprint-form');
     const bpCard = document.querySelector('[data-action="showBlueprintForm"]');

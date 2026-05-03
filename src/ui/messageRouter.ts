@@ -123,6 +123,20 @@ export function attachMessageRouter(
         refresh();
         break;
       }
+      case 'saveApiKey': {
+        const keyCfg = vscode.workspace.getConfiguration('chassis');
+        const keyMap: Record<string, string> = { gemini: 'geminiApiKey', claude: 'claudeApiKey', kimi: 'kimiApiKey' };
+        const setting = keyMap[msg.ai];
+        if (!setting) break;
+        await keyCfg.update(setting, msg.key || '', vscode.ConfigurationTarget.Global);
+        if (msg.key) {
+          vscode.window.showInformationMessage(`✓ ${msg.ai.charAt(0).toUpperCase() + msg.ai.slice(1)} API key saved.`);
+        } else {
+          vscode.window.showInformationMessage(`${msg.ai.charAt(0).toUpperCase() + msg.ai.slice(1)} API key cleared.`);
+        }
+        refresh();
+        break;
+      }
       case 'getState':
         refresh();
         break;

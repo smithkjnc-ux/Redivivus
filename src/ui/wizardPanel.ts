@@ -165,7 +165,13 @@ export class WizardPanel {
       </div>`;
       content += renderWorkTab(sessionActive, session, hasBlueprint, this.state.activeTab === 'work');
       content += renderSwitchForm(currentAI);
-      content += renderFilesTab(projectName, blueprintLocked, hasBlueprint, config?.blueprint, this.state.activeTab === 'files');
+      const chassisCfg = vscode.workspace.getConfiguration('chassis');
+      const aiKeys = {
+        gemini: !!(chassisCfg.get<string>('geminiApiKey') || process.env.GEMINI_API_KEY),
+        claude: !!(chassisCfg.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY),
+        kimi:   !!(chassisCfg.get<string>('kimiApiKey')   || process.env.MOONSHOT_API_KEY),
+      };
+      content += renderFilesTab(projectName, blueprintLocked, hasBlueprint, config?.blueprint, this.state.activeTab === 'files', aiKeys);
       content += renderHistoryTab(sessions, reviews, this.state.activeTab === 'history');
       content += this.state.vaultScanMode
         ? renderVaultScanSummary(this.state.vaultScanItems, this.state.vaultScanDuplicates, this.state.vaultScanFileCount, this.state.vaultScanFilteredCount, this.state.activeTab === 'vault')

@@ -9,7 +9,8 @@ export function renderFilesTab(
   blueprintLocked: boolean,
   hasBlueprint: boolean,
   blueprint: any,
-  isActive: boolean
+  isActive: boolean,
+  aiKeys?: { gemini: boolean; claude: boolean; kimi: boolean }
 ): string {
   let html = `<div id="tab-files" class="tab-content ${isActive ? 'active' : ''}">`;
   html += `
@@ -25,6 +26,13 @@ export function renderFilesTab(
       <div class="card" data-action="showSwitchForm">
         <div class="card-icon">🤖</div>
         <div class="card-body"><div class="card-title">Switch AI</div><div class="card-desc">Change which AI does the work.</div></div>
+      </div>
+      <div class="card" data-action="showApiKeysForm">
+        <div class="card-icon">🔑</div>
+        <div class="card-body">
+          <div class="card-title">API Keys</div>
+          <div class="card-desc">${aiKeys ? [aiKeys.gemini?'Gemini ✓':'Gemini —', aiKeys.claude?'Claude ✓':'Claude —', aiKeys.kimi?'Kimi ✓':'Kimi —'].join(' &middot; ') : 'Set your AI keys'}</div>
+        </div>
       </div>
       <div class="card" data-action="showBlueprintForm">
         <div class="card-icon">📋</div>
@@ -67,6 +75,35 @@ export function renderFilesTab(
         ${blueprintLocked ? '' : '<button id="bp-save-btn" style="padding:8px 20px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">Save Blueprint</button><label style="font-size:12px; cursor:pointer;"><input id="bp-lock" type="checkbox" style="margin-right:4px;" />Lock it (no more edits)</label>'}
         <button id="bp-cancel-btn" style="padding:8px 20px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:13px; margin-left:auto;">${blueprintLocked ? 'Close' : 'Cancel'}</button>
       </div>
+    </div>`;
+
+  html += `
+    <div id="api-keys-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
+      <h3 style="margin:0 0 4px 0; font-size:14px;">🔑 AI API Keys</h3>
+      <p style="margin:0 0 14px 0; font-size:11px; color:var(--vscode-descriptionForeground);">Keys are saved to your editor settings. Never shared or uploaded.</p>
+
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Gemini <span style="font-weight:normal; opacity:0.6;">— <a href="https://aistudio.google.com/apikey" style="color:#4ec959;">Get free key</a></span></label>
+      <div style="display:flex; gap:6px; margin-bottom:12px;">
+        <input id="key-gemini" type="password" placeholder="AIza..." style="flex:1; padding:7px 10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:monospace;" />
+        <button class="api-key-save-btn" data-ai="gemini" style="padding:6px 14px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">Save</button>
+        <button class="api-key-clear-btn" data-ai="gemini" style="padding:6px 10px; background:transparent; color:#f85149; border:1px solid #f85149; border-radius:4px; cursor:pointer; font-size:12px;">Clear</button>
+      </div>
+
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Claude <span style="font-weight:normal; opacity:0.6;">— <a href="https://console.anthropic.com/settings/keys" style="color:#4ec959;">Get key</a></span></label>
+      <div style="display:flex; gap:6px; margin-bottom:12px;">
+        <input id="key-claude" type="password" placeholder="sk-ant-..." style="flex:1; padding:7px 10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:monospace;" />
+        <button class="api-key-save-btn" data-ai="claude" style="padding:6px 14px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">Save</button>
+        <button class="api-key-clear-btn" data-ai="claude" style="padding:6px 10px; background:transparent; color:#f85149; border:1px solid #f85149; border-radius:4px; cursor:pointer; font-size:12px;">Clear</button>
+      </div>
+
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Kimi <span style="font-weight:normal; opacity:0.6;">— <a href="https://platform.moonshot.cn/console/api-keys" style="color:#4ec959;">Get key</a></span></label>
+      <div style="display:flex; gap:6px; margin-bottom:14px;">
+        <input id="key-kimi" type="password" placeholder="sk-..." style="flex:1; padding:7px 10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:monospace;" />
+        <button class="api-key-save-btn" data-ai="kimi" style="padding:6px 14px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px;">Save</button>
+        <button class="api-key-clear-btn" data-ai="kimi" style="padding:6px 10px; background:transparent; color:#f85149; border:1px solid #f85149; border-radius:4px; cursor:pointer; font-size:12px;">Clear</button>
+      </div>
+
+      <button id="api-keys-close-btn" style="padding:7px 18px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:12px;">Close</button>
     </div>`;
 
   html += '</div>';
