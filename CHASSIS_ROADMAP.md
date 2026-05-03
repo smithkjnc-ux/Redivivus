@@ -189,7 +189,13 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 - **Build timestamp in header:** CHASSIS header shows "Built: HH:MM:SS" using `.chassis/build-info.json` written at compile time — confirms changes are deployed.
 - **Vault scan command fix:** Was calling non-existent `chassis.openWizard`. Fixed to use correct `chassis.wizard` command.
 - **Windsurf deployment:** Confirmed Windsurf uses its own extension directory `~/.windsurf/extensions/`. Must use `vsce package + windsurf --install-extension chassis-0.2.0.vsix --force` to deploy, NOT VS Code's `code --install-extension`.
+- **Infinite loop fix:** `vscode:prepublish` must call `tsc` directly, NOT `npm run compile`. Calling `npm run compile` from `vscode:prepublish` causes `vsce package → prepublish → compile → vsce package → ...` loop. Fixed by changing `vscode:prepublish` to `"tsc -p ./"`.
+- **Multi-AI expansion:** CHASSIS now supports 6 providers — Gemini 2.5 Flash (free), Groq Llama 3.3 (free), Claude 3.5 Haiku (paid), GPT-4o Mini (paid), Grok 3 Mini (paid), Kimi (paid). `RoutingService` auto-detects available keys, uses preferred AI, falls back to first available. Keys read from both CHASSIS settings and env vars.
+- **API Keys UI:** New 🔑 API Keys card in Files & AI tab. Each provider row shows FREE/PAID badge, clickable "Sign up / Get key" button that opens browser, key input with Save/Remove. Keys saved to global VS Code settings. Clipboard fallback when no key set: copies prompt to clipboard and opens editor AI chat.
+- **AI badge in header:** Shows current AI. If preferred AI has no key and fallback is used, badge turns yellow and shows `AI: GEMINI → using Groq (fallback)`. Red badge with "No AI Key Set" if nothing configured.
+- **New `saveApiKey` message type** in `messageRouter.ts` saves/clears keys via `ConfigurationTarget.Global`.
+- **`openExternal` message type** added to route webview link clicks through `vscode.env.openExternal` (required since webviews block `href` navigation).
 
 ---
 
-*Last updated: May 3, 2026 — Session: Vault AI categorization + Fix Categories rescan + auto-commit on build + Windsurf deployment fix.*
+*Last updated: May 3, 2026 — Session: Multi-AI support + API Keys UI + FREE/PAID badges + browser link fix + infinite loop fix.*
