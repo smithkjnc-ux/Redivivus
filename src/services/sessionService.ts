@@ -99,13 +99,21 @@ export class SessionService {
         `- Next session: ${interview.nextSessionStart}`
       );
 
+      // auto-update roadmap
+      this.chassis.appendRoadmap(
+        this.currentSession.goal,
+        interview.completed,
+        interview.inProgress,
+        interview.nextSessionStart
+      );
+
       // save session file
       this.saveSessionFile(interview);
     }
 
     this.currentSession = null;
     vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
-    vscode.window.showInformationMessage('CHASSIS session ended.');
+    vscode.window.showInformationMessage('CHASSIS session ended. Roadmap updated.');
   }
 
   async endSessionWithData(data: any): Promise<void> {
@@ -127,10 +135,18 @@ export class SessionService {
       '- Next session: ' + interview.nextSessionStart
     );
 
+    // auto-update roadmap
+    this.chassis.appendRoadmap(
+      this.currentSession.goal,
+      interview.completed,
+      interview.inProgress,
+      interview.nextSessionStart
+    );
+
     this.saveSessionFile(interview);
     this.currentSession = null;
     vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
-    vscode.window.showInformationMessage('CHASSIS session ended.');
+    vscode.window.showInformationMessage('CHASSIS session ended. Roadmap updated.');
   }
 
   private async runExitInterview(): Promise<ExitInterview | null> {

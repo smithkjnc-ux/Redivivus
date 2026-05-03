@@ -38,6 +38,10 @@ export class ChassisService {
     return path.join(this.chassisDir, 'sessions');
   }
 
+  get roadmapPath(): string {
+    return path.join(this.workspaceRoot || '', 'CHASSIS_ROADMAP.md');
+  }
+
   // ── state checks ──
 
   isInitialized(): boolean {
@@ -298,6 +302,36 @@ Use these tags in code comments to mark intent:
     const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
     const entry = `## [${timestamp}]\n${text}\n\n`;
     fs.appendFileSync(this.worklogPath, entry);
+  }
+
+  // ── roadmap append ──
+
+  appendRoadmap(sessionGoal: string, completed: string[], inProgress: string[], nextStart: string): void {
+    const roadmap = this.roadmapPath;
+    if (!fs.existsSync(roadmap)) { return; }
+    const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
+    const lines: string[] = [
+      `## [${timestamp}] — Session End`,
+      `- **Goal:** ${sessionGoal}`,
+    ];
+    if (completed.length > 0) lines.push(`- **Completed:** ${completed.join(', ')}`);
+    if (inProgress.length > 0) lines.push(`- **In Progress:** ${inProgress.join(', ')}`);
+    if (nextStart) lines.push(`- **Next session starts with:** ${nextStart}`);
+    lines.push('');
+
+    // Update the "Last updated" line
+    let content = fs.readFileSync(roadmap, 'utf-8');
+    const entry = lines.join('\n');
+    // Insert before the last --- separator
+    const lastSep = content.lastIndexOf('\n---\n');
+    if (lastSep !== -1) {
+      content = content.slice(0, lastSep) + '\n' + entry + '\n---\n' + content.slice(lastSep + 5);
+    } else {
+      content += '\n' + entry;
+    }
+    // Refresh last updated line
+    content = content.replace(/\*Last updated:.*?\*$/m, `*Last updated: ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })} — Session: ${sessionGoal}*`);
+    fs.writeFileSync(roadmap, content);
   }
 
   // ── dead end append ──

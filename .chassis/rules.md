@@ -21,5 +21,19 @@ Use these tags in code comments to mark intent:
 - All user-facing text must be plain English appropriate for the WHO audience
 - Do not introduce dependencies outside the WHERE tech stack
 - Do not build features outside the WHAT scope
-- Read CHASSIS_ROADMAP.md before starting work. Update it when done.
 - The blueprint is in .chassis/config.json. Do not contradict it.
+
+## MANDATORY — Documentation Protocol (NON-NEGOTIABLE)
+These rules apply to EVERY AI working on this project, every session, no exceptions:
+
+1. **READ FIRST:** Before writing any code, read `CHASSIS_ROADMAP.md` in full.
+2. **UPDATE ON END:** When ending a session (Done for Now / Stop Working), `CHASSIS_ROADMAP.md` MUST be updated. CHASSIS does this automatically via the session end hook. If working outside a CHASSIS session, update it manually.
+3. **WHAT TO ADD to Recent Fixes:**
+   - Every file modified and why
+   - Every bug fixed and root cause
+   - Every new feature added
+   - Any architectural decisions made
+4. **UPDATE "Last updated" LINE** at the bottom of `CHASSIS_ROADMAP.md` with today's date and session goal.
+5. **NEVER end a session without doing steps 2–4.** This is how the next AI session (or next human) knows what happened. Skipping it breaks the entire project history chain.
+
+> CHASSIS enforces this automatically: the "Done for Now" button writes a session summary block to `CHASSIS_ROADMAP.md` before closing the session. `postcompile.js` warns if the roadmap is more than 1 day stale during every build.
