@@ -196,6 +196,12 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 - **New `saveApiKey` message type** in `messageRouter.ts` saves/clears keys via `ConfigurationTarget.Global`.
 - **`openExternal` message type** added to route webview link clicks through `vscode.env.openExternal` (required since webviews block `href` navigation).
 
+## [2026-05-03 08:03] — Session End
+- **Goal:** Make documentation protocol structural and CHASSIS-independent
+- **Completed:** `chassisService.generateRules()` now embeds full rules into all 6 shim files (`.windsurfrules`, `.cursorrules`, `CLAUDE.md`, `GEMINI.md`, `.clinerules`, `.github/copilot-instructions.md`) instead of one-liner pointers. `sessionService` calls `chassis.appendRoadmap()` on both `endSession` and `endSessionWithData` paths — roadmap auto-updates on every "Done for Now". `rules.md` updated with MANDATORY documentation protocol section. `rulesService.ts` already had full content but was bypassed by `chassisService` — now unified under `buildRulesContent()`. All existing shim files in this repo regenerated with full content (93+ lines each).
+- **In Progress:** Nothing — all changes compiled and committed
+- **Next session starts with:** Install extension to Windsurf and verify Fix Categories button works with an API key set
+
 ---
 
-*Last updated: May 3, 2026 — Session: Multi-AI support + API Keys UI + FREE/PAID badges + browser link fix + infinite loop fix.*
+*Last updated: May 3, 2026 — Session: CHASSIS-independent rule enforcement + session-end roadmap auto-update*
