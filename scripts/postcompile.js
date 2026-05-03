@@ -8,6 +8,20 @@ const path = require('path');
 const workspaceRoot = process.cwd();
 const configPath = path.join(workspaceRoot, '.chassis', 'config.json');
 
+// Check if CHASSIS_ROADMAP.md has been updated recently
+const roadmapPath = path.join(workspaceRoot, 'CHASSIS_ROADMAP.md');
+if (fs.existsSync(roadmapPath)) {
+  const roadmap = fs.readFileSync(roadmapPath, 'utf-8');
+  const match = roadmap.match(/\*Last updated: (.+?) —/);
+  if (match) {
+    const lastUpdated = new Date(match[1]);
+    const daysSince = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysSince > 1) {
+      console.warn(`⚠️  CHASSIS_ROADMAP.md last updated ${Math.floor(daysSince)} day(s) ago. Update it before ending your session.`);
+    }
+  }
+}
+
 // Write build timestamp for visual verification
 const buildTimestamp = new Date().toISOString();
 const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
