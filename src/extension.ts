@@ -7,7 +7,7 @@ import { SessionService } from './services/sessionService.js';
 import { RulesService } from './services/rulesService.js';
 import { ChangeTracker } from './services/changeTracker.js';
 import { MeasureTwiceService } from './services/measureTwiceService.js';
-import { WizardPanel } from './ui/wizardPanel.js';
+import { ChassisWebviewProvider } from './ui/chassisWebviewProvider.js';
 import { WizardService } from './services/wizardService.js';
 import { RetrofitService } from './services/retrofitService.js';
 import { RoutingService } from './services/routingService.js';
@@ -18,7 +18,6 @@ import { VaultService } from './services/vaultService.js';
 import { VaultContextService } from './services/vaultContextService.js';
 import { BuildFromVaultService } from './services/buildFromVaultService.js';
 import { StatusBar } from './ui/statusBar.js';
-import { SidebarProvider } from './ui/sidebarProvider.js';
 
 import { registerInitCommands, runAutoInit } from './commands/init.js';
 import { registerSessionCommands } from './commands/session.js';
@@ -35,6 +34,7 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('[CHASSIS] Activating...');
 
   // ── init services ──
+  // [WARN] This block initializes all core services. The order and dependencies are critical for the extension's functionality.
   const chassisService = new ChassisService();
   const blueprintService = new BlueprintService(chassisService);
   const sessionService = new SessionService(chassisService);
@@ -49,9 +49,9 @@ export function activate(context: vscode.ExtensionContext) {
   const vaultContextService = new VaultContextService(vaultService);
   routingService.setVaultContextService(vaultContextService);
   const buildFromVaultService = new BuildFromVaultService(vaultService, routingService);
-  const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker);
+  const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker, analyzerService);
   const wizardService = new WizardService(chassisService, sessionService);
-  const wizardPanel = new WizardPanel(chassisService, sessionService, context);
+  const chassisProvider = new ChassisWebviewProvider(chassisService, sessionService, context);
   const statusBar = new StatusBar(chassisService, sessionService);
 
   // ── set initial context ──
@@ -62,18 +62,21 @@ export function activate(context: vscode.ExtensionContext) {
   annotationService.activate(context);
   statusBar.activate(context);
 
-  // ── sidebar ──
-  const sidebarProvider = new SidebarProvider(chassisService, sessionService);
-  const treeView = vscode.window.createTreeView('chassisPanel', { treeDataProvider: sidebarProvider });
-  context.subscriptions.push(treeView);
+  // ── sidebar webview ──
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ChassisWebviewProvider.viewType, chassisProvider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    })
+  );
 
   // ── shared refresh helper ──
   function refreshAll() {
     statusBar.update();
-    sidebarProvider.refresh();
+    chassisProvider.refresh();
   }
 
   // ── auto-init after folder-picker reload ──
+  // [WARN] This function handles critical auto-initialization logic, especially important after VS Code reloads or workspace changes.
   runAutoInit(context, chassisService, refreshAll);
 
   // ── register commands ──
@@ -86,7 +89,7 @@ export function activate(context: vscode.ExtensionContext) {
   registerRetrofitCommands(context, chassisService, retrofitService, refreshAll);
   registerVaultCommands(context, chassisService, vaultService, refreshAll);
   registerBuildFromVaultCommand(context, buildFromVaultService);
-  registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, wizardPanel, refreshAll);
+  registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, chassisProvider, refreshAll);
 
   console.log('[CHASSIS] Activated — Phase 1 + Phase 2 + commands split');
 }

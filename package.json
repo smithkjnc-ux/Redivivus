@@ -29,7 +29,8 @@
       "chassisView": [
         {
           "id": "chassisPanel",
-          "name": "CHASSIS"
+          "name": "CHASSIS",
+          "type": "webview"
         }
       ]
     },

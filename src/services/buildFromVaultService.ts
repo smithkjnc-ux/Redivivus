@@ -1,17 +1,12 @@
-// [SCOPE] Build From Vault Service — assembles features from vault items + fills gaps with AI
+// [SCOPE] Build From Vault Service orchestrator — thin facade over types and search modules
+// Split from 228-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { VaultService, VaultItem } from './vaultService.js';
 import { RoutingService } from './routingService.js';
-
-interface BuildPlan {
-  task: string;
-  vaultItems: VaultItem[];
-  gaps: string[];
-  assembledCode: string;
-  targetFile?: string;
-}
+import { BuildPlan } from './buildFromVaultTypes.js';
+import { findRelevantByTask } from './buildFromVaultSearch.js';
 
 export class BuildFromVaultService {
   constructor(
@@ -41,7 +36,7 @@ export class BuildFromVaultService {
       cancellable: true,
     }, async (progress, token) => {
 
-      // ── Step 3: Search vault for relevant items ──
+      // ── Step 3: Search vault for relevant items (delegated to search module)
       progress.report({ message: 'Searching vault for relevant code...' });
       const allItems = this.vaultService.listItems(true);
       if (allItems.length === 0) {
@@ -49,9 +44,9 @@ export class BuildFromVaultService {
         return;
       }
 
-      const relevant = this.findRelevantByTask(task, allItems);
+      const relevant = findRelevantByTask(task, allItems);
 
-      // ── Step 4: Ask AI to plan — what to use from vault, what gaps exist ──
+      // ── Step 4: Ask AI to plan — what to use from vault, what gaps exist
       progress.report({ message: `Found ${relevant.length} vault candidates — asking AI to plan...` });
 
       const vaultSummary = relevant.slice(0, 12).map(item => {
@@ -94,7 +89,7 @@ Only include vault items that are genuinely useful for this task. Be honest abou
         return;
       }
 
-      // ── Step 5: Show plan to user for approval ──
+      // ── Step 5: Show plan to user for approval
       const selectedItems = relevant.filter(i => plan.useFromVault.includes(i.block.name));
       const vaultLines = selectedItems.length > 0
         ? selectedItems.map(i => `  ✅ ${i.block.name} (${i.tags.join('/')}${i.subcategory ? ' › ' + i.subcategory : ''})`).join('\n')
@@ -112,7 +107,7 @@ Only include vault items that are genuinely useful for this task. Be honest abou
       );
       if (confirm !== 'Build It' || token.isCancellationRequested) { return; }
 
-      // ── Step 6: Assemble — AI writes final code using vault items + fills gaps ──
+      // ── Step 6: Assemble — AI writes final code using vault items + fills gaps
       progress.report({ message: 'Assembling code from vault + writing gaps...' });
 
       const vaultCode = selectedItems.map(item => {
@@ -148,7 +143,7 @@ Rules:
         return;
       }
 
-      // ── Step 7: Show result in new editor tab ──
+      // ── Step 7: Show result in new editor tab
       const lang = targetFile
         ? (targetFile.endsWith('.ts') || targetFile.endsWith('.tsx') ? 'typescript'
           : targetFile.endsWith('.js') || targetFile.endsWith('.jsx') ? 'javascript'
@@ -161,7 +156,7 @@ Rules:
       });
       await vscode.window.showTextDocument(doc, { preview: false });
 
-      // ── Step 8: Offer to save ──
+      // ── Step 8: Offer to save
       const saveTarget = targetFile?.trim();
       if (saveTarget) {
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -188,40 +183,5 @@ Rules:
         );
       }
     });
-  }
-
-  // ── Task-aware vault search — keyword extraction from natural language ──
-  private findRelevantByTask(task: string, items: VaultItem[]): VaultItem[] {
-    const taskLower = task.toLowerCase();
-
-    // Extract words from task (3+ chars, no stop words)
-    const stopWords = new Set(['the','and','for','with','that','this','from','into','when','will','make','have','add','new','get','set','use','its','are','was','not','but','can','all','any','put','our','out','has','had','more','than','then','some','such','also','into','over','only','just','how','what','each','they','them','been','were','does','did','let','per','via']);
-    const taskWords = taskLower
-      .replace(/[^a-z0-9 ]/g, ' ')
-      .split(/\s+/)
-      .filter(w => w.length >= 3 && !stopWords.has(w));
-
-    return items
-      .map(item => {
-        let score = 0;
-        const itemText = [
-          item.block.name.toLowerCase(),
-          item.block.filePath.toLowerCase(),
-          item.tags.join(' '),
-          item.subcategory || '',
-          item.block.code.slice(0, 200).toLowerCase(),
-        ].join(' ');
-
-        for (const word of taskWords) {
-          if (itemText.includes(word)) { score += 2; }
-        }
-        // boost exact name matches
-        if (taskLower.includes(item.block.name.toLowerCase())) { score += 5; }
-        return { item, score };
-      })
-      .filter(s => s.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 15)
-      .map(s => s.item);
   }
 }

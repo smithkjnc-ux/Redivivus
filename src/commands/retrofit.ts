@@ -1,5 +1,4 @@
-// [SCOPE] CHASSIS Retrofit commands — apply CHASSIS to existing projects
-
+// [SCOPE] Registers VS Code commands related to CHASSIS retrofit operations, including initiating, confirming, and reverting project retrofits.
 import * as vscode from 'vscode';
 import { ChassisService } from '../services/chassisService.js';
 import { RetrofitService } from '../services/retrofitService.js';

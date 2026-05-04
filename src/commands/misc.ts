@@ -5,7 +5,7 @@ import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
 import { GuideService } from '../services/guideService.js';
 import { RulesService } from '../services/rulesService.js';
-import { WizardPanel } from '../ui/wizardPanel.js';
+import { ChassisWebviewProvider } from '../ui/chassisWebviewProvider.js';
 
 export function registerMiscCommands(
   context: vscode.ExtensionContext,
@@ -13,7 +13,7 @@ export function registerMiscCommands(
   sessions: SessionService,
   guideService: GuideService,
   rulesService: RulesService,
-  wizardPanel: WizardPanel,
+  provider: ChassisWebviewProvider,
   refreshAll: () => void
 ): void {
   // Show Progress
@@ -104,10 +104,11 @@ export function registerMiscCommands(
     })
   );
 
-  // Wizard Panel
+  // Wizard Panel — focus the sidebar webview
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.wizard', async () => {
-      wizardPanel.show();
+      await vscode.commands.executeCommand('chassisPanel.focus');
+      provider.refresh();
     })
   );
 
@@ -125,9 +126,11 @@ export function registerMiscCommands(
         return;
       }
 
+      // [WARN] Using synchronous child_process.execSync which can block the event loop and has security implications.
       // Check if there are changes to commit
       const { execSync } = require('child_process');
       try {
+        // [WARN] Using synchronous child_process.execSync.
         const status = execSync('git status --porcelain', { encoding: 'utf-8', cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
         if (!status.trim()) {
           vscode.window.showInformationMessage('No changes to commit.');
@@ -146,7 +149,9 @@ export function registerMiscCommands(
 
       if (mode === 'auto') {
         try {
+          // [WARN] Using synchronous child_process.execSync.
           execSync(`git add -A`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+          // [WARN] Using synchronous child_process.execSync.
           execSync(`git commit -m "${commitMessage}"`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
           vscode.window.showInformationMessage('Auto-committed successfully.');
         } catch (e) {
@@ -160,7 +165,9 @@ export function registerMiscCommands(
         });
         if (result) {
           try {
+            // [WARN] Using synchronous child_process.execSync.
             execSync(`git add -A`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
+            // [WARN] Using synchronous child_process.execSync.
             execSync(`git commit -m "${result}"`, { cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath });
             vscode.window.showInformationMessage('Committed successfully.');
           } catch (e) {

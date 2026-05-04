@@ -1,4 +1,4 @@
-// [SCOPE] Measure Twice, Cut Once — validates AI output before applying
+// [SCOPE] This service validates AI-generated code modifications before they are applied, ensuring syntax, structure, and intent are preserved.
 
 import * as vscode from 'vscode';
 
@@ -66,19 +66,19 @@ export class MeasureTwiceService {
 
     // ── Pass 2: Logic Check ──
 
-    // check for significant code removal (more than 10% of lines gone)
+    // [WARN] Heuristic: Significant code removal is defined as more than 15% of lines gone.
     const codeRemoved = modLines.length < origLines.length * 0.85;
     if (codeRemoved) {
       issues.push('Significant code removed: ' + origLines.length + ' → ' + modLines.length + ' lines (' + Math.round((1 - modLines.length / origLines.length) * 100) + '% reduction)');
     }
 
-    // check for duplication (file grew more than 30% from just adding comments)
+    // [WARN] Heuristic: Code duplication is defined as file grew more than 30% from just adding comments.
     const codeDuplicated = modLines.length > origLines.length * 1.3;
     if (codeDuplicated) {
       warnings.push('File grew significantly: ' + origLines.length + ' → ' + modLines.length + ' lines (' + Math.round((modLines.length / origLines.length - 1) * 100) + '% increase) — check for duplicated code');
     }
 
-    // check for double annotations
+    // [WARN] Heuristic: Multiple [SCOPE] tags found (more than 3) typically indicates an issue.
     const scopeCount = (modifiedContent.match(/\[SCOPE\]/g) || []).length;
     if (scopeCount > 3) {
       warnings.push('Multiple [SCOPE] tags found (' + scopeCount + ') — should usually be 1 per file');
@@ -97,6 +97,7 @@ export class MeasureTwiceService {
         missingLines++;
       }
     }
+    // [WARN] Heuristic: More than 20% of sampled lines missing/changed suggests significant modification.
     if (missingLines > sample.length * 0.2) {
       issues.push('Original code may have been modified: ' + missingLines + '/' + sample.length + ' sampled code lines are missing or changed');
     }

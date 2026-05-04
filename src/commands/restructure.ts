@@ -21,6 +21,7 @@ export function registerRestructureCommands(
       let filePath: string;
       if (pickedPath) {
         filePath = pickedPath;
+        // [WARN] Assumes `vscode.workspace.workspaceFolders` is not empty. If there's no open folder, this will throw.
         const uri = vscode.Uri.file(path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, pickedPath));
         doc = await vscode.workspace.openTextDocument(uri);
       } else {
@@ -33,7 +34,7 @@ export function registerRestructureCommands(
         filePath = vscode.workspace.asRelativePath(doc.uri);
       }
 
-      // stub restructure if no API key
+      // [WARN] Relies on external configuration or environment variable for critical API access.
       const hasKey = !!(vscode.workspace.getConfiguration('chassis').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY);
       if (!hasKey) {
         vscode.window.showInformationMessage(
@@ -64,6 +65,7 @@ export function registerRestructureCommands(
         const content = doc.getText();
         const lineCount = content.split('\n').length;
         progress.report({ message: 'Sending ' + lineCount + ' lines to Gemini...' });
+        // [WARN] This is the core AI API call. Its success is critical for the command to function, and its output directly modifies user code.
         const result = await routingService.analyzeFile(
           filePath, content,
           'Add CHASSIS annotations to this file. Add [SCOPE] at top, convert TODOs, flag warnings.',
@@ -83,6 +85,7 @@ export function registerRestructureCommands(
         await vscode.window.showTextDocument(newDoc, { preview: false });
 
         // ── Measure Twice, Cut Once ──
+        // [WARN] Critical safety mechanism to prevent unintended modifications. If this validation fails or is bypassed, user code could be corrupted.
         const validation = measureTwice.validate(content, result.text, filePath);
         const validReport = measureTwice.formatReport(validation, filePath);
 
@@ -112,6 +115,7 @@ export function registerRestructureCommands(
           const edit = new vscode.WorkspaceEdit();
           const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(content.length));
           edit.replace(doc.uri, fullRange, result.text);
+          // [WARN] Directly applies the AI-generated changes to the user's active document. This is a high-impact operation that can alter source code.
           await vscode.workspace.applyEdit(edit);
           await doc.save();
 

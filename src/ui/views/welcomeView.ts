@@ -1,37 +1,46 @@
-// [SCOPE] CHASSIS Welcome views — uninitialized dashboard + retrofit pending
+// [SCOPE] Provides UI rendering functions for the initial welcome screen and retrofit pending status.
 
 export function renderWelcomeView(): string {
   return `
-    <div class="section-title">Welcome! What brings you here?</div>
+    <div style="margin: 12px 4px 16px 4px; padding: 14px; background: rgba(59,157,255,0.06); border: 1px solid rgba(59,157,255,0.2); border-radius: 8px;">
+      <div style="font-size: 13px; font-weight: 600; margin-bottom: 6px;">👋 Welcome to CHASSIS</div>
+      <div style="font-size: 11px; color: var(--vscode-descriptionForeground); line-height: 1.6;">
+        CHASSIS keeps your AI coding organized. Pick one to get started:
+      </div>
+    </div>
+    <div class="section-title">What would you like to do?</div>
     <div class="cards">
       <div class="card primary" data-action="startWizard">
         <div class="card-icon">🚀</div>
         <div class="card-body">
-          <div class="card-title">Start a New Project</div>
-          <div class="card-desc">I'll help you set up your project with a simple interview about what you're building.</div>
+          <div class="card-title">I'm starting a new project</div>
+          <div class="card-sub">Answer 5 quick questions and CHASSIS sets everything up for you</div>
         </div>
       </div>
       <div class="card" data-action="pickProject">
         <div class="card-icon">📂</div>
         <div class="card-body">
-          <div class="card-title">Open Existing Project</div>
-          <div class="card-desc">Already have a project? Open its folder and CHASSIS will detect your setup.</div>
+          <div class="card-title">I have an existing project</div>
+          <div class="card-sub">Open a folder you're already working on — CHASSIS will pick up from there</div>
         </div>
       </div>
       <div class="card" data-cmd="chassis.wizardRetrofit">
         <div class="card-icon">🔧</div>
         <div class="card-body">
-          <div class="card-title">Organize Existing Code</div>
-          <div class="card-desc">Got messy code? I'll scan it, show you what needs fixing, and clean it up for you.</div>
+          <div class="card-title">My code is a mess — help me clean it up</div>
+          <div class="card-sub">CHASSIS will scan your files and add organization notes your AI can understand</div>
         </div>
       </div>
       <div class="card" data-cmd="chassis.guide">
         <div class="card-icon">📖</div>
         <div class="card-body">
-          <div class="card-title">What is CHASSIS?</div>
-          <div class="card-desc">New here? Learn what this tool does and how it can help you.</div>
+          <div class="card-title">What is CHASSIS? How does it work?</div>
+          <div class="card-sub">New here? Read the plain English guide before you start</div>
         </div>
       </div>
+    </div>
+    <div style="text-align:center; margin-top:20px; padding-top:14px; border-top:1px solid var(--vscode-input-border,#334455);">
+      <span data-action="dismissWelcome" style="font-size:11px; color:var(--vscode-descriptionForeground); cursor:pointer; text-decoration:underline; opacity:0.7;">Not now — just let me look around</span>
     </div>`;
 }
 

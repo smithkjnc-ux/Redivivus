@@ -49,6 +49,7 @@ export async function runAutoInit(
               };
               chassis.saveConfig(config);
               const md = '# Blueprint\n\n## WHO\n' + config.blueprint.who + '\n\n## WHAT\n' + config.blueprint.what + '\n\n## WHERE\n' + config.blueprint.where + '\n\n## WHEN\n' + config.blueprint.when + '\n\n## WHY\n' + config.blueprint.why + '\n';
+              // [WARN] Inconsistent usage: 'fs' is imported at the top, but `require('fs')` is used here. Prefer imported 'fs'.
               require('fs').writeFileSync(chassis.blueprintPath, md);
               progress.report({ message: 'Generating editor rules...' });
               chassis.generateRules(pending.name, config.blueprint);
@@ -66,6 +67,7 @@ export async function runAutoInit(
   }
 }
 
+// [NEXT] Split auto-init logic from command registration.
 export function registerInitCommands(
   context: vscode.ExtensionContext,
   chassis: ChassisService,

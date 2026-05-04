@@ -7,6 +7,55 @@
 
 ---
 
+## HARD STOP — YOU MUST DO THIS BEFORE TOUCHING ANY FILE
+
+**You are not permitted to edit, create, or delete any file in this project until you have completed every item on this checklist. This is a precondition, not a suggestion.**
+
+### Pre-Flight Checklist — complete every item, every session, no exceptions:
+- [ ] Read `CHASSIS_ROADMAP.md` in full (not skimmed — read)
+- [ ] Read `.chassis/rules.md` in full
+- [ ] Read `.chassis/blueprint.md` — confirm your planned change fits the project scope
+- [ ] Read the `[SCOPE]` tag at the top of every file you plan to touch
+- [ ] Read every `[WARN]` tag in or near code you plan to change
+- [ ] Search `CHASSIS_ROADMAP.md` for `[DEAD]` entries related to your planned approach
+
+If you skip any item: **stop. Complete it first. Then proceed.**
+
+---
+
+## HARD STOP — YOU MUST DO THIS AFTER EVERY SINGLE FILE CHANGE
+
+After touching any file — one line, one comment, one variable rename, anything:
+
+1. Open `CHASSIS_ROADMAP.md`
+2. Add an entry under "Recent Fixes" containing:
+   - **File changed:** exact filename
+   - **What changed:** specific description
+   - **Why:** the reason
+   - **Risk:** any fragility introduced, or "none"
+3. Update the `*Last updated:*` line with today's date and a one-line summary
+
+**A typo fix gets logged. A comment reword gets logged. A variable rename gets logged. There is no change too small.**
+
+> Failure to log breaks the project history chain for every future AI and human on this project.
+
+---
+
+## File Size Hard Stop — 200 Lines Maximum
+
+**If any file you are editing reaches 200 lines, stop editing it immediately.**
+
+Required steps before continuing:
+1. Split the file by responsibility into smaller files, each under 200 lines
+2. Add `[SCOPE]` at line 1 of every new file
+3. Compile and verify the project still works
+4. Log the split in `CHASSIS_ROADMAP.md`
+
+**Using `[NEXT]` as a substitute for splitting is a rule violation, not compliance.**
+The `[NEXT]` tag is for future work that genuinely cannot be done now — not for work you chose not to finish.
+
+---
+
 ## Project Blueprint
 - **WHO:** Solo developers and vibe coders using AI editors (Windsurf, Cursor, Claude Code, etc.)
 - **WHAT:** VS Code extension that enforces project structure, tracks sessions, and makes AI-generated code consistent across editors through a Universal Project Protocol
@@ -16,36 +65,11 @@
 
 ---
 
-## MANDATORY — Documentation Protocol
-**NO EXCEPTIONS. This applies to every change — code, comments, config, a single line edit, anything.**
-
-### BEFORE touching any file:
-1. Read `CHASSIS_ROADMAP.md` in full.
-
-### AFTER EVERY change — no matter how small:
-2. Open `CHASSIS_ROADMAP.md` and add an entry under "Recent Fixes":
-   - Which file was changed and exactly what was changed
-   - Why the change was made
-   - Any risk introduced
-3. Update the `*Last updated:*` line at the bottom with today's date and what you did.
-
-### This means:
-- Fixed a typo in a comment? Update the roadmap.
-- Changed a variable name? Update the roadmap.
-- Added a single log line? Update the roadmap.
-- **There is no change too small to skip this step.**
-
-> If CHASSIS is installed: "Done for Now" writes this automatically.
-> If CHASSIS is NOT installed: update `CHASSIS_ROADMAP.md` manually before you stop.
-> **Failure to do this breaks the project history chain for every future AI and human working on this project.**
-
----
-
 ## Annotation Tags
-- `[SCOPE]` — what this file/section does. Required at top of every file.
+- `[SCOPE]` — what this file/section does. **Required at line 1 of every file.**
 - `[TODO]` — work to be done
 - `[WARN]` — fragile or risky code. Read before touching.
-- `[NEXT]` — where to pick up next session
+- `[NEXT]` — where to pick up next session (genuine future work only — not a workaround)
 - `[DEAD]` — tried and failed. Don't repeat it.
 - `[DONE]` — completed. Leave for audit trail.
 
@@ -57,47 +81,63 @@
 Annotation tags are the project's navigation system. NEVER delete, move, or modify them without reason.
 
 ### Rule 2: Read [SCOPE] Before Modifying Any File
-Every file starts with [SCOPE]. Read it. If your change doesn't fit, you're in the wrong file.
+Every file starts with [SCOPE]. Read it. If your change doesn't fit the scope, you're in the wrong file.
 
 ### Rule 3: Read [WARN] Before Touching Flagged Code
-[WARN] marks fragile code. Understand WHY before changing anything nearby.
+[WARN] marks fragile code. Understand WHY it is flagged before changing anything nearby.
 
 ### Rule 4: Follow [NEXT] Tags
 [NEXT] tags tell you what should happen next. Follow them in order.
 
 ### Rule 5: Don't Repeat Dead Ends
-[DEAD] documents what was tried and failed. Read before proposing solutions.
+[DEAD] documents what was tried and failed. Always check before proposing a solution.
 
 ### Rule 6: Update Tags When You Make Changes
-- Finished a [TODO]? Change to [DONE] with what you did.
+- Finished a [TODO]? Change it to [DONE] with a note on what was done.
 - Found something fragile? Add [WARN].
-- Leaving work incomplete? Add [NEXT].
-- Tried something that failed? Add [DEAD].
+- Leaving work genuinely incomplete? Add [NEXT].
+- Tried something that failed? Add [DEAD] with an explanation.
 
 ### Rule 7: Correct Comment Syntax Per Language
-ALWAYS use the correct comment character. NEVER use // in Python. NEVER use # in JavaScript.
-  Python/Shell/YAML/Ruby:       # [TAG] description
-  JavaScript/TypeScript/Go/etc: // [TAG] description
-  HTML/XML:                     <!-- [TAG] description -->
-  CSS/SCSS:                     /* [TAG] description */
-  SQL/Lua:                      -- [TAG] description
+ALWAYS use the correct comment character for the file's language.
+```
+TypeScript / JavaScript / Go:  // [TAG] description
+Python / Shell / YAML / Ruby:  # [TAG] description
+HTML / XML / Svelte:           <!-- [TAG] description -->
+CSS / SCSS:                    /* [TAG] description */
+SQL / Lua:                     -- [TAG] description
+```
 
 ### Rule 8: Don't Remove Code Without [DEAD] Logging
-If you remove or replace a block, add [DEAD] explaining what was there and why.
+If you remove or replace a code block, add a `[DEAD]` comment explaining what was there and why it was removed.
 
 ### Rule 9: Keep Files Under 200 Lines
-Files over 200 lines should be split. Add [NEXT] at natural split points.
+Files over 200 lines must be split. See "File Size Hard Stop" above. `[NEXT]` is not an alternative.
 
 ### Rule 10: Check .chassis/ For Context
-Before starting: read `.chassis/blueprint.md`, `.chassis/work_log.md`, `CHASSIS_ROADMAP.md`.
+Before starting any work: read `.chassis/blueprint.md`, `.chassis/work_log.md`, `CHASSIS_ROADMAP.md`.
 
 ### Rule 11: Annotate All New Code
-New file → [SCOPE] at top. New function → comment above it. Risky logic → [WARN]. Incomplete → [TODO] or [NEXT].
+- New file → `[SCOPE]` at line 1
+- New function → comment above it explaining what it does
+- Risky logic → `[WARN]` immediately above it
+- Incomplete work → `[TODO]` or `[NEXT]`
 
 ### Rule 12: No Orphan Code
-Every new file needs [SCOPE]. Every feature must trace to the blueprint. If outside blueprint, add:
-  [SCOPE] WARNING — Not in original blueprint. Added because: [reason]
+Every new file needs `[SCOPE]`. Every feature must trace back to the blueprint. If a change falls outside the blueprint, add:
+```
+[SCOPE] WARNING — Not in original blueprint. Added because: [reason]
+```
 
 ---
 
-*These rules are enforced by CHASSIS. Removing this file does not remove the rules — they are in .chassis/rules.md and every other AI editor config file in this project.*
+## Why These Rules Exist
+
+An AI that skips these rules — even once, even for a "small" change — breaks the chain. The next AI that opens this project will have an incomplete roadmap, missing annotations, and no way to know what was done, why, or what failed. That is the exact problem CHASSIS was built to prevent.
+
+You are working inside a CHASSIS project. The rules are the foundation. Follow them without exception.
+
+---
+
+*These rules are enforced across all AI editors via: `CLAUDE.md`, `.windsurf/rules.md`, `.cursor/rules`, `.chassis/rules.md`*
+*Removing any one file does not remove the rules — they exist in all of the above.*

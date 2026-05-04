@@ -1,5 +1,4 @@
-// [SCOPE] Status bar — shows CHASSIS state at bottom of VS Code
-
+// [SCOPE] Manages and updates the VS Code status bar item for the CHASSIS extension, reflecting project and session states.
 import * as vscode from 'vscode';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
@@ -21,7 +20,8 @@ export class StatusBar {
     this.item.show();
     context.subscriptions.push(this.item);
 
-    // update periodically
+    // [WARN] This interval continuously updates the status bar. Ensure 'update' is performant to avoid UI lag.
+    // [WARN] Proper disposal of this interval is crucial to prevent resource leaks upon deactivation.
     const interval = setInterval(() => this.update(), 5000);
     context.subscriptions.push({ dispose: () => clearInterval(interval) });
   }

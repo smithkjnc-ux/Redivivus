@@ -1,8 +1,8 @@
+// [SCOPE] CHASSIS Dashboard — WebView panel orchestrator
 // // BUILD_TIMESTAMP: 2026-05-03T05:06:16.083Z
 // CHASSIS DESIGN RULE: Every user-facing message MUST be plain English.
 // No raw tag names, no jargon, no code terms. If a non-developer can't
 // understand it in 3 seconds, rewrite it.
-// [SCOPE] CHASSIS Dashboard — WebView panel orchestrator
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
@@ -24,7 +24,7 @@ import { attachMessageRouter, WizardPanelState } from './messageRouter.js';
 export class WizardPanel {
   private panel: vscode.WebviewPanel | undefined;
   private state: WizardPanelState = {
-    wizardStep: 'welcome', wizardData: {},
+    wizardStep: 'welcome', wizardData: {}, welcomeDismissed: false,
     vaultView: 'categories', vaultCategory: null, vaultSubcategory: null, vaultItems: [], vaultGlobal: true,
     activeTab: 'work',
     vaultScanMode: false, vaultScanItems: [], vaultScanDuplicates: [], vaultScanFileCount: 0, vaultScanFilteredCount: 0, vaultScanTotalFound: 0,
@@ -46,7 +46,7 @@ export class WizardPanel {
 
   show(): void {
     if (this.panel) { this.panel.reveal(); this.updateContent(); return; }
-    this.panel = vscode.window.createWebviewPanel('chassisWizard', 'CHASSIS', vscode.ViewColumn.Two, { enableScripts: true });
+    this.panel = vscode.window.createWebviewPanel('chassisWizard', 'CHASSIS', vscode.ViewColumn.One, { enableScripts: true, retainContextWhenHidden: true });
     this.panel.onDidDispose(() => { this.panel = undefined; });
     attachMessageRouter(this.panel.webview, this.chassis, this.sessions, this.vaultService, this.context, this.state, () => this.updateContent(), this.routingService);
     this.updateContent();
@@ -76,6 +76,7 @@ export class WizardPanel {
     if (!this.chassis.isInitialized()) return [];
     const dir = path.join(this.chassis.chassisDir, 'reviews');
     if (!fs.existsSync(dir)) return [];
+    // [WARN] Silently returns empty array on any file system or parsing error.
     try {
       return fs.readdirSync(dir).filter(f => f.endsWith('.md')).sort().reverse().slice(0, 10)
         .map(f => f.replace('_review.md', '').replace(/_/g, '.'));
@@ -115,6 +116,7 @@ export class WizardPanel {
     console.log('[CHASSIS] Looking for build info at:', buildInfoPath);
     console.log('[CHASSIS] chassisDir:', this.chassis.chassisDir);
     console.log('[CHASSIS] File exists:', fs.existsSync(buildInfoPath));
+    // [WARN] Error reading or parsing build-info.json will be caught and logged, but UI will proceed without timestamp.
     if (fs.existsSync(buildInfoPath)) {
       try {
         const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8'));

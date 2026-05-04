@@ -12,6 +12,7 @@ export function getSessionHistory(chassis: ChassisService): {html:string,path:st
     const files = fs.readdirSync(sessDir).filter(f => f.endsWith('.json')).sort().reverse().slice(0, 10);
     return files.map(f => {
       try {
+        // [WARN] Parsing external JSON data can be fragile; gracefully handled by the surrounding try/catch.
         const data = JSON.parse(fs.readFileSync(path.join(sessDir, f), 'utf-8'));
         const date = data.startedAt ? new Date(data.startedAt).toLocaleDateString() : '';
         return {

@@ -28,6 +28,7 @@ export class SidebarProvider implements vscode.TreeDataProvider<ChassisTreeItem>
     if (this._refreshing) { return; }
     this._refreshing = true;
     this._onDidChangeTreeData.fire(undefined);
+    // [WARN] This timeout might lead to race conditions if refresh takes longer than 100ms, potentially causing inconsistent UI state or missed refreshes.
     setTimeout(() => { this._refreshing = false; }, 100);
   }
 

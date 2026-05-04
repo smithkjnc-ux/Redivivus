@@ -25,6 +25,8 @@ export function registerSessionCommands(
   // End Session
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.endSession', async () => {
+      // [WARN] This command directly calls endSession without checking if a session is currently active.
+      // If endSession expects an active session, this could lead to unexpected behavior or errors.
       await sessions.endSession();
       refreshAll();
     })

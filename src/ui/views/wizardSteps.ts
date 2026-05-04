@@ -13,6 +13,7 @@ export interface WizardData {
   parentFolder?: string;
 }
 
+// [WARN] Custom HTML escaping can be fragile and a source of XSS vulnerabilities if not perfectly comprehensive.
 function esc(s: string): string {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -28,30 +29,31 @@ export function renderWizardStep(step: WizardStep, data: WizardData): string {
 
 function renderBlueprintWizard(data: WizardData): string {
   const bp = data.blueprint || {};
+  // [WARN] Large HTML string literal. Prone to errors, consider a templating engine.
   return `
     <div style="margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
-      <h2 style="margin:0 0 4px 0; font-size:18px;">Let's plan your project</h2>
-      <p style="margin:0 0 16px 0; font-size:12px; color:var(--vscode-descriptionForeground);">Answer these 5 questions. Don't overthink it — you can change them later.</p>
+      <h2 style="margin:0 0 4px 0; font-size:18px;">Let's describe your project</h2>
+      <p style="margin:0 0 16px 0; font-size:12px; color:var(--vscode-descriptionForeground);">5 quick questions — no right answers, no tech required. Your AI uses these to understand what you're building.</p>
 
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHO is going to use this?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Picture the person — skill level, context.</p>
-      <textarea id="wiz-bp-who" rows="2" placeholder="e.g. Non-technical users who want to sell locally" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.who || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Who is going to use this?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Just you? Friends? Strangers on the internet? Kids? Anyone specific?</p>
+      <textarea id="wiz-bp-who" rows="2" placeholder="e.g. Just me, for fun — or — My friends who like card games" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.who || '')}</textarea>
 
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHAT does it need to do?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Not the dream list — the minimum useful thing.</p>
-      <textarea id="wiz-bp-what" rows="2" placeholder="e.g. Let users post and find local listings via P2P" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.what || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">What does it do?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Describe it like you'd tell a friend. Don't list everything — just the main thing.</p>
+      <textarea id="wiz-bp-what" rows="2" placeholder="e.g. A simple card game where two players take turns drawing cards" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.what || '')}</textarea>
 
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHERE does this live and run?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">This determines your entire tech stack.</p>
-      <textarea id="wiz-bp-where" rows="2" placeholder="e.g. React Native, Firebase, Android first" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.where || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Where does it run?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">In a browser? On a phone? On your computer? Or just in a terminal? Not sure — say that!</p>
+      <textarea id="wiz-bp-where" rows="2" placeholder="e.g. In a web browser — or — On my Windows PC — or — Not sure yet" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.where || '')}</textarea>
 
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHEN does this need to work?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Timeline and responsiveness requirements.</p>
-      <textarea id="wiz-bp-when" rows="2" placeholder="e.g. MVP in 2 months, real-time messaging" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.when || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">What's your timeline?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">No deadline? That's fine too. Just tell us if this is a weekend project or something bigger.</p>
+      <textarea id="wiz-bp-when" rows="2" placeholder="e.g. Just for fun, no deadline — or — Want something working this weekend" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.when || '')}</textarea>
 
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHY does this need to exist?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">The gut check. If this is weak, know it before coding.</p>
-      <textarea id="wiz-bp-why" rows="2" placeholder="e.g. No marketplace lets you sell locally without tracking" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.why || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Why do you want to build it?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">"Because it sounds fun" is a totally valid answer. Honest answers help your AI give better suggestions.</p>
+      <textarea id="wiz-bp-why" rows="2" placeholder="e.g. I want to learn — or — My kid asked for it — or — I've always wanted one" style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;">${esc(bp.why || '')}</textarea>
 
       <div style="display:flex; gap:8px; margin-top:16px;">
         <button id="wiz-bp-next" style="padding:8px 20px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">Next</button>
@@ -68,6 +70,8 @@ function renderNameLocationWizard(data: WizardData): string {
   const sanitized = name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-_]/g, '');
   const fullPath = sanitized ? path.join(parent, sanitized) : '';
 
+  // [WARN] Large HTML string literal. Prone to errors, consider a templating engine.
+  // [WARN] Manual escaping for input value and data attributes (e.g., `name.replace(/"/g, '&quot;')`) can be brittle.
   return `
     <div style="margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
       <h2 style="margin:0 0 4px 0; font-size:18px;">Name your project</h2>
@@ -89,6 +93,7 @@ function renderNameLocationWizard(data: WizardData): string {
 
 function renderCreating(data: WizardData): string {
   const name = data.projectName || 'your project';
+  // [WARN] Large HTML string literal. Prone to errors, consider a templating engine.
   return `
     <div style="margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455); text-align:center;">
       <div style="font-size:36px; margin-bottom:12px;">⏳</div>

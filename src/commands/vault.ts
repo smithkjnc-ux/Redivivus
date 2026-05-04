@@ -17,21 +17,25 @@ export function registerVaultCommands(
     vscode.commands.registerCommand('chassis.saveToVault', async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
+        // [WARN] Requires an active text editor; will show error if none is open.
         vscode.window.showErrorMessage('Open a file first to save to vault.');
         return;
       }
       const content = editor.document.getText();
       const filePath = editor.document.uri.fsPath;
+      // [WARN] `extractFromFile` involves parsing and potentially AI processing, which can be complex and error-prone.
       const result = vaultService.extractFromFile(filePath, content);
       if (result.items.length === 0) {
         vscode.window.showInformationMessage('No extractable blocks found in this file.');
         return;
       }
       // Show batch summary in wizard panel
+      // [WARN] Relies on `WizardPanel.activePanel` being correctly set after `chassis.wizard` command execution.
+      // This could introduce a race condition or state issue if the panel isn't ready immediately.
       if (!WizardPanel.activePanel) {
         await vscode.commands.executeCommand('chassis.wizard');
       }
-      const panel = WizardPanel.activePanel!;
+      const panel = WizardPanel.activePanel!; // [WARN] Non-null assertion; assumes `activePanel` is set after the command.
       panel.setVaultScanResults(result.items, 1, result.filteredCount);
     })
   );
@@ -40,12 +44,17 @@ export function registerVaultCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.scanVaultCodebase', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) { vscode.window.showErrorMessage('No workspace open.'); return; }
+      if (!root) {
+        vscode.window.showErrorMessage('No workspace open.');
+        return;
+      }
+      // [WARN] `vscode.window.withProgress` operations can be cancelled by the user, requiring careful handling of `token.isCancellationRequested`.
       const result = await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: 'CHASSIS Vault: Scanning codebase...',
         cancellable: true,
       }, async (progress, token) => {
+        // [WARN] `vaultService.scanCodebase` can be a long-running, resource-intensive operation across the entire codebase.
         const scanned = await vaultService.scanCodebase(root, undefined, undefined, (msg: string) => {
           if (!token.isCancellationRequested) progress.report({ message: msg });
         });
@@ -57,10 +66,12 @@ export function registerVaultCommands(
         return;
       }
       // Open wizard panel if needed and show batch summary
+      // [WARN] Relies on `WizardPanel.activePanel` being correctly set after `chassis.wizard` command execution.
+      // This could introduce a race condition or state issue if the panel isn't ready immediately.
       if (!WizardPanel.activePanel) {
         await vscode.commands.executeCommand('chassis.wizard');
       }
-      const panel = WizardPanel.activePanel!;
+      const panel = WizardPanel.activePanel!; // [WARN] Non-null assertion; assumes `activePanel` is set after the command.
       panel.setVaultScanResults(result.items, result.fileCount, result.filteredCount);
     })
   );

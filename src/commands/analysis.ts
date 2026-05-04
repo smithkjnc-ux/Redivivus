@@ -23,6 +23,52 @@ export function registerAnalysisCommands(
     })
   );
 
+  // Verify Fix — checks if a file is actually fixed before marking done
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.verifyFix', async (filePath: string, issueType: string) => {
+      if (!filePath || !issueType) {
+        return { fixed: false, reason: 'Missing file path or issue type' };
+      }
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!root) {
+        return { fixed: false, reason: 'No workspace open' };
+      }
+      const uri = vscode.Uri.file(path.join(root, filePath));
+      const doc = await vscode.workspace.openTextDocument(uri);
+      const content = doc.getText();
+      const lines = content.split('\n');
+
+      let fixed = false;
+      let reason = '';
+      let retryPrompt = '';
+
+      if (issueType === 'largeFile') {
+        fixed = lines.length <= 200;
+        if (!fixed) {
+          reason = `File is still ${lines.length} lines (must be under 200)`;
+          retryPrompt = `Split ${filePath} (${lines.length} lines) into smaller files.\nEach new file should handle one responsibility and be under 200 lines.\nKeep all existing behavior — just reorganize the code.\nAdd a // [SCOPE] comment at the top of each new file explaining what it does.\nReference .chassis/rules.md for annotation standards.\nAfter splitting, make sure the project still compiles with: npm run compile`;
+        }
+      } else if (issueType === 'todo') {
+        const hasTodo = lines.some(l => l.includes('[TODO]') || l.includes('TODO:') || l.includes('FIXME') || l.includes('HACK'));
+        fixed = !hasTodo;
+        if (!fixed) {
+          reason = 'File still contains TODO/FIXME markers';
+          const todoLines = lines.filter((l, i) => l.includes('[TODO]') || l.includes('TODO:') || l.includes('FIXME') || l.includes('HACK')).map((l, i) => `L${i + 1}: ${l.trim()}`).slice(0, 3).join('\n');
+          retryPrompt = `Look at ${filePath}\nThere are still TODO/FIXME markers that need to be addressed:\n${todoLines}\n\nImplement these following the project rules in .chassis/rules.md.\nAfter making changes, verify the project still compiles.`;
+        }
+      } else if (issueType === 'uncommented') {
+        const hasScope = lines.some(l => l.includes('[SCOPE]'));
+        fixed = hasScope;
+        if (!fixed) {
+          reason = 'File still has no [SCOPE] comment at the top';
+          retryPrompt = `Add a // [SCOPE] comment at the very top of ${filePath} explaining what this file does, what it connects to, and why it exists.\nAlso add // [WARN] to any fragile or unclear sections.\nReference .chassis/rules.md for the annotation format.\nDo not change any existing code — comments only.`;
+        }
+      }
+
+      return { fixed, reason, retryPrompt };
+    })
+  );
+
   // Analyze Current File — counts CHASSIS tags, shows health
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.analyzeFile', async (pickedPath?: string) => {
@@ -30,6 +76,7 @@ export function registerAnalysisCommands(
       let filePath: string;
       let content: string;
       if (pickedPath) {
+        // [WARN] Accessing `workspaceFolders[0]` directly without checking for existence can lead to runtime errors if no folder is open.
         filePath = pickedPath;
         const uri = vscode.Uri.file(path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, pickedPath));
         doc = await vscode.workspace.openTextDocument(uri);
@@ -47,7 +94,7 @@ export function registerAnalysisCommands(
       const lines = content.split('\n');
       const tagDefs: Record<string, {emoji: string, label: string}> = {
         'SCOPE': { emoji: '\u{1F32F}', label: 'Purpose defined' },
-        'TODO': { emoji: '\u{1F4CB}', label: 'Work to do' },
+        '// [TODO] ': { emoji: '\u{1F4CB}', label: 'Work to do' },
         'WARN': { emoji: '\u26A0\uFE0F', label: 'Watch out' },
         'NEXT': { emoji: '\u27A1', label: 'Planned next' },
         'DEAD': { emoji: '\u{1FAA6}', label: 'Dead end' },
@@ -63,7 +110,7 @@ export function registerAnalysisCommands(
       const totalTags = Object.values(counts).reduce((a, b) => a + b, 0);
       let health = '';
       if (totalTags === 0) health = '\u{1F525} Not annotated yet \u2014 try Clean Up File first';
-      else if (counts['SCOPE'] > 0 && counts['TODO'] === 0 && counts['WARN'] === 0) health = '\u{1F4AA} Looking good! No warnings or open tasks';
+      else if (counts['SCOPE'] > 0 && counts['// [TODO] '] === 0 && counts['WARN'] === 0) health = '\u{1F4AA} Looking good! No warnings or open tasks';
       else if (counts['WARN'] > 0) health = '\u26A0\uFE0F Has warnings that need attention';
       else health = '\u{1F527} In progress \u2014 work remaining';
       let msg = filePath + ' \u2014 ' + lines.length + ' lines\n\n' + health + '\n\n';

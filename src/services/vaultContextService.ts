@@ -48,22 +48,27 @@ export class VaultContextService {
     const parts = filePath.replace(/\\/g, '/').split('/');
     for (const p of parts) {
       const clean = p.replace(/\.[^.]+$/, '').toLowerCase();
+      // [WARN] Heuristic threshold for keyword length from file path
       if (clean.length > 2) { keywords.add(clean); }
     }
 
     // From import statements — imported names and modules hint at domain
+    // [WARN] Regex parsing of imports can be fragile to different import syntaxes or complex paths.
     const importMatches = content.matchAll(/import.*?['"]([^'"]+)['"]/g);
     for (const m of importMatches) {
       const mod = path.basename(m[1]).replace(/\.[^.]+$/, '').toLowerCase();
+      // [WARN] Heuristic threshold for keyword length from module names
       if (mod.length > 2) { keywords.add(mod); }
     }
 
     // From function/class/variable names in content — camelCase split
+    // [WARN] Regex parsing of identifiers can be fragile and might miss some patterns or include irrelevant ones.
     const identifiers = content.matchAll(/\b([a-zA-Z][a-zA-Z0-9]{2,})\b/g);
     const domainWords = new Set<string>();
     for (const m of identifiers) {
       const words = m[1].replace(/([A-Z])/g, ' $1').toLowerCase().trim().split(/\s+/);
       for (const w of words) {
+        // [WARN] Heuristic threshold for keyword length from identifiers
         if (w.length > 3) { domainWords.add(w); }
       }
     }
@@ -71,6 +76,8 @@ export class VaultContextService {
     const wordCounts = new Map<string, number>();
     for (const w of domainWords) {
       const re = new RegExp('\\b' + w + '\\b', 'gi');
+      // [WARN] Heuristic threshold for keyword frequency (appearing >= 2 times)
+      // [WARN] Using RegExp for counting can be resource intensive on large files.
       const count = (content.match(re) || []).length;
       if (count >= 2) { keywords.add(w); }
     }
@@ -83,38 +90,42 @@ export class VaultContextService {
     const fileExt = path.extname(filePath).toLowerCase();
 
     return items.map(item => {
+      // [WARN] Scoring weights are heuristic and may need tuning for optimal performance.
       let score = 0;
 
       // Language match — strongly prefer same language
       const itemExt = path.extname(item.block.filePath).toLowerCase();
-      if (itemExt === fileExt) { score += 3; }
-
+      if (itemExt === fileExt) { score += 3; } // [WARN] Arbitrary weight
       // Category/subcategory keyword hits
       for (const tag of item.tags) {
-        if (keywords.has(tag)) { score += 2; }
+        if (keywords.has(tag)) { score += 2; } // [WARN] Arbitrary weight
       }
-      if (item.subcategory && keywords.has(item.subcategory)) { score += 3; }
+      if (item.subcategory && keywords.has(item.subcategory)) { score += 3; } // [WARN] Arbitrary weight
 
       // Item name keyword hits
       const nameParts = item.block.name.replace(/([A-Z])/g, ' $1').toLowerCase().split(/\s+/);
       for (const part of nameParts) {
-        if (part.length > 3 && keywords.has(part)) { score += 2; }
+        // [WARN] Heuristic threshold for keyword length
+        if (part.length > 3 && keywords.has(part)) { score += 2; } // [WARN] Arbitrary weight
       }
 
       // Item source file path keyword hits
       const srcParts = item.block.filePath.replace(/\\/g, '/').split('/');
       for (const p of srcParts) {
         const clean = p.replace(/\.[^.]+$/, '').toLowerCase();
-        if (clean.length > 2 && keywords.has(clean)) { score += 1; }
+        // [WARN] Heuristic threshold for keyword length
+        if (clean.length > 2 && keywords.has(clean)) { score += 1; } // [WARN] Arbitrary weight
       }
 
       // Code preview keyword hits (weaker signal)
+      // [WARN] Capping the code preview (slice(0, 300)) may omit relevant keywords further down the block.
       const preview = item.block.code.slice(0, 300).toLowerCase();
       let previewHits = 0;
       for (const kw of keywords) {
+        // [WARN] Heuristic threshold for keyword length in preview
         if (kw.length > 4 && preview.includes(kw)) { previewHits++; }
       }
-      score += Math.min(previewHits, 3); // cap preview hits at 3
+      score += Math.min(previewHits, 3); // [WARN] Capping preview hits (Math.min(..., 3)) is an arbitrary heuristic.
 
       return { item, score };
     });

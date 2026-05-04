@@ -12,67 +12,65 @@ export function renderFilesTab(
   isActive: boolean,
   aiKeys?: { gemini: boolean; claude: boolean; openai: boolean; groq: boolean; xai: boolean; kimi: boolean }
 ): string {
+  // [WARN] Building complex HTML via string concatenation is fragile and error-prone.
+  // [WARN] Ensure all user-provided data is properly escaped to prevent XSS.
   let html = `<div id="tab-files" class="tab-content ${isActive ? 'active' : ''}">`;
   html += `
-    <div class="cards cols-2">
-      <div class="card" data-cmd="chassis.retrofit">
-        <div class="card-icon">🔧</div>
-        <div class="card-body"><div class="card-title">Restructure Project</div><div class="card-desc">Clean up all files. Backed up first.</div></div>
-      </div>
+    <div class="section-title">Project Health</div>
+    <div class="cards">
       <div class="card" data-cmd="chassis.analyze">
-        <div class="card-icon">📊</div>
-        <div class="card-body"><div class="card-title">Scan Project</div><div class="card-desc">File counts, problems, recommendations.</div></div>
+        <div class="card-icon">�</div><div class="card-body"><div class="card-title">Scan Project</div><div class="card-sub">Find messy files, unfinished TODOs, and things that need attention</div></div>
       </div>
-      <div class="card" data-action="showSwitchForm">
-        <div class="card-icon">🤖</div>
-        <div class="card-body"><div class="card-title">Switch AI</div><div class="card-desc">Change which AI does the work.</div></div>
-      </div>
-      <div class="card" data-action="showApiKeysForm">
-        <div class="card-icon">🔑</div>
-        <div class="card-body">
-          <div class="card-title">API Keys</div>
-          <div class="card-desc">${aiKeys ? [aiKeys.gemini?'Gemini ✓':'', aiKeys.claude?'Claude ✓':'', aiKeys.openai?'OpenAI ✓':'', aiKeys.groq?'Groq ✓':'', aiKeys.xai?'Grok ✓':'', aiKeys.kimi?'Kimi ✓':''].filter(Boolean).join(' · ') || 'No keys set' : 'Set your AI keys'}</div>
-        </div>
+      <div class="card" data-cmd="chassis.retrofit">
+        <div class="card-icon">�</div><div class="card-body"><div class="card-title">Add Notes to Existing Code</div><div class="card-sub">Have CHASSIS label and organize your existing files</div></div>
       </div>
       <div class="card" data-action="showBlueprintForm">
-        <div class="card-icon">📋</div>
-        <div class="card-body"><div class="card-title">Blueprint</div><div class="card-desc">Your project's 5 W's.</div></div>
-      </div>
-      <div class="card" data-cmd="chassis.log">
-        <div class="card-icon">📜</div>
-        <div class="card-body"><div class="card-title">Work Log</div><div class="card-desc">Session history and changes.</div></div>
-      </div>
-      <div class="card" data-cmd="chassis.deadends">
-        <div class="card-icon">🚫</div>
-        <div class="card-body"><div class="card-title">Dead Ends</div><div class="card-desc">Things that didn't work.</div></div>
-      </div>
-      <div class="card" data-cmd="chassis.guide">
-        <div class="card-icon">📖</div>
-        <div class="card-body"><div class="card-title">Help</div><div class="card-desc">How to use CHASSIS.</div></div>
+        <div class="card-icon">📋</div><div class="card-body"><div class="card-title">My Project Plan</div><div class="card-sub">View or update what you're building and why</div></div>
       </div>
     </div>
-
+    <div class="section-title">AI Settings</div>
+    <div class="cards">
+      <div class="card" data-action="showSwitchForm">
+        <div class="card-icon">🤖</div><div class="card-body"><div class="card-title">Switch AI</div><div class="card-sub">Choose which AI assistant CHASSIS talks to</div></div>
+      </div>
+      <div class="card" data-action="showApiKeysForm">
+        <div class="card-icon">🔑</div><div class="card-body"><div class="card-title">API Keys</div><div class="card-sub">Connect your AI accounts (Gemini is free to start)</div></div>
+      </div>
+    </div>
+    <div class="section-title">History & Help</div>
+    <div class="cards">
+      <div class="card" data-cmd="chassis.log">
+        <div class="card-icon">📜</div><div class="card-body"><div class="card-title">Work Log</div><div class="card-sub">See everything you've done in this project</div></div>
+      </div>
+      <div class="card" data-cmd="chassis.deadends">
+        <div class="card-icon">🚫</div><div class="card-body"><div class="card-title">Dead Ends</div><div class="card-sub">Things you tried that didn't work — so you don't repeat them</div></div>
+      </div>
+      <div class="card" data-cmd="chassis.guide">
+        <div class="card-icon">📖</div><div class="card-body"><div class="card-title">Help & Guide</div><div class="card-sub">How to use CHASSIS — a plain English walkthrough</div></div>
+      </div>
+    </div>`;
+  html += `
     <div id="blueprint-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
-      <h3 style="margin:0 0 4px 0; font-size:14px;">Blueprint &mdash; ${esc(projectName || 'Your Project')}</h3>
-      <p style="margin:0 0 8px 0; font-size:11px; color:var(--vscode-descriptionForeground);">These answers shape every decision. Be specific.</p>
+      <h3 style="margin:0 0 4px 0; font-size:14px;">My Project Plan &mdash; ${esc(projectName || 'Your Project')}</h3>
+      <p style="margin:0 0 8px 0; font-size:11px; color:var(--vscode-descriptionForeground);">Your AI reads these answers every session. The more honest you are, the better it helps.</p>
       ${blueprintLocked ? '<div class="alert" style="background:rgba(78,201,89,0.08); border-color:rgba(78,201,89,0.3); margin-bottom:12px;"><div class="alert-icon">🔒</div><div class="alert-text">This blueprint is locked. No more edits.</div></div>' : hasBlueprint ? '<div class="alert" style="margin-bottom:12px;"><div class="alert-icon">⚠️</div><div class="alert-text">Changing the blueprint mid-project may shift your direction. Be intentional.</div></div>' : ''}
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHO is going to use this?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Picture the person &mdash; skill level, context.</p>
-      <textarea id="bp-who" rows="2" placeholder="e.g. Non-technical users who want to sell locally" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.who || '')}</textarea>
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHAT does it need to do?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Not the dream list &mdash; the minimum useful thing.</p>
-      <textarea id="bp-what" rows="2" placeholder="e.g. Let users post and find local listings via P2P" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.what || '')}</textarea>
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHERE does this live and run?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">This determines your entire tech stack.</p>
-      <textarea id="bp-where" rows="2" placeholder="e.g. React Native, Firebase, Android first" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.where || '')}</textarea>
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHEN does this need to work?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Timeline and responsiveness requirements.</p>
-      <textarea id="bp-when" rows="2" placeholder="e.g. MVP in 2 months, real-time messaging" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.when || '')}</textarea>
-      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">WHY does this need to exist?</label>
-      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">The gut check. If this is weak, know it before coding.</p>
-      <textarea id="bp-why" rows="2" placeholder="e.g. No marketplace lets you sell locally without tracking" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.why || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Who is going to use this?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Just you? Friends? Anyone specific?</p>
+      <textarea id="bp-who" rows="2" placeholder="e.g. Just me, for fun — or — My friends who like card games" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.who || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">What does it do?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">Describe it like you'd tell a friend — one sentence is fine.</p>
+      <textarea id="bp-what" rows="2" placeholder="e.g. A simple card game where two players take turns" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.what || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Where does it run?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">In a browser? On a phone? On your computer? Not sure is fine too.</p>
+      <textarea id="bp-where" rows="2" placeholder="e.g. In a web browser — or — On my PC — or — Not sure yet" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.where || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">What's your timeline?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">No deadline? That's fine. Weekend project or something bigger?</p>
+      <textarea id="bp-when" rows="2" placeholder="e.g. Just for fun, no deadline — or — Want something working this weekend" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.when || '')}</textarea>
+      <label style="font-size:12px; font-weight:bold; display:block; margin-bottom:4px;">Why do you want to build it?</label>
+      <p style="margin:0 0 4px; font-size:10px; color:var(--vscode-descriptionForeground);">"Because it sounds fun" is a great answer. Honest beats impressive.</p>
+      <textarea id="bp-why" rows="2" placeholder="e.g. I want to learn — or — My kid asked for it — or — Just for fun" ${blueprintLocked ? 'readonly' : ''} style="width:100%; padding:8px; margin-bottom:10px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:inherit; resize:vertical;${blueprintLocked ? ' opacity:0.6;' : ''}">${esc(blueprint?.why || '')}</textarea>
       <div style="display:flex; gap:8px; align-items:center;">
-        ${blueprintLocked ? '' : '<button id="bp-save-btn" style="padding:8px 20px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">Save Blueprint</button><label style="font-size:12px; cursor:pointer;"><input id="bp-lock" type="checkbox" style="margin-right:4px;" />Lock it (no more edits)</label>'}
+        ${blueprintLocked ? '' : '<button id="bp-save-btn" style="padding:8px 20px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">Save My Plan</button><label style="font-size:12px; cursor:pointer;"><input id="bp-lock" type="checkbox" style="margin-right:4px;" />Lock this plan (prevent accidental changes)</label>'}
         <button id="bp-cancel-btn" style="padding:8px 20px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:13px; margin-left:auto;">${blueprintLocked ? 'Close' : 'Cancel'}</button>
       </div>
     </div>`;
@@ -92,6 +90,8 @@ export function renderFilesTab(
       <button id="api-keys-close-btn" style="padding:7px 18px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:12px; margin-top:4px;">Close</button>
     </div>`;
 
+  // [WARN] Building complex HTML via string concatenation is fragile and error-prone.
+  // [WARN] Ensure all user-provided data is properly escaped to prevent XSS.
   function keyRow(id: string, label: string, tier: string, placeholder: string, link: string, hasKey?: boolean): string {
     const isFree = tier === 'Free';
     const tierBg    = isFree ? '#1a3a1a' : '#3a2a0a';
@@ -125,6 +125,8 @@ export function renderFilesTab(
 }
 
 export function renderSwitchForm(currentAI: string): string {
+  // [WARN] Building complex HTML via string concatenation is fragile and error-prone.
+  // [WARN] Ensure all user-provided data is properly escaped to prevent XSS.
   return `
     <div id="switch-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
       <h3 style="margin:0 0 8px 0; font-size:14px;">Pick your AI engine</h3>
