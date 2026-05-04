@@ -1,5 +1,4 @@
 // [SCOPE] This script runs after compilation to perform post-build tasks, including packaging extensions, updating build info, checking roadmap freshness, and managing auto-commits based on CHASSIS configuration.
-#!/usr/bin/env node
 // Post-compile script: packages extension and installs to Windsurf
 
 const { execSync } = require('child_process');

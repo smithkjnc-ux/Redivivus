@@ -8,6 +8,7 @@ import { RulesService } from './services/rulesService.js';
 import { ChangeTracker } from './services/changeTracker.js';
 import { MeasureTwiceService } from './services/measureTwiceService.js';
 import { ChassisWebviewProvider } from './ui/chassisWebviewProvider.js';
+import { ChatPanel } from './ui/chatPanel.js';
 import { WizardService } from './services/wizardService.js';
 import { RetrofitService } from './services/retrofitService.js';
 import { RoutingService } from './services/routingService.js';
@@ -52,6 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
   const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker, analyzerService);
   const wizardService = new WizardService(chassisService, sessionService);
   const chassisProvider = new ChassisWebviewProvider(chassisService, sessionService, context);
+  const chatPanel = new ChatPanel(chassisService, routingService, context);
   const statusBar = new StatusBar(chassisService, sessionService);
 
   // ── set initial context ──
@@ -62,9 +64,12 @@ export function activate(context: vscode.ExtensionContext) {
   annotationService.activate(context);
   statusBar.activate(context);
 
-  // ── sidebar webview ──
+  // ── sidebar webviews ──
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(ChassisWebviewProvider.viewType, chassisProvider, {
+      webviewOptions: { retainContextWhenHidden: true }
+    }),
+    vscode.window.registerWebviewViewProvider(ChatPanel.viewType, chatPanel, {
       webviewOptions: { retainContextWhenHidden: true }
     })
   );

@@ -167,6 +167,7 @@ Whenever `saveBlueprint()` runs in `wizardPanel.ts`, regenerate `.chassis/rules.
 - AI review/restructure commands need API key — show clear stub message when missing
 
 ## Recent Fixes
+- **Chat Panel Phase 1:** Created `src/ui/chatPanel.ts` — sidebar WebView with text input, conversation history, Gemini Flash integration via `routingService.prompt()`, blueprint context injection, code block detection with "Create File" buttons, token/cost estimates. Registered in `package.json` and `extension.ts`. No risk — isolated feature.
 - `chassis.init` now offers a "Create a new subfolder" option when picking a project folder
 - Main dashboard Work tab now includes **New Project** and **Open Project** cards for navigation without leaving the CHASSIS panel
 - `initProject` now scaffolds `src/`, `tests/`, `docs/` folders, a starter `README.md`, and generates CHASSIS shim files immediately
@@ -438,4 +439,4 @@ Full features on one project free. Pay to unlock additional projects. Simpler to
 
 - **Vault tab display fix:** Fixed vault tab (Snippets) not displaying properly in webview. Issue was that client-side `showTab()` function only updated CSS classes but didn't notify extension of state change. Added `vscode.postMessage({ type: 'setTab', tab: name })` to `showTab()` in `scriptsCore.ts`. Added handler in `messageRouterCore.ts` to update `state.activeTab` and refresh webview. Updated function signature to accept `state` parameter. Updated call in `messageRouter.ts` to pass state. Now vault tab opens and displays content correctly when clicked. Compiles clean. [SCOPE] tags preserved. Risk: state sync ensures webview re-renders with correct active tab.
 
-*Last updated: May 3, 2026 — Vault tab display fix; guideService.ts split; blueprintService.ts split; buildFromVaultService.ts split; vaultTab.ts split; wizardService.ts split; sessionService.ts split; vaultService.ts split; rulesService.ts split; routingService.ts split; guardianService.ts split; Done button fix; chassisService.ts split; Done verification; messageRouter.ts split; scripts.ts split; Universal AI enforcement*
+*Last updated: May 4, 2026 — Chat Panel Phase 1 implementation; sidebar chat interface with Gemini integration, conversation history, code blocks, token/cost tracking, blueprint context injection*

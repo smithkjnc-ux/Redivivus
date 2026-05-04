@@ -12,7 +12,8 @@
   ],
   "activationEvents": [
     "workspaceContains:.chassis",
-    "onView:chassisPanel"
+    "onView:chassisPanel",
+    "onView:chatPanel"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -30,6 +31,11 @@
         {
           "id": "chassisPanel",
           "name": "CHASSIS",
+          "type": "webview"
+        },
+        {
+          "id": "chatPanel",
+          "name": "Chat",
           "type": "webview"
         }
       ]
