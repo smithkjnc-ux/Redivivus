@@ -7,6 +7,7 @@ import { VaultService, VaultItem } from './vaultService.js';
 import { RoutingService } from './routingService.js';
 import { BuildPlan } from './buildFromVaultTypes.js';
 import { findRelevantByTask } from './buildFromVaultSearch.js';
+import { BuildFromVaultModal } from '../ui/buildFromVaultModal.js';
 
 export class BuildFromVaultService {
   constructor(
@@ -15,20 +16,15 @@ export class BuildFromVaultService {
   ) {}
 
   async run(): Promise<void> {
-    // ── Step 1: Get task description ──
-    const task = await vscode.window.showInputBox({
-      prompt: 'Describe what you want to build',
-      placeHolder: 'e.g. "add push notifications when a new listing is posted"',
-      ignoreFocusOut: true,
-    });
-    if (!task?.trim()) { return; }
-
-    // ── Step 2: Get optional target file ──
-    const targetFile = await vscode.window.showInputBox({
-      prompt: 'Target file to write into (optional — leave blank for new file)',
-      placeHolder: 'e.g. src/features/listings/notificationService.ts',
-      ignoreFocusOut: true,
-    });
+    // ── Step 1-2: Get task description and target file via modal ──
+    let input: { task: string; targetFile: string };
+    try {
+      input = await BuildFromVaultModal.show();
+    } catch {
+      return; // User cancelled
+    }
+    const task = input.task;
+    const targetFile = input.targetFile;
 
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
