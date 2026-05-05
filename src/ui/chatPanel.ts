@@ -156,15 +156,28 @@ export class ChatPanel {
       `// FROM VAULT [${i.category}]: ${i.name}\n${i.code}`
     ).join('\n\n');
 
-    // Infer file path from task + blueprint
+    // Infer extension: task text takes priority over blueprint.where
+    const taskLow = task.toLowerCase();
     const where = (config?.blueprint?.where || '').toLowerCase();
-    const ext = where.includes('python') ? '.py'
+    const ext = taskLow.includes('python') || taskLow.includes('.py') ? '.py'
+      : taskLow.includes('rust') || taskLow.includes('.rs') ? '.rs'
+      : taskLow.includes(' go ') || taskLow.includes('golang') ? '.go'
+      : taskLow.includes('html') ? '.html'
+      : taskLow.includes('css') && !taskLow.includes('scss') ? '.css'
+      : taskLow.includes('scss') ? '.scss'
+      : taskLow.includes('javascript') || / \bjs\b/.test(taskLow) ? '.js'
+      : taskLow.includes('typescript') || / \bts\b/.test(taskLow) ? '.ts'
+      : taskLow.includes('react') || taskLow.includes('tsx') ? '.tsx'
+      : where.includes('python') ? '.py'
       : where.includes('react') || where.includes('tsx') ? '.tsx'
       : where.includes('javascript') || where.includes('node') ? '.js'
+      : where.includes('rust') ? '.rs'
+      : where.includes('go') ? '.go'
       : '.ts';
-    // Derive a filename from the task (first 4 meaningful words, snake_case)
-    const stopSet = new Set(['build','create','make','write','add','generate','implement','me','a','an','the','that','for','with','using','simple','basic','just']);
-    const words = task.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w => w.length > 1 && !stopSet.has(w));
+    // Derive a clean filename: strip build verbs, language names, filler words
+    const langWords = new Set(['python','javascript','typescript','react','html','css','scss','rust','golang','go','node','nodejs','js','ts','tsx']);
+    const stopSet = new Set(['build','create','make','write','add','generate','implement','scaffold','me','a','an','the','that','for','with','using','simple','basic','just','some','new','my']);
+    const words = taskLow.replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w => w.length > 1 && !stopSet.has(w) && !langWords.has(w));
     const fileBase = words.slice(0, 4).join('_') || 'output';
     const relPath = `src/${fileBase}${ext}`;
     const absPath = path.join(root, relPath);
@@ -182,13 +195,16 @@ RULES:
 - Return ONLY the code — no markdown fences, no explanation, no preamble.`;
 
     let code: string;
+    let buildTokens = 0;
+    let buildCost = 0;
     try {
       const res = await this.routing.prompt(buildPrompt);
       if (!res.success) { throw new Error(res.error || 'AI generation failed'); }
       // Strip markdown fences if AI added them anyway
       code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
-      const tokens = Math.ceil(res.text.length / 4);
-      await this.usageTracker?.recordUsage(tokens, (tokens / 1_000_000) * 0.30, res.model || 'unknown');
+      buildTokens = Math.ceil(res.text.length / 4);
+      buildCost = (buildTokens / 1_000_000) * 0.30;
+      await this.usageTracker?.recordUsage(buildTokens, buildCost, res.model || 'unknown');
     } catch (err) {
       // Replace the thinking message
       this.state.conversation.pop();
@@ -211,7 +227,7 @@ RULES:
     this.state.conversation.pop();
     const vaultNote = relevant.length > 0 ? `, ${relevant.length} vault item(s) used` : ', 0 vault items used';
     const resultMsg = `✅ Created \`${relPath}\`${vaultNote}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__`;
-    this.state.conversation.push({ role: 'assistant', content: resultMsg, timestamp: Date.now() });
+    this.state.conversation.push({ role: 'assistant', content: resultMsg, timestamp: Date.now(), tokens: buildTokens, cost: buildCost });
     this.refresh();
   }
 
