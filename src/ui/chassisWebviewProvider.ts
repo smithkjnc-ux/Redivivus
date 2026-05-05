@@ -154,7 +154,7 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     return `<!DOCTYPE html><html><head><style>${getStyles()}</style></head><body>
-      <div class="header"><h1>C H A S S I S</h1><div class="sub">Your AI coding organizer</div><div class="project">${projectName}</div>${buildTimestamp}</div>
+      <div class="header"><div class="header-left"><h1>C H A S S I S</h1><div class="sub">Your AI coding organizer</div></div><div class="header-right"><button class="chat-button" data-cmd="chassis.openChatPanel">Open Chat</button>${buildTimestamp}</div><div class="project">${projectName}</div></div>
       ${badges}${content}<div class="footer">CHASSIS v0.2.0 &mdash; Built by PapaJoe — ${new Date().toLocaleTimeString()}</div>
       <script>${getScripts()}</script></body></html>`;
   }

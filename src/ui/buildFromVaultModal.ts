@@ -9,9 +9,13 @@ export class BuildFromVaultModal {
   private _resolve: ((result: { task: string; targetFile: string }) => void) | null = null;
   private _reject: ((reason?: any) => void) | null = null;
 
-  public static async show(): Promise<{ task: string; targetFile: string }> {
+  public static async show(prefill?: { task?: string; targetFile?: string }): Promise<{ task: string; targetFile: string }> {
     if (this.currentPanel) {
       this.currentPanel._panel.reveal(vscode.ViewColumn.One);
+      // Update prefill on existing panel
+      if (prefill) {
+        this.currentPanel._panel.webview.postMessage({ type: 'prefill', task: prefill.task || '', targetFile: prefill.targetFile || '' });
+      }
       return new Promise((resolve, reject) => {
         this.currentPanel!._resolve = resolve;
         this.currentPanel!._reject = reject;
@@ -29,7 +33,7 @@ export class BuildFromVaultModal {
       }
     );
 
-    const modal = new BuildFromVaultModal(panel);
+    const modal = new BuildFromVaultModal(panel, prefill);
     this.currentPanel = modal;
 
     return new Promise((resolve, reject) => {
@@ -38,7 +42,7 @@ export class BuildFromVaultModal {
     });
   }
 
-  private constructor(panel: vscode.WebviewPanel) {
+  private constructor(panel: vscode.WebviewPanel, private prefill?: { task?: string; targetFile?: string }) {
     this._panel = panel;
     this._panel.webview.html = this._getHtml();
     this._panel.onDidDispose(() => this.dispose());
@@ -100,10 +104,10 @@ export class BuildFromVaultModal {
   <p>Describe what you want to build. CHASSIS will search your vault for reusable code and fill in any gaps.</p>
   
   <label for="task">Task description *</label>
-  <input type="text" id="task" placeholder="e.g. add push notifications when a new listing is posted" autofocus>
+  <input type="text" id="task" placeholder="e.g. add push notifications when a new listing is posted" autofocus value="${this.prefill?.task ? this.prefill.task.replace(/"/g, '&quot;') : ''}">
   
   <label for="targetFile">Target file (optional)</label>
-  <input type="text" id="targetFile" placeholder="e.g. src/features/listings/notificationService.ts">
+  <input type="text" id="targetFile" placeholder="e.g. src/features/listings/notificationService.ts" value="${this.prefill?.targetFile ? this.prefill.targetFile.replace(/"/g, '&quot;') : ''}">
   
   <div class="buttons">
     <button class="btn-cancel" id="cancel">Cancel</button>
@@ -112,6 +116,15 @@ export class BuildFromVaultModal {
 
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
+
+    // Handle prefill from postMessage (when panel already exists)
+    window.addEventListener('message', (e) => {
+      const msg = e.data;
+      if (msg.type === 'prefill') {
+        if (msg.task) document.getElementById('task').value = msg.task;
+        if (msg.targetFile) document.getElementById('targetFile').value = msg.targetFile;
+      }
+    });
     
     document.getElementById('cancel').addEventListener('click', () => {
       vscode.postMessage({ type: 'cancel' });
@@ -121,7 +134,8 @@ export class BuildFromVaultModal {
       const task = document.getElementById('task').value.trim();
       const targetFile = document.getElementById('targetFile').value.trim();
       if (!task) {
-        alert('Please enter a task description.');
+        document.getElementById('task').focus();
+        document.getElementById('task').style.borderColor = '#f85149';
         return;
       }
       vscode.postMessage({ type: 'build', task, targetFile });
@@ -132,6 +146,13 @@ export class BuildFromVaultModal {
         document.getElementById('build').click();
       }
     });
+
+    // Focus end of task field if pre-filled
+    const taskEl = document.getElementById('task');
+    if (taskEl.value) {
+      taskEl.focus();
+      taskEl.setSelectionRange(taskEl.value.length, taskEl.value.length);
+    }
   </script>
 </body>
 </html>`;

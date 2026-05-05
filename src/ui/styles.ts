@@ -13,10 +13,16 @@ export function getStyles(): string {
     min-height: 100%;
     overflow-y: visible;
   }
-  .header { text-align: center; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--vscode-input-border, #333); }
+  .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--vscode-input-border, #333); }
+  .header-left { display: flex; flex-direction: column; }
+  .header-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
   .header h1 { font-size: 14px; font-weight: 600; letter-spacing: 4px; margin-bottom: 2px; }
   .header .sub { font-size: 10px; color: var(--vscode-descriptionForeground); margin-top: 1px; letter-spacing: 0.5px; }
   .header .project { font-size: 11px; color: var(--vscode-textLink-foreground); margin-top: 2px; }
+  .chat-button {
+    border: 1px solid var(--vscode-button-border); background: var(--vscode-button-background); color: var(--vscode-button-foreground); border-radius: 4px; padding: 6px 10px; cursor: pointer; font-size: 11px;
+  }
+  .chat-button:hover { background: var(--vscode-button-hoverBackground); }
   .badges { display: flex; justify-content: center; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
   .badge { padding: 2px 7px; border-radius: 8px; font-size: 10px; letter-spacing: 0.3px; }
   .green { background: rgba(78,201,89,0.12); color: #4ec959; }

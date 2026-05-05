@@ -15,11 +15,11 @@ export class BuildFromVaultService {
     private routingService: RoutingService,
   ) {}
 
-  async run(): Promise<void> {
+  async run(prefill?: { task?: string; targetFile?: string }): Promise<void> {
     // ── Step 1-2: Get task description and target file via modal ──
     let input: { task: string; targetFile: string };
     try {
-      input = await BuildFromVaultModal.show();
+      input = await BuildFromVaultModal.show(prefill);
     } catch {
       return; // User cancelled
     }
@@ -34,7 +34,7 @@ export class BuildFromVaultService {
 
       // ── Step 3: Search vault for relevant items (delegated to search module)
       progress.report({ message: 'Searching vault for relevant code...' });
-      const allItems = this.vaultService.listItems(true);
+      const allItems = this.vaultService.listItems();
       if (allItems.length === 0) {
         vscode.window.showWarningMessage('Vault is empty — scan a codebase first to populate it.');
         return;
@@ -46,8 +46,7 @@ export class BuildFromVaultService {
       progress.report({ message: `Found ${relevant.length} vault candidates — asking AI to plan...` });
 
       const vaultSummary = relevant.slice(0, 12).map(item => {
-        const sub = item.subcategory ? ` (${item.subcategory})` : '';
-        return `- [${item.tags.join('/')}${sub}] ${item.block.name} (${item.block.type}) — ${path.basename(item.block.filePath)}`;
+        return `- [${item.category}] ${item.name} (${item.language}) — ${path.basename(item.sourceFile)}`;
       }).join('\n');
 
       const planPrompt = `You are CHASSIS, an AI code assembly assistant.
@@ -86,9 +85,9 @@ Only include vault items that are genuinely useful for this task. Be honest abou
       }
 
       // ── Step 5: Show plan to user for approval
-      const selectedItems = relevant.filter(i => plan.useFromVault.includes(i.block.name));
+      const selectedItems = relevant.filter(i => plan.useFromVault.includes(i.name));
       const vaultLines = selectedItems.length > 0
-        ? selectedItems.map(i => `  ✅ ${i.block.name} (${i.tags.join('/')}${i.subcategory ? ' › ' + i.subcategory : ''})`).join('\n')
+        ? selectedItems.map(i => `  ✅ ${i.name} (${i.category})`).join('\n')
         : '  (none matched)';
       const gapLines = plan.gaps.length > 0
         ? plan.gaps.map(g => `  ✏️  ${g}`).join('\n')
@@ -107,8 +106,7 @@ Only include vault items that are genuinely useful for this task. Be honest abou
       progress.report({ message: 'Assembling code from vault + writing gaps...' });
 
       const vaultCode = selectedItems.map(item => {
-        const sub = item.subcategory ? ` › ${item.subcategory}` : '';
-        return `// === FROM VAULT [${item.tags.join('/')}${sub}]: ${item.block.name} ===\n${item.block.code}`;
+        return `// === FROM VAULT [${item.category}]: ${item.name} ===\n${item.code}`;
       }).join('\n\n');
 
       const fileContext = targetFile

@@ -7,8 +7,8 @@ import { SessionService } from './services/sessionService.js';
 import { RulesService } from './services/rulesService.js';
 import { ChangeTracker } from './services/changeTracker.js';
 import { MeasureTwiceService } from './services/measureTwiceService.js';
-import { ChassisWebviewProvider } from './ui/chassisWebviewProvider.js';
 import { ChatPanel } from './ui/chatPanel.js';
+import { ChassisSidebarProvider } from './ui/chassisSidebar.js';
 import { WizardService } from './services/wizardService.js';
 import { RetrofitService } from './services/retrofitService.js';
 import { RoutingService } from './services/routingService.js';
@@ -19,6 +19,7 @@ import { VaultService } from './services/vaultService.js';
 import { VaultContextService } from './services/vaultContextService.js';
 import { BuildFromVaultService } from './services/buildFromVaultService.js';
 import { StatusBar } from './ui/statusBar.js';
+import { UsageTracker } from './services/usageTracker.js';
 
 import { registerInitCommands, runAutoInit } from './commands/init.js';
 import { registerSessionCommands } from './commands/session.js';
@@ -28,8 +29,11 @@ import { registerReviewCommands } from './commands/review.js';
 import { registerRestructureCommands } from './commands/restructure.js';
 import { registerRetrofitCommands } from './commands/retrofit.js';
 import { registerVaultCommands } from './commands/vault.js';
+import { registerVaultBrowseCommand } from './commands/vaultBrowse.js';
 import { registerBuildFromVaultCommand } from './commands/buildFromVault.js';
 import { registerMiscCommands } from './commands/misc.js';
+import { registerApiSetupCommand } from './commands/apiSetup.js';
+import { registerUsageCommands } from './commands/usageCommands.js';
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('[CHASSIS] Activating...');
@@ -52,8 +56,7 @@ export function activate(context: vscode.ExtensionContext) {
   const buildFromVaultService = new BuildFromVaultService(vaultService, routingService);
   const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker, analyzerService);
   const wizardService = new WizardService(chassisService, sessionService);
-  const chassisProvider = new ChassisWebviewProvider(chassisService, sessionService, context);
-  const chatPanel = new ChatPanel(chassisService, routingService, context);
+  const usageTracker = new UsageTracker(context);
   const statusBar = new StatusBar(chassisService, sessionService);
 
   // ── set initial context ──
@@ -64,20 +67,27 @@ export function activate(context: vscode.ExtensionContext) {
   annotationService.activate(context);
   statusBar.activate(context);
 
-  // ── sidebar webviews ──
+  // ── chat panel command ──
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ChassisWebviewProvider.viewType, chassisProvider, {
-      webviewOptions: { retainContextWhenHidden: true }
-    }),
-    vscode.window.registerWebviewViewProvider(ChatPanel.viewType, chatPanel, {
-      webviewOptions: { retainContextWhenHidden: true }
+    vscode.commands.registerCommand('chassis.openChatPanel', () => {
+      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
     })
   );
+
+  // ── sidebar view with CHASSIS functions ──
+  const sidebarProvider = new ChassisSidebarProvider();
+  context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(ChassisSidebarProvider.viewType, sidebarProvider)
+  );
+
+  // ── auto-open chat panel on startup ──
+  setTimeout(() => {
+    ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+  }, 500);
 
   // ── shared refresh helper ──
   function refreshAll() {
     statusBar.update();
-    chassisProvider.refresh();
   }
 
   // ── auto-init after folder-picker reload ──
@@ -92,9 +102,12 @@ export function activate(context: vscode.ExtensionContext) {
   registerReviewCommands(context, chassisService, routingService, changeTracker);
   registerRestructureCommands(context, chassisService, routingService, measureTwice, changeTracker, refreshAll);
   registerRetrofitCommands(context, chassisService, retrofitService, refreshAll);
-  registerVaultCommands(context, chassisService, vaultService, refreshAll);
+  registerVaultCommands(context, chassisService, vaultService, routingService, refreshAll);
+  registerVaultBrowseCommand(context, vaultService);
   registerBuildFromVaultCommand(context, buildFromVaultService);
-  registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, chassisProvider, refreshAll);
+  registerApiSetupCommand(context);
+  registerUsageCommands(context, usageTracker);
+  registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, null as any, refreshAll);
 
   console.log('[CHASSIS] Activated — Phase 1 + Phase 2 + commands split');
 }

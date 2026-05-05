@@ -1,0 +1,163 @@
+# CHASSIS UX Vision — The Human-First Coding Experience
+> **This is the soul of the product. Read this before building ANY UI feature.**
+
+---
+
+## The Problem No One Has Solved
+
+Every vibe editor (Cursor, Windsurf, Copilot) does the same thing:
+1. User types what they want in a tiny sidebar
+2. Code flies by at 100 lines per second — incomprehensible
+3. A wall of green/red diff appears that means nothing to a non-coder
+4. User hopes it works
+
+That's terrifying for the 99% of people who don't write code. Engineers built these tools for engineers. CHASSIS is built for EVERYONE.
+
+**CHASSIS philosophy: "Tell me what you want. I'll handle it. Here's what I made."**
+
+---
+
+## The CHASSIS Chat Experience
+
+### Step 1: The Ask (Centered Modal)
+- Big, centered overlay — like Google's search bar. Not a tiny sidebar input.
+- "What do you want to build?" — large text, no distractions, no code visible
+- User types their request in plain English, hits Enter
+- Modal disappears — the magic starts
+
+### Step 2: The Story (Left Panel — Plain English Progress)
+Instead of showing code streaming, show a HUMAN-READABLE narrative:
+
+```
+🔨 Building your countdown timer...
+
+Looking through your vault for existing code...
+
+Found a timer pattern from your last project! Reusing it.
+
+Now I'm adding the three buttons you asked for — 
+start, pause, and reset.
+
+Adding the sound effect for when time runs out. 
+I'll use a simple beep for now — you can change it later.
+
+Almost done — just cleaning things up and making sure 
+everything connects properly.
+
+✅ Your countdown timer is ready!
+```
+
+- Each line is a sentence a human understands
+- No jargon. No "compiling JSX." No "resolving dependencies."
+- Progress feels like talking to a person who's building something for you
+- The story scrolls at a READABLE pace — not code speed
+
+### Step 3: The Code (Right Panel — Live, Synced)
+- As each story line appears on the left, the corresponding code highlights on the right
+- User sees "Adding the three buttons" → right panel scrolls to button code and gently highlights it
+- They don't need to READ the code — but they can SEE it growing in sync with the story
+- Like watching a house being built with a narrator explaining each step
+- Power users who want to read code can focus here. Everyone else watches the story.
+
+### Step 4: The Result (The "Ta-Da" Moment)
+When done, show a summary card:
+
+```
+✅ Done! Created: countdown-timer.tsx
+
+What I built:
+• A timer that counts down from 5 minutes
+• Start, pause, and reset buttons  
+• Plays a sound when time is up
+
+From vault: 2 pieces reused
+New code: 3 sections generated
+Cost: $0.002
+
+[Preview] [Open File] [Undo Everything]
+```
+
+- **Preview** — shows the result visually if possible (rendered component, screenshot, or simplified view)
+- **Open File** — opens in editor for power users who want to see/edit code
+- **Undo Everything** — one button, instant rollback, zero fear
+- Only show code if they ASK. Non-coders never need to see it.
+
+---
+
+## The Three Feelings
+
+Every CHASSIS interaction should make the user feel:
+
+1. **Involved** — they're watching it happen in real time, in words they understand
+2. **In control** — they asked for this, CHASSIS is doing what they said
+3. **Confident** — they can see progress, not mystery
+
+Every other tool makes the user feel like a passenger.
+CHASSIS makes them feel like the architect watching their blueprint come to life.
+
+---
+
+## What This Means for Implementation
+
+### The centered modal is NOT optional
+- It's the first thing a user sees. It sets the tone.
+- It says "this tool respects your attention" instead of "find the tiny input box"
+- `Ctrl+L` opens it. Click anywhere outside closes it. Escape closes it.
+- After typing, it transitions smoothly to the split view
+
+### The story narration is NOT optional  
+- Every AI action gets a plain English line BEFORE the code appears
+- The story is generated alongside the code — it's part of the prompt to the AI
+- Example prompt addition: "For each section you write, also provide a one-sentence plain English description of what you're doing and why, formatted as a comment starting with // NARRATOR:"
+- CHASSIS strips the narrator lines from the code and displays them in the story panel
+
+### Code streaming speed is CONTROLLED
+- Even if the AI returns code instantly, CHASSIS reveals it at a readable pace
+- Synced with the story — each story line triggers the corresponding code section
+- The user never sees a wall of code appear all at once
+
+### The summary card is NOT optional
+- Every completed action gets a summary
+- Plain English: what was done, what was reused, what it cost
+- Always includes Undo. ALWAYS. The user must never feel trapped.
+
+---
+
+## The Analogy
+
+A chef doesn't make you watch them chop onions. They bring you the dish.
+
+A mechanic doesn't make you watch them torque bolts. They hand you the keys and say "here's what I fixed."
+
+CHASSIS doesn't make you watch code stream. It tells you what it's building, shows you when it's done, and lets you drive.
+
+---
+
+## Competitive Advantage
+
+| Feature | Cursor/Windsurf | CHASSIS |
+|---------|----------------|---------|
+| Input | Tiny sidebar box | Centered modal, full focus |
+| Progress | Raw code streaming | Plain English story |
+| Code view | The ONLY view | Optional, synced with narrative |
+| Result | Diff view | Summary card with Preview/Undo |
+| Target user | Engineers | Everyone |
+| Feeling | "I hope this works" | "I just MADE that" |
+
+No other tool does this. They never will — because their users are engineers who WANT to see code. CHASSIS serves the other 99%.
+
+---
+
+## Notes from the Session (PapaJoe, May 3 2026)
+
+- "Watching the code is useless and even the dialog is so fast it's almost as useless"
+- "Make the user actually feel like they're involved and making something"
+- "They can read and see what is happening because CHASSIS is telling them in plain English"
+- "We can put the code on the other panel to actually see it working but most will be reading the dialog"
+- "People that know nothing about coding look at that string of coding and stuff and get so overwhelmed it is not funny"
+
+These are the founding insights. Every UI decision should be measured against them.
+
+---
+
+*Vision locked — Built by PapaJoe — May 3, 2026*

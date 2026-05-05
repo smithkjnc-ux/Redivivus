@@ -8,8 +8,8 @@ export function registerBuildFromVaultCommand(
   buildFromVaultService: BuildFromVaultService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.buildFromVault', async () => {
-      await buildFromVaultService.run();
+    vscode.commands.registerCommand('chassis.buildFromVault', async (prefill?: { task?: string; targetFile?: string }) => {
+      await buildFromVaultService.run(prefill);
     })
   );
 }

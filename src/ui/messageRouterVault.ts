@@ -45,7 +45,7 @@ export async function handleVaultMessage(
       try {
         const openItem = vaultService.getItem(msg.itemId, msg.global);
         if (openItem) {
-          const d = await vscode.workspace.openTextDocument({ content: openItem.block.code, language: openItem.block.language });
+          const d = await vscode.workspace.openTextDocument({ content: openItem.code, language: openItem.language });
           await vscode.window.showTextDocument(d, vscode.ViewColumn.Beside);
         } else {
           vscode.window.showErrorMessage(`Vault item not found: ${msg.itemId}`);
@@ -64,7 +64,7 @@ export async function handleVaultMessage(
       return true;
     }
     case 'vaultDeleteItem':
-      vaultService.deleteItem(msg.itemId, msg.global);
+      vaultService.deleteItem(msg.itemId);
       if (state.vaultCategory) {
         if (state.vaultSubcategory) {
           state.vaultItems = vaultService.listBySubcategory(state.vaultCategory as VaultCategory, state.vaultSubcategory, state.vaultGlobal);

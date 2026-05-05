@@ -20,7 +20,7 @@ export async function handleVaultRecategorizeMessage(
     vscode.window.showErrorMessage('No AI routing service available for re-categorization.');
     return true;
   }
-  const allItems = vaultService.listItems(true);
+  const allItems = vaultService.listItems();
   if (allItems.length === 0) {
     vscode.window.showInformationMessage('No saved vault items to re-categorize.');
     return true;
@@ -36,7 +36,7 @@ export async function handleVaultRecategorizeMessage(
   if (aiCheck.ai === 'none') {
     const categories = ['component','utility','algorithm','pattern','config','api','database','auth','validation','error','testing','other'];
     const listStr = otherItems.map((item: any, idx: number) =>
-      `${idx + 1}. name="${item.block.name}" type="${item.block.type}" file="${path.basename(item.block.filePath)}" preview="${item.block.code.slice(0, 80).replace(/\n/g, ' ')}"`
+      `${idx + 1}. name="${item.name}" language="${item.language}" file="${path.basename(item.sourceFile)}" preview="${item.code.slice(0, 80).replace(/\n/g, ' ')}"`
     ).join('\n');
     const clipboardPrompt = `Categorize each code block below into exactly ONE of: ${categories.join(', ')}\n\nRespond with ONLY a JSON array of strings, one per item. Example: ["utility","component","api"]\n\nItems:\n${listStr}`;
     await vscode.env.clipboard.writeText(clipboardPrompt);
@@ -75,7 +75,7 @@ export async function handleVaultRecategorizeMessage(
         const origSorted = [...(originalTags.get(item.id) ?? [])].sort().join(',');
         const newSorted  = [...item.tags].sort().join(',');
         if (origSorted !== newSorted) {
-          vaultService.updateItemTags(item.id, item.tags, true, item.subcategory);
+          vaultService.saveItem(item);
           updated++;
         }
       }
@@ -87,7 +87,7 @@ export async function handleVaultRecategorizeMessage(
 
       // Handle items AI couldn't place — offer to delete
       if (stillOther.length > 0) {
-        const preview = stillOther.slice(0, 5).map((i: any) => `• ${i.block.name} (${i.block.type})`).join('\n');
+        const preview = stillOther.slice(0, 5).map((i: any) => `• ${i.name} (${i.language})`).join('\n');
         const moreNote = stillOther.length > 5 ? `\n  ...and ${stillOther.length - 5} more` : '';
         const action = await vscode.window.showWarningMessage(
           `AI could not categorize ${stillOther.length} item${stillOther.length !== 1 ? 's' : ''} — they remain tagged "other".\n\n${preview}${moreNote}\n\nDelete them? They cannot be used if uncategorized.`,
@@ -95,7 +95,8 @@ export async function handleVaultRecategorizeMessage(
           'Delete All Uncategorized', 'Keep Them'
         );
         if (action === 'Delete All Uncategorized') {
-          const deleted = vaultService.deleteItems(stillOther.map((i: any) => i.id), true);
+          let deleted = 0;
+          for (const i of stillOther) { vaultService.deleteItem(i.id); deleted++; }
           vscode.window.showInformationMessage(`🗑 Deleted ${deleted} uncategorized vault item${deleted !== 1 ? 's' : ''}.`);
         }
       }

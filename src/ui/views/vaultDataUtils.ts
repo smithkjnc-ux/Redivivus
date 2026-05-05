@@ -4,17 +4,15 @@
 import { VaultService, VaultCategory, VaultItem, VAULT_CATEGORIES } from '../../services/vaultService.js';
 
 export function getVaultItems(vaultService: VaultService): VaultItem[] {
-  return vaultService.listItems(true); // global vault
+  return vaultService.listItems();
 }
 
 export function getVaultCategoryCounts(vaultService: VaultService): Record<string, number> {
-  const all = vaultService.listItems(true);
+  const all = vaultService.listItems();
   const counts: Record<string, number> = {};
   for (const c of VAULT_CATEGORIES) counts[c] = 0;
   for (const item of all) {
-    for (const tag of item.tags) {
-      counts[tag] = (counts[tag] || 0) + 1;
-    }
+    counts[item.category] = (counts[item.category] || 0) + 1;
   }
   return counts;
 }

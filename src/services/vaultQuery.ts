@@ -7,12 +7,12 @@ export class VaultQuery {
   constructor(private storage: any) {} // VaultStorage instance
 
   listByCategory(category: VaultCategory, global = false): VaultItem[] {
-    return this.storage.listItems(global).filter((i: VaultItem) => i.tags.includes(category));
+    return this.storage.getAllItems().filter((i: VaultItem) => i.category === category);
   }
 
   listBySubcategory(category: VaultCategory, subcategory: string, global = false): VaultItem[] {
-    return this.storage.listItems(global).filter((i: VaultItem) =>
-      i.tags.includes(category) && i.subcategory === subcategory
+    return this.storage.getAllItems().filter((i: VaultItem) =>
+      i.category === category && i.tags.includes(subcategory)
     );
   }
 
@@ -20,8 +20,11 @@ export class VaultQuery {
     const items = this.listByCategory(category, global);
     const counts = new Map<string, number>();
     for (const item of items) {
-      const sub = item.subcategory || 'general';
-      counts.set(sub, (counts.get(sub) || 0) + 1);
+      for (const tag of item.tags) {
+        if (tag !== category) {
+          counts.set(tag, (counts.get(tag) || 0) + 1);
+        }
+      }
     }
     return Array.from(counts.entries())
       .map(([name, count]) => ({ name, count }))
@@ -30,9 +33,10 @@ export class VaultQuery {
 
   searchItems(query: string, global = false): VaultItem[] {
     const lower = query.toLowerCase();
-    return this.storage.listItems(global).filter((i: VaultItem) =>
-      i.block.name.toLowerCase().includes(lower) ||
-      i.block.code.toLowerCase().includes(lower) ||
+    return this.storage.getAllItems().filter((i: VaultItem) =>
+      i.name.toLowerCase().includes(lower) ||
+      i.code.toLowerCase().includes(lower) ||
+      i.category.toLowerCase().includes(lower) ||
       i.tags.some((t: string) => t.toLowerCase().includes(lower))
     );
   }

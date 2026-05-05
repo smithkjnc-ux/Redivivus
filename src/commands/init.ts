@@ -4,6 +4,34 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { ChassisService } from '../services/chassisService.js';
+import { ChatPanel } from '../ui/chatPanel.js';
+
+/** Opens the chat panel new-project form. The form posts 'new-project' back; onNewProject callback finishes setup. */
+async function runNewProjectWizard(context: vscode.ExtensionContext): Promise<void> {
+  // Suggest a parent folder based on the current project's parent directory
+  const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+  const suggestedParent = currentRoot ? path.dirname(currentRoot) : (process.env.HOME ? path.join(process.env.HOME, 'projects') : '');
+
+  // Register the callback that receives completed form data (folderPath already resolved in the form)
+  ChatPanel.onNewProject = async (name: string, answers: Record<string, string>, folderPath?: string) => {
+    // folderPath is the full path as edited by the user (parent/slug); fall back to computing it
+    const targetFolder = folderPath || path.join(suggestedParent, name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase());
+    if (!fs.existsSync(targetFolder)) {
+      fs.mkdirSync(targetFolder, { recursive: true });
+    }
+    await context.globalState.update('pendingChassisInit', { folder: targetFolder, name, blueprint: answers });
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetFolder), false);
+  };
+
+  // Open chat panel and show the new-project form, passing the suggested parent path
+  const open = () => ChatPanel.currentPanel?.showNewProject(suggestedParent);
+  if (!ChatPanel.currentPanel) {
+    await vscode.commands.executeCommand('chassis.openChatPanel');
+    setTimeout(open, 300);
+  } else {
+    open();
+  }
+}
 
 export async function runAutoInit(
   context: vscode.ExtensionContext,
@@ -165,30 +193,60 @@ export function registerInitCommands(
     })
   );
 
+  // Open Project — shows folder picker and opens in VS Code
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.openProject', async () => {
+      const folder = await vscode.window.showOpenDialog({
+        canSelectMany: false,
+        canSelectFolders: true,
+        canSelectFiles: false,
+        openLabel: 'Open Project Folder',
+      });
+      if (folder && folder.length > 0) {
+        await vscode.commands.executeCommand('vscode.openFolder', folder[0]);
+      }
+    })
+  );
+
   // Wizard Retrofit shortcut (init + analyze + retrofit in sequence)
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.wizardRetrofit', async () => {
-      // Step 1: Init if needed
-      if (!chassis.isInitialized()) {
-        await vscode.commands.executeCommand('chassis.init');
-        if (!chassis.isInitialized()) { return; }
+      // Step 1: If a project is already open, ask what to do
+      if (chassis.isInitialized()) {
+        const config = chassis.loadConfig();
+        const currentName = config?.projectName || vscode.workspace.workspaceFolders?.[0]?.name || 'current project';
+        const choice = await vscode.window.showInformationMessage(
+          `You already have "${currentName}" open. What would you like to do?`,
+          { modal: true },
+          'Start a Brand New Project',
+          'Continue With This Project'
+        );
+        if (!choice) { return; }
+        if (choice === 'Start a Brand New Project') {
+          // Run the full 5W wizard — collects blueprint before opening new folder
+          await runNewProjectWizard(context);
+          return; // openFolder causes reload; pendingChassisInit picks up after reload
+        }
+        // Continue with current project — skip straight to analyze/retrofit
+        const analyze = await vscode.window.showInformationMessage(
+          `Continuing with "${currentName}". Run a full project analysis first?`,
+          { modal: true }, 'Analyze', 'Skip'
+        );
+        if (analyze === 'Analyze') {
+          await vscode.commands.executeCommand('chassis.analyze');
+        }
+        const retrofit = await vscode.window.showInformationMessage(
+          'Ready to retrofit. This will back up your files and add CHASSIS annotations with AI.',
+          { modal: true }, 'Start Retrofit', 'Later'
+        );
+        if (retrofit === 'Start Retrofit') {
+          await vscode.commands.executeCommand('chassis.retrofit');
+        }
+        return;
       }
-      // Step 2: Analyze
-      const analyze = await vscode.window.showInformationMessage(
-        'Project initialized. Run analysis to scan all files?',
-        { modal: true }, 'Analyze', 'Skip'
-      );
-      if (analyze === 'Analyze') {
-        await vscode.commands.executeCommand('chassis.analyze');
-      }
-      // Step 3: Offer retrofit
-      const retrofit = await vscode.window.showInformationMessage(
-        'Ready to retrofit. This will back up your files and add CHASSIS annotations with AI.',
-        { modal: true }, 'Start Retrofit', 'Later'
-      );
-      if (retrofit === 'Start Retrofit') {
-        await vscode.commands.executeCommand('chassis.retrofit');
-      }
+
+      // No project open yet — run full 5W wizard; openFolder reloads, pendingChassisInit handles the rest
+      await runNewProjectWizard(context);
     })
   );
 }

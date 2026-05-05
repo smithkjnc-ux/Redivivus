@@ -14,7 +14,7 @@ export class VaultContextService {
 
   // ── Main entry point — call before any AI code generation ──
   findRelevantItems(filePath: string, fileContent: string, maxItems = 6): VaultContext {
-    const allItems = this.vaultService.listItems(true);
+    const allItems = this.vaultService.listItems();
     if (allItems.length === 0) {
       return { items: [], contextBlock: '', hitCount: 0 };
     }
@@ -94,38 +94,34 @@ export class VaultContextService {
       let score = 0;
 
       // Language match — strongly prefer same language
-      const itemExt = path.extname(item.block.filePath).toLowerCase();
-      if (itemExt === fileExt) { score += 3; } // [WARN] Arbitrary weight
-      // Category/subcategory keyword hits
+      const itemExt = path.extname(item.sourceFile).toLowerCase();
+      if (itemExt === fileExt) { score += 3; }
+      // Category + tags keyword hits
+      if (keywords.has(item.category)) { score += 2; }
       for (const tag of item.tags) {
-        if (keywords.has(tag)) { score += 2; } // [WARN] Arbitrary weight
+        if (keywords.has(tag)) { score += 2; }
       }
-      if (item.subcategory && keywords.has(item.subcategory)) { score += 3; } // [WARN] Arbitrary weight
 
       // Item name keyword hits
-      const nameParts = item.block.name.replace(/([A-Z])/g, ' $1').toLowerCase().split(/\s+/);
+      const nameParts = item.name.replace(/([A-Z])/g, ' $1').toLowerCase().split(/\s+/);
       for (const part of nameParts) {
-        // [WARN] Heuristic threshold for keyword length
-        if (part.length > 3 && keywords.has(part)) { score += 2; } // [WARN] Arbitrary weight
+        if (part.length > 3 && keywords.has(part)) { score += 2; }
       }
 
       // Item source file path keyword hits
-      const srcParts = item.block.filePath.replace(/\\/g, '/').split('/');
+      const srcParts = item.sourceFile.replace(/\\/g, '/').split('/');
       for (const p of srcParts) {
         const clean = p.replace(/\.[^.]+$/, '').toLowerCase();
-        // [WARN] Heuristic threshold for keyword length
-        if (clean.length > 2 && keywords.has(clean)) { score += 1; } // [WARN] Arbitrary weight
+        if (clean.length > 2 && keywords.has(clean)) { score += 1; }
       }
 
       // Code preview keyword hits (weaker signal)
-      // [WARN] Capping the code preview (slice(0, 300)) may omit relevant keywords further down the block.
-      const preview = item.block.code.slice(0, 300).toLowerCase();
+      const preview = item.code.slice(0, 300).toLowerCase();
       let previewHits = 0;
       for (const kw of keywords) {
-        // [WARN] Heuristic threshold for keyword length in preview
         if (kw.length > 4 && preview.includes(kw)) { previewHits++; }
       }
-      score += Math.min(previewHits, 3); // [WARN] Capping preview hits (Math.min(..., 3)) is an arbitrary heuristic.
+      score += Math.min(previewHits, 3);
 
       return { item, score };
     });
@@ -141,10 +137,9 @@ export class VaultContextService {
     ];
 
     for (const item of items) {
-      const sub = item.subcategory ? ` › ${item.subcategory}` : '';
-      lines.push(`--- [${item.tags.join('/')}${sub}] ${item.block.name} (${item.block.type}) ---`);
-      lines.push(`// Source: ${item.block.filePath}`);
-      lines.push(item.block.code.slice(0, 400)); // cap to avoid token bloat
+      lines.push(`--- [${item.category}] ${item.name} (${item.language}) ---`);
+      lines.push(`// Source: ${item.sourceFile}`);
+      lines.push(item.code.slice(0, 400)); // cap to avoid token bloat
       lines.push('');
     }
 

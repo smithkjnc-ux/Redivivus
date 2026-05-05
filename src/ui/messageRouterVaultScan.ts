@@ -30,7 +30,7 @@ export async function handleVaultScanMessage(
         const newItems: any[] = [];
         const duplicates: any[] = [];
         for (const item of result.items) {
-          if (vaultService.isDuplicate(item, true)) { duplicates.push(item); }
+          if (vaultService.isDuplicate(item.contentHash)) { duplicates.push(item); }
           else { newItems.push(item); }
         }
 
@@ -66,7 +66,7 @@ export async function handleVaultScanMessage(
       let saved = 0;
       for (const id of ids) {
         const item = state.vaultScanItems.find((i: any) => i.id === id);
-        if (item) { vaultService.saveItem(item, true); saved++; }
+        if (item) { vaultService.saveItem(item); saved++; }
       }
       const dupCount = state.vaultScanDuplicates.length;
       const totalNew = state.vaultScanItems.length;

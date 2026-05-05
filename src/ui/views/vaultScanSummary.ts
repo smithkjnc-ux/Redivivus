@@ -38,21 +38,21 @@ export function renderVaultScanSummary(
 
   html += '<div class="list">';
   for (const item of newItems) {
-    const lineCount = item.block.lines ? (item.block.lines[1] - item.block.lines[0] + 1) : item.block.code.split('\n').length;
+    const lineCount = item.lineCount || item.code.split('\n').length;
     html += `
       <div class="list-item" style="display: flex; flex-direction: column; gap: 6px;">
         <div style="display: flex; align-items: flex-start; gap: 8px;">
           <input type="checkbox" class="vault-scan-check" data-itemid="${esc(item.id)}" checked style="margin-top: 2px; cursor: pointer; flex-shrink: 0;" />
           <div style="flex: 1; min-width: 0;">
-            <div style="font-weight: 600; font-size: 13px; margin-bottom: 2px;">${esc(item.block.name)}</div>
+            <div style="font-weight: 600; font-size: 13px; margin-bottom: 2px;">${esc(item.name)}</div>
             <div style="font-size: 11px; color: var(--vscode-descriptionForeground); line-height: 1.4;">
-              ${esc(path.basename(item.block.filePath))} &middot; ${esc(item.block.type)} &middot; ${lineCount} lines
+              ${esc(path.basename(item.sourceFile))} &middot; ${esc(item.language)} &middot; ${lineCount} lines
             </div>
           </div>
           <button class="vault-scan-preview-btn" data-previewid="${esc(item.id)}" style="padding: 2px 8px; background: transparent; color: var(--vscode-descriptionForeground); border: 1px solid var(--border, #334455); border-radius: 4px; cursor: pointer; font-size: 11px; flex-shrink: 0;">Preview</button>
         </div>
         <div class="vault-scan-preview" id="preview-${esc(item.id)}" style="display: none; margin-left: 24px;">
-          <pre style="background: var(--input-bg, #0d1117); border: 1px solid var(--border, #334455); border-radius: 4px; padding: 8px; font-size: 11px; overflow-x: auto; white-space: pre; max-height: 200px; overflow-y: auto;">${esc(item.block.code)}</pre>
+          <pre style="background: var(--input-bg, #0d1117); border: 1px solid var(--border, #334455); border-radius: 4px; padding: 8px; font-size: 11px; overflow-x: auto; white-space: pre; max-height: 200px; overflow-y: auto;">${esc(item.code)}</pre>
         </div>
       </div>`;
   }
@@ -62,10 +62,10 @@ export function renderVaultScanSummary(
         <input type="checkbox" disabled style="margin-top: 2px; flex-shrink: 0;" />
         <div style="flex: 1; min-width: 0;">
           <div style="font-weight: 600; font-size: 13px; margin-bottom: 2px;">
-            ${esc(item.block.name)}
+            ${esc(item.name)}
             <span style="background: rgba(245,166,35,0.12); color: #f5a623; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: normal; margin-left: 4px;">Already in vault</span>
           </div>
-          <div style="font-size: 11px; color: var(--vscode-descriptionForeground); line-height: 1.4;">${esc(item.block.filePath)}</div>
+          <div style="font-size: 11px; color: var(--vscode-descriptionForeground); line-height: 1.4;">${esc(item.sourceFile)}</div>
         </div>
       </div>`;
   }

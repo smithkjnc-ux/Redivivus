@@ -5,6 +5,7 @@ import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
 import { RoutingService } from '../services/routingService.js';
 import { ChangeTracker } from '../services/changeTracker.js';
+import { ChatPanel } from '../ui/chatPanel.js';
 
 export function registerReviewCommands(
   context: vscode.ExtensionContext,
@@ -76,17 +77,18 @@ export function registerReviewCommands(
         const reviewContent = '# CHASSIS Review - ' + filePath + '\n\n*AI: ' + result.model + '*\n\n---\n\n' + result.text;
         // [WARN] File system operations can fail due to permissions, disk space, or invalid paths.
         require('fs').writeFileSync(reviewPath, reviewContent);
-        // [WARN] Opening a text document can fail if the file is invalid or VS Code encounters an issue.
-        const reviewDoc2 = await vscode.workspace.openTextDocument(reviewPath);
-        await vscode.window.showTextDocument(reviewDoc2, vscode.ViewColumn.One);
+        // Show review inside chat panel
+        const reviewRaw = require('fs').readFileSync(reviewPath, 'utf-8');
+        const reviewEscaped = reviewRaw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const reviewHtml = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">🔍 AI Review — ${path.basename(filePath)}</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${reviewEscaped}</pre></div>`;
+        if (!ChatPanel.currentPanel) {
+          vscode.commands.executeCommand('chassis.openChatPanel');
+          setTimeout(() => ChatPanel.currentPanel?.showPanel('review', '🔍 AI Review', reviewHtml), 300);
+        } else {
+          ChatPanel.currentPanel.showPanel('review', '🔍 AI Review', reviewHtml);
+        }
         const next = await vscode.window.showInformationMessage(
-          'Review complete for ' + filePath + '\n\n' +
-          'The review is open on the left. It covers:\n' +
-          '\u2022 What the file does\n' +
-          '\u2022 Any bugs or risks found\n' +
-          '\u2022 Suggestions for improvement\n' +
-          '\u2022 Whether it should be split up\n\n' +
-          'What would you like to do next?',
+          'Review complete for ' + filePath + '\n\nWhat would you like to do next?',
           { modal: true },
           'Clean Up File', 'Check Another File', 'Done'
         );

@@ -88,12 +88,45 @@ export function extractTSJS(lines: string[], filePath: string): ExtractedBlock[]
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // [WARN] Regex-based parsing can miss complex arrow functions and decorated exports
-    const fnMatch = line.match(/^(export\s+)?(async\s+)?(function\s+\w+|const\s+\w+\s*=\s*(async\s+)?\([^)]*\)\s*=>|(?:export\s+)?(?:const|let|var)\s+\w+\s*=\s*(?:async\s+)?\([^)]*\)\s*=>)/);
+    // Match any function declaration: function Name(, export function Name(, export default function Name(
+    const fnRegex = /^(export\s+(default\s+)?)?(async\s+)?function\s+\w+/;
+    // Match const/let/var declarations with arrow functions or regular assignments: const Name = ...
+    const constRegex = /^(export\s+)?(const|let|var)\s+\w+\s*[=:]/;
+    // Match React hooks: useHookName
+    const hookRegex = /^(export\s+)?(const|let|var)\s+use[A-Z]\w+\s*=/;
+    // Match React components (capitalized name after function/const)
+    const compRegex = /^(export\s+)?(const|let|var|function)\s+[A-Z][a-zA-Z0-9_]*\b/;
+    // Match class methods and getters/setters
+    const methodRegex = /^(async\s+)?(get\s+|set\s+)?\w+\s*\([^)]*\)\s*\{/i;
+    const fnMatch = line.match(fnRegex);
     if (fnMatch) {
       const name = line.match(/function\s+(\w+)/)?.[1] || line.match(/(?:const|let|var)\s+(\w+)/)?.[1] || 'unnamed';
       const end = extractBraceBlock(i);
       if (end > i) { blocks.push({ filePath, name, type: 'function', code: lines.slice(i, end).join('\n'), language, lines: [i + 1, end] }); }
+    }
+    const constMatch = line.match(constRegex);
+    if (constMatch) {
+      const name = line.match(/(?:const|let|var)\s+(\w+)/)?.[1] || 'unnamed';
+      const end = extractBraceBlock(i);
+      if (end > i) { blocks.push({ filePath, name, type: 'function', code: lines.slice(i, end).join('\n'), language, lines: [i + 1, end] }); }
+    }
+    const hookMatch = line.match(hookRegex);
+    if (hookMatch) {
+      const name = line.match(/use[A-Z]\w+/)?.[0] || 'unnamed';
+      const end = extractBraceBlock(i);
+      if (end > i) { blocks.push({ filePath, name, type: 'function', code: lines.slice(i, end).join('\n'), language, lines: [i + 1, end] }); }
+    }
+    const compMatch = line.match(compRegex);
+    if (compMatch) {
+      const name = line.match(/[A-Z][a-zA-Z0-9_]*\b/)?.[0] || 'unnamed';
+      const end = extractBraceBlock(i);
+      if (end > i) { blocks.push({ filePath, name, type: 'component', code: lines.slice(i, end).join('\n'), language, lines: [i + 1, end] }); }
+    }
+    const methodMatch = line.match(methodRegex);
+    if (methodMatch) {
+      const name = line.match(/\w+\s*\([^)]*\)\s*\{/i)?.[0] || 'unnamed';
+      const end = extractBraceBlock(i);
+      if (end > i) { blocks.push({ filePath, name, type: 'method', code: lines.slice(i, end).join('\n'), language, lines: [i + 1, end] }); }
     }
     // [WARN] Regex for class matching can miss decorators
     const classMatch = line.match(/^(export\s+)?(abstract\s+)?class\s+(\w+)/);
@@ -110,7 +143,71 @@ export function extractTSJS(lines: string[], filePath: string): ExtractedBlock[]
       if (end > i) { blocks.push({ filePath, name, type: 'interface', code: lines.slice(i, end).join('\n'), language, lines: [i + 1, end] }); }
     }
   }
-  return blocks;
+  // [SCOPE] Filter to only vault-worthy, reusable code blocks
+  return blocks.filter(b => isVaultWorthy(b.code, b.name, filePath));
+}
+
+/**
+ * Determines if a code block is genuinely vault-worthy — reusable, non-trivial, well-structured.
+ * Rejects one-liners, empty functions, trivial wrappers, logs, tests, generated code.
+ */
+function isVaultWorthy(code: string, name: string, filePath: string): boolean {
+  const trimmed = code.trim();
+  const lines = trimmed.split('\n').filter(l => l.trim());
+
+  // Reject test/spec files entirely
+  if (/\.(test|spec)\.[tj]sx?$/.test(filePath) || /__tests__/.test(filePath)) {
+    return false;
+  }
+
+  // Reject generated/minified code (single very long line)
+  if (lines.length === 1 && trimmed.length > 300 && !trimmed.includes('\n')) {
+    return false;
+  }
+
+  // Must have at least 3 lines of actual code (not just declarations)
+  if (lines.length < 3) {
+    return false;
+  }
+
+  // Must be at least 80 chars — rejects trivial one-liners disguised as blocks
+  if (trimmed.length < 80) {
+    return false;
+  }
+
+  // Reject trivial patterns (only if the entire body is trivial)
+  const trivialPatterns = [
+    /^\s*console\.(log|warn|error|info|debug)\s*\(/im,
+    /^\s*return\s+\w+\s*;?\s*$/m,
+    /^\s*throw\s+new\s+Error\s*\(/im,
+    /^\s*return\s*(null|undefined|false|true)\s*;?\s*$/m,
+    /^\s*return\s*\[\s*\]\s*;?\s*$/m,
+    /^\s*return\s*\{\s*\}\s*;?\s*$/m,
+  ];
+  const bodyOnly = trimmed.replace(/^[^{]*\{/, '').replace(/\}\s*$/, '').trim();
+  for (const p of trivialPatterns) {
+    if (p.test(bodyOnly)) {
+      const bodyLines = bodyOnly.split('\n').filter(l => l.trim() && !l.trim().startsWith('//'));
+      if (bodyLines.length <= 2) { return false; }
+    }
+  }
+
+  // Reject generic throwaway names on small blocks
+  const genericNames = ['fn', 'func', 'callback', 'cb', 'tmp', 'temp', 'handler', 'onClick', 'onChange'];
+  if (genericNames.includes(name) && lines.length < 8) {
+    return false;
+  }
+
+  // Must contain actual logic — conditionals, loops, async, try/catch, assignments, calls
+  const hasLogic = /\b(if|else|for|while|switch|try|catch|async|await|map|filter|reduce|\.then\b)/.test(trimmed);
+  const hasSubstantialCalls = /[.;]\w+\s*\([^)]*\)/.test(trimmed);
+  const hasAssignments = /\b(const|let|var)\s+\w+/.test(trimmed);
+  const score = (hasLogic ? 1 : 0) + (hasSubstantialCalls ? 1 : 0) + (hasAssignments ? 1 : 0);
+  if (score < 2) {
+    return false;
+  }
+
+  return true;
 }
 
 // [SCOPE] Extract function/class blocks from Python source using indent-based parsing
@@ -143,7 +240,7 @@ export function extractPython(lines: string[], filePath: string): ExtractedBlock
       if (end > i) { blocks.push({ filePath, name: classMatch[2], type: 'class', code: lines.slice(i, end).join('\n'), language: 'python', lines: [i + 1, end] }); }
     }
   }
-  return blocks;
+  return blocks.filter(b => isVaultWorthy(b.code, b.name, filePath));
 }
 
 // [SCOPE] Extract fenced code blocks from Markdown
@@ -166,6 +263,51 @@ export function extractMarkdown(lines: string[], filePath: string): ExtractedBlo
   return blocks;
 }
 
+// [SCOPE] Keyword-based category suggestion per spec
+export function suggestCategory(name: string, code: string): VaultCategory {
+  const text = (name + ' ' + code).toLowerCase();
+  const rules: { keywords: string[]; category: VaultCategory }[] = [
+    { keywords: ['auth', 'login', 'token', 'session', 'password', 'credential', 'jwt', 'oauth', 'permission', 'role'], category: 'auth' },
+    { keywords: ['fetch', 'api', 'request', 'endpoint', 'http', 'axios', 'graphql', 'rest', 'client', 'url'], category: 'api' },
+    { keywords: ['db', 'database', 'query', 'sql', 'table', 'insert', 'select', 'update', 'delete', 'schema', 'model', 'orm', 'mongoose', 'prisma'], category: 'database' },
+    { keywords: ['component', 'render', 'view', 'screen', 'button', 'modal', 'card', 'list', 'form', 'input', 'page', 'ui', 'widget', 'layout'], category: 'component' },
+    { keywords: ['util', 'helper', 'format', 'parse', 'convert', 'transform', 'sanitize', 'normalize', 'encode', 'decode', 'slugify', 'camelize'], category: 'utility' },
+    { keywords: ['validate', 'check', 'verify', 'sanitize', 'schema', 'zod', 'joi', 'yup', 'validator', 'regex'], category: 'validation' },
+    { keywords: ['error', 'exception', 'catch', 'throw', 'fail', 'handler', 'guard', 'try', 'reject'], category: 'error' },
+    { keywords: ['test', 'spec', 'mock', 'expect', 'assert', 'jest', 'mocha', 'cypress', 'e2e', 'unit'], category: 'testing' },
+    { keywords: ['socket', 'websocket', 'p2p', 'network', 'connect', 'tcp', 'udp', 'stream', 'pipe', 'download', 'upload'], category: 'network' },
+    { keywords: ['sort', 'search', 'filter', 'algorithm', 'calculate', 'compute', 'matrix', 'graph', 'tree', 'cache', 'memoize', 'hash', 'crypto'], category: 'algorithm' },
+    { keywords: ['config', 'setting', 'env', 'option', 'preference', 'constant', 'define', 'preset', 'theme'], category: 'config' },
+    { keywords: ['pattern', 'factory', 'singleton', 'observer', 'middleware', 'decorator', 'strategy', 'proxy', 'builder'], category: 'pattern' },
+  ];
+  for (const rule of rules) {
+    if (rule.keywords.some(kw => text.includes(kw))) return rule.category;
+  }
+  return 'other';
+}
+
+/** Generate one-line description from code */
+function generateDescription(name: string, code: string): string {
+  const firstLine = code.split('\n')[0]?.trim() || '';
+  const commentMatch = code.match(/\/\*\*?\s*(.+?)\*\//);
+  if (commentMatch) return commentMatch[1].trim();
+  const lineComment = code.match(/\/\/\s*(.+)/);
+  if (lineComment && !firstLine.includes('import')) return lineComment[1].trim();
+  return `${name} — extracted code block`;
+}
+
+/** Get source project name from file path */
+function getSourceProject(filePath: string): string {
+  const parts = filePath.split('/');
+  // Find common project root indicators
+  for (let i = parts.length - 2; i >= 0; i--) {
+    if (['src', 'lib', 'app', 'packages'].includes(parts[i])) {
+      return parts[i - 1] || parts[i];
+    }
+  }
+  return parts[parts.length - 2] || 'unknown';
+}
+
 // [SCOPE] Main entry — extract all blocks from a file and apply quality filters
 export function extractFromFile(filePath: string, content: string): { items: VaultItem[]; filteredCount: number } {
   const lines = content.split('\n');
@@ -181,6 +323,7 @@ export function extractFromFile(filePath: string, content: string): { items: Vau
   const items: VaultItem[] = [];
   let filteredCount = 0;
   const seenHashes = new Set<string>();
+  const sourceProject = getSourceProject(filePath);
 
   for (const block of rawBlocks) {
     const quality = shouldSkipBlock(block, filePath);
@@ -188,7 +331,25 @@ export function extractFromFile(filePath: string, content: string): { items: Vau
     const contentHash = computeContentHash(block.code);
     if (seenHashes.has(contentHash)) { filteredCount++; continue; }
     seenHashes.add(contentHash);
-    items.push({ id: generateId(filePath, block.name, block.type), block, tags: inferTags(filePath, block), contentHash });
+
+    const category = suggestCategory(block.name, block.code);
+    const lineCount = block.lines[1] - block.lines[0] + 1;
+
+    items.push({
+      id: contentHash.substring(0, 16),
+      name: block.name,
+      code: block.code,
+      language: detectLanguage(ext),
+      category,
+      description: generateDescription(block.name, block.code),
+      sourceProject,
+      sourceFile: filePath,
+      tags: inferTags(filePath, block),
+      lineCount,
+      importCount: 0,
+      createdAt: new Date().toISOString(),
+      contentHash,
+    });
   }
   return { items, filteredCount };
 }

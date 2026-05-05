@@ -20,7 +20,7 @@ export function renderVaultTab(
   vaultSubcategory?: string | null
 ): string {
   const counts = getVaultCategoryCounts(vaultService);
-  const totalAll = vaultService.listItems(true).length;
+  const totalAll = vaultService.listItems().length;
 
   let html = `<div id="tab-vault" class="tab-content ${isActive ? 'active' : ''}">`;
 
@@ -56,12 +56,12 @@ export function renderVaultTab(
       html += `
         <div class="list-item" data-vaultid="${esc(item.id)}" data-vaultglobal="${vaultGlobal}" style="display:flex; justify-content:space-between; align-items:flex-start; cursor:pointer;">
           <div style="flex:1; min-width:0; cursor:inherit;">
-            <div style="font-weight:600; font-size:13px; margin-bottom:2px;">${esc(item.block.name)}</div>
-            <div style="font-size:11px; color:var(--vscode-descriptionForeground); line-height:1.4;">${esc(item.block.filePath)}</div>
+            <div style="font-weight:600; font-size:13px; margin-bottom:2px;">${esc(item.name)}</div>
+            <div style="font-size:11px; color:var(--vscode-descriptionForeground); line-height:1.4;">${esc(item.sourceFile)}</div>
             <div style="font-size:10px; color:var(--vscode-descriptionForeground); margin-top:4px; display:flex; gap:6px; flex-wrap:wrap;">
-              <span>${esc(item.block.language)}</span>
+              <span>${esc(item.language)}</span>
               <span>•</span>
-              <span>${esc(item.tags.join(', '))}${item.subcategory ? ` › ${esc(item.subcategory)}` : ''}</span>
+              <span>${esc(item.category)}${item.tags.length > 1 ? ` › ${esc(item.tags.slice(1).join(', '))}` : ''}</span>
             </div>
           </div>
           <div style="display:flex; gap:4px; flex-shrink:0; margin-left:8px;">
@@ -78,7 +78,7 @@ export function renderVaultTab(
 
   // ── Level 2: Subcategory grid ──
   } else if (vaultView === 'subcategories' && vaultCategory) {
-    const subcats = vaultService.getSubcategoriesForCategory(vaultCategory as VaultCategory, vaultGlobal);
+    const subcats = vaultService.getCategories().filter(c => c.name === vaultCategory);
     const catCount = counts[vaultCategory] || 0;
     html += `
       <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">

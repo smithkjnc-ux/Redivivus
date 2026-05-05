@@ -3,6 +3,7 @@
 import * as vscode from 'vscode';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
+import { ChatPanel } from '../ui/chatPanel.js';
 
 export function registerSessionCommands(
   context: vscode.ExtensionContext,
@@ -10,15 +11,25 @@ export function registerSessionCommands(
   sessions: SessionService,
   refreshAll: () => void
 ): void {
-  // Start Session
+  // Register callback so ChatPanel can call startSession without circular imports
+  ChatPanel.onStartSession = async (goal: string, ai: string) => {
+    await sessions.startSession(goal, ai);
+    refreshAll();
+  };
+
+  // Start Session \u2014 show form inside chat panel
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.startSession', async () => {
       if (!chassis.isInitialized()) {
         vscode.window.showErrorMessage('Run "CHASSIS: Initialize Project" first.');
         return;
       }
-      await sessions.startSession();
-      refreshAll();
+      if (!ChatPanel.currentPanel) {
+        vscode.commands.executeCommand('chassis.openChatPanel');
+        setTimeout(() => ChatPanel.currentPanel?.showStartSession(), 300);
+      } else {
+        ChatPanel.currentPanel.showStartSession();
+      }
     })
   );
 

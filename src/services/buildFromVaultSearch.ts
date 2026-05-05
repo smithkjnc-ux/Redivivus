@@ -17,18 +17,18 @@ export function findRelevantByTask(task: string, items: VaultItem[]): VaultItem[
     .map(item => {
       let score = 0;
       const itemText = [
-        item.block.name.toLowerCase(),
-        item.block.filePath.toLowerCase(),
+        item.name.toLowerCase(),
+        item.sourceFile.toLowerCase(),
+        item.category,
         item.tags.join(' '),
-        item.subcategory || '',
-        item.block.code.slice(0, 200).toLowerCase(),
+        item.code.slice(0, 200).toLowerCase(),
       ].join(' ');
 
       for (const word of taskWords) {
         if (itemText.includes(word)) { score += 2; }
       }
       // boost exact name matches
-      if (taskLower.includes(item.block.name.toLowerCase())) { score += 5; }
+      if (taskLower.includes(item.name.toLowerCase())) { score += 5; }
       return { item, score };
     })
     .filter(s => s.score > 0)

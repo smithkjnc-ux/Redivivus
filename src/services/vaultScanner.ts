@@ -14,7 +14,7 @@ export async function aiCategorize(items: VaultItem[], routingService: RoutingSe
   for (let i = 0; i < result.length; i += BATCH) {
     const batch = result.slice(i, i + BATCH);
     const listStr = batch.map((item, idx) =>
-      `${idx + 1}. name="${item.block.name}" type="${item.block.type}" file="${path.basename(item.block.filePath)}" preview="${item.block.code.slice(0, 120).replace(/\n/g, ' ')}"`
+      `${idx + 1}. name="${item.name}" language="${item.language}" file="${path.basename(item.sourceFile)}" preview="${item.code.slice(0, 120).replace(/\n/g, ' ')}"`
     ).join('\n');
 
     const prompt = `You are a code librarian. For each code block return TWO things:
@@ -59,12 +59,9 @@ ${listStr}`;
         const r = results[idx];
         if (!r) { return; }
         const cat = r.category?.toLowerCase().trim();
-        const sub = r.subcategory?.toLowerCase().trim().replace(/[^a-z0-9 _-]/g, '') || 'general';
         if (cat && validCategories.includes(cat)) {
-          const filtered = item.tags.filter((t: string) => t !== 'other');
-          if (!filtered.includes(cat)) { filtered.push(cat); }
-          item.tags = filtered.length > 0 ? filtered : [cat];
-          item.subcategory = sub;
+          item.category = cat;
+          item.tags = [cat];
         }
       });
     } catch {

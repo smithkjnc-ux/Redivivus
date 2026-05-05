@@ -1,11 +1,13 @@
 // [SCOPE] CHASSIS Misc commands — status display, guides, AI switching, file viewers, panel refresh
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
 import { GuideService } from '../services/guideService.js';
 import { RulesService } from '../services/rulesService.js';
 import { ChassisWebviewProvider } from '../ui/chassisWebviewProvider.js';
+import { ChatPanel } from '../ui/chatPanel.js';
 
 export function registerMiscCommands(
   context: vscode.ExtensionContext,
@@ -37,21 +39,39 @@ export function registerMiscCommands(
     })
   );
 
-  // Open Work Log
+  // Open Work Log — show inside chat panel
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.log', async () => {
       if (!chassis.isInitialized()) { return; }
-      const doc = await vscode.workspace.openTextDocument(chassis.worklogPath);
-      vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+      const raw = fs.existsSync(chassis.worklogPath)
+        ? fs.readFileSync(chassis.worklogPath, 'utf-8')
+        : '*(No work log entries yet.)*';
+      const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const html = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">📋 Work Log</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${escaped}</pre></div>`;
+      if (!ChatPanel.currentPanel) {
+        vscode.commands.executeCommand('chassis.openChatPanel');
+        setTimeout(() => ChatPanel.currentPanel?.showPanel('worklog', '📋 Work Log', html), 300);
+      } else {
+        ChatPanel.currentPanel.showPanel('worklog', '📋 Work Log', html);
+      }
     })
   );
 
-  // Open Dead Ends
+  // Open Dead Ends — show inside chat panel
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.deadends', async () => {
       if (!chassis.isInitialized()) { return; }
-      const doc = await vscode.workspace.openTextDocument(chassis.deadendsPath);
-      vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
+      const raw = fs.existsSync(chassis.deadendsPath)
+        ? fs.readFileSync(chassis.deadendsPath, 'utf-8')
+        : '*(No dead ends logged yet.)*';
+      const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const html = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">💀 Dead Ends</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${escaped}</pre></div>`;
+      if (!ChatPanel.currentPanel) {
+        vscode.commands.executeCommand('chassis.openChatPanel');
+        setTimeout(() => ChatPanel.currentPanel?.showPanel('deadends', '💀 Dead Ends', html), 300);
+      } else {
+        ChatPanel.currentPanel.showPanel('deadends', '💀 Dead Ends', html);
+      }
     })
   );
 
@@ -69,23 +89,50 @@ export function registerMiscCommands(
     })
   );
 
-  // Switch AI
+  // Show Getting Started in Chat Panel
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.showChatGettingStarted', async () => {
+      ChatPanel.show(undefined as any, undefined as any);
+      setTimeout(() => {
+        if (ChatPanel.currentPanel) {
+          ChatPanel.currentPanel.showGettingStarted();
+        }
+      }, 100);
+    })
+  );
+
+  // Switch AI — show selector inside chat panel
+  ChatPanel.onSwitchAI = async (ai: string) => {
+    const config = vscode.workspace.getConfiguration('chassis');
+    await config.update('defaultAI', ai, true);
+    vscode.window.showInformationMessage('CHASSIS now using ' + ai.toUpperCase());
+    refreshAll();
+  };
+
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.switchAI', async () => {
       const config = vscode.workspace.getConfiguration('chassis');
       const current = config.get<string>('defaultAI') || 'gemini';
-      const pick = await vscode.window.showQuickPick([
-        { label: '$(sparkle)  Gemini', description: 'Free tier — fast, good for most files', detail: current === 'gemini' ? '✅ Currently active' : '', _value: 'gemini' },
-        { label: '$(hubot)  Claude', description: 'Paid — deep reasoning, complex files', detail: current === 'claude' ? '✅ Currently active' : '', _value: 'claude' },
-        { label: '$(zap)  Kimi', description: 'Fast — good for bulk annotations', detail: current === 'kimi' ? '✅ Currently active' : '', _value: 'kimi' },
-      ], {
-        title: 'CHASSIS — Switch AI (currently: ' + current.toUpperCase() + ')',
-        placeHolder: 'Pick your AI engine',
-      });
-      if (pick) {
-        await config.update('defaultAI', (pick as any)._value, true);
-        vscode.window.showInformationMessage('CHASSIS now using ' + (pick as any)._value.toUpperCase());
-        refreshAll();
+      const ais = [
+        { id: 'gemini', label: 'Gemini', desc: 'Free tier — fast, good for most tasks', icon: '✨' },
+        { id: 'claude', label: 'Claude', desc: 'Paid — deep reasoning, best for complex files', icon: '🤖' },
+        { id: 'kimi', label: 'Kimi', desc: 'Fast — great for bulk annotations', icon: '⚡' },
+        { id: 'openai', label: 'GPT-4o', desc: 'OpenAI — versatile and widely supported', icon: '🧠' },
+        { id: 'groq', label: 'Groq', desc: 'Ultra-fast inference', icon: '🚀' },
+        { id: 'xai', label: 'Grok', desc: 'xAI — experimental, web-aware', icon: '🌐' },
+      ];
+      const cardsHtml = ais.map(a => {
+        const isActive = a.id === current;
+        const border = isActive ? 'var(--vscode-focusBorder)' : 'var(--vscode-input-border)';
+        const badge = isActive ? '<span style="float:right;font-size:10px;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground);padding:2px 6px;border-radius:10px;">Active</span>' : '';
+        return `<button data-ai="${a.id}" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:10px 12px;background:var(--vscode-editor-background);border:1px solid ${border};border-radius:6px;cursor:pointer;color:var(--vscode-editor-foreground);">${badge}<span style="font-size:16px;margin-right:8px;">${a.icon}</span><strong>${a.label}</strong><br><span style="font-size:11px;color:var(--vscode-descriptionForeground);margin-left:28px;">${a.desc}</span></button>`;
+      }).join('');
+      const html = `<div id="ai-switch-panel" style="padding:4px 0">${cardsHtml}</div>`;
+      if (!ChatPanel.currentPanel) {
+        vscode.commands.executeCommand('chassis.openChatPanel');
+        setTimeout(() => ChatPanel.currentPanel?.showPanel('switch-ai', '🤖 Switch AI', html), 300);
+      } else {
+        ChatPanel.currentPanel.showPanel('switch-ai', '🤖 Switch AI', html);
       }
     })
   );
@@ -107,8 +154,7 @@ export function registerMiscCommands(
   // Wizard Panel — focus the sidebar webview
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.wizard', async () => {
-      await vscode.commands.executeCommand('chassisPanel.focus');
-      provider.refresh();
+      await vscode.commands.executeCommand('chassisSidebar.focus');
     })
   );
 

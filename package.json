@@ -11,14 +11,12 @@
     "Other"
   ],
   "activationEvents": [
-    "workspaceContains:.chassis",
-    "onView:chassisPanel",
-    "onView:chatPanel"
+    "onStartupFinished"
   ],
   "main": "./out/extension.js",
   "contributes": {
     "viewsContainers": {
-      "activityBar": [
+      "activitybar": [
         {
           "id": "chassisView",
           "title": "CHASSIS",
@@ -29,14 +27,10 @@
     "views": {
       "chassisView": [
         {
-          "id": "chassisPanel",
+          "id": "chassisSidebar",
           "name": "CHASSIS",
-          "type": "webview"
-        },
-        {
-          "id": "chatPanel",
-          "name": "Chat",
-          "type": "webview"
+          "type": "webview",
+          "icon": "resources/chassis-icon.svg"
         }
       ]
     },
@@ -72,6 +66,10 @@
       {
         "command": "chassis.openBlueprint",
         "title": "CHASSIS: Open Blueprint"
+      },
+      {
+        "command": "chassis.openChatPanel",
+        "title": "CHASSIS: Open Chat Panel"
       },
       {
         "command": "chassis.analyzeFile",
@@ -130,8 +128,64 @@
         "title": "CHASSIS: Auto-commit (build checkpoint)"
       },
       {
+        "command": "chassis.saveToVault",
+        "title": "CHASSIS: Save to Vault"
+      },
+      {
+        "command": "chassis.scanVaultCodebase",
+        "title": "CHASSIS: Scan Codebase to Vault"
+      },
+      {
         "command": "chassis.buildFromVault",
         "title": "CHASSIS: Build from Vault"
+      },
+      {
+        "command": "chassis.openVault",
+        "title": "CHASSIS: Open Vault"
+      },
+      {
+        "command": "chassis.validateVault",
+        "title": "CHASSIS: Validate Vault Categories"
+      },
+      {
+        "command": "chassis.showChatGettingStarted",
+        "title": "CHASSIS: Show Getting Started"
+      },
+      {
+        "command": "chassis.openSettings",
+        "title": "CHASSIS: AI API Setup"
+      },
+      {
+        "command": "chassis.openSettingsInChat",
+        "title": "CHASSIS: AI API Setup in Chat"
+      },
+      {
+        "command": "chassis.viewUsage",
+        "title": "CHASSIS: View Usage Report"
+      },
+      {
+        "command": "chassis.viewUsageInChat",
+        "title": "CHASSIS: View Usage in Chat"
+      },
+      {
+        "command": "chassis.resetSessionUsage",
+        "title": "CHASSIS: Reset Session Usage"
+      },
+      {
+        "command": "chassis.resetDayUsage",
+        "title": "CHASSIS: Reset Day Usage"
+      },
+      {
+        "command": "chassis.resetWeekUsage",
+        "title": "CHASSIS: Reset Week Usage"
+      },
+      {
+        "command": "chassis.resetMonthUsage",
+        "title": "CHASSIS: Reset Month Usage"
+      },
+      {
+        "command": "chassis.resetAllUsage",
+        "title": "CHASSIS: Reset All Usage (Keep Lifetime)"
       }
     ],
     "viewsWelcome": [

@@ -11,6 +11,7 @@ import { MeasureTwiceService } from './measureTwiceService.js';
 import { RoutingService } from './routingService.js';
 import { AnalyzerService } from './analyzerService.js';
 import { getCodeFiles, backupFiles, restoreFiles, deleteDir } from './retrofitFileScanner.js';
+import { ChatPanel } from '../ui/chatPanel.js';
 import { processInChunks } from './retrofitChunker.js';
 import { handleAllAnnotated, showRetrofitSummary, buildReport } from './retrofitHelpers.js';
 
@@ -62,9 +63,16 @@ export class RetrofitService {
     if (proceed === 'View Recommendations') {
       const cached = this.analyzer?.getLastResult();
       if (cached) { this.analyzer!.showRecommendationsPanel(cached); }
-      else {
-        const doc = await vscode.workspace.openTextDocument(recsPath);
-        await vscode.window.showTextDocument(doc);
+      else if (fs.existsSync(recsPath)) {
+        const recsRaw = fs.readFileSync(recsPath, 'utf-8');
+        const recsEscaped = recsRaw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const recsHtml = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">📋 Recommendations</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${recsEscaped}</pre></div>`;
+        if (!ChatPanel.currentPanel) {
+          vscode.commands.executeCommand('chassis.openChatPanel');
+          setTimeout(() => ChatPanel.currentPanel?.showPanel('recommendations', '📋 Recommendations', recsHtml), 300);
+        } else {
+          ChatPanel.currentPanel.showPanel('recommendations', '📋 Recommendations', recsHtml);
+        }
       }
       return;
     }
@@ -136,8 +144,15 @@ export class RetrofitService {
       const reportPath = path.join(this.chassis.chassisDir, 'retrofit_report.md');
       fs.writeFileSync(reportPath, buildReport(results, total, failed));
       this.chassis.appendWorkLog('- Action: Project Retrofit\n- Files processed: ' + total + '\n- Successful: ' + (total - failed) + '\n- Failed: ' + failed + '\n- Backup: .chassis/backup/');
-      const doc = await vscode.workspace.openTextDocument(reportPath);
-      await vscode.window.showTextDocument(doc, { preview: false });
+      const reportContent = fs.readFileSync(reportPath, 'utf-8');
+      const escaped = reportContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      const html = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">🔧 Retrofit Report</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${escaped}</pre></div>`;
+      if (!ChatPanel.currentPanel) {
+        vscode.commands.executeCommand('chassis.openChatPanel');
+        setTimeout(() => ChatPanel.currentPanel?.showPanel('retrofit-report', '🔧 Retrofit Report', html), 300);
+      } else {
+        ChatPanel.currentPanel.showPanel('retrofit-report', '🔧 Retrofit Report', html);
+      }
     });
   }
 
