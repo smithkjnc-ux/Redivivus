@@ -42,6 +42,31 @@ function renderMessages(conversation: ChatMessage[]): string {
     const costStr = msg.cost ? ` · $${msg.cost.toFixed(4)}` : '';
     const tokensStr = msg.tokens ? `${msg.tokens} tokens${costStr}` : '';
 
+    // Render clarify form BEFORE escapeHtml (contains raw JSON) — format: __CLARIFY__[json]__END_CLARIFY__
+    const clarifyMatch = msg.content.match(/^__CLARIFY__(\[.+\])__END_CLARIFY__$/s);
+    if (clarifyMatch) {
+      let questions: Array<{id:string;question:string;options:Array<{label:string}>}> = [];
+      try { questions = JSON.parse(clarifyMatch[1]); } catch { /* malformed — fall through */ }
+      if (questions.length > 0) {
+        const qHtml = questions.map((q, qi) => {
+          const opts = q.options.map((o, oi) => {
+            const inputId = `cq_${qi}_${oi}`;
+            return `<label for="${inputId}" style="display:flex;align-items:center;gap:8px;padding:7px 10px;border-radius:5px;cursor:pointer;border:1px solid var(--vscode-input-border);margin-bottom:6px;background:var(--vscode-input-background);font-size:12px;">`
+              + `<input type="radio" id="${inputId}" name="cq_${qi}" value="${escapeHtml(o.label)}" style="accent-color:#0078d4;flex-shrink:0;">`
+              + `<span>${escapeHtml(o.label)}</span></label>`;
+          }).join('');
+          return `<div style="margin-bottom:16px;"><p style="font-weight:600;font-size:13px;margin:0 0 8px 0;">${qi+1}. ${escapeHtml(q.question)}</p>${opts}</div>`;
+        }).join('');
+        const formHtml = `<div id="clarify-form" style="padding:14px 0;">`
+          + `<p style="font-size:13px;font-weight:600;margin:0 0 14px 0;">Before I build this, a few quick questions:</p>`
+          + qHtml
+          + `<button id="clarify-submit-btn" style="margin-top:4px;padding:8px 20px;background:#0078d4;color:#fff;border:none;border-radius:5px;font-size:13px;font-weight:600;cursor:pointer;">Build with these choices ▶</button>`
+          + `</div>`;
+        const metadata2 = `<div class="message-meta">${timeStr}</div>`;
+        return `<div class="${bubbleClass}"><div class="message-content">${formHtml}</div>${metadata2}</div>`;
+      }
+    }
+
     let contentHtml = escapeHtml(msg.content);
     // Render action cards from AI command suggestions (format: __ACTION_CARD__command|||label|||END__)
     contentHtml = contentHtml.replace(/__ACTION_CARD__([^|]+)\|\|\|([^|]+)\|\|\|END__/g, (_match, command, label) => {
@@ -676,6 +701,19 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       if (cmdEl) {
         const cmd = cmdEl.getAttribute('data-cmd');
         if (cmd) { vscode.postMessage({ type: 'run-command', command: cmd }); }
+        return;
+      }
+      // clarify form submit
+      if (target.id === 'clarify-submit-btn' || (target.closest && target.closest('#clarify-submit-btn'))) {
+        const form = document.getElementById('clarify-form');
+        if (!form) return;
+        const radios = form.querySelectorAll('input[type=radio]:checked');
+        const answers = {};
+        radios.forEach(r => {
+          const label = r.closest('div[style]')?.querySelector('p')?.textContent || r.name;
+          answers[label.replace(/^\d+\.\s*/, '')] = r.value;
+        });
+        vscode.postMessage({ type: 'clarify-submit', answers });
         return;
       }
       // data-ai on Switch AI panel buttons

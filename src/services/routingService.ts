@@ -55,7 +55,7 @@ export class RoutingService {
 
   // ── general prompt (delegated to routingProviders)
 
-  async prompt(text: string): Promise<AIResponse & { usingFallback?: string }> {
+  async prompt(text: string, timeoutMs = 30_000): Promise<AIResponse & { usingFallback?: string }> {
     const available = this.getAvailableAI();
     if (available.ai === 'none') {
       return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in CHASSIS Settings (Files & AI tab).' };
@@ -64,7 +64,8 @@ export class RoutingService {
     const defaultAI = vscode.workspace.getConfiguration('chassis').get<string>('defaultAI') || 'gemini';
     const usingFallback = available.ai !== defaultAI ? available.label : undefined;
 
-    return callProvider(available.ai, text, this.fetchWithTimeout.bind(this));
+    const fetch = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
+    return callProvider(available.ai, text, fetch);
   }
 
   // ── fetch with timeout (orchestrator-only — shared by all providers)
