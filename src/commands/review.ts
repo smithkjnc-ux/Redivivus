@@ -93,7 +93,7 @@ export function registerReviewCommands(
           'Clean Up File', 'Check Another File', 'Done'
         );
         if (next === 'Clean Up File') {
-          await vscode.commands.executeCommand('chassis.restructureFile');
+          await vscode.commands.executeCommand('chassis.cleanUpFile');
         } else if (next === 'Check Another File') {
           await vscode.commands.executeCommand('chassis.analyzeFile');
         }

@@ -9,7 +9,7 @@ export async function handleActiveSessionWizard(session: SessionInfo | null): Pr
     {
       label: '$(eye)  Check a file before I change it',
       description: 'See what\'s in the file and what CHASSIS recommends',
-      _command: 'chassis.analyzeFile',
+      _command: 'chassis.checkFileHealth',
     },
     {
       label: '$(comment)  Have AI review my current file',
@@ -17,9 +17,9 @@ export async function handleActiveSessionWizard(session: SessionInfo | null): Pr
       _command: 'chassis.reviewFile',
     },
     {
-      label: '$(wand)  Clean up my current file',
+      label: '$(wand)  Clean up a file',
       description: 'AI adds helpful notes and warnings to the code',
-      _command: 'chassis.restructureFile',
+      _command: 'chassis.cleanUpFile',
     },
     {
       label: '$(debug-stop)  I\'m done for now',

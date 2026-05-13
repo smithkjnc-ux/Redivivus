@@ -14,6 +14,24 @@ export class VaultContextService {
 
   // ── Main entry point — call before any AI code generation ──
   findRelevantItems(filePath: string, fileContent: string, maxItems = 6): VaultContext {
+    // Guard 1: no file path or too little meaningful content — skip vault injection
+    if (!filePath || fileContent.length < 50) {
+      return { items: [], contextBlock: '', hitCount: 0 };
+    }
+
+    // Guard 2: no file extension — open-ended prompt with no language context, skip vault
+    const fileExt = path.extname(filePath).toLowerCase();
+    if (!fileExt) {
+      return { items: [], contextBlock: '', hitCount: 0 };
+    }
+
+    // Guard 3: fewer than 3 meaningful identifiers (words >= 4 chars) — not a code context
+    const identifierMatches = fileContent.match(/\b[a-zA-Z][a-zA-Z0-9]{3,}\b/g) || [];
+    const uniqueIdentifiers = new Set(identifierMatches.map(s => s.toLowerCase()));
+    if (uniqueIdentifiers.size < 3) {
+      return { items: [], contextBlock: '', hitCount: 0 };
+    }
+
     const allItems = this.vaultService.listItems();
     if (allItems.length === 0) {
       return { items: [], contextBlock: '', hitCount: 0 };
@@ -22,9 +40,9 @@ export class VaultContextService {
     const keywords = this.extractKeywords(filePath, fileContent);
     const scored = this.scoreItems(allItems, keywords, filePath);
 
-    // Only items with at least 1 matching keyword signal
+    // Only strongly relevant items (score >= 4) to avoid noise injection
     const relevant = scored
-      .filter(s => s.score > 0)
+      .filter(s => s.score >= 4)
       .sort((a, b) => b.score - a.score)
       .slice(0, maxItems)
       .map(s => s.item);
@@ -87,7 +105,7 @@ export class VaultContextService {
 
   // ── Score vault items against extracted keywords ──
   private scoreItems(items: VaultItem[], keywords: Set<string>, filePath: string): { item: VaultItem; score: number }[] {
-    const fileExt = path.extname(filePath).toLowerCase();
+    const fileExt = path.extname(filePath).toLowerCase(); // [WARN] fileExt empty check already done in findRelevantItems
 
     return items.map(item => {
       // [WARN] Scoring weights are heuristic and may need tuning for optimal performance.

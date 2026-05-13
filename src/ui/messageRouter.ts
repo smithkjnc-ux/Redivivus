@@ -7,6 +7,8 @@ import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
 import { VaultService } from '../services/vaultService.js';
 import { RoutingService } from '../services/routingService.js';
+import { GuardianService } from '../services/guardianService.js';
+import { IntentService } from '../services/intentService.js';
 import { WizardPanelState } from './messageRouterTypes.js';
 
 export { WizardPanelState };
@@ -16,6 +18,7 @@ import { handleWizardMessage } from './messageRouterWizard.js';
 import { handleVaultMessage } from './messageRouterVault.js';
 import { handleVaultScanMessage } from './messageRouterVaultScan.js';
 import { handleVaultRecategorizeMessage } from './messageRouterVaultRecategorize.js';
+import { handleMapMessage } from './messageRouterMap.js';
 
 export function attachMessageRouter(
   webview: vscode.Webview,
@@ -25,18 +28,22 @@ export function attachMessageRouter(
   context: vscode.ExtensionContext | undefined,
   state: WizardPanelState,
   refresh: () => void,
-  routingService?: RoutingService
+  routingService?: RoutingService,
+  guardianService?: GuardianService,
+  intentService?: IntentService
 ): void {
   webview.onDidReceiveMessage(async (msg) => {
     if (!msg.type && msg.command) { msg.type = 'command'; }
 
+    const postToWebview = (m: any) => webview.postMessage(m);
     const handled =
-      await handleCoreMessage(msg, chassis, state, refresh) ||
+      await handleCoreMessage(msg, chassis, state, refresh, postToWebview) ||
       await handleSessionMessage(msg, sessions, refresh) ||
       await handleWizardMessage(msg, chassis, state, context, refresh) ||
       await handleVaultMessage(msg, vaultService, state, refresh) ||
       await handleVaultScanMessage(msg, vaultService, routingService, state, refresh) ||
-      await handleVaultRecategorizeMessage(msg, vaultService, routingService, state, refresh);
+      await handleVaultRecategorizeMessage(msg, vaultService, routingService, state, refresh) ||
+      (guardianService ? await handleMapMessage(msg, state, guardianService, refresh, webview, intentService) : false);
 
     // If no handler matched, ignore silently (unknown message)
   });

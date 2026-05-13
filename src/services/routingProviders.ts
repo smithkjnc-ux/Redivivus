@@ -19,17 +19,20 @@ function classifyError(err: any, model: string): string {
   return msg;
 }
 
-export async function callProvider(ai: string, text: string, fetchWithTimeout: (url: string, options: RequestInit, timeoutMs?: number) => Promise<Response>): Promise<AIResponse & { usingFallback?: string }> {
+// [WARN] gemini-pro is used for Supervisor and Guardian calls — higher reasoning quality.
+// gemini-flash is used for Worker calls — faster and cheaper for code generation.
+export async function callProvider(ai: string, text: string, fetchWithTimeout: (url: string, options: RequestInit, timeoutMs?: number) => Promise<Response>, geminiModel?: 'flash' | 'pro'): Promise<AIResponse & { usingFallback?: string }> {
   if (ai === 'gemini') {
     const key = getGeminiKey()!;
+    const model = geminiModel === 'pro' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
     try {
-      const url = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=' + key;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
       const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }] });
       const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
       const data = await res.json() as any;
-      if (!res.ok) return { text: '', model: 'gemini-2.5-flash', success: false, error: `Gemini API error ${res.status}: ${data.error?.message || res.statusText}` };
-      return { text: (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim(), model: 'gemini-2.5-flash', success: true, usingFallback: undefined };
-    } catch (err: any) { return { text: '', model: 'gemini-2.5-flash', success: false, error: classifyError(err, 'Gemini') }; }
+      if (!res.ok) return { text: '', model, success: false, error: `Gemini API error ${res.status}: ${data.error?.message || res.statusText}` };
+      return { text: (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim(), model, success: true, usingFallback: undefined };
+    } catch (err: any) { return { text: '', model, success: false, error: classifyError(err, 'Gemini') }; }
   }
 
   if (ai === 'claude') {
@@ -83,8 +86,8 @@ export async function callProvider(ai: string, text: string, fetchWithTimeout: (
   if (ai === 'kimi') {
     const key = getKimiKey()!;
     try {
-      const url = 'https://api.moonshot.cn/v1/chat/completions';
-      const body = JSON.stringify({ model: 'moonshot-v1-8k', messages: [{ role: 'user', content: text }] });
+      const url = 'https://api.moonshot.ai/v1/chat/completions';
+      const body = JSON.stringify({ model: 'moonshot-v1-32k', messages: [{ role: 'user', content: text }] });
       const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
       const data = await res.json() as any;
       if (!res.ok) return { text: '', model: 'kimi', success: false, error: `Kimi API error ${res.status}: ${data.error?.message || res.statusText}` };

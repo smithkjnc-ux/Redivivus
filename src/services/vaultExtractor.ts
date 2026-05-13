@@ -317,6 +317,12 @@ export function extractFromFile(filePath: string, content: string): { items: Vau
     case '.ts': case '.tsx': case '.js': case '.jsx': rawBlocks = extractTSJS(lines, filePath); break;
     case '.py': rawBlocks = extractPython(lines, filePath); break;
     case '.md': rawBlocks = extractMarkdown(lines, filePath); break;
+    case '.html': case '.htm': case '.css': case '.svg':
+      // Whole-file capture — these can't be parsed for functions, save entire file as one block
+      if (content.trim().length > 50) {
+        rawBlocks = [{ name: path.basename(filePath, ext), type: 'component', code: content, lines: [1, lines.length], filePath, language: ext.replace('.', '') }];
+      }
+      break;
     default: rawBlocks = [];
   }
 

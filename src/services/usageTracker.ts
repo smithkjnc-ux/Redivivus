@@ -21,15 +21,28 @@ export interface UsagePeriod {
   endTime: number;
 }
 
+// Per-AI breakdown for a time period
+export interface AIBreakdown {
+  aiProvider: string;
+  tokens: number;
+  cost: number;
+  messages: number;
+}
+
+// Extended period with AI breakdowns
+export interface UsagePeriodWithBreakdown extends UsagePeriod {
+  byAI: AIBreakdown[];
+}
+
 export interface UsageReport {
   // Breakdowns
-  session: UsagePeriod;
-  day: UsagePeriod;
-  week: UsagePeriod;
-  month: UsagePeriod;
+  session: UsagePeriodWithBreakdown;
+  day: UsagePeriodWithBreakdown;
+  week: UsagePeriodWithBreakdown;
+  month: UsagePeriodWithBreakdown;
   // Totals
-  allTime: UsagePeriod;
-  lifetimeUnresettable: UsagePeriod;
+  allTime: UsagePeriodWithBreakdown;
+  lifetimeUnresettable: UsagePeriodWithBreakdown;
 }
 
 const STORAGE_KEY = 'chassis_usage_history';
@@ -102,74 +115,121 @@ export class UsageTracker {
     return this.currentSessionStart;
   }
 
-  // Generate comprehensive usage report
+  // Generate comprehensive usage report with per-AI breakdowns
   getReport(): UsageReport {
     const now = Date.now();
     const history = this.getHistory();
     const sessionStart = this.currentSessionStart;
-    
-    // Calculate day start (midnight today)
-    const dayStart = new Date();
-    dayStart.setHours(0, 0, 0, 0);
-    const dayStartMs = dayStart.getTime();
-    
-    // Calculate week start (Sunday midnight)
+
+    // Calculate time window boundaries
+    const dayStartMs = new Date().setHours(0, 0, 0, 0);
     const weekStart = new Date(now);
     weekStart.setDate(weekStart.getDate() - weekStart.getDay());
     weekStart.setHours(0, 0, 0, 0);
     const weekStartMs = weekStart.getTime();
-    
-    // Calculate month start (1st of month)
-    const monthStart = new Date();
-    monthStart.setDate(1);
+    const monthStartMs = new Date().setDate(1);
+    const monthStart = new Date(monthStartMs);
     monthStart.setHours(0, 0, 0, 0);
-    const monthStartMs = monthStart.getTime();
 
-    const session: UsagePeriod = { tokens: 0, cost: 0, messages: 0, startTime: sessionStart, endTime: now };
-    const day: UsagePeriod = { tokens: 0, cost: 0, messages: 0, startTime: dayStartMs, endTime: now };
-    const week: UsagePeriod = { tokens: 0, cost: 0, messages: 0, startTime: weekStartMs, endTime: now };
-    const month: UsagePeriod = { tokens: 0, cost: 0, messages: 0, startTime: monthStartMs, endTime: now };
+    // Helper to create fresh period with empty AI breakdown map
+    const createPeriod = (startTime: number) => ({
+      totals: { tokens: 0, cost: 0, messages: 0, startTime, endTime: now },
+      aiMap: new Map<string, { tokens: number; cost: number; messages: number }>(),
+    });
+
+    const sessionData = createPeriod(sessionStart);
+    const dayData = createPeriod(dayStartMs);
+    const weekData = createPeriod(weekStartMs);
+    const monthData = createPeriod(monthStart.getTime());
+    const allTimeData = createPeriod(history[0]?.timestamp || now);
+
+    // Helper to add entry to a period's totals and AI map
+    const addToPeriod = (
+      data: typeof sessionData,
+      entry: UsageEntry,
+    ) => {
+      data.totals.tokens += entry.tokens;
+      data.totals.cost += entry.cost;
+      data.totals.messages += entry.messageCount;
+
+      const ai = data.aiMap.get(entry.aiProvider);
+      if (ai) {
+        ai.tokens += entry.tokens;
+        ai.cost += entry.cost;
+        ai.messages += entry.messageCount;
+      } else {
+        data.aiMap.set(entry.aiProvider, {
+          tokens: entry.tokens,
+          cost: entry.cost,
+          messages: entry.messageCount,
+        });
+      }
+    };
 
     // Aggregate data
     for (const entry of history) {
+      // All time (all entries)
+      addToPeriod(allTimeData, entry);
+
       // Session (only current session)
       if (entry.sessionId === this.currentSessionId) {
-        session.tokens += entry.tokens;
-        session.cost += entry.cost;
-        session.messages += entry.messageCount;
+        addToPeriod(sessionData, entry);
       }
-      
+
       // Day
       if (entry.timestamp >= dayStartMs) {
-        day.tokens += entry.tokens;
-        day.cost += entry.cost;
-        day.messages += entry.messageCount;
+        addToPeriod(dayData, entry);
       }
-      
+
       // Week
       if (entry.timestamp >= weekStartMs) {
-        week.tokens += entry.tokens;
-        week.cost += entry.cost;
-        week.messages += entry.messageCount;
+        addToPeriod(weekData, entry);
       }
-      
+
       // Month
-      if (entry.timestamp >= monthStartMs) {
-        month.tokens += entry.tokens;
-        month.cost += entry.cost;
-        month.messages += entry.messageCount;
+      if (entry.timestamp >= monthStart.getTime()) {
+        addToPeriod(monthData, entry);
       }
     }
 
+    // Helper to convert aggregated data to UsagePeriodWithBreakdown
+    const toPeriodWithBreakdown = (data: typeof sessionData): UsagePeriodWithBreakdown => {
+      const byAI: AIBreakdown[] = [...data.aiMap.entries()]
+        .filter(([, stats]) => stats.tokens > 0) // Only show AIs with usage
+        .map(([aiProvider, stats]) => ({
+          aiProvider,
+          tokens: stats.tokens,
+          cost: stats.cost,
+          messages: stats.messages,
+        }))
+        .sort((a, b) => b.tokens - a.tokens); // Sort by tokens descending
+
+      return { ...data.totals, byAI };
+    };
+
     const lifetime = this.getLifetimeTotal();
+    const lifetimeWithBreakdown: UsagePeriodWithBreakdown = {
+      ...lifetime,
+      startTime: history[0]?.timestamp || now,
+      endTime: now,
+      byAI: [...allTimeData.aiMap.entries()]
+        .filter(([, stats]) => stats.tokens > 0)
+        .map(([aiProvider, stats]) => ({
+          aiProvider,
+          tokens: stats.tokens,
+          cost: stats.cost,
+          messages: stats.messages,
+        }))
+        .sort((a, b) => b.tokens - a.tokens),
+    };
 
     return {
-      session,
-      day,
-      week,
-      month,
-      allTime: lifetime, // Resettable total
-      lifetimeUnresettable: { ...lifetime }, // Permanent copy
+      session: toPeriodWithBreakdown(sessionData),
+      day: toPeriodWithBreakdown(dayData),
+      week: toPeriodWithBreakdown(weekData),
+      month: toPeriodWithBreakdown(monthData),
+      allTime: lifetimeWithBreakdown,
+      lifetimeUnresettable: lifetimeWithBreakdown,
     };
   }
 

@@ -11,8 +11,22 @@ export function attr(s: string): string {
 }
 export function fixBtn(prompt: string, label = 'Fix This', filePath = '', issueType = ''): string {
   const doneAttrs = filePath ? ` data-file="${attr(filePath)}" data-issue="${attr(issueType)}"` : '';
-  return `<button class="fix-btn" data-prompt="${attr(prompt)}">${label}</button>` +
-    `<button class="done-btn" title="Mark as fixed"${doneAttrs}>✓ Done</button>`;
+  const fileAttr = filePath ? ` data-file="${attr(filePath)}"` : '';
+  return `<button class="fix-btn" data-prompt="${attr(prompt)}"${fileAttr}>${label}</button>` +
+    (filePath ? `<button class="done-btn" title="Mark as fixed"${doneAttrs}>✓ Done</button>` : '');
+}
+
+// [SCOPE] Fix All bar — shows above each section's item list when there are multiple items
+function fixAllBar(prompts: string[], issueType: string, label: string): string {
+  if (prompts.length < 2) { return ''; }
+  // [WARN] Encode prompts as JSON in a data attribute — must be attr-escaped
+  const encoded = attr(JSON.stringify(prompts));
+  return `<div class="fix-all-bar">
+    <button class="fix-all-btn" data-prompts="${encoded}" data-issue="${issueType}" data-label="${label}">
+      ⚡ Fix All ${prompts.length} — let AI handle them in sequence
+    </button>
+    <span class="fix-all-status"></span>
+  </div>`;
 }
 
 export function buildOverviewSection(result: AnalysisResult): string {
@@ -31,6 +45,7 @@ export function buildOverviewSection(result: AnalysisResult): string {
 
 export function buildLargeFilesSection(result: AnalysisResult): string {
   if (result.largeFiles.length === 0) { return ''; }
+  const allPrompts: string[] = [];
   const rows = result.largeFiles.slice(0, 15).map(f => {
     const prompt =
       `Split ${f.relativePath} (${f.lines} lines) into smaller files.\n` +
@@ -39,6 +54,7 @@ export function buildLargeFilesSection(result: AnalysisResult): string {
       `Add a // [SCOPE] comment at the top of each new file explaining what it does.\n` +
       `Reference .chassis/rules.md for annotation standards.\n` +
       `After splitting, make sure the project still compiles with: npm run compile`;
+    allPrompts.push(prompt);
     return `<div class="item-row">` +
       `<span class="item-file">${esc(f.relativePath)}</span>` +
       `<span class="item-badge warn-badge">${f.lines} lines</span>` +
@@ -49,7 +65,8 @@ export function buildLargeFilesSection(result: AnalysisResult): string {
   return `
       <div class="section">
         <div class="section-header warn-header">📏 Files That Are Too Long (${result.largeFiles.length})</div>
-        <div class="section-why">AI tools work best with short, focused files. Files over 200 lines are harder to understand and more likely to cause bugs when edited. Consider splitting these by responsibility.</div>
+        <div class="section-why">AI tools work best with short, focused files. Files over 200 lines are harder to understand and more likely to cause bugs when edited.</div>
+        ${fixAllBar(allPrompts, 'largeFile', 'split')}
         <div class="item-list">${rows}${more}</div>
       </div>`;
 }
@@ -58,6 +75,7 @@ export function buildTodosSection(result: AnalysisResult, projectName: string): 
   if (result.todoItems.length === 0) { return ''; }
   const byFile: Record<string, string[]> = {};
   for (const t of result.todoItems) { (byFile[t.file] = byFile[t.file] || []).push(t.line); }
+  const allPrompts: string[] = [];
   const rows = Object.entries(byFile).slice(0, 12).map(([file, lines]) => {
     const lineItems = lines.slice(0, 3).map(l => {
       const lineNumMatch = l.match(/^L(\d+):\s*/);
@@ -68,6 +86,7 @@ export function buildTodosSection(result: AnalysisResult, projectName: string): 
         `There's a marker that says: "${todoText}"\n` +
         `Implement this following the project rules in .chassis/rules.md.\n` +
         `Project: ${projectName}\nAfter making changes, verify the project still compiles.`;
+      allPrompts.push(prompt);
       return `<div class="todo-line-row"><span class="todo-line">${esc(l)}</span>${fixBtn(prompt, 'Fix This', file, 'todo')}</div>`;
     }).join('');
     const moreLines = lines.length > 3 ? `<div class="item-more">+ ${lines.length - 3} more in this file</div>` : '';
@@ -78,13 +97,15 @@ export function buildTodosSection(result: AnalysisResult, projectName: string): 
   return `
       <div class="section">
         <div class="section-header warn-header">📋 Things Still To Do (${result.todoItems.length} TODOs)</div>
-        <div class="section-why">These are places in the code marked as incomplete. Click <strong>Fix This</strong> next to any item to copy a prompt for your AI chat.</div>
+        <div class="section-why">These are places in the code marked as incomplete. Click <strong>Fix This</strong> or use Fix All to let the AI handle them.</div>
+        ${fixAllBar(allPrompts, 'todo', 'fix')}
         <div class="item-list">${rows}${moreFiles}</div>
       </div>`;
 }
 
 export function buildUncommentedSection(result: AnalysisResult, projectName: string): string {
   if (result.uncommentedFiles.length === 0) { return ''; }
+  const allPrompts: string[] = [];
   const rows = result.uncommentedFiles.slice(0, 12).map(f => {
     const prompt =
       `Add a // [SCOPE] comment at the very top of ${f.relativePath} explaining what this file does, ` +
@@ -92,6 +113,7 @@ export function buildUncommentedSection(result: AnalysisResult, projectName: str
       `Also add // [WARN] to any fragile or unclear sections.\n` +
       `Reference .chassis/rules.md for the annotation format.\n` +
       `Project: ${projectName}\nDo not change any existing code — comments only.`;
+    allPrompts.push(prompt);
     return `<div class="item-row">` +
       `<span class="item-file">${esc(f.relativePath)}</span>` +
       `<span class="item-badge neutral-badge">${f.lines} lines</span>` +
@@ -102,7 +124,8 @@ export function buildUncommentedSection(result: AnalysisResult, projectName: str
   return `
       <div class="section">
         <div class="section-header neutral-header">💬 Files With No Comments (${result.uncommentedFiles.length})</div>
-        <div class="section-why">These files have zero comments. Click <strong>Add Scope</strong> to copy a prompt that adds a [SCOPE] tag to any file.</div>
+        <div class="section-why">These files have zero comments. Use Fix All to add [SCOPE] tags to all of them at once.</div>
+        ${fixAllBar(allPrompts, 'uncommented', 'annotate')}
         <div class="item-list">${rows}${more}</div>
       </div>`;
 }

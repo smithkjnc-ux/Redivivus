@@ -105,6 +105,28 @@ export class SessionService {
     this.currentSession = null;
     // [WARN] Directly manipulating VS Code UI context.
     vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
+
+    // Tier 3 memory: extract learned facts from this session's chat history
+    try {
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (root) {
+        const { LearnedMemoryService } = await import('./learnedMemoryService.js');
+        const { ChatPanel } = await import('../ui/chatPanel.js');
+        const learned = new LearnedMemoryService(root);
+        learned.pruneRecent();
+        const panel = ChatPanel.currentPanel;
+        const userMsgs = (panel?.getConversation() || [])
+          .filter((m: any) => m.role === 'user')
+          .map((m: any) => m.content as string);
+        if (userMsgs.length > 0 && panel) {
+          const routing = panel.getRouting();
+          const { permanent, recent } = await LearnedMemoryService.extractFacts(userMsgs, routing);
+          permanent.forEach(f => learned.addPermanent(f));
+          recent.forEach(f => learned.addRecent(f));
+        }
+      }
+    } catch { /* never block session end */ }
+
     vscode.window.showInformationMessage('CHASSIS session ended. Roadmap updated.');
   }
 

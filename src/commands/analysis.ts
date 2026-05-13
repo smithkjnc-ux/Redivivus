@@ -71,7 +71,7 @@ export function registerAnalysisCommands(
 
   // Analyze Current File — counts CHASSIS tags, shows health
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.analyzeFile', async (pickedPath?: string) => {
+    vscode.commands.registerCommand('chassis.checkFileHealth', async (pickedPath?: string) => {
       let doc: vscode.TextDocument;
       let filePath: string;
       let content: string;
@@ -120,11 +120,13 @@ export function registerAnalysisCommands(
         }
       }
       if (lines.length > 500) msg += '\n\u{1F4CF} This file is pretty long. Consider splitting it up.';
-      const action = await vscode.window.showInformationMessage(msg, { modal: true }, 'Clean Up File', 'AI Review', 'Close');
-      if (action === 'Clean Up File') {
-        await vscode.commands.executeCommand('chassis.restructureFile');
-      } else if (action === 'AI Review') {
-        await vscode.commands.executeCommand('chassis.reviewFile');
+      const next = await vscode.window.showInformationMessage(
+        'Health check complete for ' + filePath + '\n\nWhat would you like to do next?',
+        { modal: true },
+        'Clean Up File', 'Check Another File', 'Done'
+      );
+      if (next === 'Clean Up File') {
+        await vscode.commands.executeCommand('chassis.cleanUpFile');
       }
     })
   );

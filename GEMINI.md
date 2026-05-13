@@ -79,6 +79,15 @@ CSS / SCSS:                    /* [TAG] description */
 11. New file → [SCOPE] at line 1, comments on new functions, [WARN] on risky logic
 12. No orphan code — every file traces to the blueprint
 
+### Rule 20: Build & Deploy Protocol
+- After any code change, always run: npm run compile
+- When deploying to baked IDE, ALWAYS copy both out/ AND package.json:
+  cp -r out/* $BAKED/out/
+  cp package.json $BAKED/package.json
+- Never copy out/ without package.json — commands, settings, and activation events live in package.json
+- Version in package.json must match the current release (currently 0.3.6)
+- When adding new commands, settings, or activation events, they MUST be registered in package.json contributes section or they will silently fail
+
 ---
 
 *Rules enforced via: `CLAUDE.md` · `.windsurf/rules.md` · `.cursor/rules` · `.cursorrules` · `.github/copilot-instructions.md` · `GEMINI.md` · `.chassis/rules.md`*

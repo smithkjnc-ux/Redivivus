@@ -8,6 +8,9 @@ import { VaultService, VAULT_CATEGORIES, VaultItem } from '../services/vaultServ
 import { RoutingService } from '../services/routingService.js';
 import { ChatPanel } from '../ui/chatPanel.js';
 
+// Cache last scan results so Save to Vault in results panel can save them
+let _pendingScanItems: VaultItem[] = [];
+
 export function registerVaultCommands(
   context: vscode.ExtensionContext,
   chassis: ChassisService,
@@ -15,9 +18,34 @@ export function registerVaultCommands(
   routing: RoutingService,
   refreshAll: () => void
 ): void {
-  // Save to Vault — scan current file, save items, and show results in chat panel
+  // Save to Vault — saves pending scan results if available, otherwise scans the current file
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.saveToVault', async () => {
+      // If we have pending scan results (from Scan Project), save those
+      const itemsToSave = _pendingScanItems.length > 0 ? _pendingScanItems : null;
+      if (itemsToSave) {
+        const confirm = await vscode.window.showInformationMessage(
+          `Save ${itemsToSave.length} scanned items to your Vault?`,
+          { modal: true }, 'Save All'
+        );
+        if (confirm !== 'Save All') { return; }
+        let savedCount = 0;
+        let dupCount = 0;
+        for (const item of itemsToSave) {
+          if (!vaultService.isDuplicate(item.contentHash)) {
+            vaultService.saveItem(item);
+            savedCount++;
+          } else {
+            dupCount++;
+          }
+        }
+        _pendingScanItems = [];
+        await ensureChatPanelOpen();
+        showVaultScanResults(itemsToSave, itemsToSave.length, 0, savedCount, dupCount);
+        vscode.window.showInformationMessage(`Vault: Saved ${savedCount} items (${dupCount} duplicates skipped).`);
+        return;
+      }
+      // No pending scan — extract from current active file
       const editor = vscode.window.activeTextEditor;
       if (!editor) {
         vscode.window.showErrorMessage('Open a file first to save to vault.');
@@ -30,7 +58,6 @@ export function registerVaultCommands(
         vscode.window.showInformationMessage('No extractable blocks found in this file.');
         return;
       }
-      // Actually save each extracted item to vault
       let savedCount = 0;
       let dupCount = 0;
       for (const item of result.items) {
@@ -41,7 +68,6 @@ export function registerVaultCommands(
           dupCount++;
         }
       }
-      // Open chat panel and show scan results with save summary
       await ensureChatPanelOpen();
       showVaultScanResults(result.items, 1, result.filteredCount, savedCount, dupCount);
     })
@@ -50,11 +76,19 @@ export function registerVaultCommands(
   // Scan Codebase to Vault — batch save with duplicate detection
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.scanVaultCodebase', async () => {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) {
-        vscode.window.showErrorMessage('No workspace open.');
-        return;
-      }
+      // Show folder picker — user can scan any project, not just the current workspace
+      const defaultUri = vscode.workspace.workspaceFolders?.[0]?.uri ||
+        vscode.Uri.file(require('os').homedir() + '/projects');
+      const picked = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        defaultUri,
+        openLabel: 'Scan This Project',
+        title: 'Select a project folder to scan into your Vault',
+      });
+      if (!picked || picked.length === 0) { return; }
+      const root = picked[0].fsPath;
       const result = await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: 'CHASSIS Vault: Scanning codebase...',
@@ -70,18 +104,11 @@ export function registerVaultCommands(
         vscode.window.showInformationMessage('No extractable blocks found.');
         return;
       }
-      // Actually save each scanned item to vault
+      // Store results for Save to Vault button — user confirms before saving
+      _pendingScanItems = result.items;
       let savedCount = 0;
       let dupCount = 0;
-      for (const item of result.items) {
-        if (!vaultService.isDuplicate(item.contentHash)) {
-          vaultService.saveItem(item);
-          savedCount++;
-        } else {
-          dupCount++;
-        }
-      }
-      // Open chat panel and show scan results with save summary
+      // Open chat panel and show results — user clicks Save to Vault to confirm
       await ensureChatPanelOpen();
       showVaultScanResults(result.items, result.fileCount, result.filteredCount, savedCount, dupCount);
     })
@@ -175,6 +202,34 @@ ${listStr}`;
         `;
         ChatPanel.currentPanel?.showPanel('vault-validate', '✅ Vault Validation', content);
       });
+    })
+  );
+
+  // Vault Cleanup — remove items whose sourceFile came from pip/env paths (site-packages, lib/python, etc.)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.vaultCleanupSystemPaths', async () => {
+      const SYSTEM_PATH_SIGNALS = [
+        'site-packages', 'dist-packages', '__pycache__', '.venv', '/venv/',
+        'lib/python', 'lib64/python', '.tox', '.eggs', 'sdist', 'wheels',
+        '.mypy_cache', '.pytest_cache',
+      ];
+      const allItems = vaultService.listItems();
+      const toRemove = allItems.filter(item => {
+        const src = (item as any).sourceFile || (item as any).filePath || '';
+        return SYSTEM_PATH_SIGNALS.some(sig => src.includes(sig));
+      });
+      if (toRemove.length === 0) {
+        vscode.window.showInformationMessage('CHASSIS Vault: No system/pip path items found. Vault is already clean.');
+        return;
+      }
+      const confirm = await vscode.window.showWarningMessage(
+        `CHASSIS Vault: Found ${toRemove.length} item(s) sourced from Python pip/env paths. Remove them?`,
+        { modal: true },
+        'Remove All'
+      );
+      if (confirm !== 'Remove All') { return; }
+      for (const item of toRemove) { vaultService.deleteItem(item.id); }
+      vscode.window.showInformationMessage(`CHASSIS Vault: Removed ${toRemove.length} system path item(s).`);
     })
   );
 }

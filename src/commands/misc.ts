@@ -2,10 +2,13 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
 import { GuideService } from '../services/guideService.js';
 import { RulesService } from '../services/rulesService.js';
+import { autoCaptureFile } from '../services/vaultAutoCapture.js';
+import { getPhaseUndoService } from '../services/phaseUndoService.js';
 import { ChassisWebviewProvider } from '../ui/chassisWebviewProvider.js';
 import { ChatPanel } from '../ui/chatPanel.js';
 
@@ -39,57 +42,7 @@ export function registerMiscCommands(
     })
   );
 
-  // Open Work Log — show inside chat panel
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.log', async () => {
-      if (!chassis.isInitialized()) { return; }
-      const raw = fs.existsSync(chassis.worklogPath)
-        ? fs.readFileSync(chassis.worklogPath, 'utf-8')
-        : '*(No work log entries yet.)*';
-      const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const html = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">📋 Work Log</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${escaped}</pre></div>`;
-      if (!ChatPanel.currentPanel) {
-        vscode.commands.executeCommand('chassis.openChatPanel');
-        setTimeout(() => ChatPanel.currentPanel?.showPanel('worklog', '📋 Work Log', html), 300);
-      } else {
-        ChatPanel.currentPanel.showPanel('worklog', '📋 Work Log', html);
-      }
-    })
-  );
-
-  // Open Dead Ends — show inside chat panel
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.deadends', async () => {
-      if (!chassis.isInitialized()) { return; }
-      const raw = fs.existsSync(chassis.deadendsPath)
-        ? fs.readFileSync(chassis.deadendsPath, 'utf-8')
-        : '*(No dead ends logged yet.)*';
-      const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-      const html = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">💀 Dead Ends</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${escaped}</pre></div>`;
-      if (!ChatPanel.currentPanel) {
-        vscode.commands.executeCommand('chassis.openChatPanel');
-        setTimeout(() => ChatPanel.currentPanel?.showPanel('deadends', '💀 Dead Ends', html), 300);
-      } else {
-        ChatPanel.currentPanel.showPanel('deadends', '💀 Dead Ends', html);
-      }
-    })
-  );
-
-  // Refresh Panel
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.refreshPanel', () => {
-      refreshAll();
-    })
-  );
-
-  // Getting Started Guide
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.guide', async () => {
-      await guideService.showGuide();
-    })
-  );
-
-  // Show Getting Started in Chat Panel
+  // Getting Started panel — show inside chat panel
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.showChatGettingStarted', async () => {
       ChatPanel.show(undefined as any, undefined as any);
@@ -98,6 +51,13 @@ export function registerMiscCommands(
           ChatPanel.currentPanel.showGettingStarted();
         }
       }, 100);
+    })
+  );
+
+  // Guide — show full guide webview
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.guide', async () => {
+      await guideService.showGuide();
     })
   );
 
@@ -140,14 +100,20 @@ export function registerMiscCommands(
   // Generate AI Editor Rules
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.generateRules', async () => {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) { vscode.window.showErrorMessage('No workspace open.'); return; }
-      const config = chassis.loadConfig();
-      const name = config?.projectName || 'Project';
-      const created = rulesService.generateAll(root, name);
-      vscode.window.showInformationMessage(
-        'CHASSIS rules generated: ' + created.join(', ')
-      );
+      try {
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (!root) { vscode.window.showErrorMessage('No workspace open.'); return; }
+        const config = chassis.loadConfig();
+        const name = config?.projectName || 'Project';
+        const created = rulesService.generateAll(root, name);
+        vscode.window.showInformationMessage(
+          'CHASSIS rules generated: ' + created.join(', ')
+        );
+        refreshAll();
+      } catch (err) {
+        vscode.window.showErrorMessage('Generate Rules failed: ' + (err instanceof Error ? err.message : String(err)));
+        throw err;
+      }
     })
   );
 
@@ -220,6 +186,171 @@ export function registerMiscCommands(
             vscode.window.showErrorMessage('Commit failed: ' + (e as Error).message);
           }
         }
+      }
+    })
+  );
+
+  // Open current file (or specified file) in browser
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.openInBrowser', async (filePath?: string) => {
+      const targetPath = filePath || vscode.window.activeTextEditor?.document.uri.fsPath;
+      if (!targetPath) {
+        vscode.window.showErrorMessage('No file specified and no active editor.');
+        return;
+      }
+      if (!fs.existsSync(targetPath)) {
+        vscode.window.showErrorMessage(`File not found: ${targetPath}`);
+        return;
+      }
+      const uri = vscode.Uri.file(targetPath);
+      try {
+        await vscode.commands.executeCommand('simpleBrowser.show', uri.toString());
+      } catch {
+        await vscode.env.openExternal(uri);
+      }
+    })
+  );
+
+  // Undo a specific build phase
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.undoPhase', async () => {
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!root) {
+        vscode.window.showErrorMessage('No workspace open.');
+        return;
+      }
+
+      const phaseUndo = getPhaseUndoService(root);
+      const builds = phaseUndo.listBuilds();
+
+      if (builds.length === 0) {
+        vscode.window.showInformationMessage('No phased builds to undo.');
+        return;
+      }
+
+      // Show builds with phases
+      const buildItems = builds.map(b => ({
+        label: `${new Date(parseInt(b.buildId)).toLocaleString()}`,
+        description: `${b.phaseCount} phases — ${b.task.substring(0, 40)}${b.task.length > 40 ? '...' : ''}`,
+        detail: b.buildId,
+      }));
+
+      const selectedBuild = await vscode.window.showQuickPick(buildItems, {
+        placeHolder: 'Select a build to undo a phase from',
+      });
+
+      if (!selectedBuild) return;
+
+      const buildId = selectedBuild.detail;
+      const undoablePhases = phaseUndo.getUndoablePhases(buildId);
+
+      if (undoablePhases.length === 0) {
+        vscode.window.showInformationMessage('No undoable phases in this build.');
+        return;
+      }
+
+      // Show phases that can be undone (newest first)
+      const phaseItems = undoablePhases.map(p => ({
+        label: `Phase ${p.phaseNumber}: ${p.phaseName}`,
+        description: `${p.files.length} file(s)`,
+        detail: p.phaseNumber.toString(),
+      }));
+
+      const selectedPhase = await vscode.window.showQuickPick(phaseItems, {
+        placeHolder: 'Select phase to undo (newest first)',
+      });
+
+      if (!selectedPhase) return;
+
+      const phaseNumber = parseInt(selectedPhase.detail!);
+      const success = phaseUndo.undoPhase(buildId, phaseNumber);
+
+      if (success) {
+        vscode.window.showInformationMessage(`✅ Undid Phase ${phaseNumber}`);
+      } else {
+        vscode.window.showErrorMessage(`❌ Failed to undo Phase ${phaseNumber}`);
+      }
+    })
+  );
+
+  // Show CHASSIS capabilities in chat panel
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.showCapabilities', async () => {
+      const caps = [
+        '🏗️ **Build** — Generate code from natural language',
+        '📋 **Blueprint** — Define project scope with 5W framework',
+        '🗺️ **Map** — Visual architecture diagram',
+        '🔍 **Analyze** — Project health & recommendations',
+        '💾 **Vault** — Save & reuse code snippets',
+        '🤖 **AI Review** — Code review by AI',
+        '🧪 **Tests** — Auto-detect & run test frameworks',
+        '↩️ **Undo Phase** — Rollback individual build phases',
+        '📦 **All VS Code Commands** — Terminal, Git, settings, etc.',
+        '',
+        'Just ask me to do anything!',
+      ].join('\n');
+
+      vscode.window.showInformationMessage(
+        'CHASSIS Capabilities: Build code, Blueprint, Map, Vault, AI Review, Tests, Undo Phase, VS Code commands',
+        'Got it'
+      );
+    })
+  );
+
+  // List available projects (scans home directory for CHASSIS projects)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.listProjects', async () => {
+      const os = require('os');
+      const homeDir = os.homedir();
+      const projectsDir = path.join(homeDir, 'projects');
+
+      const projects: { name: string; path: string }[] = [];
+
+      // Check common project directories
+      const dirsToCheck = [
+        projectsDir,
+        path.join(homeDir, 'Projects'),
+        path.join(homeDir, 'dev'),
+        path.join(homeDir, 'workspace'),
+        path.join(homeDir, 'code'),
+        path.join(homeDir, 'src'),
+      ];
+
+      for (const dir of dirsToCheck) {
+        if (fs.existsSync(dir)) {
+          try {
+            const entries = fs.readdirSync(dir, { withFileTypes: true });
+            for (const entry of entries) {
+              if (entry.isDirectory()) {
+                const projectPath = path.join(dir, entry.name);
+                // Check if it's a CHASSIS project (has .chassis directory)
+                if (fs.existsSync(path.join(projectPath, '.chassis'))) {
+                  projects.push({ name: entry.name, path: projectPath });
+                }
+              }
+            }
+          } catch { /* ignore permission errors */ }
+        }
+      }
+
+      if (projects.length === 0) {
+        vscode.window.showInformationMessage('No CHASSIS projects found. Create one with "Start New Project Setup"');
+        return;
+      }
+
+      const items = projects.map(p => ({
+        label: p.name,
+        description: p.path,
+        detail: p.path,
+      }));
+
+      const selected = await vscode.window.showQuickPick(items, {
+        placeHolder: 'Select a CHASSIS project to open',
+      });
+
+      if (selected) {
+        const uri = vscode.Uri.file(selected.detail!);
+        vscode.commands.executeCommand('vscode.openFolder', uri);
       }
     })
   );

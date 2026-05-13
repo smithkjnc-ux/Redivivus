@@ -8,20 +8,25 @@ Complete every item before writing a single line of code:
 1. Read `CHASSIS_ROADMAP.md` in full
 2. Read this file in full
 3. Read `.chassis/blueprint.md` — confirm your change fits the scope
-4. Read the `[SCOPE]` tag at the top of every file you plan to touch
-5. Read every `[WARN]` tag near code you plan to change
-6. Check `CHASSIS_ROADMAP.md` for `[DEAD]` entries related to your approach
+4. Read `.chassis/dead_ends.md` — check if your approach has been tried and failed
+5. Read the `[SCOPE]` tag at the top of every file you plan to touch
+6. Read every `[WARN]` tag near code you plan to change
+7. **CHECK FILE SIZE**: Run `wc -l <file>` on every file you plan to edit. If it is over 200 lines, you MUST split it first before adding any new code. [NEXT] markers are not a substitute — they are a violation notice, not a deferral permission.
 
 ## HARD STOP — AFTER EVERY FILE CHANGE
 
 After any file touch — one line, one comment, anything:
 1. Add an entry to `CHASSIS_ROADMAP.md` under "Recent Fixes": file, what changed, why, risk
 2. Update the `*Last updated:*` line with today's date
+3. Add `[WARN]` to any logic you know is fragile
+4. Add a comment above every new function you wrote
 No exceptions. No change is too small to log.
 
-## File Size Hard Stop
-File reaches 200 lines → stop → split by responsibility → [SCOPE] on each new file → compile → log.
-[NEXT] is NOT a substitute for splitting. It is a rule violation when used that way.
+## File Size Hard Stop — NON-NEGOTIABLE
+- File reaches 200 lines → **STOP IMMEDIATELY** → split by responsibility → [SCOPE] on each new file → compile → log in roadmap.
+- **[NEXT] is NOT permission to defer a split.** It is a marker that the violation EXISTS and must be resolved at the START of the next session, not at the end.
+- Any AI that adds code to a file already over 200 lines without splitting it first is violating this rule, regardless of how small the addition is.
+- Enforcement: Before editing any file, check its line count. If over 200, split it. Then make your edit in the correct new file.
 
 ## Blueprint
 - **WHO:** Solo developers and vibe coders using AI editors (Windsurf, Cursor, Claude Code, etc.)
@@ -47,3 +52,48 @@ File reaches 200 lines → stop → split by responsibility → [SCOPE] on each 
 - Every new file needs [SCOPE] at line 1 (Rule 11)
 - Removed code must have a [DEAD] log entry (Rule 8)
 - Comment syntax must match the file's language (Rule 7)
+- **[DEAD] VS Code webview size limit — NEVER inline JS strings >~400 lines into webview HTML.**
+  VS Code webview uses document.write() internally with a hard size limit (~45KB total HTML).
+  Exceeding it causes: SyntaxError: Failed to execute 'write' on 'Document': Unexpected string
+  This error appears at index.html:1058:23 and produces a blank webview regardless of JS content.
+  CORRECT PATTERN: write the script to disk (e.g. out/ui/tlScript.js via fs.writeFileSync),
+  add localResourceRoots to the panel options, serve via webview.asWebviewUri(), load with <script src>.
+  See mapPanel.ts _buildHtml() for the reference implementation.
+
+### Rule 13: No non-ASCII characters in WebView injected scripts
+Any string injected into a VS Code WebView via document.write(), srcdoc, or template literal script blocks must contain ASCII only. Emoji, Unicode arrows, box-drawing characters cause silent parse failures.
+Use ASCII equivalents: -> not ->, -- not --, [!] not emoji.
+For emoji needed at runtime: use String.fromCharCode() to construct them inside the webview JS, never embed as literals in the HTML string.
+
+### Rule 14: Never modify shared map initialization code
+mapScriptEngine.ts IIFE contains shared state for all Architecture Map views. New views must use window.setLayoutMode() bridge only. Never re-dispatch click events or call orig() with stored event objects.
+
+### Rule 15: New map views must be tested in isolation first
+Before wiring any new Architecture Map view into the toolbar, verify its render function does not crash the shared canvas initialization. Test standalone first. If it passes standalone, wire it in. If not, fix first.
+
+### Rule 16: Map panel has a 45KB document.write() hard limit
+The map WebView uses document.write() with a ~45KB limit. Never inline large script files into the HTML template.
+Correct pattern: write script to disk (out/ui/filename.js), add to localResourceRoots, serve via webview.asWebviewUri(), load with <script src>. See mapPanel.ts _buildHtml() for reference implementation.
+
+### Rule 17: Causation-first debugging
+When any error occurs after a build or edit, always check build_history.json and the snapshot diff for the most recent build BEFORE suggesting any other cause. If the erroring file was modified in the last build, lead with that explicitly: "This file was modified in the last build — the error is likely caused by that change." Never start debugging from scratch when recent edit history exists.
+
+### Rule 18: AI for Understanding, Code for Execution
+Never use regex or keyword pattern matching to simulate language understanding. Use a 50-token AI classifier call instead. Always.
+
+AI handles: intent, meaning, classification, understanding, matching, similarity.
+Code handles: file operations, command execution, data storage, UI rendering, API calls, math.
+
+### Rule 19: CHASSIS is a coding assistant only
+Never answer questions unrelated to software development, coding, architecture, or the user's project. Offtopic requests get one hardcoded polite redirect — no AI tokens spent on the response.
+
+Hardcoded redirect: "I'm a coding assistant — I can help you build, fix, explain, or review code and projects. For anything else, I'm not the right tool. What are you building today?"
+
+### Rule 20: Build & Deploy Protocol
+- After any code change, always run: npm run compile
+- When deploying to baked IDE, ALWAYS copy both out/ AND package.json:
+  cp -r out/* $BAKED/out/
+  cp package.json $BAKED/package.json
+- Never copy out/ without package.json — commands, settings, and activation events live in package.json
+- Version in package.json must match the current release (currently 0.3.6)
+- When adding new commands, settings, or activation events, they MUST be registered in package.json contributes section or they will silently fail

@@ -92,3 +92,28 @@ export function analyzeFileMetrics(content: string, config: GuardianConfig): Fil
 
   return { totalLines, functionCount, longestFunctionLines, needsSplit };
 }
+
+/** [CHASSIS] Returns a plain-English roadmap for improving a file's architecture */
+export function generateRefactorRoadmap(metrics: FileMetrics, complexity: number): string[] {
+  const steps: string[] = [];
+  
+  if (metrics.totalLines > 200) {
+    steps.push("Break this file into 2-3 smaller files grouped by what they do.");
+  }
+  if (metrics.longestFunctionLines > 50) {
+    steps.push("Extract long instructions into smaller helper functions with clear names.");
+  }
+  if (complexity > 15) {
+    steps.push("Reduce the number of files this one talks to. It's becoming a 'bottleneck'.");
+  }
+  if (metrics.functionCount === 0 && metrics.totalLines > 100) {
+    steps.push("This file is a 'Flat File' — wrap your logic in functions to make it safer.");
+  }
+  
+  if (steps.length === 0) {
+    steps.push("Add more [TODO] markers for features you haven't built yet.");
+    steps.push("Ensure every function has a short comment explaining its job.");
+  }
+  
+  return steps;
+}

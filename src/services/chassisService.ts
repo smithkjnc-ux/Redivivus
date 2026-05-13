@@ -1,6 +1,8 @@
 // [SCOPE] CHASSIS service orchestrator — thin facade over path, config, init, rules, and logging modules
 // Split from 427-line monolith. Each responsibility now lives in its own file under 200 lines.
 
+import * as fs from 'fs';
+import * as path from 'path';
 import { ChassisPaths, isInitialized, hasWorkspace } from './chassisPaths.js';
 import { loadConfig, saveConfig } from './chassisConfig.js';
 import { initProject, scaffoldAt } from './chassisInit.js';
@@ -10,8 +12,8 @@ import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from './
 export class ChassisService {
   private paths: ChassisPaths;
 
-  constructor() {
-    this.paths = new ChassisPaths();
+  constructor(root?: string) {
+    this.paths = new ChassisPaths(root);
   }
 
   // ── path helpers (delegated to ChassisPaths)
@@ -28,6 +30,11 @@ export class ChassisService {
 
   isInitialized(): boolean { return isInitialized(this.paths); }
   hasWorkspace(): boolean { return hasWorkspace(this.paths); }
+
+  /** Returns true if the given folder has already been set up with CHASSIS (.chassis/config.json exists). */
+  static hasChassisSetup(folderPath: string): boolean {
+    return fs.existsSync(path.join(folderPath, '.chassis', 'config.json'));
+  }
 
   // ── workspace root (for compatibility with guardianService)
 

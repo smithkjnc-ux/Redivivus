@@ -6,7 +6,7 @@ import * as path from 'path';
 import { VaultService, VaultItem } from './vaultService.js';
 import { RoutingService } from './routingService.js';
 import { BuildPlan } from './buildFromVaultTypes.js';
-import { findRelevantByTask } from './buildFromVaultSearch.js';
+import { findRelevantByTask, VaultSearchResult } from './buildFromVaultSearch.js';
 import { BuildFromVaultModal } from '../ui/buildFromVaultModal.js';
 
 export class BuildFromVaultService {
@@ -40,12 +40,13 @@ export class BuildFromVaultService {
         return;
       }
 
-      const relevant = findRelevantByTask(task, allItems);
+      const searchResult: VaultSearchResult = findRelevantByTask(task, allItems);
+      const relevant = searchResult.items;
 
       // ── Step 4: Ask AI to plan — what to use from vault, what gaps exist
       progress.report({ message: `Found ${relevant.length} vault candidates — asking AI to plan...` });
 
-      const vaultSummary = relevant.slice(0, 12).map(item => {
+      const vaultSummary = relevant.slice(0, 12).map((item: VaultItem) => {
         return `- [${item.category}] ${item.name} (${item.language}) — ${path.basename(item.sourceFile)}`;
       }).join('\n');
 

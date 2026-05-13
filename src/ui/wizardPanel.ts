@@ -14,12 +14,16 @@ import { RoutingService } from '../services/routingService.js';
 import { getStyles } from './styles.js';
 import { getScripts } from './scripts.js';
 import { renderWelcomeView, renderRetrofitPendingView } from './views/welcomeView.js';
+import { renderMapTab } from './views/mapTab.js';
 import { renderWorkTab } from './views/workTab.js';
 import { renderFilesTab, renderSwitchForm } from './views/filesTab.js';
 import { renderHistoryTab, getSessionHistory, getReviews } from './views/historyTab.js';
 import { renderVaultTab, renderVaultScanSummary, getVaultItems } from './views/vaultTab.js';
 import { renderWizardStep } from './views/wizardSteps.js';
 import { attachMessageRouter, WizardPanelState } from './messageRouter.js';
+import { buildProjectMap } from '../services/mapBuilderService.js';
+import { GuardianService } from '../services/guardianService.js';
+import { IntentService } from '../services/intentService.js';
 
 export class WizardPanel {
   private panel: vscode.WebviewPanel | undefined;
@@ -28,11 +32,14 @@ export class WizardPanel {
     vaultView: 'categories', vaultCategory: null, vaultSubcategory: null, vaultItems: [], vaultGlobal: true,
     activeTab: 'work',
     vaultScanMode: false, vaultScanItems: [], vaultScanDuplicates: [], vaultScanFileCount: 0, vaultScanFilteredCount: 0, vaultScanTotalFound: 0,
+    browseAnywayBanner: false,
   };
   private disposables: vscode.Disposable[] = [];
   public static activePanel: WizardPanel | undefined;
   private vaultService: VaultService;
   private routingService: RoutingService;
+  private guardianService: GuardianService;
+  private intentService: IntentService;
 
   constructor(
     private chassis: ChassisService,
@@ -41,6 +48,9 @@ export class WizardPanel {
   ) {
     this.vaultService = new VaultService(context);
     this.routingService = new RoutingService();
+    this.guardianService = new GuardianService(chassis);
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    this.intentService = new IntentService(root);
     WizardPanel.activePanel = this;
   }
 
@@ -48,7 +58,7 @@ export class WizardPanel {
     if (this.panel) { this.panel.reveal(); this.updateContent(); return; }
     this.panel = vscode.window.createWebviewPanel('chassisWizard', 'CHASSIS', vscode.ViewColumn.One, { enableScripts: true, retainContextWhenHidden: true });
     this.panel.onDidDispose(() => { this.panel = undefined; });
-    attachMessageRouter(this.panel.webview, this.chassis, this.sessions, this.vaultService, this.context, this.state, () => this.updateContent(), this.routingService);
+    attachMessageRouter(this.panel.webview, this.chassis, this.sessions, this.vaultService, this.context, this.state, () => this.updateContent(), this.routingService, this.guardianService, this.intentService);
     this.updateContent();
   }
 
@@ -159,11 +169,20 @@ export class WizardPanel {
       if (!hasBlueprint) {
         content += `<div class="card primary" data-cmd="chassis.blueprint"><div class="card-icon">📋</div><div class="card-body"><div class="card-title">Tell CHASSIS About Your Project</div><div class="card-desc">5 quick questions so I understand what you're building. Takes about 2 minutes.</div></div></div>`;
       }
+      if (this.state.browseAnywayBanner) {
+        content += `<div style="background:#7a5c00;color:#ffe082;padding:10px 16px;border-radius:8px;margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;line-height:1.4;">
+          <span>⚠️ This project isn't set up with CHASSIS. Vault, sessions, and work log are unavailable.
+            <button onclick="vscode.postMessage({type:'initProject',name:'${projectName}'})" style="background:none;border:none;color:#ffe082;cursor:pointer;font-size:13px;text-decoration:underline;padding:0;margin-left:6px;">Set It Up</button>
+          </span>
+          <button onclick="vscode.postMessage({type:'dismiss-browse-banner'})" style="background:none;border:none;color:#ffe082;cursor:pointer;font-size:18px;line-height:1;padding:0 2px;flex-shrink:0;" title="Dismiss">&#x2715;</button>
+        </div>`;
+      }
       content += `<div class="tabs">
-        <button class="tab ${this.state.activeTab === 'work' ? 'active' : ''}" onclick="showTab('work')">Work</button>
-        <button class="tab ${this.state.activeTab === 'files' ? 'active' : ''}" onclick="showTab('files')">Files & AI</button>
-        <button class="tab ${this.state.activeTab === 'history' ? 'active' : ''}" onclick="showTab('history')">History</button>
-        <button class="tab ${this.state.activeTab === 'vault' ? 'active' : ''}" onclick="showTab('vault')">Vault</button>
+        <button class="tab ${this.state.activeTab === 'work' ? 'active' : ''}" onclick="showTab('work', event)">Work</button>
+        <button class="tab ${this.state.activeTab === 'files' ? 'active' : ''}" onclick="showTab('files', event)">Files & AI</button>
+        <button class="tab ${this.state.activeTab === 'map' ? 'active' : ''}" onclick="showTab('map', event)">Architecture Map</button>
+        <button class="tab ${this.state.activeTab === 'history' ? 'active' : ''}" onclick="showTab('history', event)">History</button>
+        <button class="tab ${this.state.activeTab === 'vault' ? 'active' : ''}" onclick="showTab('vault', event)">Vault</button>
       </div>`;
       content += renderWorkTab(sessionActive, session, hasBlueprint, this.state.activeTab === 'work');
       content += renderSwitchForm(currentAI);
@@ -177,6 +196,13 @@ export class WizardPanel {
         kimi:   !!(chassisCfg.get<string>('kimiApiKey')   || process.env.MOONSHOT_API_KEY),
       };
       content += renderFilesTab(projectName, blueprintLocked, hasBlueprint, config?.blueprint, this.state.activeTab === 'files', aiKeys);
+      
+      const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+      if (this.state.activeTab === 'map' && !this.state.mapData) {
+        try { this.state.mapData = buildProjectMap(rootPath, this.intentService); } catch { this.state.mapData = { nodes: [], edges: [] }; }
+      }
+      content += renderMapTab(this.state.mapData || { nodes: [], edges: [] }, projectName, this.state.activeTab === 'map');
+
       content += renderHistoryTab(sessions, reviews, this.state.activeTab === 'history');
       content += this.state.vaultScanMode
         ? renderVaultScanSummary(this.state.vaultScanItems, this.state.vaultScanDuplicates, this.state.vaultScanFileCount, this.state.vaultScanFilteredCount, this.state.activeTab === 'vault')

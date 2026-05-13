@@ -30,6 +30,7 @@ CHASSIS is an AI-agnostic VS Code extension + Universal Project Protocol. It loa
 8. **Fail Forward** — Dead End Log tracks what didn't work and why. No repeated mistakes across sessions.
 9. **Exit Clean** — Every session ends with an exit interview. What was done, what's pending, what to watch out for.
 10. **Guardian First** — CHASSIS prioritizes architectural health and security over AI speed. If an AI suggests a "quick fix" that breaks modularity or safety, CHASSIS blocks and mentors the user on the correct path.
+11. **Visual-to-Code Symmetry** — The user’s visual experience and the underlying code must be treated as a single entity. If a user can see it, CHASSIS must be able to find and modify the code that generates it.
 
 ---
 
@@ -78,7 +79,7 @@ Building proceeds only when confidence is High. Medium triggers clarifying quest
 
 ---
 
-## 5 Layers
+## 6 Layers
 
 ### Layer 1 — Protocol Layer
 The Universal Project Protocol. Standards for file structure, naming, documentation format. Lives in a `.chassis/` directory in the project root. Portable across projects.
@@ -113,6 +114,11 @@ AI backend selection. The user picks which AI handles the work. CHASSIS routes t
 Community-contributed blueprints, logic blocks, and solutions. Quality-gated: only CHASSIS-verified code can be uploaded. The extension is the gatekeeper.
 
 **Contract:** Everything in the Vault has a paper trail — the Blueprint, the WORK_LOG, the exit interview. Bad code can't get a CHASSIS stamp.
+
+### Layer 6 — The Lens Layer
+The Visual-to-Code mapping system. It provides the spatial context needed for non-technical users to communicate with the AI through the UI they are building.
+
+**Contract:** Selecting a visual element must result in a confirmed source-code reference. The AI must receive the visual context (HTML/CSS) alongside the logical context (File/Line) to ensure the change matches the user's intent.
 
 ---
 
@@ -233,6 +239,9 @@ AI backend selection and routing. Context injection. Model switching.
 
 **Phase 3 — Community Vault**
 Extension-gated contribution system. Quality verification. Shared blueprints and solutions.
+
+**Phase 4 — Visual Lens**
+Point-and-click UI to source-code mapping. Visual context injection for AI prompts. Spatial editing.
 
 ---
 

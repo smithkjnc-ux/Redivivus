@@ -2,21 +2,23 @@
 // Commands: view usage report, reset session/day/week/month/all with lifetime preservation
 
 import * as vscode from 'vscode';
-import { UsageTracker, UsageReport } from '../services/usageTracker.js';
+import { UsageTracker, UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
+import { RoutingService } from '../services/routingService.js';
 import { showInChatPanel } from '../services/chatPanelContent.js';
 
-export function registerUsageCommands(context: vscode.ExtensionContext, usageTracker: UsageTracker): void {
+export function registerUsageCommands(context: vscode.ExtensionContext, usageTracker: UsageTracker, routing?: RoutingService): void {
   // View Usage Report (in separate panel)
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.viewUsage', async () => {
       const report = usageTracker.getReport();
+      const roster = routing?.getRosterDisplay?.();
       const panel = vscode.window.createWebviewPanel(
         'chassisUsage',
         'CHASSIS Usage Report',
         vscode.ViewColumn.One,
         { enableScripts: true }
       );
-      panel.webview.html = getUsageHtml(report);
+      panel.webview.html = getUsageHtml(report, roster);
     })
   );
 
@@ -24,7 +26,8 @@ export function registerUsageCommands(context: vscode.ExtensionContext, usageTra
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.viewUsageInChat', async () => {
       const report = usageTracker.getReport();
-      const content = formatUsageForChat(report);
+      const roster = routing?.getRosterDisplay?.();
+      const content = formatUsageForChat(report, roster);
       showInChatPanel({ title: '📊 Usage Report', content, type: 'html' });
     })
   );
@@ -77,13 +80,42 @@ export function registerUsageCommands(context: vscode.ExtensionContext, usageTra
   );
 }
 
-function getUsageHtml(report: UsageReport): string {
+function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>): string {
+  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+
   const formatPeriod = (p: { tokens: number; cost: number; messages: number }) => {
     return {
       tokens: p.tokens.toLocaleString(),
       cost: `$${p.cost.toFixed(4)}`,
       messages: p.messages.toLocaleString(),
     };
+  };
+
+  // Format AI breakdown lines for a period — includes all roster members even with 0 tokens
+  const formatAIBreakdown = (byAI: { aiProvider: string; tokens: number; cost: number; messages: number }[], periodRoster?: typeof roster) => {
+    const displayRoster = periodRoster || roster;
+    if (!displayRoster || displayRoster.length === 0) {
+      if (!byAI || byAI.length === 0) return '';
+      const lines = byAI.map(ai =>
+        `        <div class="ai-breakdown">
+          <span class="ai-name">↳ ${aiLabels[ai.aiProvider] || ai.aiProvider}</span>
+          <span class="ai-stats">${ai.tokens.toLocaleString()} tokens (${`$${ai.cost.toFixed(4)}`})</span>
+        </div>`
+      ).join('');
+      return `<div class="ai-breakdown-container">${lines}</div>`;
+    }
+    // Build from roster to include all AIs even with 0 usage
+    const usageMap = new Map(byAI?.map(u => [u.aiProvider, u]) || []);
+    const lines = displayRoster.map(member => {
+      const usage = usageMap.get(member.ai);
+      const tokens = usage?.tokens ?? 0;
+      const cost = usage?.cost ?? 0;
+      return `        <div class="ai-breakdown">
+          <span class="ai-name">${member.emoji} ${member.label} <small style="opacity:0.7">(${member.role})</small></span>
+          <span class="ai-stats">${tokens.toLocaleString()} tokens (${`$${cost.toFixed(4)}`})</span>
+        </div>`;
+    }).join('');
+    return `<div class="ai-breakdown-container">${lines}</div>`;
   };
 
   const session = formatPeriod(report.session);
@@ -135,6 +167,25 @@ function getUsageHtml(report: UsageReport): string {
     .period-stat-label { color: var(--vscode-descriptionForeground); }
     .period-stat-value { font-weight: 500; }
     .period-stat-value.cost { color: #4ec959; }
+    .ai-breakdown-container {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--vscode-input-border);
+      font-size: 12px;
+    }
+    .ai-breakdown {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+      padding: 2px 0;
+    }
+    .ai-name {
+      color: var(--vscode-descriptionForeground);
+    }
+    .ai-stats {
+      color: var(--vscode-editor-foreground);
+      font-family: monospace;
+    }
     .lifetime-notice {
       background: rgba(78,201,89,0.1);
       border-left: 3px solid #4ec959;
@@ -198,6 +249,7 @@ function getUsageHtml(report: UsageReport): string {
         <span class="period-stat-label">Cost:</span>
         <span class="period-stat-value cost">${session.cost}</span>
       </div>
+      ${formatAIBreakdown(report.session.byAI)}
     </div>
 
     <div class="period-card">
@@ -214,6 +266,7 @@ function getUsageHtml(report: UsageReport): string {
         <span class="period-stat-label">Cost:</span>
         <span class="period-stat-value cost">${day.cost}</span>
       </div>
+      ${formatAIBreakdown(report.day.byAI)}
     </div>
 
     <div class="period-card">
@@ -230,6 +283,7 @@ function getUsageHtml(report: UsageReport): string {
         <span class="period-stat-label">Cost:</span>
         <span class="period-stat-value cost">${week.cost}</span>
       </div>
+      ${formatAIBreakdown(report.week.byAI)}
     </div>
 
     <div class="period-card">
@@ -246,6 +300,7 @@ function getUsageHtml(report: UsageReport): string {
         <span class="period-stat-label">Cost:</span>
         <span class="period-stat-value cost">${month.cost}</span>
       </div>
+      ${formatAIBreakdown(report.month.byAI)}
     </div>
 
     <div class="period-card lifetime">
@@ -262,6 +317,7 @@ function getUsageHtml(report: UsageReport): string {
         <span class="period-stat-label">Cost:</span>
         <span class="period-stat-value cost">${lifetime.cost}</span>
       </div>
+      ${formatAIBreakdown(report.lifetimeUnresettable.byAI)}
     </div>
   </div>
 
@@ -299,11 +355,37 @@ function getUsageHtml(report: UsageReport): string {
 </html>`;
 }
 
-function formatUsageForChat(report: UsageReport): string {
-  const formatPeriod = (p: { tokens: number; cost: number; messages: number }, label: string) => {
+function formatUsageForChat(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>): string {
+  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+
+  const formatAIBreakdownChat = (byAI: { aiProvider: string; tokens: number; cost: number; messages: number }[], periodRoster?: typeof roster) => {
+    const displayRoster = periodRoster || roster;
+    if (!displayRoster || displayRoster.length === 0) {
+      if (!byAI || byAI.length === 0) return '';
+      return byAI.map(ai =>
+        `<div style="margin-left:16px;font-size:12px;color:var(--vscode-descriptionForeground);">
+          ↳ ${aiLabels[ai.aiProvider] || ai.aiProvider}: ${ai.tokens.toLocaleString()} tokens ($${ai.cost.toFixed(4)})
+        </div>`
+      ).join('');
+    }
+    // Build from roster to include all AIs even with 0 usage
+    const usageMap = new Map(byAI?.map(u => [u.aiProvider, u]) || []);
+    return displayRoster.map(member => {
+      const usage = usageMap.get(member.ai);
+      const tokens = usage?.tokens ?? 0;
+      const cost = usage?.cost ?? 0;
+      return `<div style="margin-left:16px;font-size:12px;color:var(--vscode-descriptionForeground);">
+        ${member.emoji} ${member.label} <small style="opacity:0.7">(${member.role})</small>: ${tokens.toLocaleString()} tokens ($${cost.toFixed(4)})
+      </div>`;
+    }).join('');
+  };
+
+  const formatPeriod = (p: { tokens: number; cost: number; messages: number; byAI?: { aiProvider: string; tokens: number; cost: number; messages: number }[] }, label: string) => {
+    const breakdown = formatAIBreakdownChat(p.byAI || [], roster);
     return `<div style="margin:8px 0;padding:8px;background:var(--vscode-input-background);border-radius:6px;">
       <strong>${label}</strong><br>
       ${p.messages.toLocaleString()} messages · ${p.tokens.toLocaleString()} tokens · <span style="color:#4ec959;font-weight:500;">$${p.cost.toFixed(4)}</span>
+      ${breakdown}
     </div>`;
   };
 
@@ -316,6 +398,7 @@ function formatUsageForChat(report: UsageReport): string {
       <div style="margin:12px 0;padding:12px;background:linear-gradient(135deg,rgba(78,201,89,0.1),rgba(59,130,246,0.1));border-radius:6px;border-left:3px solid #4ec959;">
         <strong>💎 Lifetime Total (Unresettable)</strong><br>
         ${report.lifetimeUnresettable.messages.toLocaleString()} messages · ${report.lifetimeUnresettable.tokens.toLocaleString()} tokens · <strong style="color:#4ec959;">$${report.lifetimeUnresettable.cost.toFixed(4)}</strong>
+        ${formatAIBreakdownChat(report.lifetimeUnresettable.byAI || [])}
       </div>
       <div style="font-size:11px;color:var(--vscode-descriptionForeground);margin-top:12px;padding:8px;background:var(--vscode-input-background);border-radius:4px;">
         ℹ️ Use the sidebar buttons or command palette to reset specific periods. Lifetime total is always preserved.

@@ -1,0 +1,47 @@
+// [SCOPE] CHASSIS Scope Creep Detection Command — warn when project drifts from blueprint
+
+import * as vscode from 'vscode';
+import { ScopeCreepDetectionService } from '../services/scopeCreepDetection.js';
+import { ChassisService } from '../services/chassisService.js';
+import { RoutingService } from '../services/routingService.js';
+import { ChatPanel } from '../ui/chatPanel.js';
+
+export function registerScopeCreepCommand(
+  context: vscode.ExtensionContext,
+  chassis: ChassisService,
+  routing: RoutingService,
+): void {
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.detectScopeCreep', async () => {
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!root) {
+        vscode.window.showErrorMessage('No workspace open.');
+        return;
+      }
+
+      ChatPanel.show(undefined as any, undefined as any);
+      setTimeout(async () => {
+        const panel = ChatPanel.currentPanel;
+        if (!panel) { return; }
+
+        (panel as any).state.conversation.push({
+          role: 'assistant',
+          content: '🔍 Detecting scope creep...',
+          timestamp: Date.now(),
+        });
+        (panel as any).refresh();
+
+        const service = new ScopeCreepDetectionService(root, chassis, routing);
+        const issues = await service.detectScopeCreep();
+        const markdown = service.formatMarkdown(issues);
+
+        (panel as any).state.conversation.push({
+          role: 'assistant',
+          content: markdown,
+          timestamp: Date.now(),
+        });
+        (panel as any).refresh();
+      }, 500);
+    })
+  );
+}

@@ -6,22 +6,54 @@ import * as fs from 'fs';
 import { ChassisService } from '../services/chassisService.js';
 import { ChatPanel } from '../ui/chatPanel.js';
 
+/** Registers the onNewProject callback on ChatPanel — call at extension activation AND before showing wizard.
+ *  This ensures the handler is always live regardless of how the new-project wizard was opened. */
+export function registerOnNewProject(context: vscode.ExtensionContext): void {
+  ChatPanel.onNewProject = async (name: string, answers: Record<string, string>, folderPath?: string) => {
+    const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    const suggestedParent = currentRoot ? path.dirname(currentRoot) : (process.env.HOME ? path.join(process.env.HOME, 'projects') : '');
+    const targetFolder = folderPath || path.join(suggestedParent, name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase());
+    const pendingTask = (answers['_originalTask'] || '').trim() || ChatPanel.currentPanel?.getPendingTask?.() || (answers['what'] || '').trim();
+    require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] name=${name} folder=${targetFolder} task=${pendingTask.slice(0,60)}\n`);
+    if (!fs.existsSync(targetFolder)) {
+      fs.mkdirSync(targetFolder, { recursive: true });
+    }
+    // [WARN] Never switch workspace here — ANY workspace change (openFolder OR updateWorkspaceFolders)
+    // triggers a VSCodium extension host reload, destroying the webview and causing duplicate panels.
+    // Instead: init the project in-place, resume the build directly, then offer to open the folder after.
+    const { ChassisService } = await import('../services/chassisService.js');
+    const chassis = new ChassisService(targetFolder);
+    await chassis.initProject(name);
+    if (answers && Object.keys(answers).length > 0) {
+      const config = chassis.loadConfig();
+      if (config) {
+        config.blueprint = {
+          who: answers['who'] || '', what: answers['what'] || '',
+          where: answers['where'] || '', when: answers['when'] || '', why: answers['why'] || '',
+          health: { confirmed: 3, assumed: 1, unknown: 1, confidence: 'medium' },
+          locked: false, version: '1.0',
+        };
+        chassis.saveConfig(config);
+      }
+    }
+    await context.globalState.update('pendingChassisInit', undefined);
+    require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] init complete, resuming build in-place\n`);
+    // [WARN] DO NOT call updateWorkspaceFolders here — it reloads the extension host even on append,
+    // destroying the webview panel. Build runs in-place; user can open the folder after via notification.
+    if (pendingTask && ChatPanel.currentPanel) {
+      ChatPanel.currentPanel.resumeBuildTask(pendingTask, targetFolder);
+    }
+  };
+}
+
 /** Opens the chat panel new-project form. The form posts 'new-project' back; onNewProject callback finishes setup. */
 async function runNewProjectWizard(context: vscode.ExtensionContext): Promise<void> {
   // Suggest a parent folder based on the current project's parent directory
   const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
   const suggestedParent = currentRoot ? path.dirname(currentRoot) : (process.env.HOME ? path.join(process.env.HOME, 'projects') : '');
 
-  // Register the callback that receives completed form data (folderPath already resolved in the form)
-  ChatPanel.onNewProject = async (name: string, answers: Record<string, string>, folderPath?: string) => {
-    // folderPath is the full path as edited by the user (parent/slug); fall back to computing it
-    const targetFolder = folderPath || path.join(suggestedParent, name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase());
-    if (!fs.existsSync(targetFolder)) {
-      fs.mkdirSync(targetFolder, { recursive: true });
-    }
-    await context.globalState.update('pendingChassisInit', { folder: targetFolder, name, blueprint: answers });
-    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetFolder), false);
-  };
+  // Always re-register the callback before opening the wizard
+  registerOnNewProject(context);
 
   // Open chat panel and show the new-project form, passing the suggested parent path
   const open = () => ChatPanel.currentPanel?.showNewProject(suggestedParent);
@@ -39,6 +71,7 @@ export async function runAutoInit(
   refreshAll: () => void
 ): Promise<void> {
   const pending = context.globalState.get<{folder: string; name: string; blueprint?: any}>('pendingChassisInit');
+  require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[runAutoInit] pending=${JSON.stringify(pending)} currentRoot=${vscode.workspace.workspaceFolders?.[0]?.uri.fsPath} isInit=${chassis.isInitialized()}\n`);
   if (pending && !chassis.isInitialized()) {
     const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (currentRoot === pending.folder) {
@@ -88,6 +121,35 @@ export async function runAutoInit(
           refreshAll();
         });
         vscode.window.showInformationMessage(`CHASSIS initialized for "${pending.name}". Your blueprint is saved.`);
+        // Resume the pending build task that triggered project creation
+        const buildTask = (pending as any).pendingBuildTask as string | undefined;
+        if (buildTask) {
+          // If the panel is already open (updateWorkspaceFolders keeps it alive), resume directly.
+          // Otherwise poll briefly then open it — but NEVER open Beside an existing panel.
+          const deadline = Date.now() + 8_000;
+          const poll = () => {
+            require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[poll] currentPanel=${!!ChatPanel.currentPanel} deadline-remaining=${deadline-Date.now()}\n`);
+            if (ChatPanel.currentPanel) {
+              context.globalState.update('chassis.suppressAutoOpen', undefined);
+              ChatPanel.currentPanel.resumeBuildTask(buildTask);
+            } else if (Date.now() < deadline) {
+              setTimeout(poll, 300);
+            } else {
+              // Last resort: open panel then retry once
+              vscode.commands.executeCommand('chassis.openChatPanel').then(() => {
+                setTimeout(() => { ChatPanel.currentPanel?.resumeBuildTask(buildTask); }, 600);
+              });
+            }
+          };
+          setTimeout(poll, 700);
+          return; // Skip setup progress panel when resuming a build
+        }
+        // Open chat panel only if one isn't already open — never spawn a second tab
+        if (!ChatPanel.currentPanel) {
+          await vscode.commands.executeCommand('chassis.openChatPanel');
+        }
+        // Show setup progress panel after initialization
+        await vscode.commands.executeCommand('chassis.showSetupProgress');
       } catch (err) {
         vscode.window.showErrorMessage('CHASSIS auto-init failed: ' + (err as Error).message);
       }
@@ -148,7 +210,10 @@ export function registerInitCommands(
           if (!name) { return; }
 
           await context.globalState.update('pendingChassisInit', { folder: targetFolder, name });
-          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetFolder), false);
+          const _ef = vscode.workspace.workspaceFolders || [];
+          if (!vscode.workspace.updateWorkspaceFolders(0, _ef.length, { uri: vscode.Uri.file(targetFolder) })) {
+            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetFolder), false);
+          }
           return;
         }
 
@@ -193,9 +258,28 @@ export function registerInitCommands(
     })
   );
 
-  // Open Project — shows folder picker and opens in VS Code
+  // Open Project — shows folder picker and opens in VS Code, or opens specific project if name provided
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openProject', async () => {
+    vscode.commands.registerCommand('chassis.openProject', async (projectName?: string) => {
+      if (projectName) {
+        // Try to find the project by name in known locations
+        const homeDir = require('os').homedir();
+        const commonLocations = [
+          `${homeDir}/projects/${projectName}`,
+          `${homeDir}/${projectName}`,
+          `${homeDir}/dev/${projectName}`,
+          `${homeDir}/src/${projectName}`,
+        ];
+        for (const location of commonLocations) {
+          const fs = require('fs');
+          if (fs.existsSync(location)) {
+            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(location));
+            return;
+          }
+        }
+        // Project not found, fall through to folder picker
+        vscode.window.showWarningMessage(`Project "${projectName}" not found in common locations. Please select it manually.`);
+      }
       const folder = await vscode.window.showOpenDialog({
         canSelectMany: false,
         canSelectFolders: true,
@@ -242,6 +326,8 @@ export function registerInitCommands(
         if (retrofit === 'Start Retrofit') {
           await vscode.commands.executeCommand('chassis.retrofit');
         }
+        // Show setup progress panel after retrofit
+        await vscode.commands.executeCommand('chassis.showSetupProgress');
         return;
       }
 

@@ -12,11 +12,12 @@ You are not allowed to modify any file in this project until you have completed 
 - [ ] Read `CHASSIS_ROADMAP.md` in full — not skimmed, read.
 - [ ] Read `.chassis/rules.md` in full.
 - [ ] Read `.chassis/blueprint.md` to confirm your change fits the project scope.
+- [ ] Read `.chassis/dead_ends.md` — check if your approach has already been tried and failed.
 - [ ] Read the `[SCOPE]` tag at the top of every file you plan to touch.
 - [ ] Read every `[WARN]` tag in or near the code you plan to change.
-- [ ] Check `CHASSIS_ROADMAP.md` for any `[DEAD]` entries related to what you're about to do.
+- [ ] **CHECK FILE SIZE**: Check line count of every file you plan to edit (`wc -l <file>`). If over 200 lines, **split the file first** before adding any new code.
 
-If you cannot confirm all six steps, **stop and do them first.**
+If you cannot confirm all seven steps, **stop and do them first.**
 
 ---
 
@@ -36,16 +37,22 @@ After touching any file — one line, one comment, one variable rename — you m
 
 ---
 
-## File Size Hard Stop
+## File Size Hard Stop — NON-NEGOTIABLE
 
-If any file you are editing reaches 200 lines:
-- **Stop editing that file immediately**
-- Split it by responsibility before continuing
+If any file you are editing is already at or over 200 lines:
+- **Do not add a single line to it**
+- Split it by responsibility BEFORE making your change
 - Each new file needs a `[SCOPE]` tag at line 1
 - Compile and verify before moving on
 - Log the split in `CHASSIS_ROADMAP.md`
 
-Using `[NEXT]` as a workaround for an over-200-line file is a rule violation, not compliance.
+**`[NEXT]` is NOT a deferral pass.** It is a violation notice. It means the split is overdue and must happen at the START of the next session — not pushed further. Any AI that adds to a file already over 200 lines is violating this rule regardless of how small the addition is.
+
+The correct sequence:
+1. Check file size before editing
+2. If over 200 → split first
+3. Make your change in the correct file
+4. Log everything
 
 ---
 

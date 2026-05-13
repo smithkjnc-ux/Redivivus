@@ -27,13 +27,12 @@ export function renderWorkTab(
     </div>
     <div class="section-title">Tools</div>
     <div class="cards">
-      <div class="card" data-cmd="chassis.analyzeFile" data-pick="true">
-        <div class="card-icon">🔍</div><div class="card-body"><div class="card-title">Check a File</div><div class="card-sub">See what CHASSIS thinks about one file</div></div>
+      <div class="card" data-cmd="chassis.checkFileHealth" data-pick="true">
+        <span class="icon">�</span>
+        <div class="card-title">Check File Health</div>
+        <div class="card-desc">Count tags, show health report</div>
       </div>
-      <div class="card" data-cmd="chassis.reviewFile" data-pick="true">
-        <div class="card-icon">💬</div><div class="card-body"><div class="card-title">AI Review</div><div class="card-sub">Get your AI to review a file for problems</div></div>
-      </div>
-      <div class="card" data-cmd="chassis.restructureFile" data-pick="true">
+      <div class="card" data-cmd="chassis.cleanUpFile" data-pick="true">
         <div class="card-icon">✨</div><div class="card-body"><div class="card-title">Clean Up File</div><div class="card-sub">Add organization notes to a messy file</div></div>
       </div>
       <div class="card" data-cmd="chassis.buildFromVault">

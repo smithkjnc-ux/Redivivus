@@ -143,8 +143,41 @@ CHASSIS doesn't make you watch code stream. It tells you what it's building, sho
 | Result | Diff view | Summary card with Preview/Undo |
 | Target user | Engineers | Everyone |
 | Feeling | "I hope this works" | "I just MADE that" |
+| Cost per build | $0.01–$0.05 (paid AI only) | $0.0001–$0.001 (smart routing — free AI first) |
+| Output structure | Raw code, no context | Annotated, documented, self-explaining |
 
 No other tool does this. They never will — because their users are engineers who WANT to see code. CHASSIS serves the other 99%.
+
+### The Cost Reality for Non-Tech Users
+
+A non-tech user building a side project will make dozens to hundreds of builds. At $0.01 per build with a standard AI editor, that's real money adding up fast — and still getting back raw code they can't understand or maintain.
+
+CHASSIS routes simple tasks to free/cheap AI automatically. The same build that costs $0.01 elsewhere costs **$0.0001 in CHASSIS** — 100x cheaper. 50 builds = $0.005 instead of $0.50.
+
+But the bigger win is the output itself. CHASSIS code is **self-documenting by default** — every file has a `NARRATOR` comment, a `[SCOPE]` tag, and full JSDoc. A non-tech user can open that file 3 months later and understand exactly what they built and why. No other tool gives them that. The annotations aren't decoration — they're the user's mental model of their own project, baked directly into every file.
+
+---
+
+## One Sentence → Full Project Structure
+
+No other editor does this. From a single plain-English sentence, CHASSIS automatically creates:
+
+```
+your-project/
+├── .chassis/
+│   ├── snapshots/
+│   │   └── [timestamp]/
+│   │       └── _meta.json    ← exact task, files built, timestamp — powers Undo Everything
+│   └── debug.log             ← timestamped command audit trail
+├── docs/
+│   └── README.md             ← human-readable: what it does, how to run it, tech stack, file map
+└── src/
+    └── your_file.ts          ← annotated code: NARRATOR, [SCOPE], JSDoc, null guards
+```
+
+Cursor/Windsurf drop a file wherever the cursor is and stop. CHASSIS builds a **project** — structured, documented, undoable, and self-explaining from day one.
+
+The non-tech user doesn't have to know what a `src/` folder is or why docs matter. CHASSIS just does it. Every project they build comes out organized the same way. Six months later when they come back, everything is where they expect it.
 
 ---
 
@@ -160,4 +193,26 @@ These are the founding insights. Every UI decision should be measured against th
 
 ---
 
-*Vision locked — Built by PapaJoe — May 3, 2026*
+## Notes from the Session (PapaJoe, May 7 2026)
+
+- "Look at this folder structure and files — I am pretty sure no other editors do this automatically"
+- That folder structure screenshot IS the marketing. One sentence in → organized, documented, undoable project out. Show it side by side with what Cursor/Windsurf produce. No explanation needed.
+- CHASSIS is not just an extension — the plan is full integration. A standalone product, not a bolt-on.
+
+---
+
+## The Bigger Vision — Not Just an Extension
+
+CHASSIS starts as a VS Code extension to prove the concept. But the end goal is a **fully integrated product** — its own editor or standalone app where CHASSIS IS the environment, not a plugin inside someone else's.
+
+Why this matters:
+- As an extension, VS Code controls the shell — sidebars, panels, shortcuts, UI chrome. CHASSIS works around it.
+- As an integrated product, CHASSIS owns the entire experience — the centered modal IS the editor, the story panel IS the progress view, the project structure IS enforced by default, not by convention.
+- No competing sidebars (Copilot, GitHub, etc.) — CHASSIS is the only AI in the room.
+- Pricing, routing, vault, blueprint — all first-class, not bolted on.
+
+**The extension is the prototype. The integrated product is the destination.**
+
+---
+
+*Vision locked — Built by PapaJoe — May 3, 2026. Updated May 7, 2026.*

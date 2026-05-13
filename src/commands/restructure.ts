@@ -16,7 +16,7 @@ export function registerRestructureCommands(
   refreshAll: () => void
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.restructureFile', async (pickedPath?: string) => {
+    vscode.commands.registerCommand('chassis.cleanUpFile', async (pickedPath?: string) => {
       let doc: vscode.TextDocument;
       let filePath: string;
       if (pickedPath) {

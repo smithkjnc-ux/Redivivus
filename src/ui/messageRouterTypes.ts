@@ -17,4 +17,7 @@ export interface WizardPanelState {
   vaultScanFileCount: number;
   vaultScanFilteredCount: number;
   vaultScanTotalFound: number;
+  mapData?: any;
+  // [CHASSIS] Set when user chose "Browse Anyway" — shows yellow warning banner. Dismissed per session.
+  browseAnywayBanner: boolean;
 }

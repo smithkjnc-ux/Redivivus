@@ -4,6 +4,27 @@ Auto-managed by CHASSIS. Append-only session history.
 
 ---
 
+## [2026-05-06]
+- Action: Major feature sprint + rule compliance audit
+- Features shipped:
+  - Build Narrator (live __STORY__ panel, ⚙️→✅ per file)
+  - Summary card after builds (__RESULT_CARD__ token)
+  - Undo Everything (snapshotService.ts — pre-build snapshots, one-click restore)
+  - Active file context injection (chatPanelAI.ts — first 50 lines of open file in every prompt)
+  - First-run onboarding (3-state empty screen — new user gets setup button)
+  - Side panel drill-down (openFileAtSymbol — jumps to best matching symbol)
+  - AI-triggered permanent memory (PREFERENCE_RE mid-chat detection → learned.md)
+  - Map button fix (setTimeout defer to avoid mid-handler dispose)
+- Rule compliance fixes:
+  - Added [WARN] + [NEXT] split markers to 6 files over 200 lines
+  - Added missing function comments to updateStory(), _pruneOld()
+  - Added dead_ends.md check + file size pre-check to all 3 rules files
+  - Strengthened [NEXT] language: explicitly NOT a deferral pass
+- Violations noted this session: Rule 9 (file size), Rule 10 (blueprint/dead_ends not read at start), Rule 11 (missing function comments)
+- Files over 200 lines that need splitting next session: chatPanelHtml.ts (889), mapScript.ts (372), chatPanel.ts (343)
+
+---
+
 ## [2026-05-03 00:13:54]
 - Action: Project Analysis
 - Files scanned: 34
@@ -925,3 +946,35 @@ Auto-managed by CHASSIS. Append-only session history.
 - TODOs found: 0
 - Files needing comments: 0
 
+## [2026-05-08]
+- Action: Governance file update — 5 new rules added across all AI editor config files
+- Added .windsurfrules — Windsurf now reads CHASSIS governance rules on every edit. Added 5 new rules: WebView ASCII limit, document.write 45KB limit, map init protection, map view isolation testing, and causation-first debugging.
+- Rules added to: .windsurfrules (Rules 13-17), .chassis/rules.md (Rules 13-17), CLAUDE.md (Rules 13-17)
+- These rules were learned the hard way during the May 8 2026 Architecture Map Timeline debugging session — see CHASSIS_ROADMAP.md Recent Fixes for full history.
+
+## [2026-05-13]
+- Action: Critical iteration loop bug fixes (Session 4)
+- **Bug 1 fixed:** Free-text follow-up after build was consumed by stale scope question resolver
+  - Root cause: `hasPendingScopeQuestion()` in chatPanelMessages.ts intercepted ALL user input for 5 minutes after any scope question was asked, even if the build completed through another path
+  - Fix: Added timestamp + length guards — only intercept if scope question was asked < 2 min ago AND reply is < 100 chars. Stale questions cleared immediately.
+  - Files: templateScopeService.ts (added clearPendingScopeQuestion, getScopeQuestionTimestamp, timestamp tracking), chatPanelMessages.ts (updated guard logic)
+- **Bug 2 fixed:** "Try Again with Fix" stalled after showing retry message
+  - Root cause: handleBuildRequest(retryTask) called without skipComplex=true, sending the retry through vault/placement/cost gate modals the user could not see or interact with
+  - Fix: Changed MessageHandlerDeps.handleBuildRequest signature to accept skipComplex?, wired through chatPanel.ts, pass true for retry builds
+  - Files: chatPanelMessages.ts (interface + retry handler), chatPanel.ts (wiring)
+- Documentation updated: dead_ends.md (2 new entries), CHASSIS_ROADMAP.md (Recent Fixes table), work_log.md
+- **Bug 3 fixed:** Phantom imports in single-file generation
+  - Root cause: AI was not explicitly told to embed all code in a single file for non-HTML generation
+  - Fix: Updated `htmlRules` ternary in chatPanelBuild.ts to explicitly forbid `import`/`require` and enforce fully self-contained generation
+- **Bug 4 fixed:** Dead "Open File" button after orchestrator build completion
+  - Root cause: Orchestrator was injecting the project root directory path into the `__BUILD_RESULT__` token. `vscode.workspace.openTextDocument()` silently fails when given a directory instead of a file.
+  - Fix: Removed `__BUILD_RESULT__` token from orchestrator's completion card. Also cleaned up duplicate event listeners in `chatPanelScript.ts` and standardized `data-open-browser`.
+- **Bug 5 fixed:** New project builds showed "Fix complete!" instead of "Build complete!"
+  - Root cause: `skipComplex` flag was overloaded. It meant "bypass UI gates" but `chatPanelIntent.ts` was interpreting it as "this is a fix request"
+  - Fix: Added explicit `isFixRequest` argument to `handleBuildRequest`, passing `true` only for retries and explicit fix requests, decoupling it from `skipComplex`.
+- **Bug 6 fixed:** Missing file contents in Worker AI prompt during modification requests
+  - Root cause: `workspaceContext.ts` regex was matching against a lowercased task string (`taskLower.match(...)`), converting camelCase filenames like `mapBuilderService.ts` to `mapbuilderservice.ts`. The subsequent `find()` against `context.files` was case-sensitive, causing the file search to fail. The pipeline never found the file, so it didn't inject its contents.
+  - Fix: Executed the regex against the original `task` string with the `/i` case-insensitive flag, preserving the original casing, and compared against `f.relativePath` using `.toLowerCase()`.
+- **Bug 7 fixed:** Missing `chassis.helpMeRefine` command
+  - Root cause: The orchestrator's "Help Me Refine This" button was pointing to an unregistered command.
+  - Fix: Registered `chassis.helpMeRefine` in `extension.ts` to invoke `chassis.postToChat` with a refined prompt request.

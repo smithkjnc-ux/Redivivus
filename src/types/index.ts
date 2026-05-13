@@ -56,6 +56,22 @@ export interface ChassisConfig {
   blueprint: Blueprint;
   sessions: string[];  // session IDs
   autoCommit?: 'auto' | 'prompt' | 'off';  // auto-commit on successful build
+  lastScan?: string;  // timestamp of last project scan
+  scanResults?: ScanResults;  // results from last project scan
+  savePoints?: SavePoint[];  // git save points
+}
+
+export interface ScanResults {
+  largeFiles: Array<{ relativePath: string; lines: number }>;
+  todos: Array<{ file: string; line: string }>;
+  uncommented: Array<{ relativePath: string; lines: number }>;
+}
+
+export interface SavePoint {
+  id: string;
+  timestamp: string;
+  message: string;
+  hash: string;
 }
 
 // Annotation tag types

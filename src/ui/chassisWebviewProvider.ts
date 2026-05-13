@@ -27,6 +27,7 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
     vaultView: 'categories', vaultCategory: null, vaultSubcategory: null, vaultItems: [], vaultGlobal: true,
     activeTab: 'work',
     vaultScanMode: false, vaultScanItems: [], vaultScanDuplicates: [], vaultScanFileCount: 0, vaultScanFilteredCount: 0, vaultScanTotalFound: 0,
+    browseAnywayBanner: false,
   };
 
   constructor(
@@ -129,6 +130,7 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
       if (!hasBlueprint) {
         content += `<div class="card primary" data-cmd="chassis.blueprint"><div class="card-icon">📋</div><div class="card-body"><div class="card-title">👋 First: Tell CHASSIS What You're Building</div><div class="card-sub">5 quick questions about your project. Takes about 2 minutes. Do this first.</div></div></div>`;
       }
+      content += `<div class="card" data-cmd="chassis.showSetupProgress"><div class="card-icon">📊</div><div class="card-body"><div class="card-title">Setup Progress</div><div class="card-sub">Track your CHASSIS setup completion</div></div></div>`;
       content += `<div class="tabs">
         <button class="tab ${this.state.activeTab === 'work' ? 'active' : ''}" onclick="showTab('work')">Today</button>
         <button class="tab ${this.state.activeTab === 'files' ? 'active' : ''}" onclick="showTab('files')">Project</button>
@@ -154,7 +156,7 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     return `<!DOCTYPE html><html><head><style>${getStyles()}</style></head><body>
-      <div class="header"><div class="header-left"><h1>C H A S S I S</h1><div class="sub">Your AI coding organizer</div></div><div class="header-right"><button class="chat-button" data-cmd="chassis.openChatPanel">Open Chat</button>${buildTimestamp}</div><div class="project">${projectName}</div></div>
+      <div class="header"><div class="header-left"><h1>C H A S S I S</h1><div class="sub">Your AI coding organizer</div></div><div class="header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><button class="chat-button" data-cmd="chassis.openChatPanel">Open Chat</button><button style="padding:3px 10px;font-size:10px;background:#3a3a3a;color:#ccc;border:none;border-radius:4px;cursor:pointer;" data-cmd="chassis.openSetupHub">⚙️ Setup</button>${buildTimestamp}</div><div class="project">${projectName}</div></div>
       ${badges}${content}<div class="footer">CHASSIS v0.2.0 &mdash; Built by PapaJoe — ${new Date().toLocaleTimeString()}</div>
       <script>${getScripts()}</script></body></html>`;
   }

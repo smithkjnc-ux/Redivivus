@@ -1,173 +1,104 @@
-// [SCOPE] CHASSIS Chat Panel Build Pipeline — vault search, auto-chunking, clarification, error logging
-// Handles all build/create requests from the chat panel.
-//   Fix 1: Full error logging to .chassis/build_errors.log with real reason shown in chat
-//   Fix 2: Auto-chunking for large/complete requests (build plan → per-file builds with progress)
-//   Fix 3: Visible vault search step shown in chat before every build
-//   Clarify: 3-5 AI questions shown as a form before multi-file builds — answers injected into prompts
+// [SCOPE] CHASSIS Chat Panel Build Pipeline — Main entry points
+// Extracted from chatPanelHtml.ts. Keep under 200 lines.
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { RoutingService } from '../services/routingService.js';
 import { VaultService } from '../services/vaultService.js';
-import { findRelevantByTask } from '../services/buildFromVaultSearch.js';
+import { ChassisService } from '../services/chassisService.js';
+import { UsageTracker } from '../services/usageTracker.js';
+import { findRelevantByTask, VaultSearchResult } from '../services/buildFromVaultSearch.js';
 import { ChatMessage } from './chatPanelHtml.js';
-
-// [WARN] These keywords trigger auto-chunking — request will be broken into a multi-file build plan
-const CHUNK_TRIGGER_WORDS = ['complete', 'full', 'entire', 'whole', 'everything', 'all features'];
+import { extractNarrator, buildResultCard } from './chatPanelStory.js';
+import { BuildLedger } from '../services/buildLedgerService.js';
+import * as Inf from './chatPanelBuildInference.js';
+import * as Worker from './chatPanelBuildWorker.js';
+import * as Review from './chatPanelBuildReview.js';
+import * as Writer from './chatPanelBuildWriter.js';
 
 export interface BuildContext {
-  task: string;
-  root: string;
-  blueprintContext: string;
-  vault?: VaultService;
-  routing: RoutingService;
-  conversation: ChatMessage[];
-  refresh: () => void;
-  logError: (task: string, prompt: string, error: string, promptLen: number) => void;
-  // [WARN] postToWebview + onClarifySubmit are required for the clarification flow in chunked builds
-  postToWebview?: (msg: any) => void;
+  task: string; root: string; blueprintContext: string; vault?: VaultService; routing: RoutingService; conversation: ChatMessage[]; refresh: () => void; logError: (t: string, p: string, e: string, l: number) => void; postToWebview?: (msg: any) => void; onBuildFinished?: (t: string, f?: string[]) => void;
+  chassis?: ChassisService;
+  usageTracker?: UsageTracker;
   onClarifySubmit?: (answers: Record<string, string>) => void;
+  buildStartMessage?: string;
+  isFix?: boolean;
+  precomputedVaultSearch?: VaultSearchResult;
+  onBuildFailed?: (t: string, reason: string) => void;
 }
 
-/** Returns true if task triggers multi-file chunked build */
+// ── Vault-hit promise resolver — keyed by hitId, resolved by webview confirm/cancel ──
+const _vaultHitResolvers = new Map<string, (result: boolean) => void>();
+
+export function registerVaultHitResolver(hitId: string, resolve: (result: boolean) => void): void {
+  _vaultHitResolvers.set(hitId, resolve);
+}
+
+export function resolveVaultHit(hitId: string, result: boolean): void {
+  const resolver = _vaultHitResolvers.get(hitId);
+  if (resolver) { _vaultHitResolvers.delete(hitId); resolver(result); }
+}
+
+// Detects multi-file project requests that should use the chunked build pipeline
 export function isChunkedBuildRequest(task: string): boolean {
-  const t = task.toLowerCase();
-  return CHUNK_TRIGGER_WORDS.some(w => t.includes(w));
+  const low = task.toLowerCase();
+  return /\b(full[- ]?stack|multi[- ]?file|multiple\s+files|several\s+files)\b/.test(low)
+    || (/\b(app|application|website|platform|system|game|tool|project)\b/.test(low)
+      && /\b(complete|full|entire|whole|with\s+(a\s+)?(login|auth|database|api|backend|frontend|sidebar|navbar|router|state)|multiple|several)\b/.test(low));
 }
 
-/** Infer file extension from task text and blueprint WHERE */
-export function inferExtension(taskLow: string, where: string): string {
-  return taskLow.includes('python') || taskLow.includes('.py') ? '.py'
-    : taskLow.includes('rust') || taskLow.includes('.rs') ? '.rs'
-    : taskLow.includes(' go ') || taskLow.includes('golang') ? '.go'
-    : taskLow.includes('html') ? '.html'
-    : taskLow.includes('css') && !taskLow.includes('scss') ? '.css'
-    : taskLow.includes('scss') ? '.scss'
-    : taskLow.includes('javascript') || / \bjs\b/.test(taskLow) ? '.js'
-    : taskLow.includes('typescript') || / \bts\b/.test(taskLow) ? '.ts'
-    : taskLow.includes('react') || taskLow.includes('tsx') ? '.tsx'
-    : where.includes('python') ? '.py'
-    : where.includes('react') || where.includes('tsx') ? '.tsx'
-    : where.includes('javascript') || where.includes('node') ? '.js'
-    : where.includes('rust') ? '.rs'
-    : where.includes('go') ? '.go'
-    : '.ts';
-}
-
-/** Derive a clean filename slug from task text */
-export function deriveFileBase(taskLow: string): string {
-  const langWords = new Set(['python','javascript','typescript','react','html','css','scss','rust','golang','go','node','nodejs','js','ts','tsx']);
-  const stopSet = new Set(['build','create','make','write','add','generate','implement','scaffold','me','a','an','the','that','for','with','using','simple','basic','just','some','new','my','complete','full','entire','whole','everything','based','on','blueprint']);
-  const words = taskLow.replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w => w.length > 1 && !stopSet.has(w) && !langWords.has(w));
-  return words.slice(0, 4).join('_') || 'output';
-}
-
-/** Update the last assistant message content and refresh */
 function updateLastMsg(ctx: BuildContext, content: string): void {
   const last = ctx.conversation[ctx.conversation.length - 1];
-  if (last && last.role === 'assistant') { last.content = content; }
-  else { ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() }); }
+  if (last && last.role === 'assistant') last.content = content;
+  else ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() });
   ctx.refresh();
 }
 
-/** Append a new assistant message and refresh */
-function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
-  ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined });
+function appendMsg(ctx: BuildContext, content: string): void {
+  ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() });
   ctx.refresh();
 }
 
-/** Single-file build — vault search visible, then build, then result */
 export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
-  const { task, root, blueprintContext, vault, routing, conversation } = ctx;
-  const taskLow = task.toLowerCase();
-
-  // Fix 3: Show vault search step
+  const { task, root, blueprintContext, routing } = ctx;
+  const buildStart = Date.now();
   appendMsg(ctx, '🔍 Searching vault...');
-  const vaultItems = vault ? vault.listItems() : [];
-  const relevant = vaultItems.length > 0 ? findRelevantByTask(task, vaultItems) : [];
-  updateLastMsg(ctx, `🔍 Searching vault... found ${relevant.length} matching item${relevant.length !== 1 ? 's' : ''}`);
+  const vaultItems = ctx.vault ? ctx.vault.listItems() : [];
+  const searchResult = findRelevantByTask(task, vaultItems);
+  updateLastMsg(ctx, `🔍 Vault: ${searchResult.items.length} relevant items found`);
 
-  // Fix 3: Show planning step
-  appendMsg(ctx, '📋 Planning build...');
-  const config = vscode.workspace.workspaceFolders ? null : null; // resolved via blueprintContext
-  const where = blueprintContext.match(/Where: (.+)/)?.[1]?.toLowerCase() || '';
-  const ext = inferExtension(taskLow, where);
-  const fileBase = deriveFileBase(taskLow);
-  const relPath = `src/${fileBase}${ext}`;
+  const isMod = Inf.isModificationRequest(task.toLowerCase());
+  const existingTarget = isMod ? await Inf.findExistingTarget(root, task) : null;
+  const ext = Inf.inferExtension(task.toLowerCase(), blueprintContext);
+  const relPath = existingTarget ? path.relative(root, existingTarget) : (ext === '.html' ? 'index.html' : `src/${Inf.deriveFileBase(task.toLowerCase())}${ext}`);
   const absPath = path.join(root, relPath);
-  updateLastMsg(ctx, `📋 Planning build... → \`${relPath}\``);
 
-  // Fix 3: Show build step
-  appendMsg(ctx, '⚙️ Building...');
+  appendMsg(ctx, `📋 Planning... → \`${relPath}\``);
+  const spec = await routing.supervisorPlan(task, relPath, blueprintContext).catch(() => null);
+  
+  updateLastMsg(ctx, '⚙️ Building...');
+  const prompt = Worker.buildWorkerPrompt(ctx, relPath, !!existingTarget, existingTarget ? fs.readFileSync(absPath, 'utf8') : '', spec, '');
+  const res = await Worker.executeWorkerBuild(ctx, prompt);
+  if (!res.success) { ctx.logError(task, prompt, res.error || 'Failed', 0); return; }
 
-  const vaultSummary = relevant.slice(0, 8).map(i =>
-    `// FROM VAULT [${i.category}]: ${i.name}\n${i.code}`
-  ).join('\n\n');
+  let code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
+  code = await Review.runGuardianReview(ctx, code, relPath, spec);
+  code = await Review.runStaticValidation(code, relPath);
+  if (['.ts', '.tsx', '.js'].some(e => relPath.endsWith(e))) code = await Review.runImportValidation(ctx, code, absPath, root);
 
-  const buildPrompt = `You are CHASSIS, a code generation assistant. Generate complete, working, production-ready code.
+  const snapshotId = Writer.createSnapshot(root, task, relPath);
+  const { narration, cleanCode } = extractNarrator(code);
+  Writer.writeBuiltFile(absPath, cleanCode);
 
-TASK: "${task}"
-TARGET FILE: ${relPath}
-${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}` : ''}
-${vaultSummary ? `VAULT CODE (reuse where relevant):\n${vaultSummary}` : ''}
-
-RULES:
-- Write code that works immediately without configuration or placeholder values.
-- Use real libraries, real APIs, and real implementations. No placeholder URLs, no example.com, no TODO stubs.
-- Add a [SCOPE] comment at the top describing what this module does.
-- Return ONLY the code — no markdown fences, no explanation, no preamble.`;
-
-  const promptLen = Math.ceil(buildPrompt.length / 4);
-  let code: string;
-  let buildTokens = 0;
-  let buildCost = 0;
-
-  try {
-    const res = await routing.prompt(buildPrompt);
-    if (!res.success) { throw new Error(res.error || 'AI generation failed'); }
-    code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
-    if (!code) { throw new Error('AI returned an empty response. The prompt may be too large or the model may have refused the request.'); }
-    buildTokens = Math.ceil(res.text.length / 4);
-    buildCost = (buildTokens / 1_000_000) * 0.30;
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    // Fix 1: log full details + show real reason in chat
-    ctx.logError(task, buildPrompt, errMsg, promptLen);
-    conversation.pop(); // remove ⚙️ Building...
-    conversation.pop(); // remove 📋 Planning...
-    conversation.pop(); // remove 🔍 Searching...
-    appendMsg(ctx,
-      `❌ Build failed\n\n**Reason:** ${errMsg}\n\n_Prompt was ~${promptLen} tokens. Full details in \`.chassis/build_errors.log\`_`
-    );
-    return;
-  }
-
-  try {
-    const dir = path.dirname(absPath);
-    if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
-    fs.writeFileSync(absPath, code, 'utf8');
-  } catch (err) {
-    const errMsg = err instanceof Error ? err.message : String(err);
-    ctx.logError(task, buildPrompt, `File write failed: ${errMsg}`, promptLen);
-    conversation.pop();
-    conversation.pop();
-    conversation.pop();
-    appendMsg(ctx,
-      `❌ Could not write \`${relPath}\`\n\n**Reason:** ${errMsg}\n\n_Full details in \`.chassis/build_errors.log\`_`
-    );
-    return;
-  }
-
-  // Replace last progress msg with result
-  conversation.pop(); // remove ⚙️ Building...
-  conversation.pop(); // remove 📋 Planning...
-  conversation.pop(); // remove 🔍 Searching...
-  const vaultNote = relevant.length > 0 ? `, ${relevant.length} vault item(s) used` : '';
-  appendMsg(ctx,
-    `✅ Created \`${relPath}\`${vaultNote}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__`,
-    buildTokens, buildCost
-  );
+  const elapsed = (Date.now() - buildStart) / 1000;
+  const resultCard = buildResultCard([relPath], searchResult.items.length, 0, 0, elapsed, snapshotId, 0, !!existingTarget);
+  appendMsg(ctx, `${narration ? '📝 ' + narration + '\n\n' : ''}${resultCard}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__`);
+  
+  Writer.captureToVault(ctx, absPath, relPath);
+  Writer.openBuiltFile(absPath);
+  ctx.onBuildFinished?.(task, [relPath]);
 }
 
 export { runChunkedBuild } from './chatPanelChunked.js';
+export { runVaultAssemblyBuild } from './chatPanelBuildVault.js';

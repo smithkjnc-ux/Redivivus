@@ -9,9 +9,7 @@ import * as crypto from 'crypto';
 import { VaultItem, VAULT_CATEGORIES } from './vaultTypes.js';
 
 const VAULT_ROOT = path.join(os.homedir(), '.chassis-vault');
-const LEGACY_VAULT_BASE = path.join(os.homedir(), '.config', 'Windsurf', 'User', 'globalStorage', 'papajoe.chassis', 'vault');
-const LEGACY_GLOBAL = path.join(LEGACY_VAULT_BASE, 'global');
-const LEGACY_LOCAL = path.join(LEGACY_VAULT_BASE, 'local');
+// [DEAD] Legacy Windsurf globalStorage path removed — CHASSIS only reads from ~/.chassis-vault/
 
 function computeContentHash(code: string): string {
   return crypto.createHash('sha256').update(code.trim()).digest('hex');
@@ -165,19 +163,7 @@ export class VaultStorage {
       }
     }
 
-    // 3. Legacy globalStorage global + local files
-    for (const legacyDir of [LEGACY_GLOBAL, LEGACY_LOCAL]) {
-      if (fs.existsSync(legacyDir)) {
-        const legacyFiles = fs.readdirSync(legacyDir).filter(f => f.endsWith('.json'));
-        for (const f of legacyFiles) {
-          const item = this.loadItem(path.join(legacyDir, f));
-          if (item && !seen.has(item.contentHash)) {
-            seen.add(item.contentHash);
-            items.push(item);
-          }
-        }
-      }
-    }
+    // [DEAD] Legacy globalStorage reading removed — never pull from Windsurf's storage path
 
     return items;
   }

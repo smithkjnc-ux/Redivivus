@@ -3,6 +3,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
 import { WizardPanelState } from './messageRouterTypes.js';
 
@@ -10,7 +11,8 @@ export async function handleCoreMessage(
   msg: any,
   chassis: ChassisService,
   state: WizardPanelState,
-  refresh: () => void
+  refresh: () => void,
+  postToWebview?: (msg: any) => void
 ): Promise<boolean> {
   switch (msg.type) {
     case 'setTab':
@@ -46,9 +48,42 @@ export async function handleCoreMessage(
       const folder = await vscode.window.showOpenDialog({
         canSelectMany: false, canSelectFolders: true, canSelectFiles: false, openLabel: 'Open Project',
       });
-      if (folder && folder.length > 0) {
+      if (!folder || folder.length === 0) { return true; }
+      const folderPath = folder[0].fsPath;
+      const folderName = path.basename(folderPath);
+      if (ChassisService.hasChassisSetup(folderPath)) {
+        // Already set up — open directly, load normally
         await vscode.commands.executeCommand('vscode.openFolder', folder[0]);
+      } else {
+        // Not set up — show decision modal in the webview, do NOT switch workspace yet
+        if (postToWebview) {
+          postToWebview({ type: 'show-pick-project-modal', folderPath, folderName });
+        } else {
+          // Fallback: no webview — just open it
+          await vscode.commands.executeCommand('vscode.openFolder', folder[0]);
+        }
       }
+      return true;
+    }
+    case 'set-it-up': {
+      // User chose to set up CHASSIS for the folder — switch workspace and trigger wizard
+      const fp = msg.folderPath;
+      if (!fp) { return true; }
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(fp));
+      // After reload, the pending init is handled by extension activation (existing flow)
+      return true;
+    }
+    case 'browse-anyway': {
+      // User chose to browse without CHASSIS — switch workspace, set banner
+      const fp = msg.folderPath;
+      if (!fp) { return true; }
+      state.browseAnywayBanner = true;
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(fp));
+      return true;
+    }
+    case 'dismiss-browse-banner': {
+      state.browseAnywayBanner = false;
+      refresh();
       return true;
     }
     case 'initProject':

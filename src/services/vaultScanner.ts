@@ -72,40 +72,48 @@ ${listStr}`;
 }
 
 // [SCOPE] Walk a codebase directory and extract all vault items from matching files
-// [WARN] Uses synchronous fs operations — can block for very large codebases
+// [FIX] Now asynchronous to prevent blocking the extension host thread on large projects
 export async function scanCodebase(
   root: string,
   fileTypes = ['.ts', '.tsx', '.js', '.jsx', '.py'],
-  ignorePaths: string[] = ['node_modules', '.git', 'dist', 'build', 'out', '.next', 'coverage', '.chassis', 'functions/node_modules', 'ios/Pods', 'android/build'],
+  ignorePaths: string[] = [
+    'node_modules', '.git', 'dist', 'build', 'out', '.next', 'coverage', '.chassis',
+    'functions/node_modules', 'ios/Pods', 'android/build',
+    'site-packages', 'dist-packages', '__pycache__', '.venv', 'venv',
+    'env', '.env', 'lib/python', 'lib64/python', '.tox', 'eggs',
+    '.eggs', 'sdist', 'wheels', '.mypy_cache', '.pytest_cache',
+  ],
   progress?: (msg: string) => void
 ): Promise<{ items: VaultItem[]; fileCount: number; filteredCount: number }> {
   const items: VaultItem[] = [];
   let fileCount = 0;
   let totalFiltered = 0;
 
-  const walk = (dir: string) => {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const walk = async (dir: string) => {
+    const entries = await fs.promises.readdir(dir, { withFileTypes: true });
     for (const entry of entries) {
       const full = path.join(dir, entry.name);
       if (entry.isDirectory()) {
         if (ignorePaths.some(ip => full.includes(ip))) { continue; }
-        walk(full);
+        await walk(full);
       } else {
         const ext = path.extname(full).toLowerCase();
         if (!fileTypes.includes(ext)) { continue; }
         fileCount++;
         if (progress) { progress(`Scanning: ${path.basename(full)}`); }
         try {
-          const content = fs.readFileSync(full, 'utf-8');
+          const content = await fs.promises.readFile(full, 'utf-8');
           const result = extractFromFile(full, content);
           items.push(...result.items);
           totalFiltered += result.filteredCount;
         } catch (e) {
           console.warn(`[VaultScanner] Could not read ${full}:`, e);
         }
+        // Yield to event loop every few files to keep the UI responsive
+        if (fileCount % 20 === 0) { await new Promise(r => setTimeout(r, 0)); }
       }
     }
   };
-  walk(root);
+  await walk(root);
   return { items, fileCount, filteredCount: totalFiltered };
 }

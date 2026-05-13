@@ -28,7 +28,7 @@ if (fs.existsSync(roadmapPath)) {
 const buildTimestamp = new Date().toISOString();
 const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
 // [WARN] File system operation: `fs.writeFileSync` can fail due to permissions or disk space issues.
-fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: '0.2.0' }, null, 2));
+fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: '0.3.4' }, null, 2));
 
 // Auto-commit logic
 try {

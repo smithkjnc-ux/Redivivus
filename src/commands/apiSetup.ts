@@ -140,131 +140,62 @@ class ApiSetupPanel {
     const xaiKey = config.get<string>('xaiApiKey') || '';
     const kimiKey = config.get<string>('kimiApiKey') || '';
 
-    const hasGemini = geminiKey.length > 0;
-    const hasClaude = claudeKey.length > 0;
-    const hasOpenAI = openaiKey.length > 0;
+    const mask = (k: string) => k ? '•'.repeat(Math.min(k.length, 20)) : '';
+    const st = (k: string) => k ? 'status-ok">✅ Configured' : 'status-missing">❌ Not set';
+
+    const providers = [
+      { id: 'gemini', icon: '🤖', name: 'Gemini (Google)', badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Fast, free tier available. Recommended for most users — great starting point.', link: 'https://aistudio.google.com/apikey', linkLabel: 'Get free key ↗', val: geminiKey },
+      { id: 'claude', icon: '🧠', name: 'Claude (Anthropic)', badge: 'Paid', badgeColor: '#b85c00', desc: 'Best for complex reasoning, long documents, and nuanced code review.', link: 'https://console.anthropic.com/settings/keys', linkLabel: 'Get API key ↗', val: claudeKey },
+      { id: 'openai', icon: '⚡', name: 'OpenAI (GPT-4o)', badge: 'Paid', badgeColor: '#b85c00', desc: 'GPT-4o — strong all-rounder for code, chat, and analysis.', link: 'https://platform.openai.com/api-keys', linkLabel: 'Get API key ↗', val: openaiKey },
+      { id: 'groq',   icon: '🔥', name: 'Groq (Llama / Mixtral)', badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Extremely fast inference. Free tier available. Great for quick tasks.', link: 'https://console.groq.com/keys', linkLabel: 'Get free key ↗', val: groqKey },
+      { id: 'xai',    icon: '🚀', name: 'xAI Grok', badge: 'Paid', badgeColor: '#b85c00', desc: "Elon Musk's Grok model — strong reasoning, real-time data awareness.", link: 'https://console.x.ai/', linkLabel: 'Get API key ↗', val: xaiKey },
+      { id: 'kimi',   icon: '🔮', name: 'Kimi (Moonshot AI)', badge: 'Paid', badgeColor: '#b85c00', desc: 'Moonshot AI — very large context window, good for big codebases.', link: 'https://platform.moonshot.cn/', linkLabel: 'Get API key ↗', val: kimiKey },
+    ];
+
+    const providerCards = providers.map(p => `
+  <div class="provider">
+    <div class="provider-header">
+      <span class="provider-name">${p.icon} ${p.name} <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;background:${p.badgeColor}30;color:${p.badgeColor};vertical-align:middle;">${p.badge}</span></span>
+      <span class="provider-status ${st(p.val)}</span>
+    </div>
+    <div class="provider-desc">${p.desc} <a href="${p.link}" style="color:#4a9eff;font-size:11px;">${p.linkLabel}</a></div>
+    <input type="password" id="${p.id}-key" placeholder="Enter ${p.name} API key" value="${mask(p.val)}" data-original="${p.val ? 'set' : ''}">
+  </div>`).join('');
 
     return `<!DOCTYPE html>
 <html>
 <head>
   <style>
-    body { 
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; 
-      padding: 20px; 
-      max-width: 600px;
-      margin: 0 auto;
-    }
-    h1 { font-size: 24px; margin-bottom: 8px; }
-    .subtitle { color: var(--vscode-descriptionForeground); margin-bottom: 24px; }
-    .provider { 
-      background: var(--vscode-input-background);
-      border: 1px solid var(--vscode-input-border);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 12px;
-    }
-    .provider-header { 
-      display: flex; 
-      justify-content: space-between; 
-      align-items: center;
-      margin-bottom: 8px;
-    }
-    .provider-name { font-weight: 600; font-size: 14px; }
-    .provider-status { 
-      font-size: 12px; 
-      padding: 2px 8px; 
-      border-radius: 12px;
-    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; max-width: 640px; margin: 0 auto; }
+    h1 { font-size: 24px; margin-bottom: 4px; }
+    .subtitle { color: var(--vscode-descriptionForeground); margin-bottom: 8px; font-size:13px; }
+    .free-tip { background: rgba(26,122,58,0.12); border:1px solid #1a7a3a50; border-radius:8px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:var(--vscode-foreground); }
+    .free-tip strong { color:#4ec959; }
+    .provider { background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
+    .provider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap:wrap; gap:6px; }
+    .provider-name { font-weight: 600; font-size: 13px; }
+    .provider-status { font-size: 12px; padding: 2px 8px; border-radius: 12px; white-space:nowrap; }
     .status-ok { background: rgba(78,201,89,0.2); color: #4ec959; }
     .status-missing { background: rgba(255,83,79,0.2); color: #ff534f; }
-    .provider-desc { 
-      font-size: 12px; 
-      color: var(--vscode-descriptionForeground);
-      margin-bottom: 12px;
-    }
-    input { 
-      width: 100%;
-      padding: 8px 12px;
-      background: var(--vscode-editor-background);
-      border: 1px solid var(--vscode-input-border);
-      border-radius: 4px;
-      color: var(--vscode-input-foreground);
-      font-family: monospace;
-      font-size: 13px;
-    }
+    .provider-desc { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 10px; line-height:1.5; }
+    input { width: 100%; box-sizing:border-box; padding: 7px 10px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-input-border); border-radius: 4px; color: var(--vscode-input-foreground); font-family: monospace; font-size: 12px; }
     input:focus { outline: none; border-color: var(--vscode-focusBorder); }
-    .actions { 
-      margin-top: 24px; 
-      display: flex; 
-      gap: 12px; 
-      justify-content: center;
-    }
-    button { 
-      padding: 10px 24px;
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    button:hover { background: var(--vscode-button-hoverBackground); }
-    button.secondary { 
-      background: var(--vscode-input-background);
-      color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border);
-    }
-    .apply-feedback {
-      margin-top: 16px;
-      padding: 12px;
-      background: rgba(78,201,89,0.1);
-      border-left: 3px solid #4ec959;
-      border-radius: 0 4px 4px 0;
-      display: none;
-    }
-    .apply-feedback.show { display: block; }
-    .tip {
-      margin-top: 24px;
-      padding: 12px;
-      background: var(--vscode-input-background);
-      border-radius: 6px;
-      font-size: 12px;
-      color: var(--vscode-descriptionForeground);
-    }
-    .tip strong { color: var(--vscode-editor-foreground); }
+    .actions { margin-top: 20px; display: flex; gap: 12px; justify-content: center; }
+    button { padding: 9px 22px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    button:hover { opacity:0.85; }
+    button.secondary { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); }
+    .apply-feedback { margin-top:14px; padding:10px 14px; background:rgba(78,201,89,0.1); border-left:3px solid #4ec959; border-radius:0 4px 4px 0; display:none; font-size:13px; }
+    .apply-feedback.show { display:block; }
+    .tip { margin-top:20px; padding:10px 14px; background:var(--vscode-input-background); border-radius:6px; font-size:11px; color:var(--vscode-descriptionForeground); }
   </style>
 </head>
 <body>
   <h1>🔐 CHASSIS API Setup</h1>
-  <div class="subtitle">Configure your AI provider API keys</div>
+  <div class="subtitle">Configure your AI provider API keys — you only need ONE to get started.</div>
 
-  <div class="provider">
-    <div class="provider-header">
-      <span class="provider-name">🤖 Gemini (Google)</span>
-      <span class="provider-status ${hasGemini ? 'status-ok' : 'status-missing'}">${hasGemini ? '✅ Configured' : '❌ Not set'}</span>
-    </div>
-    <div class="provider-desc">Free tier available. Fast responses. Recommended for most use cases.</div>
-    <input type="password" id="gemini-key" placeholder="Enter Gemini API key" value="${geminiKey ? '•'.repeat(Math.min(geminiKey.length, 20)) : ''}" data-original="${geminiKey ? 'set' : ''}">
-  </div>
+  <div class="free-tip">💡 <strong>Free options:</strong> Gemini (Google) and Groq both have free tiers — no credit card needed. Start with either one and add others later.</div>
 
-  <div class="provider">
-    <div class="provider-header">
-      <span class="provider-name">🧠 Claude (Anthropic)</span>
-      <span class="provider-status ${hasClaude ? 'status-ok' : 'status-missing'}">${hasClaude ? '✅ Configured' : '❌ Not set'}</span>
-    </div>
-    <div class="provider-desc">Paid API. Best for complex reasoning and long context.</div>
-    <input type="password" id="claude-key" placeholder="Enter Claude API key" value="${claudeKey ? '•'.repeat(Math.min(claudeKey.length, 20)) : ''}" data-original="${claudeKey ? 'set' : ''}">
-  </div>
-
-  <div class="provider">
-    <div class="provider-header">
-      <span class="provider-name">⚡ OpenAI (GPT-4o)</span>
-      <span class="provider-status ${hasOpenAI ? 'status-ok' : 'status-missing'}">${hasOpenAI ? '✅ Configured' : '❌ Not set'}</span>
-    </div>
-    <div class="provider-desc">Paid API. GPT-4o for high quality responses.</div>
-    <input type="password" id="openai-key" placeholder="Enter OpenAI API key" value="${openaiKey ? '•'.repeat(Math.min(openaiKey.length, 20)) : ''}" data-original="${openaiKey ? 'set' : ''}">
-  </div>
+  ${providerCards}
 
   <div class="actions">
     <button id="apply-btn">✅ Apply Changes</button>
@@ -272,52 +203,35 @@ class ApiSetupPanel {
   </div>
 
   <div id="apply-feedback" class="apply-feedback">
-    ✅ <strong>Keys applied successfully!</strong> You can now use CHASSIS with your configured AI providers.<br>
-    <span id="apply-time"></span>
+    ✅ <strong>Keys applied!</strong> CHASSIS will use your configured provider automatically.<br>
+    <span id="apply-time" style="font-size:11px;opacity:0.7;"></span>
   </div>
 
   <div class="tip">
-    <strong>💡 Tip:</strong> You can also set API keys via environment variables:
-    <code>GEMINI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, etc.
+    💡 You can also set keys via environment variables: <code>GEMINI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GROQ_API_KEY</code>, <code>XAI_API_KEY</code>, <code>MOONSHOT_API_KEY</code>
   </div>
 
   <script>
     const vscode = acquireVsCodeApi();
-    const applyBtn = document.getElementById('apply-btn');
-    const feedback = document.getElementById('apply-feedback');
-    const applyTime = document.getElementById('apply-time');
-    const vscodeSettingsBtn = document.getElementById('vscode-settings-btn');
-
-    applyBtn.addEventListener('click', () => {
-      const geminiInput = document.getElementById('gemini-key');
-      const claudeInput = document.getElementById('claude-key');
-      const openaiInput = document.getElementById('openai-key');
-
-      // Only send keys if they were actually entered (not the masked dots)
-      const geminiValue = geminiInput.value.includes('•') && geminiInput.dataset.original === 'set' ? undefined : geminiInput.value;
-      const claudeValue = claudeInput.value.includes('•') && claudeInput.dataset.original === 'set' ? undefined : claudeInput.value;
-      const openaiValue = openaiInput.value.includes('•') && openaiInput.dataset.original === 'set' ? undefined : openaiInput.value;
-
-      vscode.postMessage({
-        type: 'save-keys',
-        geminiKey: geminiValue,
-        claudeKey: claudeValue,
-        openaiKey: openaiValue
+    document.getElementById('apply-btn').addEventListener('click', () => {
+      const ids = ['gemini','claude','openai','groq','xai','kimi'];
+      const payload = { type: 'save-keys' };
+      ids.forEach(id => {
+        const el = document.getElementById(id + '-key');
+        const v = el.value;
+        payload[id + 'Key'] = (v.includes('\u2022') && el.dataset.original === 'set') ? undefined : v;
       });
+      vscode.postMessage(payload);
     });
-
-    vscodeSettingsBtn.addEventListener('click', () => {
+    document.getElementById('vscode-settings-btn').addEventListener('click', () => {
       vscode.postMessage({ type: 'open-vscode-settings' });
     });
-
-    window.addEventListener('message', (e) => {
-      const msg = e.data;
-      if (msg.type === 'saved') {
-        feedback.classList.add('show');
-        applyTime.textContent = 'Applied at ' + msg.timestamp;
-        setTimeout(() => {
-          feedback.classList.remove('show');
-        }, 5000);
+    window.addEventListener('message', e => {
+      if (e.data.type === 'saved') {
+        const fb = document.getElementById('apply-feedback');
+        document.getElementById('apply-time').textContent = 'Applied at ' + e.data.timestamp;
+        fb.classList.add('show');
+        setTimeout(() => fb.classList.remove('show'), 5000);
       }
     });
   </script>

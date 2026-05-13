@@ -40,7 +40,7 @@ export async function handleNormalWorkflowWizard(chassis: ChassisService): Promi
   options.push({
     label: '$(eye)  Check a file',
     description: 'See what\'s in a file and what CHASSIS would do to it',
-    _command: 'chassis.analyzeFile',
+    _command: 'chassis.checkFileHealth',
   });
 
   options.push({

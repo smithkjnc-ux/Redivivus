@@ -2,6 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileInfo, AnalysisResult } from './analyzerTypes.js';
+import { getResolvedPaths } from './resolvedItems.js';
 
 export { FileInfo, AnalysisResult };
 
@@ -104,11 +105,19 @@ export function buildAnalysis(files: FileInfo[]): AnalysisResult {
   }
   largeFiles.sort((a, b) => b.lines - a.lines);
 
+  // [CHASSIS] Filter out items the user has already resolved — they persist in .chassis/resolved.json
+  const resolvedLarge = getResolvedPaths('largeFile');
+  const resolvedTodo = getResolvedPaths('todo');
+  const resolvedUncommented = getResolvedPaths('uncommented');
+  const filteredLarge = largeFiles.filter(f => !resolvedLarge.has(f.relativePath));
+  const filteredTodos = todoItems.filter(t => !resolvedTodo.has(t.file));
+  const filteredUncommented = uncommentedFiles.filter(f => !resolvedUncommented.has(f.relativePath));
+
   const dirs = new Set<string>();
   for (const f of files) {
     const dir = path.dirname(f.relativePath);
     if (dir !== '.') { dirs.add(dir); }
   }
 
-  return { totalFiles: files.length, totalLines, filesByType, largeFiles, todoItems, uncommentedFiles, structure: Array.from(dirs).sort() };
+  return { totalFiles: files.length, totalLines, filesByType, largeFiles: filteredLarge, todoItems: filteredTodos, uncommentedFiles: filteredUncommented, structure: Array.from(dirs).sort() };
 }

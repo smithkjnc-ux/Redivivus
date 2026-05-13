@@ -8,6 +8,7 @@ import { VAULT_CATEGORIES, VaultCategory, VaultItem } from './vaultTypes.js';
 import { extractFromFile, computeContentHash } from './vaultExtractor.js';
 import { aiCategorize as _aiCategorize, scanCodebase as _scanCodebase } from './vaultScanner.js';
 import { VaultStorage } from './vaultStorage.js';
+import { chassisFormat } from './chassisFormatter.js';
 import { RoutingService } from './routingService.js';
 
 export { VAULT_CATEGORIES, VaultCategory, VaultItem };
@@ -96,6 +97,36 @@ export class VaultService {
     );
   }
 
+  /** Finds vault items that are likely duplicates of a build task.
+   *  Extracts meaningful words from the task, scores each vault item by keyword overlap,
+   *  returns matches above the threshold sorted by score descending. */
+  findSimilar(task: string, threshold = 0.25): Array<VaultItem & { score: number }> {
+    const stopWords = new Set(['a','an','the','and','or','for','to','in','of','that','with','build','create','make','write','generate','function','simple','basic','small']);
+    const taskWords = task.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(w => w.length > 2 && !stopWords.has(w));
+    if (taskWords.length === 0) { return []; }
+    return this.getAllItems()
+      .map(item => {
+        const itemName = item.name.toLowerCase().replace(/[_-]/g, ' ');
+        // Exact name match is decisive — always surfaces as a strong hit
+        const exactNameMatch = taskWords.some(w => itemName === w || itemName.includes(w));
+        if (exactNameMatch) { return { ...item, score: 1.0 }; }
+        // Name word matches count double (more signal than description words)
+        const nameWords = itemName.split(/\s+/).filter(w => w.length > 2);
+        const nameMatches = taskWords.filter(w => nameWords.some(n => n.includes(w) || w.includes(n))).length;
+        const descHaystack = [item.description, item.tags.join(' ')]
+          .join(' ').toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+        const descMatches = taskWords.filter(w => descHaystack.includes(w)).length;
+        const score = (nameMatches * 2 + descMatches) / (taskWords.length + nameMatches);
+        return { ...item, score };
+      })
+      .filter(item => item.score >= threshold)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+  }
+
   // ── import item into target project
 
   importItem(itemId: string, targetProject: string): string | null {
@@ -113,8 +144,9 @@ export class VaultService {
       : item.language;
     const filePath = path.join(vaultDir, `${item.name}.${ext}`);
 
+    const formattedCode = chassisFormat(item.code, item.name, item.language || 'typescript');
     const header = `// Imported from CHASSIS Vault — source: ${item.sourceProject}/${path.basename(item.sourceFile)}\n`;
-    fs.writeFileSync(filePath, header + item.code);
+    fs.writeFileSync(filePath, header + formattedCode);
 
     item.importCount++;
     this.saveItem(item);

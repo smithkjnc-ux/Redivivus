@@ -99,3 +99,34 @@ Every new file needs [SCOPE]. Every feature must trace to the blueprint. If outs
 ---
 
 *These rules are enforced by CHASSIS. Removing this file does not remove the rules — they are in .chassis/rules.md and every other AI editor config file in this project.*
+
+---
+
+### Rule 13: No non-ASCII characters in WebView injected scripts
+Any string injected into a VS Code WebView via document.write(), srcdoc, or template literal script blocks must contain ASCII only. Emoji, Unicode arrows, box-drawing characters cause silent parse failures.
+Use ASCII equivalents: -> not ->, -- not --, [!] not emoji.
+For emoji needed at runtime: use String.fromCharCode() to construct them inside the webview JS, never embed as literals in the HTML string.
+
+### Rule 14: Never modify shared map initialization code
+mapScriptEngine.ts IIFE contains shared state for all Architecture Map views. New views must use window.setLayoutMode() bridge only. Never re-dispatch click events or call orig() with stored event objects.
+
+### Rule 15: New map views must be tested in isolation first
+Before wiring any new Architecture Map view into the toolbar, verify its render function does not crash the shared canvas initialization. Test standalone first. If it passes standalone, wire it in. If not, fix first.
+
+### Rule 16: Map panel has a 45KB document.write() hard limit
+The map WebView uses document.write() with a ~45KB limit. Never inline large script files into the HTML template.
+Correct pattern: write script to disk (out/ui/filename.js), add to localResourceRoots, serve via webview.asWebviewUri(), load with <script src>. See mapPanel.ts _buildHtml() for reference implementation.
+
+### Rule 17: Causation-first debugging
+When any error occurs after a build or edit, always check build_history.json and the snapshot diff for the most recent build BEFORE suggesting any other cause. If the erroring file was modified in the last build, lead with that explicitly: "This file was modified in the last build — the error is likely caused by that change." Never start debugging from scratch when recent edit history exists.
+
+### Rule 18: AI for Understanding, Code for Execution
+Never use regex or keyword pattern matching to simulate language understanding. Use a 50-token AI classifier call instead. Always.
+
+AI handles: intent, meaning, classification, understanding, matching, similarity.
+Code handles: file operations, command execution, data storage, UI rendering, API calls, math.
+
+### Rule 19: CHASSIS is a coding assistant only
+Never answer questions unrelated to software development, coding, architecture, or the user's project. Offtopic requests get one hardcoded polite redirect — no AI tokens spent on the response.
+
+Hardcoded redirect: "I'm a coding assistant — I can help you build, fix, explain, or review code and projects. For anything else, I'm not the right tool. What are you building today?"

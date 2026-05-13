@@ -1,9 +1,10 @@
 {
   "name": "chassis",
   "displayName": "CHASSIS",
-  "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.2.0",
+  "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
+  "version": "0.3.6",
   "publisher": "papajoe",
+  "icon": "resources/chassis-icon-128.png",
   "engines": {
     "vscode": "^1.110.0"
   },
@@ -68,28 +69,28 @@
         "title": "CHASSIS: Open Blueprint"
       },
       {
+        "command": "chassis.lockBlueprint",
+        "title": "CHASSIS: Lock Blueprint"
+      },
+      {
         "command": "chassis.openChatPanel",
         "title": "CHASSIS: Open Chat Panel"
       },
       {
-        "command": "chassis.analyzeFile",
-        "title": "CHASSIS: Check Current File"
+        "command": "chassis.checkFileHealth",
+        "title": "CHASSIS: Check File Health"
       },
       {
         "command": "chassis.analyze",
         "title": "CHASSIS: Analyze Project"
       },
       {
-        "command": "chassis.refreshPanel",
-        "title": "CHASSIS: Refresh Panel"
-      },
-      {
         "command": "chassis.guide",
-        "title": "CHASSIS: Getting Started"
+        "title": "CHASSIS: Getting Started Guide"
       },
       {
-        "command": "chassis.restructureFile",
-        "title": "CHASSIS: Restructure Current File"
+        "command": "chassis.cleanUpFile",
+        "title": "CHASSIS: Clean Up File"
       },
       {
         "command": "chassis.reviewFile",
@@ -113,7 +114,7 @@
       },
       {
         "command": "chassis.wizardRetrofit",
-        "title": "CHASSIS: Wizard — Retrofit Existing Project"
+        "title": "CHASSIS: Wizard \u2014 Retrofit Existing Project"
       },
       {
         "command": "chassis.switchAI",
@@ -148,6 +149,14 @@
         "title": "CHASSIS: Validate Vault Categories"
       },
       {
+        "command": "chassis.refreshKnowledgeBase",
+        "title": "CHASSIS: Refresh Knowledge Base (GitHub + Starter Patterns)"
+      },
+      {
+        "command": "chassis.vaultCleanupSystemPaths",
+        "title": "CHASSIS: Vault - Remove System/Pip Path Items"
+      },
+      {
         "command": "chassis.showChatGettingStarted",
         "title": "CHASSIS: Show Getting Started"
       },
@@ -165,7 +174,31 @@
       },
       {
         "command": "chassis.viewUsageInChat",
-        "title": "CHASSIS: View Usage in Chat"
+        "title": "View Usage Stats in Chat"
+      },
+      {
+        "command": "chassis.openSetupHub",
+        "title": "CHASSIS: Open Setup Hub",
+        "category": "CHASSIS"
+      },
+      {
+        "command": "chassis.configureGitHubBackup",
+        "title": "CHASSIS: Configure GitHub Backup",
+        "category": "CHASSIS"
+      },
+      {
+        "command": "chassis.backupNow",
+        "title": "CHASSIS: Backup to GitHub Now",
+        "category": "CHASSIS"
+      },
+      {
+        "command": "chassis.toggleGitHubBackup",
+        "title": "CHASSIS: Toggle GitHub Auto-Backup",
+        "category": "CHASSIS"
+      },
+      {
+        "command": "chassis.showSetupProgress",
+        "title": "Show Setup Progress"
       },
       {
         "command": "chassis.resetSessionUsage",
@@ -186,6 +219,50 @@
       {
         "command": "chassis.resetAllUsage",
         "title": "CHASSIS: Reset All Usage (Keep Lifetime)"
+      },
+      {
+        "command": "chassis.explainSelection",
+        "title": "CHASSIS: Explain Selection"
+      },
+      {
+        "command": "chassis.improveSelection",
+        "title": "CHASSIS: Improve Selection"
+      },
+      {
+        "command": "chassis.viewTimeline",
+        "title": "CHASSIS: View Project Timeline"
+      },
+      {
+        "command": "chassis.savePoint",
+        "title": "CHASSIS: Create Save Point"
+      },
+      {
+        "command": "chassis.restoreSavePoint",
+        "title": "CHASSIS: Restore Save Point"
+      },
+      {
+        "command": "chassis.splitFiles",
+        "title": "CHASSIS: Split Large Files"
+      },
+      {
+        "command": "chassis.retrofitBlueprint",
+        "title": "CHASSIS: Retrofit Blueprint from Scan"
+      },
+      {
+        "command": "chassis.detectScopeCreep",
+        "title": "CHASSIS: Detect Scope Creep"
+      },
+      {
+        "command": "chassis.detectDuplicates",
+        "title": "CHASSIS: Detect Duplicate Code"
+      },
+      {
+        "command": "chassis.saveSelectionToVault",
+        "title": "CHASSIS: Save Selection to Vault"
+      },
+      {
+        "command": "chassis.showMap",
+        "title": "CHASSIS: Show Architecture Map 🗺"
       }
     ],
     "viewsWelcome": [
@@ -198,6 +275,32 @@
         "view": "chassisPanel",
         "contents": "[Open CHASSIS Dashboard](command:chassis.wizard)",
         "when": "chassis.initialized"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "chassis.openChatPanel",
+        "key": "ctrl+l",
+        "mac": "cmd+l",
+        "when": "editorTextFocus || terminalFocus"
+      },
+      {
+        "command": "chassis.wizard",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c",
+        "when": "editorTextFocus || terminalFocus"
+      },
+      {
+        "command": "chassis.buildFromVault",
+        "key": "ctrl+shift+b",
+        "mac": "cmd+shift+b",
+        "when": "editorTextFocus || terminalFocus"
+      },
+      {
+        "command": "chassis.savePoint",
+        "key": "ctrl+shift+s",
+        "mac": "cmd+shift+s",
+        "when": "editorTextFocus || terminalFocus"
       }
     ],
     "menus": {
@@ -242,44 +345,129 @@
           "command": "chassis.buildFromVault",
           "when": "chassis.initialized"
         }
+      ],
+      "editor/context": [
+        {
+          "submenu": "chassis.editor",
+          "group": "9_chassis@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "submenu": "chassis.explorer",
+          "group": "9_chassis@1"
+        }
+      ],
+      "chassis.editor": [
+        {
+          "command": "chassis.reviewFile",
+          "group": "chassis@1"
+        },
+        {
+          "command": "chassis.cleanUpFile",
+          "group": "chassis@2"
+        },
+        {
+          "command": "chassis.checkFileHealth",
+          "group": "chassis@3"
+        },
+        {
+          "command": "chassis.explainSelection",
+          "group": "chassis@4",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "chassis.improveSelection",
+          "group": "chassis@5",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "chassis.saveSelectionToVault",
+          "group": "chassis@6",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "chassis.saveToVault",
+          "group": "chassis@7"
+        }
+      ],
+      "chassis.explorer": [
+        {
+          "command": "chassis.reviewFile",
+          "group": "chassis@1"
+        },
+        {
+          "command": "chassis.cleanUpFile",
+          "group": "chassis@2"
+        },
+        {
+          "command": "chassis.checkFileHealth",
+          "group": "chassis@3"
+        },
+        {
+          "command": "chassis.saveToVault",
+          "group": "chassis@4"
+        }
       ]
     },
+    "submenus": [
+      {
+        "id": "chassis.editor",
+        "label": "CHASSIS"
+      },
+      {
+        "id": "chassis.explorer",
+        "label": "CHASSIS"
+      }
+    ],
     "configuration": {
       "title": "CHASSIS",
       "properties": {
         "chassis.defaultAI": {
           "type": "string",
           "default": "gemini",
-          "enum": ["gemini", "claude", "openai", "groq", "xai", "kimi"],
+          "enum": [
+            "gemini",
+            "claude",
+            "openai",
+            "groq",
+            "xai",
+            "kimi"
+          ],
           "enumDescriptions": [
             "Google Gemini (free tier available)",
             "Anthropic Claude (paid)",
             "OpenAI GPT-4o / GPT-4o Mini (paid)",
-            "Groq — Llama 3 (free tier)",
+            "Groq \u2014 Llama 3 (free tier)",
             "xAI Grok (paid)",
             "Moonshot Kimi (paid)"
           ],
           "description": "Which AI provider to use for CHASSIS operations"
         },
+        "chassis.projectsDirectory": {
+          "type": "string",
+          "default": "~/projects",
+          "description": "Directory containing all CHASSIS projects for project listing and switching"
+        },
         "chassis.geminiApiKey": {
           "type": "string",
           "default": "",
-          "description": "Google Gemini API key — free at aistudio.google.com (or set GEMINI_API_KEY env var)"
+          "description": "Google Gemini API key \u2014 free at aistudio.google.com (or set GEMINI_API_KEY env var)"
         },
         "chassis.claudeApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic Claude API key — console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
+          "description": "Anthropic Claude API key \u2014 console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
         },
         "chassis.openaiApiKey": {
           "type": "string",
           "default": "",
-          "description": "OpenAI API key for GPT-4o — platform.openai.com (or set OPENAI_API_KEY env var)"
+          "description": "OpenAI API key for GPT-4o \u2014 platform.openai.com (or set OPENAI_API_KEY env var)"
         },
         "chassis.groqApiKey": {
           "type": "string",
           "default": "",
-          "description": "Groq API key — free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
+          "description": "Groq API key \u2014 free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
         },
         "chassis.xaiApiKey": {
           "type": "string",
@@ -290,13 +478,32 @@
           "type": "string",
           "default": "",
           "description": "Moonshot Kimi API key — platform.moonshot.cn (or set MOONSHOT_API_KEY env var)"
+        },
+        "chassis.guardianEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Guardian AI — when 2+ AI keys are configured, the higher-ranked AI silently reviews and corrects the worker AI's responses before they reach you. Disable to skip the review step."
+        },
+        "chassis.startupBehavior": {
+          "type": "string",
+          "default": "launcher",
+          "enum": [
+            "launcher",
+            "lastProject"
+          ],
+          "enumDescriptions": [
+            "Show the Welcome launcher screen with Start New / Open Existing / Recent Projects options",
+            "Automatically reopen the most recent CHASSIS project (falls back to launcher if none exists)"
+          ],
+          "description": "What CHASSIS should do when launched without a specific folder open"
         }
       }
     }
   },
   "scripts": {
     "vscode:prepublish": "tsc -p ./",
-    "compile": "tsc -p ./ && node scripts/postcompile.js",
+    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && node scripts/postcompile.js",
+    "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src",
