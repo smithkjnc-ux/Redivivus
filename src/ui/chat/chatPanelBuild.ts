@@ -35,9 +35,10 @@ export function registerVaultHitResolver(hitId: string, resolve: (result: boolea
   _vaultHitResolvers.set(hitId, resolve);
 }
 
-export function resolveVaultHit(hitId: string, result: boolean): void {
+// [FIX] result accepts string choice ('build-fresh'|'cancel'|'use-vault') from gate handler
+export function resolveVaultHit(hitId: string, result: string | boolean): void {
   const resolver = _vaultHitResolvers.get(hitId);
-  if (resolver) { _vaultHitResolvers.delete(hitId); resolver(result); }
+  if (resolver) { _vaultHitResolvers.delete(hitId); resolver(result as any); }
 }
 
 // Detects multi-file project requests that should use the chunked build pipeline
@@ -63,6 +64,9 @@ function appendMsg(ctx: BuildContext, content: string): void {
 export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const { task, root, blueprintContext, routing } = ctx;
   const buildStart = Date.now();
+  const ledger = new BuildLedger();
+  const primaryAI = routing.getAvailableAI().ai;
+
   appendMsg(ctx, '🔍 Searching vault...');
   const vaultItems = ctx.vault ? ctx.vault.listItems() : [];
   const searchResult = findRelevantByTask(task, vaultItems);
@@ -76,7 +80,11 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
 
   appendMsg(ctx, `📋 Planning... → \`${relPath}\``);
   const spec = await routing.supervisorPlan(task, relPath, blueprintContext).catch(() => null);
-  
+  if (spec) {
+    const supTokens = Math.ceil((task.length + blueprintContext.length + spec.length) / 4);
+    ledger.record(primaryAI, 'supervisor', 'planned', supTokens);
+  }
+
   updateLastMsg(ctx, '⚙️ Building...');
   const prompt = Worker.buildWorkerPrompt(ctx, relPath, !!existingTarget, existingTarget ? fs.readFileSync(absPath, 'utf8') : '', spec, '');
   const res = await Worker.executeWorkerBuild(ctx, prompt);
@@ -85,6 +93,10 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
     updateLastMsg(ctx, `❌ Build failed: ${res.error || 'AI returned no response. Check .chassis/build_errors.log for details.'}`);
     return;
   }
+
+  const workerAI = (res as any).routedTo || primaryAI;
+  const workerTokens = Math.ceil((prompt.length + res.text.length) / 4);
+  ledger.record(workerAI, spec ? 'worker' : 'solo', 'built', workerTokens);
 
   let code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
   code = await Review.runGuardianReview(ctx, code, relPath, spec);
@@ -95,10 +107,15 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const { narration, cleanCode } = extractNarrator(code);
   Writer.writeBuiltFile(absPath, cleanCode);
 
+  const ledgerSummary = ledger.hasData() ? ledger.getSummary() : undefined;
+  const totalTokens = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.tokens, 0) : 0;
+  const totalCost = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.costUSD, 0) : 0;
+  ctx.usageTracker?.recordUsage(totalTokens, totalCost, workerAI);
+
   const elapsed = (Date.now() - buildStart) / 1000;
-  const resultCard = buildResultCard([relPath], searchResult.items.length, 0, 0, elapsed, snapshotId, 0, !!existingTarget);
+  const resultCard = buildResultCard([relPath], searchResult.items.length, totalTokens, totalCost, elapsed, snapshotId, 0, !!existingTarget, ledgerSummary);
   appendMsg(ctx, `${narration ? '📝 ' + narration + '\n\n' : ''}${resultCard}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__`);
-  
+
   Writer.captureToVault(ctx, absPath, relPath);
   Writer.openBuiltFile(absPath);
   ctx.onBuildFinished?.(task, [relPath]);

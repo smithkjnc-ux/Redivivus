@@ -1,7 +1,13 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 15, 2026 — Session 4s: fixed isSimpleUnit word boundary + Make it a Project Instead handler*
+*Last updated: May 15, 2026 — Session 4s: wired BuildLedger into runSingleFileBuild for token/cost reporting*
+
+## Recent Fixes — May 15, 2026 (Session 4s: token + cost reporting wired into build result card)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/ui/chat/chatPanelBuild.ts` | `runSingleFileBuild` now creates a `BuildLedger`, records supervisor plan tokens (estimate from text lengths / 4) and worker build tokens (prompt + response / 4), computes totals, calls `ctx.usageTracker?.recordUsage()`, and passes `ledgerSummary` to `buildResultCard`. The "WHO DID WHAT" breakdown and cost line now populate in the result card. | Result card always showed `$0.0000 · 0 tokens`. The `BuildLedger` and renderer were fully built but never wired in. | Low — token counts are estimates (chars/4), not exact. Cost is derived from ledger's `tokenCostForAI` rate table. No AI calls added. |
 
 ## Recent Fixes — May 15, 2026 (Session 4s: isSimpleUnit false-positive + Make it a Project button)
 
