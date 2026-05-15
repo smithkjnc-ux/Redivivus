@@ -6,7 +6,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { RoutingService } from './routingService.js';
+import { RoutingService } from './ai/routingService.js';
 
 const LEARNED_FILE = '.chassis/learned.md';
 const RECENT_TTL_DAYS = 30;

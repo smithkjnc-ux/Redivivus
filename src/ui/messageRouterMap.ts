@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { WizardPanelState } from './messageRouterTypes.js';
-import { GuardianService } from '../services/guardianService.js';
+import { GuardianService } from '../services/ai/guardianService.js';
 
 export async function handleMapMessage(
   msg: any,

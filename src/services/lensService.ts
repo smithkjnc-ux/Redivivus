@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import { AnalyzerService } from './analyzerService.js';
-import { GuardianService } from './guardianService.js';
+import { GuardianService } from './ai/guardianService.js';
 
 /**
  * [SCOPE]

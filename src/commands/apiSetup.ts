@@ -2,7 +2,7 @@
 // Chat panel shows read-only status, webview panel allows editing with Apply button.
 
 import * as vscode from 'vscode';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 
 export function registerApiSetupCommand(context: vscode.ExtensionContext): void {
   // Full settings webview panel

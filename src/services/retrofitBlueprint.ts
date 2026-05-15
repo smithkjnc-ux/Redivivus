@@ -2,7 +2,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { RoutingService } from './routingService.js';
+import { RoutingService } from './ai/routingService.js';
 
 export interface Blueprint5W {
   who: string;

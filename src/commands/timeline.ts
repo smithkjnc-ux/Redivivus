@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import { ChassisService } from '../services/chassisService.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 import { TimelineService } from '../services/timelineService.js';
 
 export function registerTimelineCommand(

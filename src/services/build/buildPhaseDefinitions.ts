@@ -1,0 +1,88 @@
+// [SCOPE] Build Phase Definitions — phase names, descriptions, prompts
+// Extracted from buildOrchestrator.ts
+
+import { BuildPhase, PhaseDefinition } from './buildOrchestrator.js';
+import type { ComplexityTier } from './buildOrchestrator.js';
+
+export const BUILD_PHASES: PhaseDefinition[] = [
+  {
+    id: 'foundation',
+    name: 'Foundation',
+    icon: '🏗️',
+    description: 'Project structure, entry points, configuration, dependencies',
+    estimatedPercent: 10,
+    dependencies: [],
+    outputs: ['package.json', 'tsconfig.json', 'src/index.*', 'README.md'],
+    durationEstimate: 15,
+  },
+  {
+    id: 'data',
+    name: 'Data Layer',
+    icon: '🗄️',
+    description: 'Data models, schemas, database, state management, types',
+    estimatedPercent: 15,
+    dependencies: ['foundation'],
+    outputs: ['src/models/*', 'src/types/*', 'src/schema/*', 'src/store/*'],
+    durationEstimate: 15,
+  },
+  {
+    id: 'core',
+    name: 'Core Engine',
+    icon: '⚙️',
+    description: 'Business logic, algorithms, game engine, core services',
+    estimatedPercent: 25,
+    dependencies: ['foundation', 'data'],
+    outputs: ['src/engine/*', 'src/services/*', 'src/logic/*', 'src/utils/*'],
+    durationEstimate: 15,
+  },
+  {
+    id: 'interface',
+    name: 'Interface',
+    icon: '🎨',
+    description: 'UI components, screens, layout, styling',
+    estimatedPercent: 20,
+    dependencies: ['foundation', 'data'],
+    outputs: ['src/components/*', 'src/ui/*', 'src/screens/*', 'src/pages/*'],
+    durationEstimate: 15,
+  },
+  {
+    id: 'integration',
+    name: 'Integration',
+    icon: '🔗',
+    description: 'API connections, external services, webhooks, auth',
+    estimatedPercent: 15,
+    dependencies: ['core', 'data'],
+    outputs: ['src/api/*', 'src/hooks/*', 'src/clients/*'],
+    durationEstimate: 15,
+  },
+  {
+    id: 'features',
+    name: 'Features',
+    icon: '✨',
+    description: 'User-facing features, workflows, interactions',
+    estimatedPercent: 20,
+    dependencies: ['interface', 'core'],
+    outputs: ['src/features/*', 'src/workflows/*'],
+    durationEstimate: 15,
+  },
+  {
+    id: 'polish',
+    name: 'Polish',
+    icon: '✨',
+    description: 'Error handling, validation, tests, optimization, edge cases',
+    estimatedPercent: 15,
+    dependencies: ['features', 'integration'],
+    outputs: ['src/tests/*', 'src/validation/*', '*.test.*', '*.spec.*'],
+    durationEstimate: 15,
+  },
+  {
+    id: 'delivery',
+    name: 'Delivery',
+    icon: '🚀',
+    description: 'Build config, deployment, documentation, final checks',
+    estimatedPercent: 5,
+    dependencies: ['polish'],
+    outputs: ['.github/workflows/*', 'Dockerfile', 'docker-compose.yml', 'DEPLOY.md'],
+    durationEstimate: 15,
+  },
+];

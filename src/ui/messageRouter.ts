@@ -5,9 +5,9 @@
 import * as vscode from 'vscode';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
-import { VaultService } from '../services/vaultService.js';
-import { RoutingService } from '../services/routingService.js';
-import { GuardianService } from '../services/guardianService.js';
+import { VaultService } from '../services/vault/vaultService.js';
+import { RoutingService } from '../services/ai/routingService.js';
+import { GuardianService } from '../services/ai/guardianService.js';
 import { IntentService } from '../services/intentService.js';
 import { WizardPanelState } from './messageRouterTypes.js';
 

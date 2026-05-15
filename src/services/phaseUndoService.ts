@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const PHASE_SNAPSHOTS_DIR = '.chassis/phase_snapshots';
-const MAX_PHASE_HISTORY = 20;
+export const MAX_PHASE_HISTORY = 20;
 
 export interface PhaseSnapshot {
   id: string;
@@ -128,162 +128,53 @@ export class PhaseUndoService {
   /**
    * Undo a specific phase — restore files to state before that phase
    */
+
   undoPhase(buildId: string, phaseNumber: number): boolean {
-    const history = this.getBuildHistory(buildId);
-    if (!history) {
-      console.error(`[PhaseUndo] No history found for build ${buildId}`);
-      return false;
-    }
-
-    const phase = history.phases.find(p => p.phaseNumber === phaseNumber);
-    if (!phase) {
-      console.error(`[PhaseUndo] Phase ${phaseNumber} not found in build ${buildId}`);
-      return false;
-    }
-
-    const phaseDir = path.join(this.phaseSnapshotsRoot, phase.id);
-    if (!fs.existsSync(phaseDir)) {
-      console.error(`[PhaseUndo] Snapshot directory missing: ${phaseDir}`);
-      return false;
-    }
-
-    console.log(`[PhaseUndo] Undoing phase ${phaseNumber}: ${phase.phaseName}`);
-
-    // Restore pre-existing files
-    for (const relPath of phase.preExisting) {
-      const backupPath = path.join(phaseDir, relPath);
-      const targetPath = path.join(this.root, relPath);
-
-      if (fs.existsSync(backupPath)) {
-        fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-        fs.copyFileSync(backupPath, targetPath);
-        console.log(`[PhaseUndo] Restored: ${relPath}`);
-      }
-    }
-
-    // Delete files that were created in this phase
-    for (const relPath of phase.newFiles) {
-      const targetPath = path.join(this.root, relPath);
-      if (fs.existsSync(targetPath)) {
-        fs.unlinkSync(targetPath);
-        console.log(`[PhaseUndo] Deleted: ${relPath}`);
-      }
-    }
-
-    // Mark phase as undone in history
-    phase.undone = true;
-    this.updateBuildHistory(history);
-
-    return true;
+    const { undoPhaseImpl } = require('./phaseUndoServiceImpl.js');
+    return undoPhaseImpl(this, buildId, phaseNumber);
   }
 
-  /**
-   * Get list of phases that can be undone
-   */
   getUndoablePhases(buildId: string): PhaseSnapshot[] {
-    const history = this.getBuildHistory(buildId);
-    if (!history) return [];
-
-    // Return phases that haven't been undone, in reverse order (newest first)
-    return history.phases
-      .filter(p => !p.undone)
-      .sort((a, b) => b.phaseNumber - a.phaseNumber);
+    const { getUndoablePhasesImpl } = require('./phaseUndoServiceImpl.js');
+    return getUndoablePhasesImpl(this, buildId);
   }
 
-  /**
-   * Get full build history
-   */
   getBuildHistory(buildId: string): PhaseHistory | null {
-    const historyPath = path.join(this.phaseSnapshotsRoot, `${buildId}.json`);
-    if (!fs.existsSync(historyPath)) return null;
-
-    try {
-      return JSON.parse(fs.readFileSync(historyPath, 'utf8'));
-    } catch {
-      return null;
-    }
+    const { getBuildHistoryImpl } = require('./phaseUndoServiceImpl.js');
+    return getBuildHistoryImpl(this, buildId);
   }
 
-  /**
-   * List all builds with phase history
-   */
   listBuilds(): { buildId: string; task: string; phaseCount: number }[] {
-    if (!fs.existsSync(this.phaseSnapshotsRoot)) return [];
-
-    const histories = fs.readdirSync(this.phaseSnapshotsRoot)
-      .filter(f => f.endsWith('.json'))
-      .map(f => {
-        const historyPath = path.join(this.phaseSnapshotsRoot, f);
-        try {
-          const history: PhaseHistory = JSON.parse(fs.readFileSync(historyPath, 'utf8'));
-          return {
-            buildId: history.buildId,
-            task: history.task,
-            phaseCount: history.phases.length,
-          };
-        } catch {
-          return null;
-        }
-      })
-      .filter((h): h is NonNullable<typeof h> => h !== null);
-
-    return histories.sort((a, b) => parseInt(b.buildId) - parseInt(a.buildId));
+    const { listBuildsImpl } = require('./phaseUndoServiceImpl.js');
+    return listBuildsImpl(this);
   }
 
   private addPhaseToHistory(buildId: string, snapshot: PhaseSnapshot): void {
-    const history = this.getBuildHistory(buildId);
-    if (!history) return;
-
-    history.phases.push(snapshot);
-    this.updateBuildHistory(history);
+    const { addPhaseToHistoryImpl } = require('./phaseUndoServiceImpl.js');
+    return addPhaseToHistoryImpl(this, buildId, snapshot);
   }
 
   private updateBuildHistory(history: PhaseHistory): void {
-    const historyPath = path.join(this.phaseSnapshotsRoot, `${history.buildId}.json`);
-    fs.writeFileSync(historyPath, JSON.stringify(history, null, 2));
+    const { updateBuildHistoryImpl } = require('./phaseUndoServiceImpl.js');
+    return updateBuildHistoryImpl(this, history);
   }
 
   private pruneOldHistories(): void {
-    if (!fs.existsSync(this.phaseSnapshotsRoot)) return;
-
-    const histories = this.listBuilds();
-    if (histories.length > MAX_PHASE_HISTORY) {
-      const toDelete = histories.slice(MAX_PHASE_HISTORY);
-      for (const build of toDelete) {
-        this.deleteBuildHistory(build.buildId);
-      }
-    }
+    const { pruneOldHistoriesImpl } = require('./phaseUndoServiceImpl.js');
+    return pruneOldHistoriesImpl(this);
   }
 
   private deleteBuildHistory(buildId: string): void {
-    const historyPath = path.join(this.phaseSnapshotsRoot, `${buildId}.json`);
-    
-    // Delete all phase snapshots for this build
-    const history = this.getBuildHistory(buildId);
-    if (history) {
-      for (const phase of history.phases) {
-        const phaseDir = path.join(this.phaseSnapshotsRoot, phase.id);
-        if (fs.existsSync(phaseDir)) {
-          fs.rmSync(phaseDir, { recursive: true });
-        }
-      }
-    }
-
-    // Delete history file
-    if (fs.existsSync(historyPath)) {
-      fs.unlinkSync(historyPath);
-    }
-
-    console.log(`[PhaseUndo] Deleted old build history: ${buildId}`);
+    const { deleteBuildHistoryImpl } = require('./phaseUndoServiceImpl.js');
+    return deleteBuildHistoryImpl(this, buildId);
   }
 }
-
 
 // Singleton instance
 let phaseUndoServiceInstance: PhaseUndoService | null = null;
 
 export function getPhaseUndoService(root: string): PhaseUndoService {
-  if (!phaseUndoServiceInstance || phaseUndoServiceInstance['root'] !== root) {
+  if (!phaseUndoServiceInstance || (phaseUndoServiceInstance as any).root !== root) {
     phaseUndoServiceInstance = new PhaseUndoService(root);
   }
   return phaseUndoServiceInstance;

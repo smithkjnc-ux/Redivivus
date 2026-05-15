@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisPaths } from './chassisPaths.js';
+import { ChassisPaths } from './project/chassisPaths.js';
 
 export async function updateGitignore(root: string): Promise<void> {
   const gitignorePath = path.join(root, '.gitignore');

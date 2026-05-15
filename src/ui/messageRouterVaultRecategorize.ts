@@ -3,8 +3,8 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { VaultService } from '../services/vaultService.js';
-import { RoutingService } from '../services/routingService.js';
+import { VaultService } from '../services/vault/vaultService.js';
+import { RoutingService } from '../services/ai/routingService.js';
 import { WizardPanelState } from './messageRouterTypes.js';
 
 export async function handleVaultRecategorizeMessage(

@@ -3,9 +3,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/routingService.js';
-import { ChangeTracker } from '../services/changeTracker.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { RoutingService } from '../services/ai/routingService.js';
+import { ChangeTracker } from '../services/build/changeTracker.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 
 export function registerReviewCommands(
   context: vscode.ExtensionContext,

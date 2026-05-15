@@ -2,8 +2,8 @@
 // Called by messageRouter orchestrator. No vault navigation or recategorize logic here.
 
 import * as vscode from 'vscode';
-import { VaultService } from '../services/vaultService.js';
-import { RoutingService } from '../services/routingService.js';
+import { VaultService } from '../services/vault/vaultService.js';
+import { RoutingService } from '../services/ai/routingService.js';
 import { WizardPanelState } from './messageRouterTypes.js';
 
 export async function handleVaultScanMessage(

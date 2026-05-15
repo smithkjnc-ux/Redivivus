@@ -3,9 +3,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisPaths, isInitialized, hasWorkspace } from './chassisPaths.js';
+import { ChassisPaths, isInitialized, hasWorkspace } from './project/chassisPaths.js';
 import { loadConfig, saveConfig } from './chassisConfig.js';
-import { initProject, scaffoldAt } from './chassisInit.js';
+import { initProject, scaffoldAt } from './project/chassisInit.js';
 import { generateRules } from './chassisRules.js';
 import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from './chassisLogging.js';
 

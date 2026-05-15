@@ -1,0 +1,168 @@
+// [SCOPE] CHASSIS Chat Panel Chunked Build — multi-file build pipeline orchestration
+// Per-file loop extracted to chatPanelChunkedLoop.ts
+
+import * as path from 'path';
+import { findRelevantByTask, VaultSearchResult } from '../../services/vault/buildFromVaultSearch.js';
+import { getPhaseUndoService } from '../../services/phaseUndoService.js';
+import { BuildContext } from './chatPanelBuild.js';
+import { generateClarifyQuestions, encodeClarifyToken, formatAnswersForPrompt } from './chatPanelClarify.js';
+import { encodeStoryToken, buildResultCard } from './chatPanelStory.js';
+import { generateDocs } from './chatPanelDocs.js';
+import { SnapshotService } from '../../services/snapshotService.js';
+import { autoCaptureFiles } from '../../services/vault/vaultAutoCapture.js';
+import { BuildLedger } from '../../services/build/buildLedgerService.js';
+import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService.js';
+import { runFileBuildLoop, FileBuildLoopResult } from './chatPanelChunkedLoop.js';
+
+export function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
+  ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined });
+  ctx.refresh();
+}
+
+export function updateLastMsg(ctx: BuildContext, content: string): void {
+  const last = ctx.conversation[ctx.conversation.length - 1];
+  if (last && last.role === 'assistant') { last.content = content; }
+  else { ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() }); }
+  ctx.refresh();
+}
+
+/** Multi-file chunked build — clarify → vault search → plan → per-file builds with visible progress */
+export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<void> {
+  const { root, vault, blueprintContext, routing, conversation } = ctx;
+  const buildStart = Date.now();
+
+  const { supervisor, worker } = routing.selectSupervisorAndWorker();
+  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const supervisorLabel = aiLabels[supervisor] || supervisor;
+  const workerLabel = worker ? (aiLabels[worker] || worker) : null;
+
+  // [DEAD] orchestratedBuild bypass was here — removed because it skipped file saving,
+  // project creation wizard, vault capture, and explorer opening. Multi-AI coordination
+  // happens through the existing supervisor/worker planning step + Guardian review instead.
+
+  const ledger = new BuildLedger();
+  const phaseUndo = getPhaseUndoService(root);
+  const buildId = phaseUndo.startPhasedBuild(task);
+
+  // Clarification step
+  let answersBlock = '';
+  const isDirectSplit = /split/i.test(task) && /lines/i.test(task);
+  if (ctx.postToWebview && !isDirectSplit) {
+    appendMsg(ctx, 'Thinking... Preparing a few quick questions...');
+    const questions = await generateClarifyQuestions(task, blueprintContext, routing);
+    if (questions.length > 0) {
+      const last = conversation[conversation.length - 1];
+      if (last && last.role === 'assistant') { last.content = encodeClarifyToken(questions); }
+      ctx.refresh();
+      // [WARN] 2-minute timeout prevents indefinite freeze if clarify UI fails to render
+      const answers = await Promise.race<Record<string, string>>([
+        new Promise<Record<string, string>>((resolve) => { ctx.onClarifySubmit = resolve; }),
+        new Promise<Record<string, string>>(resolve => setTimeout(() => resolve({}), 120_000)),
+      ]);
+      answersBlock = formatAnswersForPrompt(answers);
+      const summary = Object.entries(answers).map(([q, a]) => `  • ${q}: **${a}**`).join('\n');
+      const last2 = conversation[conversation.length - 1];
+      if (last2 && last2.role === 'assistant') { last2.content = `✅ Got it — building with your choices:\n${summary}`; }
+      ctx.refresh();
+    } else { conversation.pop(); ctx.refresh(); }
+  }
+
+  // Vault search
+  appendMsg(ctx, '🔍 Searching vault...');
+  const vaultItems = vault ? vault.listItems() : [];
+  const searchResult: VaultSearchResult = vaultItems.length > 0 ? findRelevantByTask(task, vaultItems) : { items: [], totalScanned: 0, matchedCount: 0, highConfidenceCount: 0 };
+  const relevant = searchResult.items;
+  const vaultMsg = relevant.length > 0
+    ? `🔍 Vault: ${relevant.length} relevant from ${searchResult.totalScanned} scanned (${searchResult.highConfidenceCount} high confidence)`
+    : `🔍 Vault: No matches found in ${searchResult.totalScanned} items`;
+  updateLastMsg(ctx, vaultMsg);
+
+  // Planning
+  const plannerLabel = workerLabel ? `${supervisorLabel} (Supervisor)` : supervisorLabel;
+  appendMsg(ctx, `📋 Planning build — ${plannerLabel} generating file list...`);
+
+  const planPrompt = `I need to build: "${task}"
+${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
+Return ONLY a JSON array — no markdown, no explanation, no code:
+[
+  {"file": "src/models.py", "purpose": "Data models for expenses"},
+  {"file": "src/storage.py", "purpose": "Save and load data from JSON file"},
+  {"file": "src/main.py", "purpose": "CLI entry point"}
+]`;
+
+  const promptLen = Math.ceil(planPrompt.length / 4);
+  interface PlanEntry { filename: string; purpose: string; }
+  let filePlan: PlanEntry[] = [];
+
+  try {
+    const res = await (workerLabel
+      ? (async () => { const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 30_000); const { callProvider } = await import('../../services/ai/routingProviders.js'); return callProvider(supervisor, planPrompt, f); })()
+      : routing.prompt(planPrompt, 30_000));
+    if (!res.success) { throw new Error(res.error || 'Planning step failed'); }
+    const planTokens = Math.ceil(res.text.length / 4);
+    ledger.record(supervisor, worker ? 'supervisor' : 'solo', 'planned', planTokens);
+    const planCost = (planTokens / 1_000_000) * 0.30;
+    ctx.usageTracker?.recordUsage(planTokens, planCost, supervisor);
+    let raw = res.text.trim().replace(/^```[a-zA-Z]*\n?/i, '').replace(/\n?```$/i, '').trim();
+    const arrMatch = raw.match(/\[[\s\S]*\]/);
+    if (arrMatch) { raw = arrMatch[0]; }
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || parsed.length === 0) { throw new Error('AI returned empty plan'); }
+    filePlan = parsed.map((e: any) => ({ filename: e.filename || e.file || 'src/output.py', purpose: e.purpose || '' }));
+  } catch (err) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    ctx.logError(task, planPrompt, `Build plan failed: ${errMsg}`, promptLen);
+    conversation.pop(); conversation.pop();
+    appendMsg(ctx, `❌ Build plan failed\n\n**Reason:** ${errMsg}\n\n_Prompt was ~${promptLen} tokens. Full details in \`.chassis/build_errors.log\`_`);
+    return;
+  }
+
+  updateLastMsg(ctx, `📋 Plan ready — ${filePlan.length} file${filePlan.length !== 1 ? 's' : ''} to build`);
+
+  // Snapshot before building
+  let snapshotId: string | undefined;
+  try { const snap = new SnapshotService(root); snapshotId = snap.prepare(task, filePlan.map(f => f.filename)); } catch { /* never block */ }
+
+  appendMsg(ctx, encodeStoryToken(['Starting build...']));
+  const storyMsgIndex = ctx.conversation.length - 1;
+
+  const loopResult = await runFileBuildLoop({
+    task, ctx, filePlan, relevant, blueprintContext, answersBlock,
+    routing, supervisor, worker, supervisorLabel, workerLabel,
+    buildId, phaseUndo, ledger, storyMsgIndex,
+  });
+
+  // On failure, error message already shown by loop; just return
+  if (!loopResult.success) { return; }
+
+  const { builtFiles, totalTokens, totalCost, storyLines } = loopResult;
+  const elapsed = (Date.now() - buildStart) / 1000;
+
+  // Auto-capture built files to vault
+  const projectName = ctx.chassis?.loadConfig?.()?.projectName || 'Unknown';
+  const absPaths = builtFiles.map(f => path.join(root, f));
+  const capture = vault ? await autoCaptureFiles(absPaths, projectName, vault, task) : { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
+
+  // Mark story complete
+  ctx.conversation[storyMsgIndex].content = '__STORY_DONE__' + encodeStoryToken(storyLines).slice('__STORY__'.length);
+  ctx.refresh();
+
+  // Final result card
+  const ledgerSummary = ledger.hasData() ? ledger.getSummary() : undefined;
+  const resultCard = buildResultCard(builtFiles, relevant.length, totalTokens, totalCost, elapsed, snapshotId, capture, false, ledgerSummary);
+  appendMsg(ctx, `${resultCard}`, totalTokens, totalCost);
+
+  if (ctx.onBuildFinished) { ctx.onBuildFinished(task, builtFiles); }
+
+  // Build history
+  try {
+    const swPair2 = ctx.routing ? (ctx.routing as any).selectSupervisorAndWorker?.() : null;
+    const hist2 = new BuildHistoryService(root);
+    hist2.record(makeBuildHistoryEntry({ snapshotId: snapshotId || Date.now().toString(), task, files: builtFiles, tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: swPair2?.supervisor || 'gemini', worker: swPair2?.worker || null, resultCardToken: resultCard }));
+  } catch { /* never block */ }
+
+  // Generate docs in background
+  generateDocs(root, task, blueprintContext, filePlan, routing)
+    .then(docPath => { if (docPath.endsWith('.md')) { conversation.push({ role: 'assistant', content: `📖 Documentation written to \`${docPath}\``, timestamp: Date.now() }); ctx.refresh(); } })
+    .catch(() => { /* best-effort */ });
+}

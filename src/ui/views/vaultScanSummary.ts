@@ -2,7 +2,7 @@
 // Called by vaultTab. No data retrieval or main tab rendering logic here.
 
 import * as path from 'path';
-import { VaultItem } from '../../services/vaultService.js';
+import { VaultItem } from '../../services/vault/vaultService.js';
 import { esc } from './vaultDataUtils.js';
 
 export function renderVaultScanSummary(

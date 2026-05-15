@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import { RetrofitBlueprintService } from '../services/retrofitBlueprint.js';
-import { RoutingService } from '../services/routingService.js';
+import { RoutingService } from '../services/ai/routingService.js';
 import { ChassisService } from '../services/chassisService.js';
 import * as path from 'path';
 import * as fs from 'fs';

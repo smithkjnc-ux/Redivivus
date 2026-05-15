@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import { ChassisConfig } from '../types/index.js';
-import { ChassisPaths } from './chassisPaths.js';
+import { ChassisPaths } from './project/chassisPaths.js';
 
 export function loadConfig(paths: ChassisPaths): ChassisConfig | null {
   if (!fs.existsSync(paths.configPath)) { return null; }

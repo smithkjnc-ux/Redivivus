@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { Blueprint } from '../types/index.js';
-import { ChassisPaths } from './chassisPaths.js';
+import { ChassisPaths } from './project/chassisPaths.js';
 
 export function generateRules(paths: ChassisPaths, projectName: string, blueprint: Blueprint, targetPath?: string): void {
   const root = targetPath || paths.getWorkspaceRoot();

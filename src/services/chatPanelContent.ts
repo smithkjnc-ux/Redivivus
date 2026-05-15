@@ -2,7 +2,7 @@
 // Allows commands to display their output in the main chat window instead of separate webviews.
 
 import * as vscode from 'vscode';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 
 export interface ContentPanelOptions {
   title: string;

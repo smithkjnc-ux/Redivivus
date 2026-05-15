@@ -6,12 +6,12 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ChassisService } from './chassisService.js';
-import { ChangeTracker } from './changeTracker.js';
-import { MeasureTwiceService } from './measureTwiceService.js';
-import { RoutingService } from './routingService.js';
+import { ChangeTracker } from './build/changeTracker.js';
+import { MeasureTwiceService } from './build/measureTwiceService.js';
+import { RoutingService } from './ai/routingService.js';
 import { AnalyzerService } from './analyzerService.js';
 import { getCodeFiles, backupFiles, restoreFiles, deleteDir } from './retrofitFileScanner.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 import { processInChunks } from './retrofitChunker.js';
 import { handleAllAnnotated, showRetrofitSummary, buildReport } from './retrofitHelpers.js';
 

@@ -1,10 +1,10 @@
 // [SCOPE] CHASSIS Scope Creep Detection Command — warn when project drifts from blueprint
 
 import * as vscode from 'vscode';
-import { ScopeCreepDetectionService } from '../services/scopeCreepDetection.js';
+import { ScopeCreepDetectionService } from '../services/code/scopeCreepDetection.js';
 import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/routingService.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { RoutingService } from '../services/ai/routingService.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 
 export function registerScopeCreepCommand(
   context: vscode.ExtensionContext,

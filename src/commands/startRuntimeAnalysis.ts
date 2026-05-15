@@ -10,11 +10,11 @@ import * as cp from 'child_process';
 import { loadRuntimeProfile } from '../services/runtimeProfiler.js';
 import { buildPythonTraceScript } from '../runtime/pythonInstrumentor.js';
 import { buildJsHookScript } from '../runtime/jsInstrumentor.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/routingService.js';
+import { RoutingService } from '../services/ai/routingService.js';
 import { UsageTracker } from '../services/usageTracker.js';
-import { VaultService } from '../services/vaultService.js';
+import { VaultService } from '../services/vault/vaultService.js';
 
 const DURATION_S  = 30;
 const POLL_MS     = 5000;

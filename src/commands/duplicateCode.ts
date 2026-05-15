@@ -1,9 +1,9 @@
 // [SCOPE] CHASSIS Duplicate Code Detection Command — find repeated patterns
 
 import * as vscode from 'vscode';
-import { DuplicateCodeDetectionService } from '../services/duplicateCodeDetection.js';
-import { RoutingService } from '../services/routingService.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { DuplicateCodeDetectionService } from '../services/code/duplicateCodeDetection.js';
+import { RoutingService } from '../services/ai/routingService.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 
 export function registerDuplicateCodeCommand(
   context: vscode.ExtensionContext,

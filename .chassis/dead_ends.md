@@ -33,3 +33,19 @@ Things that didn't work and why. Learn from these.
 - **What happened:** A task requesting modification of `mapBuilderService.ts` had its casing destroyed to `mapbuilderservice.ts`. The exact match against the workspace's `context.files` failed because the file system and relative paths use camelCase. The file contents were never injected into the Worker AI's prompt.
 - **Never do this:** Never use `task.toLowerCase()` before a regex capture group if you intend to use the captured string as an exact file path match in a case-sensitive file system or data structure.
 - **Do this instead:** Execute the regex against the original, case-preserved `task` string using the `/i` case-insensitive regex flag. Then compare both strings with `.toLowerCase()` to ensure robust matching.
+
+---
+
+## [DEAD] Emitted tokens without renderer parser — __BUILD_RESULT__ showing raw text
+- **What was tried:** The build pipeline emitted `__BUILD_RESULT__filename|||filepath|||END__` tokens to mark files that were built, but the renderer only had parsers for `__ACTION_CARD__`, `__RESULT_CARD__`, etc. — no parser for `__BUILD_RESULT__`.
+- **What happened:** After every build, users saw raw text like `__BUILD_RESULT__src/main.ts|||/home/user/project/src/main.ts|||END__` in the chat, blocking the conversation flow and appearing broken.
+- **Never do this:** Never emit a token format without adding a corresponding parser in `chatPanelRenderer.ts`. The renderer regexes must always match the token format exactly, or the token shows raw text.
+- **Do this instead:** Add the parser regex in `chatPanelRenderer.ts` when you add the token emitter. Include a fallback strip regex (`.replace(/__BUILD_RESULT__[^\n]*/g, '')`) to catch any malformed tokens and prevent chat blocking.
+
+---
+
+## [DEAD] Routing conversion verbs (convert/turn/transform/rewrite) through BUILD_TRIGGER_RE
+- **What was tried:** Added conversion verbs (convert, turn, transform, rewrite, port, refactor, rebuild, redo) to `BUILD_TRIGGER_RE` in `chatPanelMsgSendMessage.ts` plus a separate `CONVERT_TRIGGER_RE` regex, so "Convert this TypeScript file to HTML" would route to the build pipeline.
+- **What happened:** The full build pipeline (supervisor -> worker -> guardian) is too heavy for conversion requests. The chat showed "aligning tolerances..." indefinitely and never produced output. The pipeline stalled trying to run vault search, supervisor plan, worker build, and guardian review.
+- **Never do this:** Never route conversion/transform verbs into `BUILD_TRIGGER_RE`. The build pipeline expects brand-new project creation with full orchestration.
+- **Do this instead:** Keep conversion requests on the AI chat path (`handleAIChat`). Use `chatPanelAutoSave.ts` to auto-detect substantial code blocks in the AI response and save them to disk automatically.

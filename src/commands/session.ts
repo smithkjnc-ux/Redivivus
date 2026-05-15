@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 
 export function registerSessionCommands(
   context: vscode.ExtensionContext,

@@ -1,6 +1,6 @@
 // [SCOPE] Retrofit chunker — splits large files into sections and processes each via AI routing
 import * as vscode from 'vscode';
-import { RoutingService } from './routingService.js';
+import { RoutingService } from './ai/routingService.js';
 
 // [WARN] Chunk boundaries are heuristic — natural breaks (empty lines, function/class defs) are
 // preferred but not guaranteed. If a chunk fails, the original chunk is kept unchanged.

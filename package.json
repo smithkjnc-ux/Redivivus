@@ -165,6 +165,18 @@
         "title": "CHASSIS: AI API Setup"
       },
       {
+        "command": "chassis.apiSetup",
+        "title": "CHASSIS: AI API Setup (alias)"
+      },
+      {
+        "command": "chassis.injectTerminalError",
+        "title": "CHASSIS: Fix Last Terminal Error"
+      },
+      {
+        "command": "chassis.vaultDedup",
+        "title": "CHASSIS: Vault - Find and Remove Duplicates"
+      },
+      {
         "command": "chassis.openSettingsInChat",
         "title": "CHASSIS: AI API Setup in Chat"
       },
@@ -263,6 +275,11 @@
       {
         "command": "chassis.showMap",
         "title": "CHASSIS: Show Architecture Map 🗺"
+      },
+      {
+        "command": "chassis.selfDiagnostic",
+        "title": "CHASSIS: Run Self-Diagnostic",
+        "category": "CHASSIS"
       }
     ],
     "viewsWelcome": [
@@ -301,6 +318,12 @@
         "key": "ctrl+shift+s",
         "mac": "cmd+shift+s",
         "when": "editorTextFocus || terminalFocus"
+      },
+      {
+        "command": "chassis.injectTerminalError",
+        "key": "ctrl+shift+e",
+        "mac": "cmd+shift+e",
+        "when": "terminalFocus || editorTextFocus"
       }
     ],
     "menus": {

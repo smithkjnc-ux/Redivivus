@@ -3,11 +3,11 @@
 
 import * as vscode from 'vscode';
 import { runRuntimeProfiler, buildProfileSummary } from '../services/runtimeProfiler.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/routingService.js';
+import { RoutingService } from '../services/ai/routingService.js';
 import { UsageTracker } from '../services/usageTracker.js';
-import { VaultService } from '../services/vaultService.js';
+import { VaultService } from '../services/vault/vaultService.js';
 
 export function registerProfileRuntimeCommand(
   context: vscode.ExtensionContext,

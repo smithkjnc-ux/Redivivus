@@ -4,7 +4,7 @@
 
 ---
 
-*Last updated: May 11, 2026*
+*Last updated: May 13, 2026*
 
 ---
 
@@ -20,7 +20,7 @@
 - [x] **Full conversation history in AI context** — last 14 turns (user + CHASSIS), not just 3 user messages. DONE (May 11)
 - [x] **Project file tree in AI context** — top 2-level file tree injected into system prompt. DONE (May 11)
 - [x] **Work log in AI context** — last 20 lines of `.chassis/work_log.md` injected. DONE (May 11)
-- [ ] **Terminal error awareness** — detect last terminal error, offer to inject into chat. "I see an error in your terminal — want me to fix it?"
+- [x] **Terminal error awareness** — `terminalErrorService.ts`, `Ctrl+Shift+E`, `chassis.injectTerminalError` command. DONE (May 13)
 
 ### 🟢 Priority 3 — Polish & Onboarding
 - [x] **Better first-run onboarding** — 3 empty states: initialized / uninitialized / no workspace. DONE
@@ -68,37 +68,23 @@ During wizard init: generates `.chassis/rules.md` + shim files at project root:
 `saveBlueprint()` regenerates `.chassis/rules.md` from current config on every save.
 
 ### Open Existing Project Flow
-**Status:** NEEDS WORK
+**Status:** DONE (May 13)
 
-**Current:** Opens folder picker, switches to folder.
-**Target:**
-1. Open folder picker
-2. Check if `.chassis/` exists
-3. **If exists:** go straight to main dashboard with all data loaded
-4. **If not exists:** "This project hasn't been set up with CHASSIS yet" → Set It Up / Just Browse
+Non-CHASSIS folders now show branching dialog with "Open Anyway" option. Existing CHASSIS projects load dashboard directly.
 
 ---
 
 ## TODO — After Core Is Stable
 
 ### Natural Language VS Code Command Router
-- [ ] Phase 1: Local dictionary (`commands.json`) — zero AI cost, covers ~90% of common requests
-  - "open terminal" → `workbench.action.terminal.new`
-  - "split editor" → `workbench.action.splitEditor`
-  - "format this file" → `editor.action.formatDocument`
-  - "go to line 42" → `workbench.action.gotoLine`
-  - "close all tabs" → `workbench.action.closeAllEditors`
-  - "zoom in/out" → `workbench.action.zoomIn/Out`
-  - "open settings" → `workbench.action.openSettings`
-  - "toggle sidebar" → `workbench.action.toggleSidebarVisibility`
-  - "show problems" → `workbench.actions.view.problems`
+- [x] Phase 1: Local dictionary (`commands.json`) — DONE (May 13). Normalize + 2-pass match, friendly labels, CHASSIS commands included.
 - [ ] Phase 2: Gemini-backed fallback — free AI with VS Code command list as context
 - [ ] Phase 3: Full agent chaining — "refactor, split, commit, update roadmap" as one instruction
 
 ### CHASSIS Sidebar Chat Panel
-- [ ] Register CHASSIS Chat as a proper VS Code sidebar view in the Activity Bar
-- [ ] Mirrors Chat panel but embedded in sidebar — visible while editing code
-- [ ] Quick questions + status; main chat panel stays for full-width builds
+- [x] Registered in Activity Bar with `chassisSidebar` viewType. DONE (May 13).
+- [x] Live status header: project name, blueprint badge, session badge, AI badge. DONE (May 13).
+- [x] All commands wired correctly including `chassis.openChatPanel`, `vaultDedup`, `injectTerminalError`. DONE (May 13).
 
 ### Guardian Mentor Pending Items
 - [ ] Visual Blueprint Wizard — drag-and-drop goal interface for Five Ws
@@ -123,9 +109,10 @@ During wizard init: generates `.chassis/rules.md` + shim files at project root:
 - [ ] Present draft for user review/correction
 
 ### Guided Blueprint Mode
-- [ ] AI conversational follow-ups per W field
-- [ ] Pushes back on vague answers, auto-fills polished summary
-- [ ] "Help me think through this" button next to each W
+- [x] Inline gap detection before builds — `blueprintGapDetector.ts`. DONE (May 13).
+- [x] Blue card with text inputs per missing W field, "Let's build" + "Skip" buttons. DONE (May 13).
+- [x] Answers persisted to blueprint via `chassis.saveConfig()`, build resumes automatically. DONE (May 13).
+- [ ] "Help me think through this" AI follow-up button next to each W field (future)
 
 ### Scope Creep Detection
 - [ ] Flag when code drifts from blueprint intent
@@ -134,7 +121,7 @@ During wizard init: generates `.chassis/rules.md` + shim files at project root:
 - [ ] Find similar/identical logic across files
 
 ### Vault Intelligence
-- [ ] Deduplication + Merge Engine — identify near-duplicate vault items, merge with diff view
+- [x] Deduplication + Merge Engine — `vaultDeduplicator.ts`, Jaccard similarity, chat preview + merge. DONE (May 13).
 - [ ] Translation Engine — convert vault items to different languages (JS → Python, etc.)
 - [ ] Language Recommendation Engine — suggest vault items based on project language patterns
 
@@ -146,10 +133,10 @@ During wizard init: generates `.chassis/rules.md` + shim files at project root:
 - [x] Guardian First Principle — health checks before any build
 - [x] `guardianService.ts` — health scoring, file/function length enforcement, Level 4 Block
 - [x] ELI5 integration — converts AI actions to plain English
+- [x] Starter Chassis Templates — 10 templates in `chassis-templates` repo, all live. DONE (May 13).
 - [ ] Visual Blueprint Wizard
 - [ ] Proactive Architectural Blocking
 - [ ] Safety Stoplights
-- [ ] Starter Chassis Templates
 
 ### PHASE 4 — Visual Lens (Point-and-Click Context)
 **Status:** FUTURE / CONCEPTUAL

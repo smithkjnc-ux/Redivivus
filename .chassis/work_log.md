@@ -4,6 +4,35 @@ Auto-managed by CHASSIS. Append-only session history.
 
 ---
 
+## [2026-05-13]
+- **Session Start** — ID: 20260513_fixbugs
+- AI: Gemini
+- Goal: Fix 3 critical bugs in CHASSIS extension
+
+### Bug Fixes:
+1. **Bug 1 — Raw __BUILD_RESULT__ token showing after builds**
+   - **File:** `src/ui/chatPanelRenderer.ts:36-42`
+   - **Fix:** Added regex parser to convert `__BUILD_RESULT__filename|||filepath|||END__` token into an "Open File" button
+   - **Fallback:** Added second regex to strip any remaining raw BUILD_RESULT tokens to prevent chat blocking
+   - **Testing:** Verify build results show Open File button instead of raw token
+
+2. **Bug 2 — AI failover on Gemini API timeout**
+   - **File:** `src/ui/chatPanelBuildWorker.ts:16-57`
+   - **Fix:** Added `executeWorkerBuild()` retry logic that detects timeout errors and tries available fallback AIs
+   - **User message:** Shows "⏱️ Gemini timed out — retrying with Kimi..." before each failover attempt
+   - **Testing:** Temporarily lower timeout or block Gemini to verify failover chain works
+
+3. **Bug 3 — Supervisor prompt ignores format preferences**
+   - **File:** `src/services/routingService.ts:263-284`
+   - **Fix:** Added `supervisorPlan()` logic to detect format preferences from user task:
+     - HTML output: detects "html", "one html file", "single html"
+     - Single file: detects "single file", "one file", "single output"
+     - No build step: detects "no build", "no webpack", "vanilla js"
+   - **Spec injection:** Format instructions added to supervisor prompt for worker spec
+   - **Testing:** Request "single HTML file" and verify output is self-contained HTML
+
+---
+
 ## [2026-05-06]
 - Action: Major feature sprint + rule compliance audit
 - Features shipped:

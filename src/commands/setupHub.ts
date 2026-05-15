@@ -40,7 +40,7 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
   const hasGitHub = !!(githubCfg.enabled && githubCfg.token);
 
   // Guardian status
-  const { RoutingService } = await import('../services/routingService.js');
+  const { RoutingService } = await import('../services/ai/routingService.js');
   const tmpRouting = new RoutingService();
   const guardianActive = tmpRouting.isGuardianActive();
   const workerAI = tmpRouting.getAvailableAI().ai;

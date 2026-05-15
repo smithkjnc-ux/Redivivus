@@ -1,0 +1,152 @@
+// [SCOPE] CHASSIS Chat Panel AI helpers — system prompt builder, command card renderer, response processor
+// Extracted from chatPanelHtml.ts. Keep under 200 lines.
+
+import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import { ChassisService } from '../../services/chassisService.js';
+import { LearnedMemoryService } from '../../services/learnedMemoryService.js';
+import { getSystemPrompt } from './chatPanelAIPrompt.js';
+import { buildProjectAnnotationContext } from './chatPanelProjectContext.js';
+
+/** Builds the AI prompt prefix — question path gets CHASSIS identity + annotations, code gen gets focused prompt */
+export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string): string {
+  const config = chassis.isInitialized() ? chassis.loadConfig() : null;
+  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'none';
+  const bp = config?.blueprint;
+
+  // [CHASSIS] Detect code generation requests — use a focused prompt, not the CHASSIS identity prompt
+  if (userText && /\b(convert|turn|transform|rewrite|replace|port|rebuild|build|create|make|generate|write|implement)\b/i.test(userText)) {
+    return buildCodeGenPrefix(userText, workspaceRoot);
+  }
+
+  let bpStr = 'No blueprint set.';
+  if (bp) {
+    bpStr = ['who','what','where','when','why'].map(f => `${f.toUpperCase()}: ${String(bp[f as keyof typeof bp] || '(not set)').trim()}`).join('\n');
+  }
+
+  let activeFileContext = '';
+  try {
+    const editor = vscode.window.activeTextEditor;
+    if (editor) {
+      const filePath = editor.document.uri.fsPath;
+      const relPath = workspaceRoot !== 'none' ? path.relative(workspaceRoot, filePath) : filePath;
+      const lines = editor.document.getText().split('\n');
+      const maxLines = Math.min(lines.length, 500);
+      const truncNote = lines.length > maxLines ? `\n(truncated: showing ${maxLines} of ${lines.length} lines)` : '';
+      activeFileContext = `\n--- ACTIVE FILE: ${relPath} (${lines.length} lines) ---\n\`\`\`\n${lines.slice(0, maxLines).join('\n')}\n\`\`\`${truncNote}\n`;
+    }
+  } catch {}
+
+  let conversationContext = '';
+  if (fullConversation) {
+    conversationContext = '\n--- HISTORY ---\n' + fullConversation.slice(-10).map(m => `${m.role}: ${m.content.slice(0, 300)}`).join('\n') + '\n';
+  }
+
+  const prompt = getSystemPrompt(bpStr);
+  // [CHASSIS] Inject annotation-driven project context — the AI sees [SCOPE] from ALL files
+  // in ~200 tokens instead of loading 50,000 tokens of raw code. This is the CHASSIS advantage.
+  const projectContext = buildProjectAnnotationContext(workspaceRoot);
+  return `${prompt}\n${projectContext}${activeFileContext}${conversationContext}\nUser:`;
+}
+
+// [SCOPE] Focused code generation prompt — bypasses CHASSIS identity noise entirely
+// [WARN] This is the key difference vs Antigravity. Antigravity reads the whole file and uses a focused prompt.
+// CHASSIS was wrapping code gen in 44 lines of identity/capabilities/behavioral rules that distracted the AI.
+function buildCodeGenPrefix(userText: string, workspaceRoot: string): string {
+  // 1. Find source files — read from disk, don't rely on activeTextEditor
+  let sourceCode = '';
+  const srcFiles = findSourceFiles(userText, workspaceRoot);
+  if (srcFiles.length > 0) {
+    for (const sf of srcFiles) {
+      sourceCode += `\n--- SOURCE FILE: ${sf.relPath} (${sf.lineCount} lines) ---\n\`\`\`\n${sf.content}\n\`\`\`\n`;
+    }
+  } else {
+    // Fall back to active editor
+    try {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        const filePath = editor.document.uri.fsPath;
+        const relPath = workspaceRoot !== 'none' ? path.relative(workspaceRoot, filePath) : filePath;
+        const content = editor.document.getText();
+        sourceCode = `\n--- ACTIVE FILE: ${relPath} ---\n\`\`\`\n${content}\n\`\`\`\n`;
+      }
+    } catch {}
+  }
+
+  return `You are a code generator. Your job is to convert/create code exactly as requested.
+
+RULES:
+- Write the COMPLETE, FULLY FUNCTIONAL file. Every function, every variable, every line.
+- Port ALL logic from the source. Do not skip, summarize, or stub any section.
+- The output must work immediately when opened in a browser. Zero missing pieces.
+- Output ONLY the code inside a single fenced code block. No explanations, no comments about what you did.
+- For browser targets: single self-contained HTML file with inline <style> and <script>.
+- Convert TypeScript constructs (enums, interfaces, type annotations) to plain JavaScript equivalents.
+- Preserve all constants, physics values, colors, dimensions, and game logic exactly.
+${sourceCode}
+User:`;
+}
+
+// [SCOPE] Find source files referenced in user message — reads from disk, not activeTextEditor
+// [WARN] This is critical: when user is in the chat panel, activeTextEditor may not have the right file.
+export interface SourceFile { relPath: string; content: string; lineCount: number; }
+/** Find source files in the project — reads from disk, not activeTextEditor */
+export function findSourceFiles(userText: string, workspaceRoot: string): SourceFile[] {
+  if (workspaceRoot === 'none') { return []; }
+  const results: SourceFile[] = [];
+  try {
+    // Strategy: find the main source files in the project
+    // Look for references like "the TypeScript file", "the .ts file", project name mentions
+    const srcDir = path.join(workspaceRoot, 'src');
+    const searchDirs = [srcDir, workspaceRoot];
+    const codeExts = ['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.java', '.rb'];
+
+    for (const dir of searchDirs) {
+      if (!fs.existsSync(dir)) { continue; }
+      const files = fs.readdirSync(dir).filter(f => {
+        const ext = path.extname(f).toLowerCase();
+        return codeExts.includes(ext) && !f.endsWith('.d.ts') && f !== 'vite-env.d.ts';
+      });
+      for (const file of files) {
+        const absPath = path.join(dir, file);
+        const stat = fs.statSync(absPath);
+        if (stat.isFile() && stat.size < 100_000) {
+          const content = fs.readFileSync(absPath, 'utf8');
+          const lineCount = content.split('\n').length;
+          if (lineCount > 10) { // Only include substantial files
+            results.push({ relPath: path.relative(workspaceRoot, absPath), content, lineCount });
+          }
+        }
+      }
+      if (results.length > 0) { break; } // Found files in src/, don't also scan root
+    }
+  } catch { /* best-effort */ }
+  return results.slice(0, 3); // Cap at 3 files to avoid token explosion
+}
+
+/** Map VS Code command IDs to human-readable labels for action cards */
+export function commandLabel(command: string): string {
+  const labels: Record<string, string> = {
+    'chassis.startSession': '🚀 Start Session', 'chassis.endSession': '🏁 End Session',
+    'chassis.wizardRetrofit': '🆕 New Project', 'chassis.analyze': '🔍 Analyze',
+    'chassis.openVault': '💾 Vault', 'chassis.savePoint': '💾 Save Point'
+  };
+  return labels[command] || `▶ Run: ${command}`;
+}
+
+const SAFE_COMMANDS = ['chassis.showMap', 'chassis.viewUsageInChat', 'chassis.log', 'chassis.deadends', 'chassis.openVault'];
+
+/** Process AI response — extract commands, generate action cards */
+export function processAIResponse(text: string): { text: string; executedCommand: boolean } {
+  const match = text.match(/\[\[COMMAND:(\w+(?:\.\w+)*)\]\]/);
+  if (match) {
+    const cmd = match[1];
+    if (SAFE_COMMANDS.includes(cmd)) {
+      vscode.commands.executeCommand(cmd).then(() => {}, () => {});
+      return { text: text.replace(match[0], '').trim(), executedCommand: true };
+    }
+    return { text: text.replace(match[0], `__ACTION_CARD__${cmd}|||${commandLabel(cmd)}|||END__`).trim(), executedCommand: false };
+  }
+  return { text, executedCommand: false };
+}

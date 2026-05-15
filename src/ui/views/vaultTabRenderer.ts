@@ -1,7 +1,7 @@
 // [SCOPE] Vault tab main renderer — renderVaultTab for categories, subcategories, items views
 // Called by vaultTab. No scan summary rendering logic here.
 
-import { VaultService, VaultCategory, VaultItem, VAULT_CATEGORIES } from '../../services/vaultService.js';
+import { VaultService, VaultCategory, VaultItem, VAULT_CATEGORIES } from '../../services/vault/vaultService.js';
 import { getVaultCategoryCounts, esc } from './vaultDataUtils.js';
 
 const CAT_ICONS: Record<string, string> = {

@@ -3,9 +3,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/routingService.js';
-import { MeasureTwiceService } from '../services/measureTwiceService.js';
-import { ChangeTracker } from '../services/changeTracker.js';
+import { RoutingService } from '../services/ai/routingService.js';
+import { MeasureTwiceService } from '../services/build/measureTwiceService.js';
+import { ChangeTracker } from '../services/build/changeTracker.js';
 
 export function registerRestructureCommands(
   context: vscode.ExtensionContext,

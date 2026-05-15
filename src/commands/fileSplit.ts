@@ -1,9 +1,9 @@
 // [SCOPE] CHASSIS File Split Assistant Command — scans and suggests file splits
 
 import * as vscode from 'vscode';
-import { FileSplitService } from '../services/fileSplitService.js';
-import { RoutingService } from '../services/routingService.js';
-import { ChatPanel } from '../ui/chatPanel.js';
+import { FileSplitService } from '../services/code/fileSplitService.js';
+import { RoutingService } from '../services/ai/routingService.js';
+import { ChatPanel } from '../ui/chat/chatPanel.js';
 
 export function registerFileSplitCommand(
   context: vscode.ExtensionContext,

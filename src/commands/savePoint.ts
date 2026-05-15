@@ -2,7 +2,7 @@
 // [DONE] Previously ran git commit directly. Now opens panel so user can create save points AND
 //        browse/undo build history from one place.
 import * as vscode from 'vscode';
-import { showBuildHistoryPanel } from '../ui/buildHistoryPanel.js';
+import { showBuildHistoryPanel } from '../ui/views/buildHistoryPanel.js';
 
 export function registerSavePointCommand(context: vscode.ExtensionContext) {
   // chassis.savePoint — toolbar button; opens the panel
