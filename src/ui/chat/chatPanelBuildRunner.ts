@@ -18,7 +18,8 @@ export async function runBuildAfterGates(
   // Use chassis root — it may point to a just-created project before VS Code workspace catches up
   const root = deps.chassis?.getWorkspaceRoot?.() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
-  const isSimpleUnit = /function|script|snippet|utility|helper|class|method|component|hook|module/i.test(task);
+  // [FIX] Word boundary prevents "JavaScript" from matching "script", "className" from matching "class", etc.
+  const isSimpleUnit = /\b(function|script|snippet|utility|helper|class|method|component|hook|module)\b/i.test(task);
 
   if (!root) {
     // No folder open + simple unit → build to vault directly, no folder needed

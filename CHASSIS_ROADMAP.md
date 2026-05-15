@@ -1,7 +1,14 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 15, 2026 — Session 4s: fixed Bug 8 — set-status:ready missing on no-root early returns*
+*Last updated: May 15, 2026 — Session 4s: fixed isSimpleUnit word boundary + Make it a Project Instead handler*
+
+## Recent Fixes — May 15, 2026 (Session 4s: isSimpleUnit false-positive + Make it a Project button)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/ui/chat/chatPanelBuildRunner.ts` | Added `\b` word boundaries to `isSimpleUnit` regex. Was `/function\|script\|snippet\|.../i`, now `/\b(function\|script\|...)\b/i`. | "JavaScript" contains the substring "script" — without word boundaries, any task mentioning JavaScript, TypeScript, or className was falsely classified as a simple unit and routed to the compact vault wizard instead of the placement gate. A personal finance dashboard got the "Build & Save to Vault" compact panel instead of the proper project-creation flow. | None — stricter classification; tasks that genuinely ask for a "function" or "script" still match |
+| `src/ui/chat/chatPanelScriptProjects.ts` | Fixed "Make it a Project Instead" button click handler: was posting `{ type:'show-panel', panelType:'create-folder' }` to the extension (no inbound handler — silently dropped). Now calls `showCreateFolderPanel(prefillName, pendingTask)` directly in the webview, which posts `{ type:'create-folder', name, parentPath, pendingTask }` — a message the extension DOES handle. | Clicking "Make it a Project Instead" did nothing. The `showCreateFolderPanel` function was already defined in the webview; the button just needed to call it instead of posting a message the extension doesn't listen for. | None — calls existing webview function; create-folder handler unchanged |
 
 ## Recent Fixes — May 15, 2026 (Session 4s: Bug 8 — status ticker freeze on no-workspace paths)
 
