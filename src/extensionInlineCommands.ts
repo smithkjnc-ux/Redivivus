@@ -69,19 +69,33 @@ export function registerInlineCommands(
     if (cfg.enabled && cfg.autoBackupOnBuild) {
       await githubBackupService.backup();
     }
-    // If the built project isn't in the workspace Explorer yet, add it automatically
+    // If the built project isn't in the workspace Explorer yet, add it automatically.
+    // [WARN] Only add when there is ALREADY at least one workspace folder. Adding the FIRST folder
+    //        triggers a VS Code window reload which kills the chat panel message channel — the webview
+    //        shows cached content but is disconnected, so the user cannot type or interact with it.
+    //        When no folders exist, skip the auto-add and let the user open the folder manually.
     const builtRoot = ChatPanel.currentPanel ? (ChatPanel.currentPanel.getChassisRoot?.() || '') : '';
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const alreadyInWs = vscode.workspace.workspaceFolders?.some(f => f.uri.fsPath === builtRoot);
-    if (builtRoot && !alreadyInWs) {
+    const existingFolders = vscode.workspace.workspaceFolders ?? [];
+    const alreadyInWs = existingFolders.some(f => f.uri.fsPath === builtRoot);
+    if (builtRoot && !alreadyInWs && existingFolders.length > 0) {
       // Build is done — safe to add to workspace now. Set synchronous flag BEFORE updateWorkspaceFolders
       // fires onDidChangeWorkspaceFolders (globalState.update is async and loses the race).
       _suppressNextFolderAdd.value = true;
       await context.globalState.update('chassis.suppressAutoOpen', builtRoot);
       vscode.workspace.updateWorkspaceFolders(
-        vscode.workspace.workspaceFolders?.length ?? 0, 0,
+        existingFolders.length, 0,
         { uri: vscode.Uri.file(builtRoot) }
       );
+    } else if (builtRoot && !alreadyInWs && existingFolders.length === 0) {
+      // [FIX] First folder: show a notification instead of auto-adding (auto-add would reload window)
+      vscode.window.showInformationMessage(
+        `Project built at: ${builtRoot}`,
+        'Open as Workspace'
+      ).then(choice => {
+        if (choice === 'Open as Workspace') {
+          vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(builtRoot));
+        }
+      });
     }
   };
 

@@ -1,7 +1,13 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 15, 2026 — Session 4s: wired BuildLedger into runSingleFileBuild for token/cost reporting*
+*Last updated: May 15, 2026 — Session 4s: fixed chat freeze caused by updateWorkspaceFolders on first folder*
+
+## Recent Fixes — May 15, 2026 (Session 4s: chat freeze after build — window reload from updateWorkspaceFolders)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/extensionInlineCommands.ts` | `onBuildFinished` now checks `existingFolders.length > 0` before calling `updateWorkspaceFolders`. When no folders exist (first project built from chat), shows an "Open as Workspace" notification button instead. When at least one folder already exists, still auto-adds normally. | Adding the FIRST workspace folder via `updateWorkspaceFolders` causes VS Code to reload the window. The chat webview panel is destroyed; the user sees cached content but the message channel is disconnected — making the chat completely non-responsive. The user had to open a new chat panel after every build. | Low — auto-add still works for multi-root workspaces. First-folder case now requires one extra user click ("Open as Workspace" toast). |
 
 ## Recent Fixes — May 15, 2026 (Session 4s: token + cost reporting wired into build result card)
 
