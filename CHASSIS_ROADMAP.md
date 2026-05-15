@@ -1,7 +1,21 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 15, 2026 — Session 4s: fixed 4 build screen freeze bugs*
+*Last updated: May 15, 2026 — Session 4s: fixed Bug 8 — set-status:ready missing on no-root early returns*
+
+## Recent Fixes — May 15, 2026 (Session 4s: Bug 8 — status ticker freeze on no-workspace paths)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/ui/chat/chatPanelBuildRunner.ts` | Added `deps.postToWebview({ type: 'set-status', status: 'ready' })` before each early return in the `!root` block: (1) vault-only path (isSimpleUnit && !skipComplex), (2) skipComplex path, (3) after placement modal resolve (covers both new-project and cancel). | The `finally` block that posts `set-status: ready` is only reached when `root` is defined and the actual AI build runs. All three `!root` early-return paths exited without resetting the status, leaving "routing wiring..." spinning forever in the chat header even after the function returned. | None — purely additive postMessage calls; no logic changes |
+
+## Recent Fixes — May 15, 2026 (Session 4s: gate response handler mismatch + freeze fixes)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/ui/chat/chatPanelMessageRouter.ts` | Added `vault-hit-*` handler: extracts resolverId from message type, calls `resolveVaultHit(resolverId, msg.choice)`. Added `placement-*` handler: extracts placementId, calls `resolvePlacement(placementId, msg.choice)`. Both run before the `handleChatMessage` fallthrough. | The gate WebView scripts (`chatPanelScriptGates.ts`) were redesigned to send `{ type:'vault-hit-{id}', choice:... }` and `{ type:'placement-{id}', choice:... }`, but the extension handlers still expected the old format (`use-vault`/`build-anyway` + `hitId`, `placement-add-here/new-project/cancel` + `placementId`). Every vault-hit and placement response from the user was silently dropped — the promise timed out after 60s/5min causing the build screen freeze. | Low — handlers are additive; old dead handlers remain as fallback |
+| `src/ui/chat/chatPanelMessages.ts` | Fixed `confirm-build` handler: was always resolving `true` (`resolveBuildConfirm(msg.buildId, true)`), ignoring `msg.confirmed`. Now uses `msg.confirmed !== false`. | Clicking "Cancel" on the cost estimate modal sent `confirmed:false` but the extension resolved it as `true` — the build proceeded anyway. | Low — only affects the cancel path; confirm path unchanged |
+| `src/ui/chat/chatPanelBuild.ts` | Updated `resolveVaultHit` signature from `result: boolean` to `result: string \| boolean` to accept the choice string from the new handler. | TS type safety — `resolver(result as any)` already worked at runtime but the public signature was misleading. | None — runtime behavior unchanged |
 
 ## Recent Fixes — May 15, 2026 (Session 4s: build screen freeze fixes)
 

@@ -27,6 +27,8 @@ export async function runBuildAfterGates(
       const prefillAnswers = await extractBlueprintFromPrompt(task, deps.routing);
       const _defaultParentV = require('os').homedir() + '/projects';
       deps.postToWebview({ type: 'show-panel', panelType: 'new-project', suggestedParent: _defaultParentV, prefillTask: task, compact: true, vaultOnly: true, prefillAnswers });
+      // [FIX] Bug 8: was missing — status ticker froze at "routing wiring..." forever
+      deps.postToWebview({ type: 'set-status', status: 'ready' });
       return;
     }
     // [FIX] skipComplex=true means user confirmed build from compact wizard — skip the 5-min
@@ -37,6 +39,8 @@ export async function runBuildAfterGates(
       const prefillAnswers = await extractBlueprintFromPrompt(task, deps.routing);
       const _defaultParentS = require('os').homedir() + '/projects';
       deps.postToWebview({ type: 'show-panel', panelType: 'new-project', suggestedParent: _defaultParentS, prefillTask: task, compact: false, prefillAnswers });
+      // [FIX] Bug 8: was missing — status ticker froze at "routing wiring..." forever
+      deps.postToWebview({ type: 'set-status', status: 'ready' });
       return;
     }
     // No folder open + complex project → show WebView placement modal (not native dialog)
@@ -53,6 +57,8 @@ export async function runBuildAfterGates(
       const _defaultParentN = require('os').homedir() + '/projects';
       deps.postToWebview({ type: 'show-panel', panelType: 'new-project', suggestedParent: _defaultParentN, prefillTask: task, compact: false, prefillAnswers });
     }
+    // [FIX] Bug 8: covers both 'new-project' and 'cancel'/'timeout' branches — was missing
+    deps.postToWebview({ type: 'set-status', status: 'ready' });
     return;
   }
 
