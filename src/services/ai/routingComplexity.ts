@@ -23,19 +23,37 @@ export async function routeByComplexityImpl(
   };
   const has = (ai: string) => !!keyMap[ai]?.();
 
-  const isLargeContext = tokens.total > 4000;
+  // [FIX] 4000-token threshold was too low — any prompt with vault context exceeded it, forcing Kimi.
+  // 50k is genuinely large (beyond most model context windows except Kimi/Claude/Gemini).
+  const isLargeContext = tokens.total > 50_000;
   const isSpeedTask = complexity === 'simple' && tokens.total < 1500;
+
+  // [FIX] Respect user's explicitly selected AI (the header chip / chassis.defaultAI setting).
+  // Previously hardcoded Gemini as the "medium complexity" pick — Claude was never chosen if Gemini was configured.
+  const preferredAI = svc.getPreferredAI?.() || '';
 
   let chosenAI: string | null = null;
   let routingReason = '';
-  if (isLargeContext && has('kimi'))       { chosenAI = 'kimi';   routingReason = 'Large prompt (' + tokens.total.toLocaleString() + ' tokens) — Kimi 32k handles big context best'; }
-  else if (isSpeedTask && has('groq'))     { chosenAI = 'groq';   routingReason = 'Simple short task — Groq/Llama is fastest for quick builds'; }
-  else if (has('gemini'))                  { chosenAI = 'gemini'; routingReason = 'Medium complexity — Gemini Flash is the reliable all-rounder'; }
-  else if (has('claude'))                  { chosenAI = 'claude'; routingReason = 'Complex task — Claude chosen for strongest reasoning'; }
-  else if (has('openai'))                  { chosenAI = 'openai'; routingReason = 'Complex task — GPT-4o chosen as strong fallback'; }
-  else if (has('xai'))                     { chosenAI = 'xai';    routingReason = 'Grok chosen — strong reasoning fallback'; }
-  else if (has('kimi'))                    { chosenAI = 'kimi';   routingReason = 'Kimi chosen as fallback worker'; }
-  else if (has('groq'))                    { chosenAI = 'groq';   routingReason = 'Groq chosen as fallback worker'; }
+  if (preferredAI && has(preferredAI) && !isSpeedTask) {
+    chosenAI = preferredAI;
+    routingReason = `Using your selected AI: ${preferredAI}`;
+  } else if (isLargeContext && has('kimi')) {
+    chosenAI = 'kimi';   routingReason = 'Very large prompt (>' + tokens.total.toLocaleString() + ' tokens) — Kimi chosen for maximum context';
+  } else if (isSpeedTask && has('groq')) {
+    chosenAI = 'groq';   routingReason = 'Simple short task — Groq/Llama is fastest for quick builds';
+  } else {
+    // Use highest capability rank: claude > openai > xai > gemini > kimi > groq
+    const reasonMap: Record<string, string> = {
+      claude: 'Claude chosen — strongest reasoning and code quality',
+      openai: 'GPT-4o chosen — strong full-stack reasoning',
+      xai: 'Grok chosen — strong reasoning',
+      gemini: 'Gemini Flash chosen — reliable all-rounder',
+      kimi: 'Kimi chosen as available worker',
+      groq: 'Groq chosen — fastest available',
+    };
+    chosenAI = ['claude', 'openai', 'xai', 'gemini', 'kimi', 'groq'].find(has) || null;
+    if (chosenAI) routingReason = reasonMap[chosenAI] || chosenAI;
+  }
 
   if (!chosenAI) {
     return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in CHASSIS Settings (Files & AI tab).' };

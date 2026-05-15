@@ -78,14 +78,16 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const relPath = existingTarget ? path.relative(root, existingTarget) : (ext === '.html' ? 'index.html' : `src/${Inf.deriveFileBase(task.toLowerCase())}${ext}`);
   const absPath = path.join(root, relPath);
 
-  appendMsg(ctx, `📋 Planning... → \`${relPath}\``);
+  appendMsg(ctx, `📋 Supervisor planning \`${relPath}\`...`);
   const spec = await routing.supervisorPlan(task, relPath, blueprintContext).catch(() => null);
   if (spec) {
     const supTokens = Math.ceil((task.length + blueprintContext.length + spec.length) / 4);
     ledger.record(primaryAI, 'supervisor', 'planned', supTokens);
+    updateLastMsg(ctx, `📋 Plan ready (${spec.split('\n').length} steps) — handing off to worker AI...`);
   }
 
-  updateLastMsg(ctx, '⚙️ Building...');
+  const workerName = (routing as any).getPreferredAI?.() || primaryAI;
+  appendMsg(ctx, `⚙️ ${workerName.charAt(0).toUpperCase() + workerName.slice(1)} writing \`${relPath}\`...`);
   const prompt = Worker.buildWorkerPrompt(ctx, relPath, !!existingTarget, existingTarget ? fs.readFileSync(absPath, 'utf8') : '', spec, '');
   const res = await Worker.executeWorkerBuild(ctx, prompt);
   if (!res.success) {
@@ -94,14 +96,20 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
     return;
   }
 
-  const workerAI = (res as any).routedTo || primaryAI;
+  const workerAI = (res as any).routedTo || workerName;
   const workerTokens = Math.ceil((prompt.length + res.text.length) / 4);
   ledger.record(workerAI, spec ? 'worker' : 'solo', 'built', workerTokens);
+
+  // Show code preview so the user can see something was actually generated
+  const rawLines = res.text.trim().split('\n');
+  const previewLines = rawLines.slice(0, 20).join('\n') + (rawLines.length > 20 ? '\n...' : '');
+  updateLastMsg(ctx, `⚙️ ${rawLines.length} lines generated — Guardian reviewing...\n\`\`\`\n${previewLines}\n\`\`\``);
 
   let code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
   code = await Review.runGuardianReview(ctx, code, relPath, spec);
   code = await Review.runStaticValidation(code, relPath);
   if (['.ts', '.tsx', '.js'].some(e => relPath.endsWith(e))) code = await Review.runImportValidation(ctx, code, absPath, root);
+  updateLastMsg(ctx, `✅ Review complete — writing \`${relPath}\`...`);
 
   const snapshotId = Writer.createSnapshot(root, task, relPath);
   const { narration, cleanCode } = extractNarrator(code);

@@ -10,6 +10,7 @@ import { callProvider } from './routingProviders.js';
 import { AI_RANK } from './guardianAI.js';
 import { routeByComplexityImpl } from './routingComplexity.js';
 import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
+import { createPlan, executeStep, reviewOutput, OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
 
 interface SwPair { supervisor: string; worker: string | null; }
 let _swCache: { pair: SwPair; settingsKey: string } | null = null;
@@ -60,10 +61,15 @@ export class RoutingService {
     return result;
   }
 
+  /** Returns the user's explicitly selected AI (from the header chip / settings), or '' if none set. */
+  getPreferredAI(): string {
+    return vscode.workspace.getConfiguration('chassis').get<string>('defaultAI') || '';
+  }
+
   getModelName(): string {
     const ai = this.getAvailableAI().ai;
     const modelMap: Record<string, string> = {
-      gemini: 'gemini-2.5-flash', claude: 'claude-3-5-haiku-20241022',
+      gemini: 'gemini-2.5-flash', claude: 'claude-sonnet-4-20250514',
       openai: 'gpt-4o-mini', groq: 'llama-3.3-70b-versatile',
       xai: 'grok-2-1212', kimi: 'moonshot-v1-8k',
     };
@@ -177,5 +183,11 @@ export class RoutingService {
   getGuardianFor(workerAI: string): string | null {
     const { selectGuardianAI } = require('./guardianAI.js');
     return selectGuardianAI(workerAI, this.getKeyMap());
+  }
+
+  /** Multi-AI orchestrated build — delegates to routingOrchestration.ts */
+  async orchestratedBuild(task: string, context: string, onProgress?: ProgressCallback): Promise<OrchestratedResult> {
+    const { orchestratedBuildImpl } = await import('./routingOrchestration.js');
+    return orchestratedBuildImpl(this, task, context, onProgress);
   }
 }

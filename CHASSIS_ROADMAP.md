@@ -1,7 +1,15 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 15, 2026 — Session 4s: fixed chat freeze caused by updateWorkspaceFolders on first folder*
+*Last updated: May 15, 2026 — Session 4s: fixed AI routing to respect user selection + live build progress*
+
+## Recent Fixes — May 15, 2026 (Session 4s: AI routing + live build progress)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/services/ai/routingService.ts` | Added `getPreferredAI()` method that reads `chassis.defaultAI` from VS Code config. | `routeByComplexityImpl` needed access to the user's explicitly selected AI without coupling to VS Code directly. | None — read-only getter |
+| `src/services/ai/routingComplexity.ts` | (1) Changed large-context threshold from 4000 → 50,000 tokens. (2) Added `preferredAI` check: if user has a default AI set and it's available, use it before any other logic. (3) Changed fallback ordering to capability rank (claude>openai>xai>gemini>kimi>groq) instead of hardcoding Gemini as the primary. | 4k threshold caused any prompt with 15 vault items to route to Kimi. Gemini was hardcoded as the "medium" AI before Claude, so Claude was never used even when configured and explicitly selected. User clicked the Claude chip; Gemini was used anyway. | Low — preferred AI check only fires when key is present; fallback chain unchanged |
+| `src/ui/chat/chatPanelBuild.ts` | Added live progress messages during build: "Supervisor planning...", "Claude writing `file`...", N-line code preview after AI responds, "Guardian reviewing...", "Review complete — writing...". | A 1-2 minute build showed only "Building..." the entire time — users worried the build was frozen. Now each phase is visible and the first 20 lines of generated code appear in chat before the final result card. | Low — additive messages only; all feed into the existing appendMsg/updateLastMsg pattern |
 
 ## Recent Fixes — May 15, 2026 (Session 4s: chat freeze after build — window reload from updateWorkspaceFolders)
 
