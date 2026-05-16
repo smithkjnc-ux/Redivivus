@@ -59,9 +59,12 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
 /** No-routing fallback — keyword detection when no AI service is available. */
 export function fallbackClassify(text: string): IntentResult {
   const t = text.toLowerCase().trim();
-  const buildVerbs = /\b(build|create|make|write|generate|implement|scaffold|code|develop|produce|split|refactor|reorganize|restructure|add|fix|repair|update|modify|extend|improve|change|edit|remove|delete|swap|replace|convert|debug|correct|refine|patch|solve|resolve|rebuild|rewrite|redesign)\b/i;
-  const isPureWhQuestion = /^(what|how|why|when|where|who|which)\b/i.test(t) && !buildVerbs.test(t);
-  const isTrailingQuestion = /\?$/i.test(t) && !buildVerbs.test(t);
+  // Fix verbs: user is describing a problem with existing code
+  const fixVerbs = /\b(fix|debug|repair|patch|solve|resolve|broken|doesn.t work|not working|isn.t working|no sound|no audio|crash|error|bug|wrong|off|broken)\b/i;
+  const buildVerbs = /\b(build|create|make|write|generate|implement|scaffold|code|develop|produce|split|refactor|reorganize|restructure|add|update|modify|extend|improve|change|edit|remove|delete|swap|replace|convert|correct|refine|rebuild|rewrite|redesign)\b/i;
+  const isPureWhQuestion = /^(what|how|why|when|where|who|which)\b/i.test(t) && !buildVerbs.test(t) && !fixVerbs.test(t);
+  const isTrailingQuestion = /\?$/i.test(t) && !buildVerbs.test(t) && !fixVerbs.test(t);
+  if (fixVerbs.test(t)) { return { type: 'fix' }; }
   if (buildVerbs.test(t)) { return { type: 'build' }; }
   if (isPureWhQuestion || isTrailingQuestion) { return { type: 'question' }; }
   return { type: 'question' };

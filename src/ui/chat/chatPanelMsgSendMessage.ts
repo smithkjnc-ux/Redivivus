@@ -11,6 +11,7 @@ import { ProjectOperations } from '../../services/project/projectOperations.js';
 import { _pendingGuidedBuilds } from './chatPanelMsgSpecial.js';
 import { _scanChassisProjects } from '../chassisProjectScanner.js';
 import { handleAIChat } from './chatPanelMsgSendAI.js';
+import { handleFixRequest } from './chatPanelMsgFix.js';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { chassis, routing, usageTracker, conversation, panel, refresh } = deps;
@@ -153,6 +154,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
       conversation.push({ role: 'assistant', content: 'I couldn\'t find a main file to run (looked for index.html, main.js, etc.). Which file would you like to open?', timestamp: Date.now() });
     }
     refresh(); return;
+  }
+
+  if (intent.type === 'fix') {
+    await handleFixRequest(userText, deps);
+    return;
   }
 
   if (intent.type === 'build') {

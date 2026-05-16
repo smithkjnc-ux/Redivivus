@@ -5,7 +5,7 @@ import { RoutingService } from '../../services/ai/routingService.js';
 import { tracer } from '../../services/pipelineTracer.js';
 import { checkHardcodedOverrides, fallbackClassify } from './chatPanelClassifierOverrides.js';
 
-export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run';
+export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix';
 export type AvailableCommand =
   | 'chassis.openProject'
   | 'chassis.wizardRetrofit'
@@ -44,7 +44,8 @@ export async function classifyIntent(
   const systemPrompt = `You are the CHASSIS intent classifier. Given a user message and project context, classify it as ONE of these intents and return ONLY valid JSON, nothing else.
 
 Intents:
-- build: user wants to CREATE something NEW from scratch (new file, new app, new feature, new script)
+- build: user wants to CREATE something NEW from scratch (new file, new app, new feature, new script, add a new capability)
+- fix: user is reporting a BUG, PROBLEM, or MALFUNCTION in EXISTING code — something that used to or should work is broken, wrong, or missing behavior
 - convert: user wants to TRANSFORM or PORT existing code (convert, rewrite, refactor, port, turn X into Y, change language/format)
 - run: user wants to RUN, PREVIEW, LAUNCH, TEST, or SEE the existing project/app/file in action
 - question: user asking about their project, code, or any software development topic
@@ -83,9 +84,15 @@ Examples (follow these exactly):
 "explain what a REST API is" → {"intent": "question"}
 "build me a login page" → {"intent": "build"}
 "add a dark mode toggle" → {"intent": "build"}
-"can you fix the audio" → {"intent": "build"}
-"fix this bug" → {"intent": "build"}
-"the button doesn't work" → {"intent": "build"}
+"add a settings page" → {"intent": "build"}
+"can you fix the audio" → {"intent": "fix"}
+"fix this bug" → {"intent": "fix"}
+"the button doesn't work" → {"intent": "fix"}
+"it runs but doesn't produce any sounds" → {"intent": "fix"}
+"nothing happens when I click" → {"intent": "fix"}
+"the colors are wrong" → {"intent": "fix"}
+"it's broken" → {"intent": "fix"}
+"something is off with the layout" → {"intent": "fix"}
 "run the animal sound player" → {"intent": "run"}
 "let me see if it works" → {"intent": "run"}
 "open it in the browser" → {"intent": "run"}
@@ -105,6 +112,7 @@ Examples (follow these exactly):
 Return ONLY JSON:
 { "intent": "command", "command": "chassis.openProject" }
 { "intent": "build" }
+{ "intent": "fix" }
 { "intent": "convert" }
 { "intent": "run" }
 { "intent": "question" }
@@ -140,7 +148,7 @@ OFFTOPIC definition: No connection to software development, coding, architecture
       return { type: 'command', command: parsed.command as AvailableCommand };
     }
     
-    if (intent === 'build' || intent === 'convert' || intent === 'run') {
+    if (intent === 'build' || intent === 'convert' || intent === 'run' || intent === 'fix') {
       tracer.done(_sid, 'success', Date.now() - _t0, `classified as "${intent}"`, Math.ceil(systemPrompt.length / 4), Math.ceil(result.text.length / 4));
       return { type: intent };
     }

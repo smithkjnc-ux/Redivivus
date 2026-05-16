@@ -23,7 +23,7 @@ export interface MessageHandlerDeps {
   conversation: ChatMessage[];
   panel: vscode.WebviewPanel;
   isBuildRequest: (text: string) => Promise<boolean>;
-  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run'; command?: string; subtype?: string }>;
+  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix'; command?: string; subtype?: string }>;
   handleBuildRequest: (task: string, skipComplex?: boolean, isFixRequest?: boolean) => Promise<void>;
   buildFromVaultPrefill: () => { task?: string; targetFile?: string };
   refresh: () => void;
