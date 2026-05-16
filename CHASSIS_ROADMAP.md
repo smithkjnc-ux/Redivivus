@@ -1,13 +1,14 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 13: fix pipeline phantom file prevention + Web Audio lazy-init guidance*
+*Last updated: May 16, 2026 — Session 13: fix pipeline capture-phase Web Audio pattern + direct index.html fix*
 
 ## Recent Fixes — May 16, 2026 (Session 13: fix pipeline phantom files + Web Audio fix)
 
 | File | What Changed | Why | Risk |
 |------|-------------|-----|------|
-| `src/ui/chat/chatPanelMsgFix.ts` | Split to 178 lines (was 216). Added `allowedRels` set from collected source files. Worker prompt: added Rule 4 "only modify files listed above -- do NOT create new files". Worker prompt: added Rule 5 Web Audio lazy-init pattern. Supervisor prompt: added known-pattern hint for Web Audio / no sound. `parseFixResponse` now receives `allowedRels` and skips phantom paths. Skipped files logged in chat as `[WARN] Worker invented N non-existent files`. | Worker AI hallucinated `file.js` on every animal_sound_player fix run. Also never produced lazy-init AudioContext pattern which is the correct Chrome autoplay fix. | None -- fixes are still applied to all allowed paths; only phantom ones are blocked. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Split to 183 lines (was 216). Phantom file prevention (allowedRels filter). Supervisor/Worker prompts updated: replaced lazy-init promise chain pattern with capture-phase document.addEventListener('click', ..., {capture:true}) pattern. This creates AudioContext BEFORE any onclick fires so playSound needs no async chain. Eliminates the .catch() "Failed to initialize audio" error that appeared on Linux Chrome/file://. | Worker AI hallucinated file.js. Lazy-init promise chain (.then/.catch) failed on Linux Chrome on file:// because the async continuation lost the user-gesture context, causing DOMException inside .then() which hit the error .catch(). Capture-phase listener solves this definitively. | None -- fixes are still applied to all allowed paths; only phantom ones are blocked. |
+| `animal_sound_player/index.html` | Directly fixed with working capture-phase Web Audio pattern: var ac=null; document.addEventListener('click', create/resume ac, {capture:true}); playSound() calls go() directly, no promise chain. Sound functions (playBird/playCat/playDog/playWhistle) take ctx param. HTML entities instead of emoji literals. | Previous CHASSIS-generated versions either had phantom file.js, or used getAC().then() which failed on Linux Chrome with "Failed to initialize audio." | None -- verified working pattern. |
 | `src/ui/chat/chatPanelMsgFixUtils.ts` | New file (73 lines). Extracted `parseFixResponse`, `takeSnapshot`, `collectSourceFiles` from chatPanelMsgFix.ts. `parseFixResponse` gains `allowedRels: Set<string>` param and returns `{ fixes, skipped }`. | 200-line split required. | None. |
 
 ## Recent Fixes — May 16, 2026 (Session 13: fix pipeline + Guardian coverage)

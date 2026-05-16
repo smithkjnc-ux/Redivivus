@@ -61,10 +61,11 @@ Find EVERY bug contributing to this problem. For each bug:
 Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.
 
 Known patterns:
-- Web Audio API / no sound: if AudioContext is created at global/page-load scope, that IS the bug.
-  Chrome suspends AudioContext created before user gesture. Correct fix: lazy initialization --
-  let ac = null; function getAC() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); return ac.state === 'suspended' ? ac.resume().then(()=>ac) : Promise.resolve(ac); }
-  Then in click handler: getAC().then(ac => playXxx(ac));`;
+- Web Audio API / no sound: AudioContext created at page-load scope is ALWAYS wrong in Chrome.
+  Even with lazy init, an async getAC().then() chain loses the user-gesture context on Linux Chrome/file://.
+  Correct fix: capture-phase document click listener creates ac BEFORE any onclick fires, so playSound
+  calls sound functions directly -- no promise chain, no .catch(), no async at all.
+  Diagnose any global 'new AudioContext()' or any 'getAudioContext().then()' promise chain as CRITICAL.`;
 
     const diagRes = await routing.prompt(diagPrompt, 60_000);
     if (!diagRes.success || !diagRes.text?.trim()) {
@@ -100,10 +101,14 @@ RULES:
 2. Return the COMPLETE corrected file for every file that changes -- every line, no truncation
 3. Do NOT add unrequested features. Fix only what is diagnosed.
 4. ONLY modify files listed above (${fileNames}). Do NOT create new files or invent file paths.
-5. Web Audio API / no sound: use lazy AudioContext initialization -- create inside click handler, not at page load.
-   Pattern: let ac=null; function getAC(){ if(!ac) ac=new(window.AudioContext||window.webkitAudioContext)(); return ac.state==='suspended'?ac.resume().then(()=>ac):Promise.resolve(ac); }
-   In onclick: getAC().then(function(ctx){ playXxx(ctx); }).catch(function(e){ console.error(e); });
-   Each sound function receives ctx as a parameter -- never references a global audioContext.
+5. Web Audio API / no sound: use capture-phase document click listener. This fires BEFORE any onclick,
+   so AudioContext exists and is running by the time playSound() is called. NO promise chain in playSound.
+   Exact required pattern:
+   var ac=null;
+   document.addEventListener('click',function(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){console.error(e);}}if(ac&&ac.state==='suspended'){ac.resume();}},{capture:true});
+   function playSound(animal){if(!ac)return;function go(){if(animal==='bird')playBird(ac);else if(animal==='cat')playCat(ac);else if(animal==='dog')playDog(ac);else if(animal==='whistle')playWhistle(ac);}if(ac.state==='suspended'){ac.resume().then(go);}else{go();}}
+   Each sound function (playBird, playCat, playDog, playWhistle) takes ac as first parameter.
+   Remove any .catch() block that shows an error message -- if ac is null, just return silently.
 
 FORMAT (exact -- required):
 ## Fix: relative/path/to/file
