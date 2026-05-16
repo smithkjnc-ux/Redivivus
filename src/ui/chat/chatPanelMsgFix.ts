@@ -61,11 +61,15 @@ Find EVERY bug contributing to this problem. For each bug:
 Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.
 
 Known patterns:
-- Web Audio API / no sound: AudioContext created at page-load scope is ALWAYS wrong in Chrome.
-  Even with lazy init, an async getAC().then() chain loses the user-gesture context on Linux Chrome/file://.
-  Correct fix: capture-phase document click listener creates ac BEFORE any onclick fires, so playSound
-  calls sound functions directly -- no promise chain, no .catch(), no async at all.
-  Diagnose any global 'new AudioContext()' or any 'getAudioContext().then()' promise chain as CRITICAL.`;
+- Web Audio API / no sound (CRITICAL -- switch approach entirely): On Linux Chrome and file:// URLs,
+  AudioContext.destination silently routes to a null device -- no error is thrown, code runs, zero audio.
+  This is invisible from source code; it is a runtime environment problem not fixable by adjusting AudioContext.
+  CORRECT FIX: abandon Web Audio API output entirely. Generate PCM samples in JS, write a WAV blob,
+  play with new Audio(url).play(). This uses the HTML5 Audio pipeline which works on all systems.
+  Diagnose ANY use of AudioContext / OscillatorNode / createGain as CRITICAL when the bug is "no sound".
+  The WAV blob pattern:
+    function playSound(name) { var url = buildWAV(name); new Audio(url).play(); }
+    function buildWAV(name) { /* generate Float32Array samples, write 44-byte WAV header, return createObjectURL */ }`;
 
     const diagRes = await routing.prompt(diagPrompt, 60_000);
     if (!diagRes.success || !diagRes.text?.trim()) {
@@ -101,14 +105,13 @@ RULES:
 2. Return the COMPLETE corrected file for every file that changes -- every line, no truncation
 3. Do NOT add unrequested features. Fix only what is diagnosed.
 4. ONLY modify files listed above (${fileNames}). Do NOT create new files or invent file paths.
-5. Web Audio API / no sound: use capture-phase document click listener. This fires BEFORE any onclick,
-   so AudioContext exists and is running by the time playSound() is called. NO promise chain in playSound.
-   Exact required pattern:
-   var ac=null;
-   document.addEventListener('click',function(){if(!ac){try{ac=new(window.AudioContext||window.webkitAudioContext)();}catch(e){console.error(e);}}if(ac&&ac.state==='suspended'){ac.resume();}},{capture:true});
-   function playSound(animal){if(!ac)return;function go(){if(animal==='bird')playBird(ac);else if(animal==='cat')playCat(ac);else if(animal==='dog')playDog(ac);else if(animal==='whistle')playWhistle(ac);}if(ac.state==='suspended'){ac.resume().then(go);}else{go();}}
-   Each sound function (playBird, playCat, playDog, playWhistle) takes ac as first parameter.
-   Remove any .catch() block that shows an error message -- if ac is null, just return silently.
+5. Web Audio API / no sound: DO NOT use AudioContext/OscillatorNode. Use WAV blob + Audio element.
+   AudioContext.destination outputs silence on Linux Chrome (no error thrown) -- HTML5 Audio works.
+   Pattern: function playSound(name){new Audio(buildWAV(name)).play();}
+   buildWAV(name): allocate Float32Array, fill with sine/square wave segments using
+   phase accumulator (phase+=2*PI*freq/sr), apply attack/release envelope (Math.min(t*30,1)*Math.min((dur-t)*20,1)),
+   write standard 44-byte WAV header (RIFF/WAVE/fmt/data chunks, sr=44100, 16-bit mono),
+   return URL.createObjectURL(new Blob([buf],{type:'audio/wav'})).
 
 FORMAT (exact -- required):
 ## Fix: relative/path/to/file
