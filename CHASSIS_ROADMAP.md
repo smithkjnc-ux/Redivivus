@@ -1,7 +1,14 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 12: vault/template TODOs complete — Rule 18 templateWizard, 4 spec templates, 9 starter patterns, script category, 3 GitHub searches*
+*Last updated: May 16, 2026 — Session 13: fix pipeline 3-phase Supervisor/Worker/Guardian + Guardian coverage gaps closed*
+
+## Recent Fixes — May 16, 2026 (Session 13: fix pipeline + Guardian coverage)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFix.ts` | Rewrote fix pipeline: Phase 1 uses `routing.prompt()` (was `routeByComplexity`). Timeout 60s Phase 1 / 90s Phase 2. All HTML entities replaced with ASCII (`[1/3]`, `[FAIL]`, `[WARN]`). Added `modelLabel()` to show which AI handled each phase. | `routeByComplexity` routed short bug reports ("no sound") as simple → Groq (weakest), silently failing pipeline. HTML entities in conversation content rendered as literal text because WebView renderer escapes `&`. | None — explicit timeouts prevent silent failures. |
+| `src/ui/chat/chatPanelMsgSendAI.ts` | Guardian now runs for all Q&A responses (removed `hasCodeBlock` guard). Guardian also now runs for convert responses with code blocks (previously skipped with "would corrupt" comment). Convert uses prefixed task string so Guardian knows it's reviewing a conversion. | Q&A text-only answers bypassed Guardian entirely. Convert path had no Guardian review at all. User confirmed these were gaps to fix. | Low — Guardian errors are caught; original text used on error. Convert context prefix prevents Guardian from reverting conversions. |
 
 ## Recent Fixes — May 16, 2026 (Session 12: vault/template TODOs)
 

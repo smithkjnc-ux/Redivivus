@@ -99,11 +99,13 @@ export async function handleAIChat(
 
     // [WARN] hasCodeBlock must only match FENCED code blocks, not inline backticks.
     const hasCodeBlock = /```[a-z]*\n/i.test(finalText);
-    // Skip Guardian for conversions — it would corrupt the transformed output
-    if (!isConvert && routing.isGuardianActive() && hasCodeBlock) {
+    // [GUARDIAN] Q&A: always run (hasCodeBlock guard removed — was skipping text-only answers).
+    // Convert: run when response has a code block; prefix task so Guardian knows it's a conversion.
+    if (routing.isGuardianActive() && (!isConvert || hasCodeBlock)) {
       const workerAI = routing.getAvailableAI().ai;
       const blueprintCtx = chassis.isInitialized() ? (chassis.loadConfig()?.blueprint ? JSON.stringify(chassis.loadConfig()!.blueprint) : '') : '';
-      const review = await routing.guardianReview(userText, finalText, workerAI, blueprintCtx).catch(() => null);
+      const guardianTask = isConvert ? `Code conversion/transform task: ${userText}` : userText;
+      const review = await routing.guardianReview(guardianTask, finalText, workerAI, blueprintCtx).catch(() => null);
       if (review && !review.passed && review.correctedText) {
         finalText = review.correctedText + `\n\n---\n*Guardian (${review.guardianAI}) reviewed and corrected this response.*`;
       }
