@@ -1,7 +1,19 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 11: Fix intent — bug reports now trigger code diagnosis instead of build modal*
+*Last updated: May 16, 2026 — Session 12: vault/template TODOs complete — Rule 18 templateWizard, 4 spec templates, 9 starter patterns, script category, 3 GitHub searches*
+
+## Recent Fixes — May 16, 2026 (Session 12: vault/template TODOs)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/project/templateWizard.ts` | Fixed Rule 18: isSmallUnit + isTemplateRequest now use 50-token AI classifier calls instead of regex. Added `routing` param; keyword fallback only when routing unavailable. | [WARN][RULE 18] violation was documented in `[NEXT]` tag since initial implementation. | Low — AI calls add latency only when plan mode fires a template build. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Wire template wizard into plan-mode builds: after mode+gaps check, before `handleBuildRequest`, await `runTemplateWizard`. If wizard handled, pass `customizationPrompt` to build. | `runTemplateWizard` was previously unwired — no active caller. | Low — wizard only fires in plan mode; falls through on cancel/AI-classifier-no. |
+| `src/services/project/specTemplates.ts` | Added 4 spec templates: todo-list-html, calculator-html, markdown-preview-html, color-picker-html. Spec-only entries (no codeTemplate) — 4-5 lines each. | Only 1 spec template existed (canvas animation). Most common HTML builds now have pinned specs. | None — match() functions are narrow and checked before AI. |
+| `src/services/project/starterPatternsUtils.ts` | Added getDOMPatterns() (3 patterns: $/$$/onEvent/toggleClass), getStoragePatterns() (1: localStore), getStringPatterns() (5: capitalize/truncate/sleep/chunk/unique). | Vault starter set was JS-utility-only. DOM, storage, and string utilities fill the most common gaps. | None — hand-verified code, no external deps. |
+| `src/services/project/starterPatterns.ts` | Import and spread getDOMPatterns, getStoragePatterns, getStringPatterns. Updated `[NEXT]` to `[DONE]`. | Patterns were defined but not exported to the vault seeder. | None. |
+| `src/services/vault/vaultSeeder.ts` | Added 3 GitHub searches: localStorage wrapper, date formatting, useLocalStorage React hook. Updated `[NEXT]` to `[DONE]`. | Previous searches were all utility/api/auth — no storage or React hooks. | None — deduplicates on contentHash; skips if already present. |
+| `src/services/project/templateRegistryData.ts` | Added script category with 3 subcategories: Python data script, shell automation script, Node.js CLI tool. Updated `[TODO]` to `[DONE]`. | Template wizard had no script/automation path — common use case for solo devs. | None — registry paths are placeholders until templates are published. |
 
 ## Recent Fixes — May 16, 2026 (Session 11: Fix intent — bug reports diagnosed, not modal'd)
 
