@@ -36,6 +36,12 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
     return { type: 'command', command: 'chassis.openProject' };
   }
 
+  // "yes, apply the fix" / "yes fix it" / "go ahead" after a fix diagnosis → question (re-confirm context)
+  // [RULE 18] Structural: explicit yes/confirm + fix/apply keyword in short message.
+  if (/^(yes|yeah|yep|ok|okay|sure|go ahead|do it|apply|confirm)[\s,.]*(apply|it|the fix|fix it|please)?[.!]*$/i.test(t)) {
+    return { type: 'question' };
+  }
+
   // Install dependencies — "install deps", "npm install", "pip install", "install packages"
   // [RULE 18] Structural fast path: explicit package manager verb or "install" + dependency noun.
   if (/\b(npm|yarn|pnpm)\s+install\b/i.test(t) ||
