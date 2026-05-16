@@ -6,14 +6,10 @@
 //        to Groq/cheap models which produce thin output and cause silent pipeline failure.
 
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
+import * as fs from 'fs';
 import { MessageHandlerDeps } from './chatPanelMessages.js';
-
-const SOURCE_EXTS = new Set(['.html', '.js', '.ts', '.jsx', '.tsx', '.py', '.css', '.sh']);
-const SKIP_DIRS = new Set(['node_modules', '.git', 'out', 'dist', '.chassis', '__pycache__', '.venv']);
-const MAX_FILES = 10;
-const MAX_FILE_BYTES = 20_000;
+import { parseFixResponse, takeSnapshot, collectSourceFiles } from './chatPanelMsgFixUtils.js';
 
 function modelLabel(model: string): string {
   const m = (model || '').toLowerCase();
@@ -39,6 +35,8 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     conversation.push({ role: 'assistant', content: 'No source files found. Is the correct folder open?', timestamp: Date.now() });
     refresh(); return;
   }
+  const allowedRels = new Set(sourceFiles.map(f => f.rel));
+  const fileNames = sourceFiles.map(f => f.rel).join(', ');
   const filesBlock = sourceFiles.map(f => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
 
   // Phase 1: Supervisor diagnoses ALL bugs
@@ -60,7 +58,13 @@ Find EVERY bug contributing to this problem. For each bug:
 - What is wrong and why it causes this symptom
 - What the correct code should do
 
-Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.`;
+Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.
+
+Known patterns:
+- Web Audio API / no sound: if AudioContext is created at global/page-load scope, that IS the bug.
+  Chrome suspends AudioContext created before user gesture. Correct fix: lazy initialization --
+  let ac = null; function getAC() { if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)(); return ac.state === 'suspended' ? ac.resume().then(()=>ac) : Promise.resolve(ac); }
+  Then in click handler: getAC().then(ac => playXxx(ac));`;
 
     const diagRes = await routing.prompt(diagPrompt, 60_000);
     if (!diagRes.success || !diagRes.text?.trim()) {
@@ -86,13 +90,20 @@ Number each bug. Be specific -- name actual variable names, function names. Do N
 SUPERVISOR DIAGNOSIS:
 ${diagnosis}
 
-ORIGINAL SOURCE FILES:
+ORIGINAL SOURCE FILES (the ONLY files that exist in this project):
+${fileNames}
+
 ${filesBlock}
 
 RULES:
 1. Fix ALL bugs in the diagnosis -- do not skip any
 2. Return the COMPLETE corrected file for every file that changes -- every line, no truncation
 3. Do NOT add unrequested features. Fix only what is diagnosed.
+4. ONLY modify files listed above (${fileNames}). Do NOT create new files or invent file paths.
+5. Web Audio API / no sound: use lazy AudioContext initialization -- create inside click handler, not at page load.
+   Pattern: let ac=null; function getAC(){ if(!ac) ac=new(window.AudioContext||window.webkitAudioContext)(); return ac.state==='suspended'?ac.resume().then(()=>ac):Promise.resolve(ac); }
+   In onclick: getAC().then(function(ctx){ playXxx(ctx); }).catch(function(e){ console.error(e); });
+   Each sound function receives ctx as a parameter -- never references a global audioContext.
 
 FORMAT (exact -- required):
 ## Fix: relative/path/to/file
@@ -130,11 +141,12 @@ FORMAT (exact -- required):
     }
   } catch { guardianNote = 'Guardian: skipped (error)'; }
 
-  // Parse fix blocks and write files
-  const { fixes } = parseFixResponse(finalResponse, root);
+  // Parse fix blocks -- only writes files that exist in allowedRels (no phantom files)
+  const { fixes, skipped } = parseFixResponse(finalResponse, root, allowedRels);
   if (fixes.length === 0) {
+    const skipNote = skipped.length > 0 ? `\n[WARN] Worker invented ${skipped.length} file(s) not in project: ${skipped.join(', ')}` : '';
     conversation[conversation.length - 1].content =
-      `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\nWorker could not produce correctable file blocks. Describe the problem differently and try again.`;
+      `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\nWorker could not produce correctable file blocks. Describe the problem differently and try again.${skipNote}`;
     refresh(); return;
   }
 
@@ -149,6 +161,7 @@ FORMAT (exact -- required):
   }
 
   const fileList = written.map(f => `- \`${f}\``).join('\n');
+  const skipLine = skipped.length > 0 ? `\n[WARN] Worker invented ${skipped.length} non-existent file(s) -- skipped: ${skipped.join(', ')}` : '';
   const failLine = failed.length > 0 ? `\n[WARN] Could not write: ${failed.join(', ')}` : '';
   const previewToken = written.some(f => f.endsWith('.html'))
     ? `\n__PREVIEW_BROWSER__${path.join(root, written.find(f => f.endsWith('.html'))!)}|||END_PREVIEW_BROWSER__`
@@ -156,60 +169,10 @@ FORMAT (exact -- required):
 
   conversation[conversation.length - 1].content =
     `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\n` +
-    `**Fixed ${written.length} file${written.length !== 1 ? 's' : ''}** (Worker: ${workerLabel})\n${guardianNote}\n${fileList}${failLine}${previewToken}`;
+    `**Fixed ${written.length} file${written.length !== 1 ? 's' : ''}** (Worker: ${workerLabel})\n${guardianNote}\n${fileList}${skipLine}${failLine}${previewToken}`;
   refresh();
 
   if (written.length > 0) {
     try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: true, preserveFocus: true }); } catch { /* non-blocking */ }
   }
-}
-
-function parseFixResponse(text: string, root: string): { fixes: { rel: string; abs: string; content: string }[] } {
-  const fixes: { rel: string; abs: string; content: string }[] = [];
-  const fixPattern = /^## Fix:\s*(.+?)\s*\n```[a-z]*\n([\s\S]*?)```/gm;
-  let match: RegExpExecArray | null;
-  while ((match = fixPattern.exec(text)) !== null) {
-    const rel = match[1].trim().replace(/^\//, '');
-    const content = match[2].trimEnd();
-    if (rel && content) { fixes.push({ rel, abs: path.join(root, rel), content }); }
-  }
-  if (fixes.length === 0) {
-    const alt = /^## Fix:\s*(.+?)\s*\n([\s\S]*?)(?=^## Fix:|$)/gm;
-    while ((match = alt.exec(text)) !== null) {
-      const rel = match[1].trim().replace(/^\//, '');
-      const content = match[2].replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trimEnd();
-      if (rel && content && content.length > 10) { fixes.push({ rel, abs: path.join(root, rel), content }); }
-    }
-  }
-  return { fixes };
-}
-
-function takeSnapshot(root: string, relPaths: string[]): void {
-  try {
-    const snapDir = path.join(root, '.chassis', 'fix-snapshots', `fix-${Date.now()}`);
-    fs.mkdirSync(snapDir, { recursive: true });
-    for (const rel of relPaths) {
-      const src = path.join(root, rel);
-      if (fs.existsSync(src)) { fs.copyFileSync(src, path.join(snapDir, rel.replace(/\//g, '__'))); }
-    }
-  } catch { /* best-effort */ }
-}
-
-function collectSourceFiles(root: string): { rel: string; content: string }[] {
-  const results: { rel: string; content: string }[] = [];
-  function walk(dir: string, depth: number): void {
-    if (results.length >= MAX_FILES || depth > 4) { return; }
-    let entries: string[];
-    try { entries = fs.readdirSync(dir).sort(); } catch { return; }
-    for (const entry of entries) {
-      if (SKIP_DIRS.has(entry)) { continue; }
-      const full = path.join(dir, entry); const rel = path.relative(root, full);
-      let stat: fs.Stats; try { stat = fs.statSync(full); } catch { continue; }
-      if (stat.isDirectory()) { walk(full, depth + 1); continue; }
-      if (!SOURCE_EXTS.has(path.extname(entry).toLowerCase())) { continue; }
-      try { let c = fs.readFileSync(full, 'utf-8'); if (c.length > MAX_FILE_BYTES) { c = c.slice(0, MAX_FILE_BYTES) + '\n// ...'; } results.push({ rel, content: c }); } catch { continue; }
-      if (results.length >= MAX_FILES) { return; }
-    }
-  }
-  walk(root, 0); return results;
 }
