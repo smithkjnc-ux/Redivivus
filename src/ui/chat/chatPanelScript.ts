@@ -7,6 +7,7 @@ import { buildTemplatesScript } from './chatPanelScriptTemplates.js';
 import { buildInterviewScript } from './chatPanelScriptInterview.js';
 import { buildActionsScript } from './chatPanelScriptActions.js';
 import { buildGatesScript } from './chatPanelScriptGates.js';
+import { buildExpandedInterviewScript } from './chatPanelScriptExpandedInterview.js';
 
 export function buildChatScript(): string {
   return `
@@ -157,6 +158,7 @@ export function buildChatScript(): string {
         else if (msg.panelType === 'start-session') showStartSessionPanel();
         else if (msg.panelType === 'new-project') showNewProjectPanel(msg.suggestedParent, msg.prefillTask, !!msg.compact, !!msg.vaultOnly, msg.prefillAnswers);
         else if (msg.panelType === 'create-folder') showCreateFolderPanel(msg.prefillName, msg.pendingTask);
+        else if (msg.panelType === 'expanded-interview') showExpandedInterviewPanel(msg.prefillTask, msg.complexity);
         else showContentPanel(msg.title, msg.content);
       }
       if (msg.type === 'inject-text' && input && msg.text) { input.value = msg.text; input.focus(); }
@@ -177,5 +179,6 @@ export function buildChatScript(): string {
     ${buildInterviewScript()}
     ${buildActionsScript()}
     ${buildGatesScript()}
+    ${buildExpandedInterviewScript()}
   `;
 }

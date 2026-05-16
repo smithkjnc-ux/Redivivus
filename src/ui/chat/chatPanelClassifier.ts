@@ -28,6 +28,7 @@ export type AvailableCommand =
 export interface IntentResult {
   type: IntentType;
   command?: AvailableCommand;
+  subtype?: string;
 }
 
 export async function classifyIntent(
@@ -150,7 +151,6 @@ OFFTOPIC definition: No connection to software development, coding, architecture
   } catch (error) {
     if (_sid) tracer.done(_sid, 'fail', Date.now() - _t0, String(error).slice(0, 60));
     // Fallback: if classification fails, treat as question and continue to normal chat
-    console.log('[CHASSIS INTENT] AI classification failed, falling back to question:', error);
     return { type: 'question' };
   }
 }

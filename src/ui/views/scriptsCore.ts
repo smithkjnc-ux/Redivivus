@@ -72,7 +72,7 @@ export function getCoreScripts(): string {
       }
     });
 
-    // [TODO] Remove console.log from production code (vault list-item handler).
+    // [DONE] console.log removed from vault list-item handler (no console.log in this block).
     // [WARN] showTab is defined but called externally via inline onclick attributes — do not remove.
     function showTab(name, e) {
       document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));

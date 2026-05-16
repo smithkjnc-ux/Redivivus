@@ -5,6 +5,8 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import * as os from 'os';
+import * as vscode from 'vscode';
 import { RoutingService } from '../../services/ai/routingService.js';
 import { VaultService } from '../../services/vault/vaultService.js';
 import { ChatMessage } from './chatPanelHtml.js';
@@ -158,15 +160,29 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     return;
   }
 
-  // ── 4. Write back to the same file ───────────────────────────────
+  // ── 4. Write back — snapshot original for diff view first ────────
+  let tempOrigPath: string | undefined;
   try {
+    tempOrigPath = path.join(os.tmpdir(), `chassis-orig-${Date.now()}-${path.basename(absPath)}`);
+    fs.writeFileSync(tempOrigPath, originalContent, 'utf-8');
     fs.writeFileSync(absPath, newContent, 'utf-8');
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     ctx.logError(task, editPrompt, `Write failed: ${errMsg}`, promptLen);
-    appendMsg(ctx, `❌ Could not write \`${filePath}\`\n\n**Reason:** ${errMsg}`);
+    appendMsg(ctx, `&#x274C; Could not write \`${filePath}\`\n\n**Reason:** ${errMsg}`);
     if (ctx.onBuildFailed) { ctx.onBuildFailed(task, errMsg); }
     return;
+  }
+
+  // Diff stats: count lines that changed
+  const oldLines = originalContent.split('\n'); const newLines = newContent.split('\n');
+  const added = newLines.filter(l => !oldLines.includes(l)).length;
+  const removed = oldLines.filter(l => !newLines.includes(l)).length;
+  const diffSummary = `(+${added} / -${removed} lines)`;
+
+  // Open VS Code diff view — non-blocking, user can review what changed
+  if (tempOrigPath) {
+    vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempOrigPath), vscode.Uri.file(absPath), `CHASSIS Edit: ${path.basename(filePath)} ${diffSummary}`).then(undefined, () => {});
   }
 
   // ── 5. Save new blocks to vault (deduped by content hash) ────────
@@ -174,11 +190,11 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   if (vault) {
     const saved = await saveNewBlocksToVault(absPath, vault);
     if (saved > 0) {
-      vaultMsg = `\n💾 Saved **${saved}** new code block${saved !== 1 ? 's' : ''} to vault`;
+      vaultMsg = `\n&#x1F4BE; Saved **${saved}** new code block${saved !== 1 ? 's' : ''} to vault`;
     }
   }
 
   // ── 6. Done ───────────────────────────────────────────────────────
-  updateLastMsg(ctx, `✅ Fixed \`${filePath}\`${vaultMsg}`);
+  updateLastMsg(ctx, `&#x2705; Fixed \`${filePath}\` ${diffSummary}${vaultMsg}\n\n_Diff view opened — close it to dismiss._`);
   if (ctx.onBuildFinished) { ctx.onBuildFinished(task, [filePath]); }
 }

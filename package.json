@@ -173,6 +173,10 @@
         "title": "CHASSIS: Fix Last Terminal Error"
       },
       {
+        "command": "chassis.inspectElement",
+        "title": "CHASSIS: Inspect UI Element - Find Source Code"
+      },
+      {
         "command": "chassis.vaultDedup",
         "title": "CHASSIS: Vault - Find and Remove Duplicates"
       },
@@ -279,6 +283,11 @@
       {
         "command": "chassis.selfDiagnostic",
         "title": "CHASSIS: Run Self-Diagnostic",
+        "category": "CHASSIS"
+      },
+      {
+        "command": "chassis.showPipelineTrace",
+        "title": "CHASSIS: Show Pipeline Trace",
         "category": "CHASSIS"
       }
     ],

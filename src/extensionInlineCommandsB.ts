@@ -107,17 +107,38 @@ export function registerInlineCommandsB(
     registerStartRuntimeAnalysisCommand(context, chassisService, routingService, usageTracker, vaultService);
   } catch (e) { console.error('[CHASSIS] Failed to register chassis.startRuntimeAnalysis', e); }
 
-  // [TODO] chassis.startExpandedInterview — full expanded interview not yet built.
-  //        Wired to chassis.wizardRetrofit as a temporary fallback so the action
-  //        card in handleDeepBuild doesn't silently fail.
-  //        Replace with the real expanded interview flow when implemented.
+  // [DONE] chassis.startExpandedInterview — opens ChatPanel and triggers 5W interview form.
+  //        Previously forwarded to chassis.wizardRetrofit. Now wired to the real expanded interview.
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.startExpandedInterview', async () => {
-      await vscode.commands.executeCommand('chassis.wizardRetrofit');
+      const panel = ChatPanel.currentPanel || await vscode.commands.executeCommand<any>('chassis.openChat');
+      if (ChatPanel.currentPanel) {
+        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const config = root && chassisService?.isInitialized?.() ? chassisService.loadConfig?.() : null;
+        const prefillTask = config?.blueprint?.what || '';
+        (ChatPanel.currentPanel as any)._panel?.webview?.postMessage({
+          type: 'show-panel',
+          panelType: 'expanded-interview',
+          prefillTask,
+          complexity: null,
+        });
+        (ChatPanel.currentPanel as any)._panel?.reveal?.();
+      }
     })
   );
 
   // [CHASSIS] Terminal Error Awareness — capture terminal output for "Fix this error" injection
+  // [CHASSIS] UI Inspector — describe a UI element to find its source code and inject into chat
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.inspectElement', async () => {
+      const input = await vscode.window.showInputBox({ prompt: 'Describe the UI element (class name, id, or description)', placeHolder: 'e.g., .submit-button, #navbar, the login form' });
+      if (!input) { return; }
+      const { LensService } = await import('./services/lensService.js');
+      const lens = new LensService(null as any, null as any);
+      await lens.inspectAndInject({ description: input, className: input.startsWith('.') ? input.slice(1) : undefined, id: input.startsWith('#') ? input.slice(1) : undefined });
+    })
+  );
+
   registerTerminalErrorService(context);
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.injectTerminalError', () => {

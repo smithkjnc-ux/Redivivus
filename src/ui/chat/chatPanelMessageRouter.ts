@@ -191,6 +191,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     onSwitchAI: ChatPanel.onSwitchAI,
     onNewProject: ChatPanel.onNewProject,
     setLastModel: (model: string) => { (panel as any).state.lastModel = model; },
+    setBlueprintContext: (ctx: string) => { state.blueprintContext = ctx; },
     buildMode: state.buildMode,
     planInterview: state.planInterview,
   });

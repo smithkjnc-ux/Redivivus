@@ -17,11 +17,14 @@ import { buildHeaderInfo } from './chatPanelHeader.js';
 import { SetupProgressService, SetupProgress } from '../../services/project/setupProgressService.js';
 import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
 import { handlePanelMessage } from './chatPanelMessageRouter.js';
+import { loadLastSessionContext } from './chatPanelSessionResume.js';
 
 interface ChatPanelState {
   conversation: ChatMessage[];
   blueprintContext: string;
   lastModel?: string; // Track exact model from last AI response
+  buildMode?: 'plan' | 'direct';
+  planInterview?: import('./chatPanelPlanInterview.js').PlanInterviewState;
 }
 
 export class ChatPanel {
@@ -64,6 +67,7 @@ export class ChatPanel {
     this.usageTracker = usageTracker;
     this._panel = panel;
     this.loadBlueprintContext();
+    loadLastSessionContext(this.chassis, this.state.conversation);
     this._panel.webview.options = { enableScripts: true };
     this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('./chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
     this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
@@ -78,18 +82,7 @@ export class ChatPanel {
         this.refresh();
       }
     }));
-    // [CHASSIS] Build history restoration disabled for clean testing — re-enable after v1.0
-    // Restore last 3 result cards from build history so undo buttons survive restarts
-    // try {
-    //   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    //   if (root) {
-    //     const hist = new BuildHistoryService(root);
-    //     const cards = hist.getLastResultCards(3).reverse();
-    //     for (const card of cards) {
-    //       this.state.conversation.push({ role: 'assistant', content: card.resultCardToken, timestamp: Date.now() });
-    //     }
-    //   }
-    // } catch { /* never block startup */ }
+    // [DEAD] Build history restoration via BuildHistoryService.getLastResultCards() — disabled, causes chat tab duplication. Re-enable post-v1.0.
     this.refresh();
   }
 

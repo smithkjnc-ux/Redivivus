@@ -1,48 +1,108 @@
-// [SCOPE] Visual Lens Service (PHASE 4) — conceptually maps UI elements to source code.
-// [TODO] Implement UI Inspector Bridge and Element-to-Source Mapper.
-// [TODO] Integrate with guardianService.ts for data scrubbing.
+// [SCOPE] Visual Lens Service — maps UI element descriptions to source code for fix injection.
+// Workflow: user describes an element → grep project for class/id/tag → inject file context into chat.
+// [DONE] captureElement, translateToSource, injectContext stubs now implemented.
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AnalyzerService } from './analyzerService.js';
 import { GuardianService } from './ai/guardianService.js';
 
-/**
- * [SCOPE]
- * LensService provides the logic for the "Point-and-Click" context mapping.
- * It translates visual element metadata into actionable source-code references.
- * 
- * Architectural Flow:
- * 1. Capture: tagName, className, and data-source attributes from clicked element.
- * 2. Translate: Cross-reference against project_map.md using analyzerService.ts.
- * 3. Validate: Scrub sensitive data via guardianService.ts.
- * 4. Prompt: Inject snippet and instructions into the active AI session.
- */
+export interface ElementMetadata {
+  tagName?: string;
+  className?: string;
+  id?: string;
+  text?: string;          // inner text (first 60 chars)
+  description?: string;   // user's natural-language description
+}
+
+export interface SourceRef {
+  filePath: string;
+  line: number;
+  snippet: string;
+}
+
 export class LensService {
+  private _lastCapture: ElementMetadata | null = null;
+
   constructor(
     private analyzer: AnalyzerService,
     private guardian: GuardianService
   ) {}
 
-  /**
-   * [NEXT] Implement element capture from browser/webview bridge.
-   */
-  async captureElement(metadata: any): Promise<void> {
-    // [TODO] logic to capture tagName, className, data-source
+  /** Store element metadata from the webview bridge or user input. */
+  async captureElement(metadata: ElementMetadata): Promise<void> {
+    this._lastCapture = metadata;
   }
 
-  /**
-   * [NEXT] Implement source-map translation or heuristic mapping.
-   */
-  async translateToSource(metadata: any): Promise<{ filePath: string; line: number } | null> {
-    // [TODO] use analyzer to find the code responsible for the element
+  /** Search project files for the element's class, id, or tag. Returns the best match. */
+  async translateToSource(metadata: ElementMetadata): Promise<SourceRef | null> {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) { return null; }
+
+    // Build search terms from most-specific to least
+    const terms: string[] = [];
+    if (metadata.id) { terms.push(`id="${metadata.id}"`, `id='${metadata.id}'`, `#${metadata.id}`); }
+    if (metadata.className) { terms.push(...metadata.className.split(' ').filter(Boolean).map(c => `.${c}`), metadata.className); }
+    if (metadata.description) { terms.push(metadata.description); }
+    if (metadata.tagName) { terms.push(`<${metadata.tagName}`); }
+
+    for (const term of terms) {
+      const result = await searchProjectFiles(root, term);
+      if (result) { return result; }
+    }
     return null;
   }
 
-  /**
-   * [NEXT] Implement prompt injection with visual context.
-   */
-  async injectContext(snippet: string, sourceRef: { filePath: string; line: number }): Promise<void> {
-    // [TODO] Scrub snippet with guardian
-    // [TODO] Inject into ChatPanel or active AI session
+  /** Inject element context and source reference into the active ChatPanel conversation. */
+  async injectContext(snippet: string, sourceRef: SourceRef): Promise<void> {
+    const { ChatPanel } = await import('../ui/chat/chatPanel.js');
+    if (!ChatPanel.currentPanel) { return; }
+    const content = [
+      `&#x1F50D; **UI Inspector found:** \`${sourceRef.filePath}:${sourceRef.line}\``,
+      `\`\`\`\n${snippet}\n\`\`\``,
+      `_Type "fix this" or describe the change you want._`,
+    ].join('\n');
+    (ChatPanel.currentPanel as any).state.conversation.push({ role: 'assistant', content, timestamp: Date.now() });
+    ChatPanel.currentPanel.refresh();
+    vscode.window.showTextDocument(vscode.Uri.file(sourceRef.filePath), { preview: true, selection: new vscode.Range(Math.max(0, sourceRef.line - 1), 0, sourceRef.line, 0) });
+  }
+
+  /** High-level entry: capture → translate → inject. Called by chassis.inspectElement command. */
+  async inspectAndInject(metadata: ElementMetadata): Promise<void> {
+    await this.captureElement(metadata);
+    const ref = await this.translateToSource(metadata);
+    if (!ref) {
+      vscode.window.showWarningMessage(`CHASSIS: Could not find source for "${metadata.description || metadata.className || metadata.id || metadata.tagName}"`);
+      return;
+    }
+    await this.injectContext(ref.snippet, ref);
+  }
+}
+
+async function searchProjectFiles(root: string, term: string): Promise<SourceRef | null> {
+  const exts = ['.tsx', '.jsx', '.ts', '.js', '.html', '.vue', '.svelte'];
+  const skipDirs = new Set(['node_modules', '.chassis', 'out', 'dist', '.git']);
+  try {
+    for await (const filePath of walkDir(root, exts, skipDirs)) {
+      const lines = fs.readFileSync(filePath, 'utf-8').split('\n');
+      for (let i = 0; i < lines.length; i++) {
+        if (lines[i].includes(term)) {
+          const start = Math.max(0, i - 2); const end = Math.min(lines.length - 1, i + 4);
+          return { filePath: path.relative(root, filePath), line: i + 1, snippet: lines.slice(start, end + 1).join('\n') };
+        }
+      }
+    }
+  } catch { /* file read errors are non-fatal */ }
+  return null;
+}
+
+async function* walkDir(dir: string, exts: string[], skipDirs: Set<string>): AsyncGenerator<string> {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!skipDirs.has(entry.name)) { yield* walkDir(path.join(dir, entry.name), exts, skipDirs); }
+    } else if (exts.some(e => entry.name.endsWith(e))) {
+      yield path.join(dir, entry.name);
+    }
   }
 }

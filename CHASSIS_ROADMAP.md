@@ -1,7 +1,46 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10W: Rule 18 complete — all 5 remaining regex NL violations replaced with AI classifiers*
+*Last updated: May 16, 2026 — Session 10Y: All 10 bulletproof gaps closed — post-build guidance, install intent, 5W interview, API pings, diff preview, vault capture, session resume, console.log cleanup, UI inspector*
+
+## Recent Fixes — May 16, 2026 (Session 10X: Task #1 — Build→Run→Error→Fix loop)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelPostBuild.ts` | Created (107 lines). `detectPostBuildInfo()` — detects project type (html/node/python/go/rust/shell), entry file, run command, missing deps (package.json without node_modules; requirements.txt without venv). `buildPostBuildGuidance()` — returns markdown "What to do next" section with run command, install warning, "paste error here" invite. | After every build, users had no next-step guidance. Build → run → error → fix loop was invisible and manual. | None — guidance is advisory and appended after result card. |
+| `src/ui/chat/chatPanelBuild.ts` | Added `buildPostBuildGuidance` import. Modified single-file result card append to include `nextSteps` after result card and preview token. | Single-file builds had no post-build guidance. | None. |
+| `src/ui/chat/chatPanelChunked.ts` | Added `buildPostBuildGuidance` import. Modified multi-file result card append to include `nextSteps`. | Chunked builds had no post-build guidance. | None. |
+| `src/ui/chat/chatPanelClassifierOverrides.ts` | Added install-deps fast-path before run fast-path: "npm install", "pip install", "install dependencies" → `{ type: 'run', subtype: 'install' }`. | Users saying "install deps" after a build should get an automatic terminal install, not a build prompt. | None — falls through to AI classifier if not matched. |
+| `src/ui/chat/chatPanelClassifier.ts` | Added `subtype?: string` to `IntentResult` interface. | Required to distinguish install-deps from generic run intent in message handler. | None — new optional field, backward compatible. |
+| `src/ui/chat/chatPanelMessages.ts` | Added `subtype?: string` to `classifyIntent` return type. | TS compile error after adding subtype to IntentResult. | None. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Extended run intent handler: checks `intent.subtype === 'install'` — detects package manager (package.json/requirements.txt/Cargo.toml/go.mod), opens terminal, runs appropriate install command. Falls back to generic "open main file" for non-install run intent. | "install deps" chat messages were going unhandled. Terminal install is cleaner than directing user to a command manually. | Low — fails gracefully if no manifest found. |
+
+## Recent Fixes — May 16, 2026 (Session 10Y: Tasks #5–#10 — API pings, diff preview, vault capture, session resume, console.log, UI inspector)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/selfDiagnosticChecks.ts` | Replaced fake `[TODO]` ping with real `fetch()` calls to each provider's model-list endpoint (Gemini, OpenAI, Claude, Groq, xAI, Kimi). 5-second AbortController timeout. Returns pass/fail/warn based on HTTP status. | Diagnostic was always returning pass regardless of whether the API key worked. Users couldn't tell if their key was valid or their network was blocked. | Low — read-only GET requests, 5s timeout, errors caught and returned as warn/fail. |
+| `src/ui/chat/chatPanelEditBuild.ts` | Added `import * as os`, `import * as vscode`. Before writing edited file: snapshot original to temp path. After writing: compute +N/-N line diff stats, open `vscode.diff()` with temp → final so user can see exactly what changed. Success message includes diff stats. | Edit builds silently overwrote files with no visibility into what changed. Hard to review AI edits. | Low — diff view is non-blocking, write always happens. Temp file cleanup is best-effort. |
+| `src/ui/chat/chatPanelBuildUtils.ts` | Added `import * as os`. After vault-only build: write code to temp file with inferred extension, call `autoCaptureFile()`, delete temp. Shows "Saved N snippets to vault" in result. Changed `[NEXT]` to `[DONE]`. | Vault-only build results were never captured to vault — the [NEXT] stub was never implemented. | Low — autoCaptureFile failures are caught, never block the build flow. |
+| `src/ui/chat/chatPanelSessionResume.ts` | Created (52 lines). `loadLastSessionContext()` — reads most recent session JSON from `.chassis/sessions/`, surfaces goal/completed/inProgress/nextSessionStart in chat if session is < 48h old. | Chat panel started blank every time — no reminder of what was in progress. Session context helps users resume naturally without re-reading their notes. | None — read-only, push to conversation array only. |
+| `src/ui/chat/chatPanel.ts` | Added `loadLastSessionContext` import + call in constructor after `loadBlueprintContext`. | Wire point for session resume. | None — only adds a message if a recent session exists. |
+| `src/ui/map/mapScriptActions.ts` | Removed 2 debug `console.log` calls injected into the map webview script (startup + canvas check). Kept `console.error` on abort condition. | console.log in webview-injected scripts leaks to the browser console of every user. Debug noise. | None — removed debug logs only. `console.error` abort kept. |
+| `src/ui/views/scriptsCore.ts` | Changed `[TODO]` to `[DONE]` at line 75 — no actual console.log was present in that block. | Stale TODO annotation. | None. |
+| `src/ui/chat/chatPanelClassifier.ts` | Removed `console.log` from AI classification error catch block. | Classification failures happen on every misrouted request — the log was noisy extension output. Fallback to `question` is already safe without logging. | None. |
+| `src/services/lensService.ts` | Implemented 3 stubs: `captureElement` (stores metadata), `translateToSource` (async walks project files, grepping for class/id/tag/description), `injectContext` (posts found source + snippet to ChatPanel, opens file at matching line). Added `inspectAndInject` high-level entry. Added `walkDir` async generator and `searchProjectFiles` helper. | All 3 methods were empty stubs — the UI Inspector was completely non-functional. | Low — file walk is limited to src/components/app directories, skips node_modules/out. Read-only. |
+| `src/extensionInlineCommandsB.ts` | Added `chassis.inspectElement` command: InputBox asks for element description (class, id, or natural text), then calls `lens.inspectAndInject()`. | LensService was implemented but never registered as a callable command. | None. |
+| `package.json` | Added `chassis.inspectElement` command registration. | Required for VS Code to recognize the command. Without this, it silently fails. | None. |
+
+## Recent Fixes — May 16, 2026 (Session 10X continued: Task #4 — Expanded 5W Interview panel)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelScriptExpandedInterview.ts` | Created (98 lines). `buildExpandedInterviewScript()` — generates JS `showExpandedInterviewPanel(prefillTask, complexity)`. Single-page scrollable form with 5 sections (WHO/WHAT/WHERE/WHEN/WHY), 7 standard-tier questions (choice+text), submit → posts `expanded-interview-submit`. Skip button posts with `skipped:true`. | Expanded interview panel had no webview UI — the `show-panel: expanded-interview` message was silently ignored. | None — ASCII-only JS per Rule 13. |
+| `src/ui/chat/chatPanelScript.ts` | Added `buildExpandedInterviewScript` import and call in script footer. Added `expanded-interview` case to `show-panel` handler. | Webview now handles the panel type message from orchestrator and `chassis.startExpandedInterview`. | None. |
+| `src/ui/chat/chatPanelMsgExpandedInterview.ts` | Created (41 lines). `handleExpandedInterviewSubmit()` — compiles 5W answers into a context string, calls `deps.setBlueprintContext()` to inject into build pipeline, then calls `handleBuildRequest` with the prefill task. | Extracted from chatPanelMessages.ts to keep it under 200 lines. | None. |
+| `src/ui/chat/chatPanelMessages.ts` | Added `setBlueprintContext?` to `MessageHandlerDeps`. Added `expanded-interview-submit` handler delegating to new sub-module. Added import for `handleExpandedInterviewSubmit`. | Interface needed `setBlueprintContext` so the interview handler can inject context into the build pipeline. | None — optional field, backward compatible. |
+| `src/ui/chat/chatPanelMessageRouter.ts` | Added `setBlueprintContext: (ctx: string) => { state.blueprintContext = ctx; }` to deps construction. | Wires the setter from the panel state into the message handler deps. | None. |
+| `src/extensionInlineCommandsB.ts` | Updated `chassis.startExpandedInterview` command: now opens ChatPanel (or focuses existing) and posts `show-panel: expanded-interview` with `prefillTask` from blueprint.what. Removed `[TODO]` tag, added `[DONE]`. | Was just forwarding to `chassis.wizardRetrofit`. Now triggers the real expanded interview form. | Low — uses `(panel as any)._panel` accessor like other command handlers. |
 
 ## Recent Fixes — May 16, 2026 (Session 10W: Rule 18 complete — all remaining regex NL violations fixed)
 

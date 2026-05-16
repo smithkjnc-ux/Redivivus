@@ -120,6 +120,30 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     }
     const fs = require('fs') as typeof import('fs');
     const path = require('path') as typeof import('path');
+
+    // Install deps subtype: detect package manager and run install in terminal
+    if (intent.subtype === 'install') {
+      const hasPkg = fs.existsSync(path.join(root, 'package.json'));
+      const hasReqs = fs.existsSync(path.join(root, 'requirements.txt'));
+      const hasCargo = fs.existsSync(path.join(root, 'Cargo.toml'));
+      const hasGoMod = fs.existsSync(path.join(root, 'go.mod'));
+      let installCmd = 'npm install';
+      let depsLabel = 'Node.js';
+      if (hasReqs && !hasPkg) { installCmd = 'pip install -r requirements.txt'; depsLabel = 'Python'; }
+      else if (hasCargo) { installCmd = 'cargo build'; depsLabel = 'Rust'; }
+      else if (hasGoMod) { installCmd = 'go mod download'; depsLabel = 'Go'; }
+      else if (!hasPkg && !hasReqs) {
+        conversation.push({ role: 'assistant', content: 'No package.json or requirements.txt found — nothing to install.', timestamp: Date.now() });
+        refresh(); return;
+      }
+      const terminal = vscode.window.createTerminal(`CHASSIS: Install (${depsLabel})`);
+      terminal.show();
+      terminal.sendText(installCmd);
+      conversation.push({ role: 'assistant', content: `&#x23F3; Running \`${installCmd}\` in terminal...`, timestamp: Date.now() });
+      refresh(); return;
+    }
+
+    // Default run: open main entry file
     const candidates = ['index.html', 'main.html', 'index.js', 'main.js', 'app.js', 'main.py', 'app.py', 'index.py'];
     const main = candidates.find(f => fs.existsSync(path.join(root, f)));
     if (main) {

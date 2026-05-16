@@ -4,7 +4,6 @@
 
 export const MAP_SCRIPT_ACTIONS = `
   // --- Initialization ---
-  console.log('[CHASSIS Map] MAP_SCRIPT IIFE started');
   let vs;
   try { vs = acquireVsCodeApi(); } catch(e) { vs = window.vscode || null; }
 
@@ -12,7 +11,6 @@ export const MAP_SCRIPT_ACTIONS = `
   const sidePanel = document.getElementById('side-panel');
   const toast = document.getElementById('toast');
 
-  console.log('[CHASSIS Map] canvas el:', canvas, '| sidePanel el:', sidePanel);
   if (!canvas || !sidePanel) { console.error('[CHASSIS Map] ABORT: canvas or sidePanel not found'); return; }
 
   const ctx = canvas.getContext('2d');

@@ -4,8 +4,19 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { BuildRequestDeps, classifyIntent, isBuildRequest, handleBuildRequest } from './chatPanelIntent.js';
 import { ChatPanel } from './chatPanel.js';
+
+/** Validates that a build root is a legitimate user project directory, not the CHASSIS extension folder or other invalid paths. */
+export function isValidBuildRoot(root: string | undefined): root is string {
+  if (!root || !fs.existsSync(root)) { return false; }
+  // Never build into the CHASSIS extension directory or any VS Code extensions dir
+  const lower = root.toLowerCase();
+  if (lower.includes('/extensions/chassis') || lower.includes('\\extensions\\chassis')) { return false; }
+  if (lower.includes('/resources/app/extensions/') || lower.includes('\\resources\\app\\extensions\\')) { return false; }
+  return true;
+}
 
 export function panelBuildRequestDeps(panel: ChatPanel): BuildRequestDeps {
   return {
@@ -20,6 +31,7 @@ export function panelBuildRequestDeps(panel: ChatPanel): BuildRequestDeps {
     pendingTask: (panel as any)._pendingTask,
     setPendingTask: (t) => { (panel as any)._pendingTask = t; },
     setActiveBuildCtx: (ctx) => { (panel as any)._activeBuildCtx = ctx; },
+    buildMode: (panel as any).state.buildMode,
   };
 }
 
@@ -89,10 +101,27 @@ export async function panelVaultOnlyBuild(panel: ChatPanel, task: string): Promi
   }
 
   const code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
-  // [NEXT] Auto-save snippet to vault using autoCaptureFile once vault API is available here
+
+  // Auto-capture snippet to vault via temp file — uses full extraction + dedup + quality gate
+  // [DONE] was [NEXT] — vault API is accessible via (panel as any).vault
+  let vaultCapture = '';
+  const vault = (panel as any).vault;
+  if (vault) {
+    try {
+      const ext = /python|\.py\b/i.test(task) ? '.py' : /html/i.test(task) ? '.html' : /css/i.test(task) ? '.css' : '.js';
+      const tmpPath = path.join(os.tmpdir(), `chassis-snippet-${Date.now()}${ext}`);
+      fs.writeFileSync(tmpPath, code, 'utf-8');
+      const { autoCaptureFile } = await import('../../services/vault/vaultAutoCapture.js');
+      const projectName = (panel as any).chassis?.isInitialized?.() ? ((panel as any).chassis.loadConfig()?.projectName || 'snippets') : 'snippets';
+      const captured = await autoCaptureFile(tmpPath, projectName, vault, task);
+      try { fs.unlinkSync(tmpPath); } catch { /* temp cleanup best-effort */ }
+      if (captured.newItems > 0) { vaultCapture = `\n&#x1F4BE; Saved **${captured.newItems}** snippet${captured.newItems !== 1 ? 's' : ''} to vault`; }
+    } catch { /* never block on vault failure */ }
+  }
+
   state.conversation.push({
     role: 'assistant',
-    content: `✅ Snippet ready — use the Create File button below to save it.\n\`\`\`\n${code}\n\`\`\``,
+    content: `&#x2705; Snippet ready — use the Create File button below to save it.${vaultCapture}\n\`\`\`\n${code}\n\`\`\``,
     timestamp: Date.now(),
   });
   panel.refresh();

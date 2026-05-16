@@ -7,12 +7,14 @@ import { getPhaseUndoService } from '../../services/phaseUndoService.js';
 import { BuildContext } from './chatPanelBuild.js';
 import { generateClarifyQuestions, encodeClarifyToken, formatAnswersForPrompt } from './chatPanelClarify.js';
 import { encodeStoryToken, buildResultCard } from './chatPanelStory.js';
+import { buildPostBuildGuidance } from './chatPanelPostBuild.js';
 import { generateDocs } from './chatPanelDocs.js';
 import { SnapshotService } from '../../services/snapshotService.js';
 import { autoCaptureFiles } from '../../services/vault/vaultAutoCapture.js';
 import { BuildLedger } from '../../services/build/buildLedgerService.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService.js';
 import { runFileBuildLoop, FileBuildLoopResult } from './chatPanelChunkedLoop.js';
+import { tracer } from '../../services/pipelineTracer.js';
 
 export function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
   ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined });
@@ -94,11 +96,12 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
   interface PlanEntry { filename: string; purpose: string; }
   let filePlan: PlanEntry[] = [];
 
+  const _planT0 = Date.now(); const _planSid = tracer.step('SUPERVISOR', supervisorLabel, `Planning ${task.slice(0, 60)}`);
   try {
     const res = await (workerLabel
       ? (async () => { const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 30_000); const { callProvider } = await import('../../services/ai/routingProviders.js'); return callProvider(supervisor, planPrompt, f); })()
       : routing.prompt(planPrompt, 30_000));
-    if (!res.success) { throw new Error(res.error || 'Planning step failed'); }
+    if (!res.success) { tracer.done(_planSid, 'fail', Date.now() - _planT0, res.error || 'failed'); throw new Error(res.error || 'Planning step failed'); }
     const planTokens = Math.ceil(res.text.length / 4);
     ledger.record(supervisor, worker ? 'supervisor' : 'solo', 'planned', planTokens);
     const planCost = (planTokens / 1_000_000) * 0.30;
@@ -109,6 +112,7 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) { throw new Error('AI returned empty plan'); }
     filePlan = parsed.map((e: any) => ({ filename: e.filename || e.file || 'src/output.py', purpose: e.purpose || '' }));
+    tracer.done(_planSid, 'success', Date.now() - _planT0, `${filePlan.length} files planned`, Math.ceil(planPrompt.length / 4), planTokens);
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     ctx.logError(task, planPrompt, `Build plan failed: ${errMsg}`, promptLen);
@@ -150,8 +154,13 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
   // Final result card
   const ledgerSummary = ledger.hasData() ? ledger.getSummary() : undefined;
   const resultCard = buildResultCard(builtFiles, relevant.length, totalTokens, totalCost, elapsed, snapshotId, capture, false, ledgerSummary);
-  appendMsg(ctx, `${resultCard}`, totalTokens, totalCost);
+  const htmlFile = builtFiles.find(f => f.endsWith('.html'));
+  const previewToken = htmlFile ? `\n__PREVIEW_BROWSER__${path.join(root, htmlFile)}|||END_PREVIEW_BROWSER__` : '';
+  const nextSteps = buildPostBuildGuidance(root, builtFiles);
+  appendMsg(ctx, `${resultCard}${previewToken}${nextSteps}`, totalTokens, totalCost);
 
+  tracer.vault('save', `${builtFiles.length} files saved to vault`);
+  tracer.end(builtFiles, totalTokens, totalCost);
   if (ctx.onBuildFinished) { ctx.onBuildFinished(task, builtFiles); }
 
   // Build history

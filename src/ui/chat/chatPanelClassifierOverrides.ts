@@ -36,6 +36,15 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
     return { type: 'command', command: 'chassis.openProject' };
   }
 
+  // Install dependencies — "install deps", "npm install", "pip install", "install packages"
+  // [RULE 18] Structural fast path: explicit package manager verb or "install" + dependency noun.
+  if (/\b(npm|yarn|pnpm)\s+install\b/i.test(t) ||
+      /\bpip\s+install\b/i.test(t) ||
+      /\binstall\s+(the\s+)?(packages?|dependencies|deps|modules|requirements?)\b/i.test(t) ||
+      /\binstall\s+dep(endencies)?\b/i.test(t)) {
+    return { type: 'run', subtype: 'install' };
+  }
+
   // Run / preview — "run the app", "launch the sound player", "open in browser", "let me see it"
   // [RULE 18] Structural fast path: explicit run/launch/preview/test verb + subject or explicit browser mention.
   if (/\b(run|launch|preview|start|execute|test)\s+(the\s+|my\s+|it\s+)?(app|program|project|player|game|site|page|script|server|it)\b/i.test(t) ||

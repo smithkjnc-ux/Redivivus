@@ -14,6 +14,7 @@ import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleO
 import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne } from './chatPanelMsgArchitect.js';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial.js';
 import { handleMapContext } from './chatPanelMsgMapContext.js';
+import { handleExpandedInterviewSubmit } from './chatPanelMsgExpandedInterview.js';
 
 export interface MessageHandlerDeps {
   chassis: ChassisService;
@@ -22,7 +23,7 @@ export interface MessageHandlerDeps {
   conversation: ChatMessage[];
   panel: vscode.WebviewPanel;
   isBuildRequest: (text: string) => Promise<boolean>;
-  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run'; command?: string }>;
+  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run'; command?: string; subtype?: string }>;
   handleBuildRequest: (task: string, skipComplex?: boolean, isFixRequest?: boolean) => Promise<void>;
   buildFromVaultPrefill: () => { task?: string; targetFile?: string };
   refresh: () => void;
@@ -32,6 +33,7 @@ export interface MessageHandlerDeps {
   onNewProject?: (name: string, answers: Record<string, string>, folderPath?: string) => Promise<void>;
   buildMode?: 'plan' | 'direct';
   planInterview?: import('./chatPanelPlanInterview.js').PlanInterviewState;
+  setBlueprintContext?: (ctx: string) => void;
 }
 
 
@@ -184,5 +186,8 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
 
   } else if (msg.type === 'fix-terminal-error') {
     await handleFixTerminalError(msg, deps, conversation, refresh);
+
+  } else if (msg.type === 'expanded-interview-submit') {
+    await handleExpandedInterviewSubmit(msg, deps, conversation, refresh);
   }
 }

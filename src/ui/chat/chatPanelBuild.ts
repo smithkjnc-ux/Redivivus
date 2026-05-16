@@ -11,6 +11,7 @@ import { UsageTracker } from '../../services/usageTracker.js';
 import { findRelevantByTask, VaultSearchResult } from '../../services/vault/buildFromVaultSearch.js';
 import { ChatMessage } from './chatPanelHtml.js';
 import { extractNarrator, buildResultCard } from './chatPanelStory.js';
+import { buildPostBuildGuidance } from './chatPanelPostBuild.js';
 import { BuildLedger } from '../../services/build/buildLedgerService.js';
 import * as Inf from './chatPanelBuildInference.js';
 import * as Worker from './chatPanelBuildWorker.js';
@@ -147,7 +148,8 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const elapsed = (Date.now() - buildStart) / 1000;
   const resultCard = buildResultCard([relPath, ...scaffoldedFiles], searchResult.items.length, totalTokens, totalCost, elapsed, snapshotId, 0, !!existingTarget, ledgerSummary);
   const previewToken = relPath.endsWith('.html') ? `\n__PREVIEW_BROWSER__${absPath}|||END_PREVIEW_BROWSER__` : '';
-  appendMsg(ctx, `${narration ? '📝 ' + narration + '\n\n' : ''}${resultCard}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${previewToken}`);
+  const nextSteps = buildPostBuildGuidance(root, [relPath, ...scaffoldedFiles]);
+  appendMsg(ctx, `${narration ? '&#x1F4DD; ' + narration + '\n\n' : ''}${resultCard}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${previewToken}${nextSteps}`);
 
   tracer.vault('save', `${relPath} → vault`);
   tracer.end([relPath, ...scaffoldedFiles], totalTokens, totalCost);
