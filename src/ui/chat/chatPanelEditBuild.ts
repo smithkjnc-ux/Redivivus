@@ -14,6 +14,7 @@ export interface EditBuildContext {
   task: string;        // the original fix prompt
   issueType: string;   // 'todo' | 'uncommented'
   root: string;
+  blueprintContext?: string; // project 5W context — passed to AI so edits respect project scope
   routing: RoutingService;
   vault?: VaultService;
   conversation: ChatMessage[];
@@ -77,8 +78,9 @@ function appendMsg(ctx: EditBuildContext, content: string): void {
 
 // [SCOPE] Main entry point — called instead of runSingleFileBuild for todo/uncommented fix types
 export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
-  const { filePath, task, issueType, root, routing, vault, conversation } = ctx;
+  const { filePath, task, issueType, root, blueprintContext, routing, vault, conversation } = ctx;
   const absPath = path.join(root, filePath);
+  const bpSection = blueprintContext ? `\nPROJECT CONTEXT:\n${blueprintContext}\n` : '';
 
   // ── 1. Read the file ──────────────────────────────────────────────
   let originalContent: string;
@@ -107,7 +109,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
       useExcerpt = true;
       editPrompt =
         `Edit this excerpt from \`${filePath}\` (lines ${ex.start + 1}–${ex.end + 1}):\n\`\`\`\n${ex.excerpt}\n\`\`\`\n\n` +
-        `TASK: ${task}\n\n` +
+        `TASK: ${task}${bpSection}\n` +
         `RULES:\n` +
         `- Return ONLY the modified excerpt (same line range, no fences, no explanation)\n` +
         `- Change [TODO] to [DONE] once the task is implemented\n` +
@@ -116,7 +118,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     } else {
       editPrompt =
         `Edit this file \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
-        `TASK: ${task}\n\n` +
+        `TASK: ${task}${bpSection}\n` +
         `RULES:\n` +
         `- Return ONLY the complete updated file (no fences, no explanation)\n` +
         `- Change [TODO] to [DONE] once implemented\n` +
@@ -127,7 +129,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     // issueType === 'uncommented' — add [SCOPE] / [WARN] tags, never modify logic
     editPrompt =
       `Add CHASSIS annotation comments to \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
-      `TASK: ${task}\n\n` +
+      `TASK: ${task}${bpSection}\n` +
       `RULES:\n` +
       `- Return ONLY the complete updated file (no fences, no explanation)\n` +
       `- Add \`// [SCOPE]\` at line 1 describing what this file does in one sentence\n` +

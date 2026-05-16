@@ -1,7 +1,17 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10S: Rule 18 full audit — AI classifiers replace all critical regex NL decisions*
+*Last updated: May 16, 2026 — Session 10T: Blueprint context wired into edit builds + auto-create 5W inference + vagueness warning*
+
+## Recent Fixes — May 16, 2026 (Session 10T: Blueprint context gaps closed)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuildAutoCreate.ts` | Created (55 lines). `autoCreateProject()` — uses `extractBlueprintFromPrompt` to AI-infer all 5W fields from task. Writes full config.json + blueprint.md. Returns `{ dir, blueprint, blueprintContext }`. | Auto-create previously wrote literal "?" for who/where/why — blueprint was hollow. AI now fills all fields from the user's request. | Low — fields default to empty string if AI can't infer, never hard-errors. |
+| `src/ui/chat/chatPanelBuildRunner.ts` | Removed inline `autoCreateProject` block. Added import for `chatPanelBuildAutoCreate.ts`. After auto-create: `deps.blueprintContext` refreshed with enriched context. Added vagueness warning if 2+ blueprint fields remain empty (shows action card to refine blueprint). `isSimpleUnit` regex replaced with AI classifier ("snippet or project?"). | Blueprint context was not refreshed after auto-create — build pipeline received stale/empty context. Also Rule 18 fix for `isSimpleUnit`. | Low — vagueness warning is advisory only; build proceeds regardless. |
+| `src/ui/chat/chatPanelEditBuild.ts` | Added `blueprintContext?: string` to `EditBuildContext`. Injected `PROJECT CONTEXT:\n${blueprintContext}` section into all three edit prompt variants (excerpt, full-file, uncommented). | Edit builds had no access to the 5W blueprint — AI edited files without knowing the project's who/what/where/why. Edits could drift out of scope or assume wrong context. | None — bpSection is empty string if no context, backward compatible. |
+| `src/ui/chat/chatPanelEditHandler.ts` | Removed `'blueprintContext'` from `Omit<BuildRequestDeps, ...>` type. Added `blueprintContext: deps.blueprintContext` to `EditBuildContext` construction. | Required to pass blueprint context from webview message deps into the edit build pipeline. | None. |
+| `src/ui/chat/chatPanelMessageRouter.ts` | Added `blueprintContext: state.blueprintContext` to `handleEditRequest` call. | The edit request handler was receiving deps without blueprint context — now wired from panel state. | None. |
 
 ## Recent Fixes — May 16, 2026 (Session 10S: Rule 18 — full audit, 4 critical fixes + 6 flagged)
 

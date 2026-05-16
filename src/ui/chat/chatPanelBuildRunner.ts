@@ -8,10 +8,10 @@ import * as os from 'os';
 import { BuildRequestDeps, _pendingPlacements } from './chatPanelIntent.js';
 import { BuildContext, runSingleFileBuild, runChunkedBuild, isChunkedBuildRequest } from './chatPanelBuild.js';
 import { handleComplexityRoutedBuild, OrchestratorDeps } from './chatPanelOrchestrator.js';
-import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor.js';
 import { VaultSearchResult } from '../../services/vault/buildFromVaultSearch.js';
 import { isValidBuildRoot } from './chatPanelBuildUtils.js';
-import { deriveFileBase } from './chatPanelBuildInference.js';
+import { autoCreateProject } from './chatPanelBuildAutoCreate.js';
+import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor.js';
 
 // [WARN] Always use LIVE workspace folder — chassis service root can be stale from activation
 // [WARN] ~/projects itself may be open as workspace — must reject it as a build root or files land in the container
@@ -29,17 +29,6 @@ function getLiveRoot(deps: BuildRequestDeps): string | undefined {
   return undefined;
 }
 
-// Auto-creates a named project folder with minimal CHASSIS structure for "Just Build" with no folder open
-async function autoCreateProject(task: string, deps: BuildRequestDeps): Promise<string> {
-  const slug = await deriveFileBase(task, deps.routing);
-  const projectsDir = vscode.workspace.getConfiguration('chassis').get<string>('projectsDirectory', '~/projects').replace('~', os.homedir());
-  const projectDir = path.join(projectsDir, slug);
-  fs.mkdirSync(path.join(projectDir, '.chassis'), { recursive: true });
-  const config = { projectName: slug, initialized: true, blueprint: { what: task.slice(0, 200) } };
-  fs.writeFileSync(path.join(projectDir, '.chassis', 'config.json'), JSON.stringify(config, null, 2));
-  fs.writeFileSync(path.join(projectDir, '.chassis', 'blueprint.md'), `# ${slug}\n\n**What:** ${task}\n`);
-  return projectDir;
-}
 
 export async function runBuildAfterGates(
   task: string,
@@ -64,9 +53,35 @@ export async function runBuildAfterGates(
     // Just Build + no folder → auto-create named project folder, continue to build
     if (deps.buildMode === 'direct' && !skipComplex) {
       try {
-        root = await autoCreateProject(task, deps);
+        const created = await autoCreateProject(task, deps);
+        root = created.dir;
         autoCreatedProject = true;
-        // root is now set — fall through to build below
+        deps.blueprintContext = created.blueprintContext; // refresh so the build pipeline has full 5W context
+
+        // Warn if 2+ fields couldn't be inferred — user asked to just build, so we proceed, but flag it
+        const emptyCount = [created.blueprint.who, created.blueprint.where, created.blueprint.why].filter(v => !v).length;
+        if (emptyCount >= 2) {
+          const fieldList = [
+            `  - **What:** ${created.blueprint.what || task.slice(0, 80)}`,
+            `  - **Who:** ${created.blueprint.who   || '_Not specified — AI will assume personal use_'}`,
+            `  - **Where:** ${created.blueprint.where || '_Not specified — AI will infer from context_'}`,
+            `  - **Why:** ${created.blueprint.why   || '_Not specified_'}`,
+          ].join('\n');
+          deps.conversation.push({
+            role: 'assistant',
+            content: [
+              `&#x26A0; **Some details were not explicit in your request — building with best-guess reasoning:**`,
+              ``,
+              fieldList,
+              ``,
+              `Proceeding with the build now. If the result isn\\'t what you expected, try again with more detail or refine the blueprint first.`,
+              ``,
+              `__ACTION_CARD__chassis.openBlueprintEditor|||&#x1F4DD; Refine Blueprint First|||END__`,
+            ].join('\n'),
+            timestamp: Date.now(),
+          });
+          deps.refresh();
+        }
       } catch (e) {
         deps.postToWebview({ type: 'set-status', status: 'ready' });
         deps.conversation.push({ role: 'assistant', content: `Could not create project folder: ${e instanceof Error ? e.message : String(e)}`, timestamp: Date.now() });

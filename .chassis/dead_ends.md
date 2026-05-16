@@ -48,4 +48,12 @@ Things that didn't work and why. Learn from these.
 - **What was tried:** Added conversion verbs (convert, turn, transform, rewrite, port, refactor, rebuild, redo) to `BUILD_TRIGGER_RE` in `chatPanelMsgSendMessage.ts` plus a separate `CONVERT_TRIGGER_RE` regex, so "Convert this TypeScript file to HTML" would route to the build pipeline.
 - **What happened:** The full build pipeline (supervisor -> worker -> guardian) is too heavy for conversion requests. The chat showed "aligning tolerances..." indefinitely and never produced output. The pipeline stalled trying to run vault search, supervisor plan, worker build, and guardian review.
 - **Never do this:** Never route conversion/transform verbs into `BUILD_TRIGGER_RE`. The build pipeline expects brand-new project creation with full orchestration.
+
+---
+
+## [DEAD] Bypassing the chunked build pipeline for multi-AI orchestrated builds
+- **What was tried:** In `chatPanelChunked.ts`, added an early return for `routing.orchestratedBuild` when 2+ AIs were available. This orchestrated build ran its own plan->execute->review loop and dumped the final code directly into the chat history.
+- **What happened:** The early return completely skipped the core CHASSIS build pipeline. File auto-save, project creation wizard, workspace opening, and vault capture (`autoCaptureFiles`) were never triggered. The user received a wall of raw code instead of a managed project.
+- **Never do this:** Do not replace the chunked build pipeline. Multi-AI coordination must hook *into* the existing pipeline phases (e.g. at the planning phase), not circumvent the pipeline entirely.
+- **Do this instead:** Use the existing supervisor/worker logic in `chatPanelChunked.ts` where the supervisor generates the plan array and the worker executes the file builds, triggering all appropriate pipeline hooks (auto-save, vault, ledger).
 - **Do this instead:** Keep conversion requests on the AI chat path (`handleAIChat`). Use `chatPanelAutoSave.ts` to auto-detect substantial code blocks in the AI response and save them to disk automatically.

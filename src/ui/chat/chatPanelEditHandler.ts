@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import { BuildRequestDeps } from './chatPanelIntent.js';
 import { runEditFileBuild, EditBuildContext } from './chatPanelEditBuild.js';
 
-export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, 'blueprintContext' | 'pendingTask' | 'setPendingTask' | 'setActiveBuildCtx'>): Promise<void> {
+export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, 'pendingTask' | 'setPendingTask' | 'setActiveBuildCtx'>): Promise<void> {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { return; }
   deps.conversation.push({ role: 'user', content: `Fix \`${msg.filePath}\`: ${msg.task}`, timestamp: Date.now() });
@@ -15,6 +15,7 @@ export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, '
     task: msg.task,
     issueType: msg.issueType || 'todo',
     root,
+    blueprintContext: deps.blueprintContext,
     routing: deps.routing,
     vault: deps.vault,
     conversation: deps.conversation,

@@ -75,6 +75,16 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     return;
   }
 
+  if (msg.type === 'new-project-cancel') {
+    (panel as any)._pendingTask = undefined;
+    state.planInterview = undefined;
+    // Return to launcher: clear conversation and force full HTML rebuild so the welcome screen shows
+    state.conversation = [];
+    (panel as any)._initialized = false;
+    panel.refresh();
+    return;
+  }
+
   if (msg.type === 'build-task') {
     const task = msg.task || _pendingTask;
     (panel as any)._pendingTask = undefined;
@@ -100,6 +110,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
       chassis: (panel as any).chassis,
       routing: (panel as any).routing,
       vault: (panel as any).vault,
+      blueprintContext: state.blueprintContext,
       conversation: state.conversation,
       refresh: () => panel.refresh(),
       logError: (t: string, p: string, e: string, len?: number) => (panel as any)._logBuildError(t, p, e, len),
@@ -108,10 +119,61 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     return;
   }
 
+  if (msg.type === 'set-mode') {
+    state.buildMode = msg.mode === 'plan' || msg.mode === 'direct' ? msg.mode : undefined;
+    if (msg.mode === 'plan') {
+      const { startPlanInterview } = require('./chatPanelPlanInterview.js');
+      startPlanInterview(state);
+    } else if (msg.mode === 'direct') {
+      state.planInterview = undefined;
+    }
+    panel.refresh();
+    return;
+  }
+
+  if (msg.type === 'switch-mode') {
+    const nextMode = state.buildMode === 'plan' ? 'direct' : 'plan';
+    state.buildMode = nextMode;
+    if (nextMode === 'plan') {
+      const { startPlanInterview } = require('./chatPanelPlanInterview.js');
+      startPlanInterview(state);
+    } else {
+      state.planInterview = undefined;
+    }
+    panel.refresh();
+    return;
+  }
+
   if (msg.type === 'assistant-message') {
     state.conversation.push({ role: 'assistant', content: msg.text, timestamp: Date.now() });
     panel.refresh();
     return;
+  }
+
+  // [FIX] vault-hit gate: webview posts { type:'vault-hit-{resolverId}', choice:'build-fresh'|'cancel'|'use-vault' }
+  // Old handlers (use-vault/build-anyway + hitId field) never fired — type and field both mismatched.
+  if (msg.type?.startsWith('vault-hit-') && msg.choice) {
+    const resolverId = msg.type.slice('vault-hit-'.length);
+    const { resolveVaultHit } = require('./chatPanelBuild.js');
+    resolveVaultHit(resolverId, msg.choice);
+    return;
+  }
+
+  // [FIX] placement gate: webview posts { type:'placement-{placementId}', choice:'here'|'new-project'|'cancel' }
+  // Old handlers (placement-add-here etc. + placementId field) never fired — same mismatch pattern.
+  if (msg.type?.startsWith('placement-') && msg.choice) {
+    const placementId = msg.type.slice('placement-'.length);
+    const { resolvePlacement } = require('./chatPanelIntent.js');
+    resolvePlacement(placementId, msg.choice);
+    return;
+  }
+
+  // [FIX] start-new-project sets deps.buildMode locally inside handleChatMessage but never writes back to state.
+  // On the NEXT message state.buildMode is still undefined → orchestrator runs in "just build" mode.
+  // Sync state here before constructing deps so the correct mode is visible on all future messages.
+  if (msg.type === 'start-new-project') {
+    state.buildMode = msg.mode === 'plan' ? 'plan' : (msg.mode === 'direct' ? 'direct' : undefined);
+    if (msg.mode !== 'plan') { state.planInterview = undefined; }
   }
 
   await handleChatMessage(msg, {
@@ -129,5 +191,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     onSwitchAI: ChatPanel.onSwitchAI,
     onNewProject: ChatPanel.onNewProject,
     setLastModel: (model: string) => { (panel as any).state.lastModel = model; },
+    buildMode: state.buildMode,
+    planInterview: state.planInterview,
   });
 }
