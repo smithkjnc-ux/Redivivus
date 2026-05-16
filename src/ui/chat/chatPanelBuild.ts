@@ -18,6 +18,7 @@ import * as Worker from './chatPanelBuildWorker.js';
 import * as Review from './chatPanelBuildReview.js';
 import * as Writer from './chatPanelBuildWriter.js';
 import { tracer } from '../../services/pipelineTracer.js';
+import { formatVaultContext } from '../../services/vault/vaultContextService.js';
 
 export interface BuildContext {
   task: string; root: string; blueprintContext: string; vault?: VaultService; routing: RoutingService; conversation: ChatMessage[]; refresh: () => void; logError: (t: string, p: string, e: string, l: number) => void; postToWebview?: (msg: any) => void; onBuildFinished?: (t: string, f?: string[]) => void;
@@ -99,7 +100,9 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
 
   // Worker AI is determined at build time by routeByComplexity — show placeholder until routedTo is known
   appendMsg(ctx, `⚙️ Building \`${relPath}\`...`);
-  const prompt = Worker.buildWorkerPrompt(ctx, relPath, !!existingTarget, existingTarget ? fs.readFileSync(absPath, 'utf8') : '', spec, '');
+  // [FIX] Inject vault context into worker prompt — was always passing empty string
+  const vaultSummary = searchResult.items.length > 0 ? formatVaultContext(searchResult.items) : '';
+  const prompt = Worker.buildWorkerPrompt(ctx, relPath, !!existingTarget, existingTarget ? fs.readFileSync(absPath, 'utf8') : '', spec, vaultSummary);
   const _workT0 = Date.now(); const _workSid = tracer.step('WORKER', undefined, `Building ${relPath}`);
   const res = await Worker.executeWorkerBuild(ctx, prompt);
   if (!res.success) {

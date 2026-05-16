@@ -7,6 +7,7 @@ import { RoutingService } from '../services/ai/routingService.js';
 import { ChatPanel } from '../ui/chat/chatPanel.js';
 import { registerVaultValidate } from './vaultValidate.js';
 import { showVaultScanResults } from './vaultResults.js';
+import { enrichVaultDescriptions } from '../services/vault/vaultEnrich.js';
 
 export let _pendingScanItems: any[] = [];
 
@@ -103,6 +104,33 @@ export function registerVaultCommands(
   );
 
   registerVaultValidate(context, vaultService, routing);
+
+  // Enrich existing vault items with AI descriptions and quality scores
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.vault.enrich', async () => {
+      const items = vaultService.listItems();
+      const needsEnrich = items.filter((i: any) => !i.description || !i.qualityScore);
+      if (needsEnrich.length === 0) {
+        vscode.window.showInformationMessage('CHASSIS Vault: All items already have AI descriptions.');
+        return;
+      }
+      const choice = await vscode.window.showInformationMessage(
+        `CHASSIS Vault: ${needsEnrich.length} item(s) need AI descriptions. This will make ${needsEnrich.length} AI calls. Continue?`,
+        { modal: true }, 'Enrich Now', 'Cancel'
+      );
+      if (choice !== 'Enrich Now') { return; }
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'CHASSIS Vault: Enriching...', cancellable: false },
+        async (progress) => {
+          const callAI = (p: string) => routing.prompt(p, 12_000);
+          const result = await enrichVaultDescriptions(vaultService, callAI, (done, total, name) => {
+            progress.report({ message: `${done + 1}/${total}: ${name}`, increment: (1 / total) * 100 });
+          });
+          vscode.window.showInformationMessage(`CHASSIS Vault: Enriched ${result.enriched} items, removed ${result.skipped} low-quality, ${result.failed} failed.`);
+        }
+      );
+    })
+  );
 }
 
 export async function ensureChatPanelOpen(): Promise<void> {

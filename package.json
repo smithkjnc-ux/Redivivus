@@ -157,6 +157,10 @@
         "title": "CHASSIS: Vault - Remove System/Pip Path Items"
       },
       {
+        "command": "chassis.vault.enrich",
+        "title": "CHASSIS: Vault - Enrich Items with AI Descriptions"
+      },
+      {
         "command": "chassis.showChatGettingStarted",
         "title": "CHASSIS: Show Getting Started"
       },

@@ -1,7 +1,7 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10Y: All 10 bulletproof gaps closed — post-build guidance, install intent, 5W interview, API pings, diff preview, vault capture, session resume, console.log cleanup, UI inspector*
+*Last updated: May 16, 2026 — Session 10Z: Vault fully functional — quality gate wired, context injected into builds, semantic threshold fixed, AI enrichment command, assembly build uses AI*
 
 ## Recent Fixes — May 16, 2026 (Session 10X: Task #1 — Build→Run→Error→Fix loop)
 
@@ -14,6 +14,19 @@
 | `src/ui/chat/chatPanelClassifier.ts` | Added `subtype?: string` to `IntentResult` interface. | Required to distinguish install-deps from generic run intent in message handler. | None — new optional field, backward compatible. |
 | `src/ui/chat/chatPanelMessages.ts` | Added `subtype?: string` to `classifyIntent` return type. | TS compile error after adding subtype to IntentResult. | None. |
 | `src/ui/chat/chatPanelMsgSendMessage.ts` | Extended run intent handler: checks `intent.subtype === 'install'` — detects package manager (package.json/requirements.txt/Cargo.toml/go.mod), opens terminal, runs appropriate install command. Falls back to generic "open main file" for non-install run intent. | "install deps" chat messages were going unhandled. Terminal install is cleaner than directing user to a command manually. | Low — fails gracefully if no manifest found. |
+
+## Recent Fixes — May 16, 2026 (Session 10Z: Vault — 5 critical fixes to make vault actually work)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuildWriter.ts` | `captureToVault()`: added `callAI = (p) => ctx.routing.prompt(p, 12_000)` passed to `autoCaptureFile`. Changed `[NEXT]` → [FIX]. | AI quality gate (`evaluateQuality`) was only called when `callAI` was provided — it never was. Every capture used heuristic fallback, filling vault with low-quality code. | Low — AI call is async, captured inside try/catch. Build never blocked. |
+| `src/ui/chat/chatPanelChunked.ts` | `autoCaptureFiles` call: added `_callAI = (p) => routing.prompt(p, 12_000)` as 5th argument. Added `formatVaultContext` import. Injected vault context block into `planPrompt` before "Break this into files". | Same quality gate gap as single-file builds. Also vault search results were computed but never passed to the AI planner — it planned blind. | Low — vault context appended before instructions, stays within token budget via 400-char cap per item. |
+| `src/ui/chat/chatPanelBuild.ts` | Added `formatVaultContext` import. Replaced empty string `vaultSummary` in `buildWorkerPrompt` call with `formatVaultContext(searchResult.items)`. | Single-file worker prompt had a `vaultSummary` parameter slot that was always passed as `''`. | None — empty if no vault items. |
+| `src/services/vault/vaultContextService.ts` | Changed `buildContextBlock` from `private` to `public`. Added exported standalone `formatVaultContext(items)` function for use in build pipelines without instantiating the full service. | `buildContextBlock` existed but was unreachable from outside the class. Build pipelines already had vault items from `findRelevantByTask` but no way to format them for prompts. | None — purely additive. |
+| `src/services/vault/vaultSemanticSearch.ts` | Changed confidence threshold from `0.95` to `0.65`. Removed 3 `process.stderr.write` debug lines. | 0.95 was unrealistic — AI confidence scores from natural text prompts rarely exceed 0.80. Semantic search never fired. Now fires on reasonable matches. | Low — lower threshold means more false positives, but intentMismatch check still filters frontend/backend confusion. |
+| `src/services/vault/vaultEnrich.ts` | Created (50 lines). `enrichVaultDescriptions(vault, callAI, onProgress)` — loops items missing `description` or `qualityScore`, calls AI quality gate, saves enriched items, removes low-quality ones. | Vault items captured before quality gate was wired have no AI metadata. This is a one-shot repair pass. | Low — removes items scoring < 3, which is correct behavior. Idempotent (skips already-enriched). |
+| `src/commands/vault.ts` | Added `chassis.vault.enrich` command: counts items needing enrichment, confirms with user, runs enrichment with progress notification. Registered in `package.json`. | No way to retroactively improve existing vault items. | Low — user confirms before running; each item requires one AI call. |
+| `src/ui/chat/chatPanelBuildVault.ts` | Replaced raw code concatenation with AI-assisted assembly. New prompt: "adapt and combine these vault components to implement the task, fill gaps, fix conflicts". Shows "Assembling from N vault items..." message. Handles AI failure gracefully. Added post-build guidance. | Raw concat produced unrunnable output: no imports merged, no type conflicts resolved, no missing functionality filled. | Low — AI failure returns error message; vault items still visible in chat. |
 
 ## Recent Fixes — May 16, 2026 (Session 10Y: Tasks #5–#10 — API pings, diff preview, vault capture, session resume, console.log, UI inspector)
 

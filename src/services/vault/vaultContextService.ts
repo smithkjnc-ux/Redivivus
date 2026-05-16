@@ -141,12 +141,23 @@ export class VaultContextService {
       }
       score += Math.min(previewHits, 3);
 
+      // [CHASSIS] Quality gate boost — prefer higher-quality items
+      const qs = (item as any).qualityScore as number | undefined;
+      if (qs && qs >= 4) { score += 2; }
+      if (qs && qs >= 5) { score += 2; }
+
+      // [CHASSIS] Description/useCase keyword matching
+      const desc = ((item.description || '') + ' ' + ((item as any).useCase || '')).toLowerCase();
+      for (const kw of keywords) {
+        if (kw.length > 4 && desc.includes(kw)) { score += 1; break; }
+      }
+
       return { item, score };
     });
   }
 
   // ── Build the context block injected into AI prompts ──
-  private buildContextBlock(items: VaultItem[]): string {
+  buildContextBlock(items: VaultItem[]): string {
     const lines: string[] = [
       '=== CHASSIS VAULT: Relevant existing code ===',
       'The following reusable blocks already exist in the project vault.',
@@ -155,7 +166,11 @@ export class VaultContextService {
     ];
 
     for (const item of items) {
-      lines.push(`--- [${item.category}] ${item.name} (${item.language}) ---`);
+      const qs = (item as any).qualityScore as number | undefined;
+      const star = qs && qs >= 5 ? ' ⭐' : '';
+      lines.push(`--- [${item.category}] ${item.name} (${item.language})${star} ---`);
+      if (item.description) { lines.push(`// ${item.description}`); }
+      if ((item as any).useCase) { lines.push(`// Use when: ${(item as any).useCase}`); }
       lines.push(`// Source: ${item.sourceFile}`);
       lines.push(item.code.slice(0, 400)); // cap to avoid token bloat
       lines.push('');
@@ -164,4 +179,10 @@ export class VaultContextService {
     lines.push('=== END VAULT CONTEXT ===');
     return lines.join('\n');
   }
+}
+
+/** Standalone formatter — call with findRelevantByTask results to get a vault context block for any AI prompt. */
+export function formatVaultContext(items: VaultItem[]): string {
+  if (!items || items.length === 0) { return ''; }
+  return new VaultContextService(null as any).buildContextBlock(items);
 }

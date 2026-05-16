@@ -167,13 +167,12 @@ export async function semanticVaultSearch(
   const prompt = buildSemanticPrompt(task, summary);
 
   try {
-    process.stderr.write(`[vault-semantic] task="${task}" candidates=${capped.map(i=>i.name).join(',')}\n`);
     const res = await callAI(prompt);
-    if (!res.success || !res.text) { process.stderr.write(`[vault-semantic] AI failed: ${res.text}\n`); return null; }
-    process.stderr.write(`[vault-semantic] AI response: ${res.text.slice(0,200)}\n`);
+    if (!res.success || !res.text) { return null; }
 
     const parsed = parseSemanticResponse(res.text, capped);
-    if (!parsed || parsed.confidence < 0.95) { return null; }
+    // [FIX] Was 0.95 — AI responses rarely score that high; semantic search was effectively never firing
+    if (!parsed || parsed.confidence < 0.65) { return null; }
 
     const matched = capped[parsed.index];
     const intentMismatch = await detectIntentMismatch(task, matched, callAI);

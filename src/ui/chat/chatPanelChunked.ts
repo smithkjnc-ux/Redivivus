@@ -15,6 +15,7 @@ import { BuildLedger } from '../../services/build/buildLedgerService.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService.js';
 import { runFileBuildLoop, FileBuildLoopResult } from './chatPanelChunkedLoop.js';
 import { tracer } from '../../services/pipelineTracer.js';
+import { formatVaultContext } from '../../services/vault/vaultContextService.js';
 
 export function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
   ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined });
@@ -83,8 +84,10 @@ export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<
   const plannerLabel = workerLabel ? `${supervisorLabel} (Supervisor)` : supervisorLabel;
   appendMsg(ctx, `📋 Planning build — ${plannerLabel} generating file list...`);
 
+  // [FIX] Inject vault context into planner so supervisor knows what already exists
+  const vaultCtxBlock = relevant.length > 0 ? formatVaultContext(relevant) + '\n' : '';
   const planPrompt = `I need to build: "${task}"
-${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
+${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${vaultCtxBlock}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
 Return ONLY a JSON array — no markdown, no explanation, no code:
 [
   {"file": "src/models.py", "purpose": "Data models for expenses"},
@@ -145,7 +148,9 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
   // Auto-capture built files to vault
   const projectName = ctx.chassis?.loadConfig?.()?.projectName || 'Unknown';
   const absPaths = builtFiles.map(f => path.join(root, f));
-  const capture = vault ? await autoCaptureFiles(absPaths, projectName, vault, task) : { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
+  // [FIX] Pass callAI so quality gate runs on vault capture (was always using heuristic fallback)
+  const _callAI = (p: string) => routing.prompt(p, 12_000);
+  const capture = vault ? await autoCaptureFiles(absPaths, projectName, vault, task, _callAI) : { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
 
   // Mark story complete
   ctx.conversation[storyMsgIndex].content = '__STORY_DONE__' + encodeStoryToken(storyLines).slice('__STORY__'.length);

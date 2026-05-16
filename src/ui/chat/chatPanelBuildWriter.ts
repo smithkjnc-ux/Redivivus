@@ -37,11 +37,31 @@ export async function openBuiltFile(absPath: string): Promise<void> {
   } catch {}
 }
 
+// Creates package.json and tsconfig.json for TypeScript Node.js projects if they don't exist.
+// Only runs for .ts builds (not HTML, not React/TSX). Created arrays receives the relative paths of new files.
+export function scaffoldNodeProject(root: string, nameBase: string, created: string[] = []): void {
+  const pkgPath = path.join(root, 'package.json');
+  if (!fs.existsSync(pkgPath)) {
+    const pkg = { name: nameBase, version: '0.1.0', main: `dist/${nameBase}.js`, scripts: { build: 'tsc', start: `node dist/${nameBase}.js`, dev: `ts-node src/${nameBase}.ts` }, devDependencies: { '@types/node': '^20.0.0', typescript: '^5.0.0', 'ts-node': '^10.9.0' } };
+    fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2), 'utf8');
+    created.push('package.json');
+  }
+  const tscPath = path.join(root, 'tsconfig.json');
+  if (!fs.existsSync(tscPath)) {
+    const tsconfig = { compilerOptions: { target: 'ES2020', module: 'commonjs', lib: ['ES2020'], outDir: './dist', rootDir: './src', strict: true, esModuleInterop: true, skipLibCheck: true, forceConsistentCasingInFileNames: true, resolveJsonModule: true }, include: ['src/**/*'], exclude: ['node_modules', 'dist'] };
+    fs.writeFileSync(tscPath, JSON.stringify(tsconfig, null, 2), 'utf8');
+    created.push('tsconfig.json');
+  }
+}
+
 export function captureToVault(ctx: BuildContext, absPath: string, relPath: string): void {
   if (ctx.vault) {
     try {
       const projectName = path.basename(ctx.root);
-      autoCaptureFile(absPath, projectName, ctx.vault, ctx.task);
+      // [FIX] Pass callAI so the AI quality gate (evaluateQuality) actually runs.
+      // Previously called without callAI → heuristic fallback always used → vault fills with low-quality code.
+      const callAI = ctx.routing ? (p: string) => ctx.routing.prompt(p, 12_000) : undefined;
+      autoCaptureFile(absPath, projectName, ctx.vault, ctx.task, callAI);
     } catch {}
   }
 }
