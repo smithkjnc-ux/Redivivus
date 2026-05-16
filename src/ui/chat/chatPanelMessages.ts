@@ -9,7 +9,7 @@ import { ChatMessage } from './chatPanelHtml.js';
 import { resolveBuildConfirm, resolvePlacement } from './chatPanelIntent.js';
 import { resolveVaultHit } from './chatPanelBuild.js';
 import { handleSendMessage } from './chatPanelMsgSendMessage.js';
-import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile } from './chatPanelMsgFileOps.js';
+import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser } from './chatPanelMsgFileOps.js';
 import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder } from './chatPanelMsgProjectOps.js';
 import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne } from './chatPanelMsgArchitect.js';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial.js';
@@ -22,7 +22,7 @@ export interface MessageHandlerDeps {
   conversation: ChatMessage[];
   panel: vscode.WebviewPanel;
   isBuildRequest: (text: string) => Promise<boolean>;
-  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'command' | 'question' | 'offtopic'; command?: string }>;
+  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run'; command?: string }>;
   handleBuildRequest: (task: string, skipComplex?: boolean, isFixRequest?: boolean) => Promise<void>;
   buildFromVaultPrefill: () => { task?: string; targetFile?: string };
   refresh: () => void;
@@ -30,6 +30,8 @@ export interface MessageHandlerDeps {
   onStartSession?: (goal: string, ai: string) => Promise<void>;
   onSwitchAI?: (ai: string) => Promise<void>;
   onNewProject?: (name: string, answers: Record<string, string>, folderPath?: string) => Promise<void>;
+  buildMode?: 'plan' | 'direct';
+  planInterview?: import('./chatPanelPlanInterview.js').PlanInterviewState;
 }
 
 
@@ -37,6 +39,12 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   const { routing, conversation, panel, refresh } = deps;
 
   if (msg.type === 'send-message') {
+    // [CHASSIS] Plan mode: if interview is active, route to conversational interview handler
+    if (deps.buildMode === 'plan' && deps.planInterview && deps.planInterview.step < 8) {
+      const { handlePlanInterviewAnswer } = await import('./chatPanelPlanInterview.js');
+      await handlePlanInterviewAnswer(msg, deps);
+      return;
+    }
     await handleSendMessage(msg, deps);
 
   } else if (msg.type === 'map-context') {
@@ -53,6 +61,9 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
 
   } else if (msg.type === 'open-in-browser') {
     await handleOpenInBrowser(msg);
+
+  } else if (msg.type === 'preview-browser') {
+    await handlePreviewBrowser(msg);
 
   } else if (msg.type === 'create-file') {
     await handleCreateFile(msg);
@@ -82,7 +93,16 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     await handleOpenProject(msg);
 
   } else if (msg.type === 'start-new-project') {
-    vscode.commands.executeCommand('chassis.wizardRetrofit');
+    deps.buildMode = msg.mode === 'plan' ? 'plan' : 'direct';
+    deps.planInterview = undefined;
+    if (msg.mode === 'plan') {
+      const { startPlanInterview } = await import('./chatPanelPlanInterview.js');
+      await startPlanInterview(deps);
+    } else {
+      // Just Build: prompt the user to describe what they want — AI handles it from there
+      conversation.push({ role: 'assistant', content: "What would you like to build? Describe it in plain English and I'll get started.", timestamp: Date.now() });
+    }
+    refresh();
 
   } else if (msg.type === 'open-existing-project') {
     await handleOpenExistingProject(msg, conversation, refresh);
@@ -97,7 +117,8 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     await handleBrowseFolder(msg, panel);
 
   } else if (msg.type === 'confirm-build') {
-    if (msg.buildId) { resolveBuildConfirm(msg.buildId, true); }
+    // [FIX] msg.confirmed=false means user clicked Cancel — was always resolving true before
+    if (msg.buildId) { resolveBuildConfirm(msg.buildId, msg.confirmed !== false); }
 
   } else if (msg.type === 'cancel-build') {
     if (msg.buildId) { resolveBuildConfirm(msg.buildId, false); }
@@ -116,6 +137,14 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
 
   } else if (msg.type === 'placement-cancel') {
     if (msg.placementId) { resolvePlacement(msg.placementId, 'cancel'); }
+
+  } else if (msg.type === 'scope-submit') {
+    const { resolveScopeQuestion } = await import('../../services/project/templateScopeService.js');
+    resolveScopeQuestion(msg.answer || '');
+
+  } else if (msg.type === 'scope-cancel') {
+    const { clearPendingScopeQuestion } = await import('../../services/project/templateScopeService.js');
+    clearPendingScopeQuestion();
 
   } else if (msg.type === 'template-wizard-submit' || msg.type === 'template-wizard-cancel') {
     try {

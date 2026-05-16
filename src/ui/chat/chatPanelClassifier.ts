@@ -2,8 +2,10 @@
 // Extracted from chatPanelIntent.ts
 
 import { RoutingService } from '../../services/ai/routingService.js';
+import { tracer } from '../../services/pipelineTracer.js';
+import { checkHardcodedOverrides, fallbackClassify } from './chatPanelClassifierOverrides.js';
 
-export type IntentType = 'build' | 'command' | 'question' | 'offtopic';
+export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run';
 export type AvailableCommand =
   | 'chassis.openProject'
   | 'chassis.wizardRetrofit'
@@ -33,52 +35,17 @@ export async function classifyIntent(
   routing?: RoutingService,
   context?: { projectName?: string; workspacePath?: string; blueprintStatus?: string }
 ): Promise<IntentResult> {
-  // Hardcoded overrides — patterns too ambiguous for AI classifier
   const t = text.toLowerCase().trim();
-  if (/\b(close|exit|leave|quit)\b.*(current\s+)?(project|folder|workspace)/i.test(t) ||
-      /\b(close|exit)\s+(this|the)\s+(project|folder)/i.test(t)) {
-    return { type: 'command', command: 'workbench.action.closeFolder' };
-  }
-  if (/\b(open|show|view|see|browse|launch)\b.*(the\s+)?vault\b/i.test(t) ||
-      /\bvault\b.*(open|show|view|browse)/i.test(t)) {
-    return { type: 'command', command: 'chassis.openVault' };
-  }
-  if (/\b(open|show|view)\b.*(the\s+)?blueprint\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.openBlueprint' };
-  }
-  if (/\b(open|show|view)\b.*(the\s+)?(architecture\s+)?map\b/i.test(t) ||
-      /\barchitecture\s+map\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.showMap' };
-  }
-  if (/\b(start|begin|new)\s+session\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.startSession' };
-  }
-  if (/\b(end|stop|finish|done\s+for\s+now)\s+(the\s+)?session\b/i.test(t) ||
-      /\bdone\s+for\s+(now|today)\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.endSession' };
-  }
-  if (/\b(save\s+point|savepoint|checkpoint|save\s+my\s+work)\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.savePoint' };
-  }
-  if (/\b(switch|open|go\s+to|load)\s+(to\s+)?(a\s+)?(different|another|new\s+)?project\b/i.test(t) ||
-      /\bopen\s+project\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.openProject' };
-  }
-
-  // If no routing service available, fall back to simple keyword detection
-  if (!routing) {
-    const t = text.toLowerCase().trim();
-    const buildVerbs = /\b(build|create|make|write|generate|implement|scaffold|code|develop|produce|split|refactor|reorganize|restructure|add|fix|update|modify|extend|improve|change|edit|remove|delete|swap|replace)\b/i;
-    const isQuestion = /\?$|^(what|how|why|when|where|who|can you|could you|do you|does|is there|tell me|explain|show me what)/i.test(t);
-    
-    if (buildVerbs.test(t) && !isQuestion) { return { type: 'build' }; }
-    return { type: 'question' };
-  }
+  const override = checkHardcodedOverrides(t);
+  if (override) { return override; }
+  if (!routing) { return fallbackClassify(text); }
 
   const systemPrompt = `You are the CHASSIS intent classifier. Given a user message and project context, classify it as ONE of these intents and return ONLY valid JSON, nothing else.
 
 Intents:
-- build: user wants to create/write/make/add something
+- build: user wants to CREATE something NEW from scratch (new file, new app, new feature, new script)
+- convert: user wants to TRANSFORM or PORT existing code (convert, rewrite, refactor, port, turn X into Y, change language/format)
+- run: user wants to RUN, PREVIEW, LAUNCH, TEST, or SEE the existing project/app/file in action
 - question: user asking about their project, code, or any software development topic
 - command: user wants to trigger a CHASSIS action
 - offtopic: no connection to software development, coding, architecture, databases, APIs, or technical topics
@@ -115,19 +82,43 @@ Examples (follow these exactly):
 "explain what a REST API is" → {"intent": "question"}
 "build me a login page" → {"intent": "build"}
 "add a dark mode toggle" → {"intent": "build"}
+"can you fix the audio" → {"intent": "build"}
+"fix this bug" → {"intent": "build"}
+"the button doesn't work" → {"intent": "build"}
+"run the animal sound player" → {"intent": "run"}
+"let me see if it works" → {"intent": "run"}
+"open it in the browser" → {"intent": "run"}
+"launch the app" → {"intent": "run"}
+"update the styles" → {"intent": "build"}
+"repair the broken link" → {"intent": "build"}
+"option A" → {"intent": "build"}
+"go with option B" → {"intent": "build"}
+"let's do the first approach" → {"intent": "build"}
+"convert this to TypeScript" → {"intent": "convert"}
+"rewrite this in Python" → {"intent": "convert"}
+"turn this HTML into a React component" → {"intent": "convert"}
+"port this to Go" → {"intent": "convert"}
+"refactor this into components" → {"intent": "convert"}
+"transform this JSON into CSV" → {"intent": "convert"}
 
 Return ONLY JSON:
 { "intent": "command", "command": "chassis.openProject" }
 { "intent": "build" }
+{ "intent": "convert" }
+{ "intent": "run" }
 { "intent": "question" }
 { "intent": "offtopic" }
 
 OFFTOPIC definition: No connection to software development, coding, architecture, databases, APIs, or technical topics. NOT offtopic: coding education, dev concepts, project advice, architecture questions. IS offtopic: weather, sports, recipes, jokes, travel, personal advice, general knowledge.`;
 
+  let _sid = '';
+  let _t0 = 0;
   try {
+    _t0 = Date.now();
+    _sid = tracer.step('INTENT', 'AI classifier', text.slice(0, 60));
     // Use Supervisor AI (Gemini) for classification with max_tokens: 50
     const result = await (routing as any).prompt(systemPrompt);
-    
+
     if (!result || !result.text) {
       throw new Error('No response from AI classifier');
     }
@@ -148,13 +139,16 @@ OFFTOPIC definition: No connection to software development, coding, architecture
       return { type: 'command', command: parsed.command as AvailableCommand };
     }
     
-    if (intent === 'build') {
-      return { type: 'build' };
+    if (intent === 'build' || intent === 'convert' || intent === 'run') {
+      tracer.done(_sid, 'success', Date.now() - _t0, `classified as "${intent}"`, Math.ceil(systemPrompt.length / 4), Math.ceil(result.text.length / 4));
+      return { type: intent };
     }
-    
+
+    tracer.done(_sid, 'success', Date.now() - _t0, `classified as "${intent}"`, Math.ceil(systemPrompt.length / 4), Math.ceil(result.text.length / 4));
     return { type: 'question' };
-    
+
   } catch (error) {
+    if (_sid) tracer.done(_sid, 'fail', Date.now() - _t0, String(error).slice(0, 60));
     // Fallback: if classification fails, treat as question and continue to normal chat
     console.log('[CHASSIS INTENT] AI classification failed, falling back to question:', error);
     return { type: 'question' };

@@ -1,7 +1,17 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10U: Plan It is now the default; Just Build demoted to secondary option*
+*Last updated: May 16, 2026 — Session 10V: Intent-aware message routing — run/preview intent + modal moved to backend*
+
+## Recent Fixes — May 16, 2026 (Session 10V: Intent-aware routing — run intent + backend modal)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelClassifierOverrides.ts` | Created (59 lines). Extracted all hardcoded fast-path overrides from `chatPanelClassifier.ts`. Added run/preview intent fast-path: "run the app", "launch the player", "open in browser", "let me see it". | Classifier was at 197 lines — needed room. Also gives run intent a structural fast-path before the AI call. | None. |
+| `src/ui/chat/chatPanelClassifier.ts` | Added `'run'` to `IntentType`. Replaced 30-line hardcoded block with `checkHardcodedOverrides()` + `fallbackClassify()` calls. Updated AI prompt: run intent description + 4 examples. Handle `run` in parse result. | "run the animal sound player" was never reaching the backend classifier — webview modal intercepted it first. | None — fallback still classifies as question on error. |
+| `src/ui/chat/chatPanelScript.ts` | `doSend()`: removed mode-check modal trigger. All messages now go straight to backend. Added `show-mode-popover` incoming message handler: stores pendingText, calls existing `showModePopover()`. | Modal fired before any classification, so questions/run requests got the "choose your approach" popup. Now only build intent triggers the modal, from the backend. | Low — existing `showModePopover` and button handlers unchanged. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Added `run` intent handler: finds main file (index.html, main.js, etc.) in workspace root and opens in browser via `vscode.env.openExternal`. For `build` intent with no mode set: sends `show-mode-popover` back to webview instead of calling `handleBuildRequest`. | Run requests were being treated as build requests. Mode modal should only appear for confirmed build intent. | None — run handler fails gracefully if no main file found. |
+| `src/ui/chat/chatPanelMessages.ts` | Added `'run'` to `classifyIntent` return type union. | TS compile error after adding run to IntentType. | None. |
 
 ## Recent Fixes — May 16, 2026 (Session 10U: Plan It as default UX)
 
