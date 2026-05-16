@@ -57,6 +57,7 @@ export interface BuildRequestDeps {
   pendingTask: string | undefined;
   setPendingTask: (t: string | undefined) => void;
   usageTracker?: import('../../services/usageTracker.js').UsageTracker;
+  buildMode?: 'plan' | 'direct';
 }
 
 /** 
@@ -64,24 +65,23 @@ export interface BuildRequestDeps {
  * Uses Supervisor AI to classify user messages into intent categories.
  */
 import { classifyIntent, isBuildRequest, IntentType, IntentResult, AvailableCommand } from './chatPanelClassifier.js';
+import { tracer } from '../../services/pipelineTracer.js';
 export { classifyIntent, isBuildRequest, IntentType, IntentResult, AvailableCommand };
 
 /** Handles a build request — shows choice dialog for complex requests, runs pipeline for simple ones. */
 export async function handleBuildRequest(task: string, deps: BuildRequestDeps, skipComplex: boolean = false, isFixRequest: boolean = false): Promise<void> {
   require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[handleBuildRequest entry] task=${task.slice(0,60)} skipComplex=${skipComplex}\n`);
   deps.postToWebview({ type: 'set-status', status: 'working' });
+  if (!skipComplex) tracer.start(task);
 
   // ── Scope clarification — ask 2 questions in chat before doing anything for vague requests ──
   // [WARN] Only fires on fresh project-type requests with no detail. Never fires on skipComplex=true
   //        (that's a resumed build that already went through the wizard).
-  if (!skipComplex && isVagueProjectRequest(task)) {
-    const scopeAnswer = await askScopeQuestions(task, (content) => {
-      deps.conversation.push({ role: 'assistant', content, timestamp: Date.now() });
-      deps.refresh();
-      deps.postToWebview({ type: 'set-status', status: 'ready' });
-    });
+  // Direct mode: skip scope clarification entirely (auto-approve scope)
+  if (!skipComplex && deps.buildMode !== 'direct' && await isVagueProjectRequest(task, deps.routing)) {
+    const scopeAnswer = await askScopeQuestions(task, deps.postToWebview);
     if (scopeAnswer) {
-      const { enrichedTask } = parseScopeAnswer(scopeAnswer);
+      const { enrichedTask } = await parseScopeAnswer(scopeAnswer, deps.routing);
       // Note: user's answer is already in conversation (pushed by send-message handler) — don't push again
       // Continue with enriched task — skipComplex=true so we don't re-run scope check
       await handleBuildRequest(enrichedTask, deps, true);
@@ -105,6 +105,56 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
 
   // ── Vault-hit gate (keyword search) — must fire BEFORE cost modal ──
   // Skip when skipComplex=true (resumed build after new project creation — just build, no gates)
-// [NEXT] Continued in chatPanelIntentB.ts
+  let precomputedVaultSearch: VaultSearchResult | undefined;
+  if (!skipComplex && deps.vault) {
+    const vaultHits = findRelevantByTask(task, deps.vault.listItems());
+    if (vaultHits.items.length > 0 || semanticHit) {
+      tracer.vault('hit', `${vaultHits.items.length} match${vaultHits.items.length !== 1 ? 'es' : ''} — "${task.slice(0, 40)}"`);
+      tracer.gate('Vault-Hit', `${vaultHits.items.length} matches — showing choice modal`);
+      precomputedVaultSearch = vaultHits;
+      const resolverId = `vault-${Date.now()}`;
+      const choice = await new Promise<'use-vault' | 'build-fresh' | 'cancel'>((resolve) => {
+        // We can just use the map directly or register VaultHitResolver if we import it.
+        // But since this was extracted, let's just use the exported map.
+        // Wait, _pendingBuildConfirms, etc. Let's import registerVaultHitResolver.
+        registerVaultHitResolver(resolverId, resolve as any); // cast to any to fix strict TS return type
+        deps.postToWebview({ type: 'show-vault-hit', resolverId, task, matchCount: vaultHits.items.length, isSemantic: semanticHit });
+        setTimeout(() => resolve('cancel'), 60000); // 1 min timeout
+      });
+      if (choice === 'cancel') { deps.postToWebview({ type: 'set-status', status: 'ready' }); return; }
+      if (choice === 'use-vault') {
+        const ctx = { task, root: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', blueprintContext: deps.blueprintContext, vault: deps.vault, chassis: deps.chassis, routing: deps.routing, conversation: deps.conversation, refresh: deps.refresh, logError: deps.logError, postToWebview: deps.postToWebview };
+        await runVaultAssemblyBuild(ctx, vaultHits.items);
+        deps.postToWebview({ type: 'set-status', status: 'ready' });
+        return;
+      }
+      // if 'build-fresh', fall through to cost estimate
+    }
+  }
+
+  // ── Cost Estimate gate ──
+  // Direct mode: skip cost estimate gate entirely (auto-approve)
+  if (!skipComplex && deps.buildMode !== 'direct') {
+    const confirmed = await awaitCostConfirmation(task, deps);
+    tracer.gate('Cost', confirmed ? 'approved' : 'user cancelled');
+    if (!confirmed) { deps.postToWebview({ type: 'set-status', status: 'ready' }); return; }
+  }
+
+  // ── Plan mode: check blueprint completeness before building ──
+  if (deps.buildMode === 'plan' && !skipComplex) {
+    const config = deps.chassis?.isInitialized?.() ? deps.chassis.loadConfig() : null;
+    const bp = config?.blueprint;
+    const hasCompleteBlueprint = bp && ['who','what','where','when','why'].every((k: string) => (bp as any)[k] && (bp as any)[k].trim().length > 0);
+    if (!hasCompleteBlueprint) {
+      deps.postToWebview({ type: 'set-status', status: 'ready' });
+      deps.postToWebview({ type: 'assistant-message', text: '📋 **Plan Mode Active** — Let\'s complete your project blueprint first. I\'m starting the 5 W\'s interview...' });
+      // Trigger blueprint interview via command; after completion user can re-submit the build request
+      await vscode.commands.executeCommand('chassis.blueprintInterview');
+      return;
+    }
+  }
+
+  // ── All gates passed, run the build ──
+  await runBuildAfterGates(task, deps, skipComplex, isFixRequest, precomputedVaultSearch);
 }
 export { handleEditRequest } from './chatPanelEditHandler.js';

@@ -2,6 +2,8 @@
 // or needs user confirmation before writing into the current project.
 // Called by handleBuildRequest before vault search, on every build path.
 
+import type { RoutingService } from '../ai/routingService.js';
+
 export type PlacementDecision = 'fit' | 'ambiguous' | 'no-project';
 
 export interface PlacementCheckResult {
@@ -9,15 +11,12 @@ export interface PlacementCheckResult {
   projectName: string;
 }
 
-// [WARN][RULE 18] BACKEND_SIGNALS and FRONTEND_SIGNALS below are Rule 18 violations — keyword lists
-// simulating domain classification. taskDomain() and blueprintDomain() should use a 50-token AI
-// classifier call: "Is this task frontend, backend, or mixed? Reply: frontend/backend/mixed/unknown"
-// Requires making checkBuildPlacement() async, which cascades to chatPanelIntent.ts callers.
-// [NEXT] Replace taskDomain() with AI classifier in a dedicated session.
+// [DONE] BACKEND_SIGNALS/FRONTEND_SIGNALS keyword lists replaced with AI classifier per Rule 18.
+// blueprintDomain reads our own structured context — kept as keyword filter (structural, not NL).
 const BACKEND_SIGNALS = /\b(api|endpoint|route|controller|model|schema|migration|database|db|server|backend|django|fastapi|flask|express|sqlalchemy|orm|rest|graphql|prisma|middleware|auth|jwt|crud|repository|serializer)\b/i;
 const FRONTEND_SIGNALS = /\b(ui|page|component|form|input|button|screen|modal|layout|style|css|html|react|vue|svelte|widget|panel|card|header|nav|menu|sidebar|dropdown|toast|dialog|table|grid|theme|render)\b/i;
 
-/** Derive the domain implied by a blueprintContext string (WHO/WHAT/WHERE fields). */
+/** Derive the domain from blueprintContext (our own structured data — keyword match is safe here). */
 function blueprintDomain(ctx: string): 'frontend' | 'backend' | 'mixed' | 'unknown' {
   const isFrontend = FRONTEND_SIGNALS.test(ctx);
   const isBackend  = BACKEND_SIGNALS.test(ctx);
@@ -27,13 +26,16 @@ function blueprintDomain(ctx: string): 'frontend' | 'backend' | 'mixed' | 'unkno
   return 'unknown';
 }
 
-/** Derive the domain implied by the task string. */
-function taskDomain(task: string): 'frontend' | 'backend' | 'mixed' | 'unknown' {
-  const isFrontend = FRONTEND_SIGNALS.test(task);
-  const isBackend  = BACKEND_SIGNALS.test(task);
-  if (isFrontend && !isBackend) { return 'frontend'; }
-  if (isBackend  && !isFrontend) { return 'backend'; }
-  if (isFrontend && isBackend)  { return 'mixed'; }
+/** [RULE 18] AI classifier decides task domain — regex cannot reliably parse free-form task descriptions. */
+async function taskDomain(task: string, routing: RoutingService): Promise<'frontend' | 'backend' | 'mixed' | 'unknown'> {
+  try {
+    const prompt = `Task: "${task.slice(0, 200)}"\nIs this task about frontend UI, backend logic, or both? Reply with one word: frontend, backend, mixed, or unknown`;
+    const res = await routing.prompt(prompt, 12_000);
+    if (res.success && res.text) {
+      const w = res.text.trim().toLowerCase();
+      if (w === 'frontend' || w === 'backend' || w === 'mixed') { return w; }
+    }
+  } catch { /* fall through */ }
   return 'unknown';
 }
 
@@ -66,12 +68,13 @@ function projectNameWords(name: string): string[] {
  * 4. Domain mismatch: strictly opposite frontend/backend domains → 'ambiguous'
  * 5. Unknown/mixed domains → 'fit'
  */
-export function checkBuildPlacement(
+export async function checkBuildPlacement(
   task: string,
   blueprintContext: string,
   isInitialized: boolean,
   projectName: string,
-): PlacementCheckResult {
+  routing: RoutingService,
+): Promise<PlacementCheckResult> {
   if (!isInitialized || !blueprintContext.trim()) {
     return { decision: 'no-project', projectName };
   }
@@ -104,7 +107,7 @@ export function checkBuildPlacement(
 
   // Rule 4: domain mismatch check
   const bpDomain = blueprintDomain(blueprintContext);
-  const taskDom  = taskDomain(task);
+  const taskDom  = await taskDomain(task, routing);
 
   if (bpDomain === 'unknown' || taskDom === 'unknown') { return { decision: 'fit', projectName }; }
   if (bpDomain === 'mixed'   || taskDom === 'mixed')   { return { decision: 'fit', projectName }; }

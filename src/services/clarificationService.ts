@@ -2,6 +2,7 @@
 // Forces explicit confirmation before proceeding with ambiguous requests
 
 import * as vscode from 'vscode';
+import type { RoutingService } from './ai/routingService.js';
 
 export interface ClarificationRequest {
   question: string;
@@ -94,45 +95,25 @@ export async function clarifyAmbiguousReference(
   return null;
 }
 
-// [WARN][RULE 18] needsClarification uses ambiguous-pronoun regex and verb keyword lists to simulate
-// intent understanding. Should use a 50-token AI classifier instead:
-// "Does this request have enough context to act on, or does it need clarification? Reply: clear or unclear"
-// [NEXT] Make needsClarification async and replace regex checks with AI classifier call.
-export function needsClarification(
+// [DONE] needsClarification regex replaced with AI classifier per Rule 18.
+export async function needsClarification(
   task: string,
-  candidates: string[]
-): { needsClarification: boolean; reason: string } {
-  const taskLower = task.toLowerCase();
-
-  // Ambiguous pronouns
-  const ambiguousRefs = /\b(this|that|it|here|there)\b/;
-  if (ambiguousRefs.test(taskLower) && candidates.length > 1) {
-    return {
-      needsClarification: true,
-      reason: `Ambiguous reference "${taskLower.match(ambiguousRefs)?.[0]}" with ${candidates.length} possible files`,
-    };
+  candidates: string[],
+  routing: RoutingService
+): Promise<{ needsClarification: boolean; reason: string }> {
+  // Structural fast-path: explicit file extension → unambiguous target, no clarification needed
+  if (/\b[\w\-]+\.(html|ts|tsx|js|jsx|py|rs|go|css|scss)\b/.test(task)) {
+    return { needsClarification: false, reason: '' };
   }
-
-  // No explicit file mentioned and multiple candidates
-  const hasExplicitFile = /\b([\w\-]+\.(html|ts|tsx|js|jsx|py|rs|go|css|scss))\b/.test(task);
-  if (!hasExplicitFile && candidates.length > 1) {
-    return {
-      needsClarification: true,
-      reason: `No explicit file mentioned, ${candidates.length} candidates found`,
-    };
-  }
-
-  // Unclear action (could be add OR modify)
-  const hasAdd = /\badd\b/.test(taskLower);
-  const hasModify = /\b(modify|update|change|fix)\b/.test(taskLower);
-  if (hasAdd && !hasModify && candidates.length > 0) {
-    // "Add" could mean "add new file" or "add to existing"
-    return {
-      needsClarification: true,
-      reason: 'Unclear if "add" means new file or add to existing',
-    };
-  }
-
+  // [RULE 18] AI classifier decides if the request is ambiguous given the candidate files
+  try {
+    const fileList = candidates.slice(0, 5).join(', ') || 'none';
+    const prompt = `Task: "${task.slice(0, 200)}"\nCandidate files: ${fileList}\nIs it clear which file to modify, or is this request ambiguous? Reply with one word: clear or unclear`;
+    const res = await routing.prompt(prompt, 12_000);
+    if (res.success && res.text && res.text.trim().toLowerCase().startsWith('unclear')) {
+      return { needsClarification: true, reason: `Ambiguous request across ${candidates.length} candidate file(s)` };
+    }
+  } catch { /* fall through */ }
   return { needsClarification: false, reason: '' };
 }
 
@@ -150,9 +131,10 @@ function getFileDescription(file: string): string {
 export async function ensureClarityBeforeBuild(
   task: string,
   candidates: string[],
-  postToWebview: (msg: any) => void
+  postToWebview: (msg: any) => void,
+  routing: RoutingService
 ): Promise<{ canProceed: boolean; targetFile?: string }> {
-  const check = needsClarification(task, candidates);
+  const check = await needsClarification(task, candidates, routing);
 
   if (!check.needsClarification) {
     return { canProceed: true, targetFile: candidates[0] };

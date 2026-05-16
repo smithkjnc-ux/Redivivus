@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { applyChassisStructure } from './chatPanelCodeStructure.js';
+import type { RoutingService } from '../../services/ai/routingService.js';
 
 // Minimum lines in a code block to qualify for auto-save
 const MIN_AUTO_SAVE_LINES = 10;
@@ -21,11 +22,7 @@ const EXT_MAP: Record<string, string> = {
   sql: 'sql', md: 'md', markdown: 'md', xml: 'xml', svg: 'svg',
 };
 
-// [WARN][RULE 18] BUILD_VERB_RE below is a Rule 18 violation — keyword list simulating intent detection.
-// shouldAutoSave() should use a 50-token AI classifier: "Did the user ask to create/build a file? yes or no"
-// Requires making shouldAutoSave() async, which cascades to chatPanelMsgSendAI.ts caller.
-// [NEXT] Replace with AI classifier when refactoring chatPanelMsgSendAI.ts.
-const BUILD_VERB_RE = /\b(build|create|make|generate|write|add|implement|code|develop|produce|convert|turn|transform|rewrite|replace|port|refactor|rebuild|redo)\b/i;
+// [DONE] BUILD_VERB_RE replaced with AI classifier per Rule 18.
 
 interface AutoSaveTarget {
   code: string;
@@ -34,9 +31,15 @@ interface AutoSaveTarget {
 }
 
 /** Checks if the AI response has a single dominant code block worth auto-saving */
-export function shouldAutoSave(aiResponse: string, userMessage: string): boolean {
-  // Only auto-save when user message contains a build/convert verb
-  if (!BUILD_VERB_RE.test(userMessage)) { return false; }
+export async function shouldAutoSave(aiResponse: string, userMessage: string, routing: RoutingService): Promise<boolean> {
+  // [RULE 18] AI classifier decides whether the user asked to build/generate a file
+  try {
+    const prompt = `User message: "${userMessage.slice(0, 200)}"\nDid the user ask to build, create, or generate a new file or program? Reply with one word: yes or no`;
+    const res = await routing.prompt(prompt, 12_000);
+    if (res.success && res.text && !res.text.trim().toLowerCase().startsWith('yes')) { return false; }
+  } catch {
+    if (!/\b(build|create|make|generate|write|implement|code|produce|rewrite|rebuild)\b/i.test(userMessage)) { return false; }
+  }
   // [WARN] Handle BOTH closed (```...```) and truncated (```... with no closing fence) code blocks.
   // AI responses often get truncated when hitting output token limits.
   const closedBlocks = aiResponse.match(/```\w*\s*\n[\s\S]*?```/g) || [];
@@ -145,13 +148,21 @@ export async function autoSaveAndOpen(code: string, filename: string, root: stri
   return `✅ Saved: \`${filename}\` → \`${friendlyDir}/\``;
 }
 
-// [WARN][RULE 18] DELETE_RE is a Rule 18 violation — should use AI: "Does user want to delete files? yes or no"
-const DELETE_RE = /\b(delete|remove|clean up|get rid of|trash)\b/i;
+// [DONE] DELETE_RE replaced with AI classifier per Rule 18.
 const FILE_EXT_RE = /\b(\w+\.\w{2,5})\b/g;
 
-/** Check if user is asking to delete files */
-export function shouldDeleteFiles(userText: string): boolean {
-  return DELETE_RE.test(userText);
+/** Check if user is asking to delete files from the project */
+export async function shouldDeleteFiles(userText: string, routing: RoutingService): Promise<boolean> {
+  // Fast-path: if no deletion-adjacent word appears at all, skip AI call
+  if (!/\b(delete|remove|clean|trash|wipe|erase|get rid)\b/i.test(userText)) { return false; }
+  // [RULE 18] AI classifier — "remove the button" ≠ "remove the file"
+  try {
+    const prompt = `User message: "${userText.slice(0, 200)}"\nIs the user asking to delete or remove project files? Reply with one word: yes or no`;
+    const res = await routing.prompt(prompt, 12_000);
+    return res.success && !!res.text && res.text.trim().toLowerCase().startsWith('yes');
+  } catch {
+    return false; // never accidentally delete on AI failure
+  }
 }
 
 /** Delete files matching user request */

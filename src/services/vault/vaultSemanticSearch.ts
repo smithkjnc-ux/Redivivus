@@ -137,24 +137,20 @@ function preFilterByCategory(task: string, items: VaultItem[], limit = 30): Vaul
     .map(s => s.item);
 }
 
-// [WARN][RULE 18] detectIntentMismatch uses frontend/backend keyword lists to simulate domain classification.
-// This function is called inside semanticVaultSearch which already has a callAI param — should pass that
-// through and ask: "Is this task frontend, backend, or mixed? Is this vault item frontend, backend, or mixed?"
-// [NEXT] Make detectIntentMismatch async and replace the regex signals with a single AI call.
-function detectIntentMismatch(task: string, item: VaultItem): boolean {
-  const frontendSignals  = /\b(ui|form|page|component|input|button|screen|modal|layout|view|render|style|css|html|react|vue|svelte|widget|panel|card|sidebar|header|nav|footer|menu|dropdown|toast|dialog|table|grid|list|icon|theme)\b/i;
-  const backendSignals   = /\b(api|endpoint|route|controller|model|schema|migration|django|fastapi|express|flask|sqlalchemy|orm|database|db|repository|service layer|serializer|middleware|auth|jwt|crud|rest|graphql|prisma)\b/i;
-
-  const taskIsFrontend  = frontendSignals.test(task);
-  const taskIsBackend   = backendSignals.test(task);
-  const itemCode        = [item.name, item.description ?? '', item.code.slice(0, 300)].join(' ');
-  const itemIsFrontend  = frontendSignals.test(itemCode);
-  const itemIsBackend   = backendSignals.test(itemCode);
-
-  // Only flag a mismatch when one side is clearly frontend and the other clearly backend
-  if (taskIsFrontend && !taskIsBackend && itemIsBackend && !itemIsFrontend) { return true; }
-  if (taskIsBackend  && !taskIsFrontend && itemIsFrontend && !itemIsBackend) { return true; }
-  return false;
+// [DONE] detectIntentMismatch regex replaced with AI classifier per Rule 18.
+async function detectIntentMismatch(
+  task: string,
+  item: VaultItem,
+  callAI: (prompt: string) => Promise<{ text: string; success: boolean }>
+): Promise<boolean> {
+  try {
+    const snippet = [item.name, item.description ?? '', item.code.slice(0, 200)].join(' ');
+    const prompt = `Task: "${task.slice(0, 150)}"\nVault item: "${snippet.slice(0, 200)}"\nAre these clearly in opposite domains (one frontend UI, the other backend logic)? Reply with one word: mismatch or match`;
+    const res = await callAI(prompt);
+    return res.success && !!res.text && res.text.trim().toLowerCase().startsWith('mismatch');
+  } catch {
+    return false; // never block vault results on AI failure
+  }
 }
 
 /** Run AI semantic search against the vault.
@@ -180,7 +176,7 @@ export async function semanticVaultSearch(
     if (!parsed || parsed.confidence < 0.95) { return null; }
 
     const matched = capped[parsed.index];
-    const intentMismatch = detectIntentMismatch(task, matched);
+    const intentMismatch = await detectIntentMismatch(task, matched, callAI);
 
     return {
       item: matched,

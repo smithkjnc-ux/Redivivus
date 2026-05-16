@@ -1,7 +1,17 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10V: Intent-aware message routing — run/preview intent + modal moved to backend*
+*Last updated: May 16, 2026 — Session 10W: Rule 18 complete — all 5 remaining regex NL violations replaced with AI classifiers*
+
+## Recent Fixes — May 16, 2026 (Session 10W: Rule 18 complete — all remaining regex NL violations fixed)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelAutoSave.ts` | `shouldAutoSave` made async — AI classifier replaces BUILD_VERB_RE: "Did user ask to build/create a file? yes or no". `shouldDeleteFiles` made async — AI classifier replaces DELETE_RE: "Is user asking to delete files? yes or no". Fast-path pre-filter kept on delete (structural, not NL). Caller `chatPanelMsgSendAI.ts` updated to `await` both. | "remove the CSS class" was triggering file deletion. "convert" was triggering auto-save when AI gave a text explanation. Regex couldn't distinguish. | Low — AI failures fall back to false (no delete, no save). |
+| `src/services/build/buildPlacementCheck.ts` | `taskDomain()` made async with routing param — AI classifier: "Is this task frontend, backend, mixed, or unknown?". `checkBuildPlacement` made async. `blueprintDomain()` kept as regex (reads our own structured data). | Keyword lists misclassify "add a REST-like feel to the UI" as backend, "make the API page load faster" as frontend. | Low — returns 'unknown' on AI failure → treats as 'fit'. |
+| `src/services/vault/vaultSemanticSearch.ts` | `detectIntentMismatch` made async — AI classifier: "Are task and vault item in opposite domains? mismatch or match". Uses existing `callAI` param already available in `semanticVaultSearch`. | Frontend/backend keyword lists excluded valid vault results. "form validation" was being flagged as frontend even when the vault item was a general validation utility. | Low — returns false (no mismatch) on AI failure → vault item included. |
+| `src/services/project/templateScopeService.ts` | `isVagueProjectRequest` made async with routing: AI classifier "vague or clear". `parseScopeAnswer` made async with routing: AI parses complexity + purpose as JSON. Callers in `chatPanelIntent.ts` updated to `await`. | Regex length/keyword heuristics blocked valid detailed requests and passed through genuinely vague ones. parseScopeAnswer keyword matching missed creative phrasings like "something I can show clients". | Low — both return safe defaults on AI failure (false / 'simple'/'general'). |
+| `src/services/clarificationService.ts` | `needsClarification` made async with routing: AI classifier "clear or unclear" given task + candidate files. Structural fast-path kept for explicit file extensions. `ensureClarityBeforeBuild` updated to pass routing. | Ambiguous-pronoun regex ("this", "it") was triggering clarification for "fix this bug" even when context was clear. | Low — returns false (no clarification needed) on AI failure → proceeds. |
 
 ## Recent Fixes — May 16, 2026 (Session 10V: Intent-aware routing — run intent + backend modal)
 

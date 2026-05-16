@@ -1,7 +1,7 @@
 // [SCOPE] Template Scope Service — detects vague project requests and asks 2 clarifying questions
 // in the chat BEFORE showing the template wizard. Wizard becomes a confirmation/gap-filler only.
 // [WARN] Never block builds — if user ignores or times out, continue with original task.
-// [NEXT] Use AI to parse the scope answer and pre-select wizard category + subcategory.
+// [DONE] isVagueProjectRequest and parseScopeAnswer replaced with AI classifiers per Rule 18.
 
 // [WARN] One pending scope resolver at a time — cleared on reply or timeout
 let _pendingScopeResolve: ((answer: string | null) => void) | null = null;
@@ -39,35 +39,24 @@ export function clearPendingScopeQuestion(): void {
   }
 }
 
+import type { RoutingService } from '../ai/routingService.js';
+
 /**
- * Returns true if the task is a vague project-type request that needs scope clarification.
- * "Build me a website" → true
- * "Build me a portfolio website for Jane Smith, dark theme" → false (already has detail)
- * "Add a contact form" → false (modification, not a new project)
+ * Returns true if the task is a vague new-project request needing scope clarification.
+ * [RULE 18] AI classifier — "build me a website" vs "build me a portfolio with dark theme for Jane"
+ * Fast path: skip AI if task is clearly not a new-project request (file/modification language).
  */
-// [WARN][RULE 18] isVagueProjectRequest and parseScopeAnswer below use keyword regex to simulate
-// understanding of project type, vagueness, and complexity. Both should use 50-token AI classifier calls.
-// [NEXT] Make both functions async with routing param. Replace regex with:
-//   "Is this a vague new-project request lacking type/features/audience? Reply: vague or clear"
-//   "What complexity is this scope answer? Reply: simple, medium, or full"
-export function isVagueProjectRequest(task: string): boolean {
-  const t = task.trim();
-
-  // Must be a project-type request
-  const isProjectRequest =
-    /build\s+(me\s+)?(a|an)\s+(website|web site|game|app|dashboard|portfolio|landing page|api|backend|blog|tool|cli)/i.test(t) ||
-    /create\s+(a|an)\s+(website|game|app|dashboard|portfolio|blog)/i.test(t) ||
-    /make\s+(a|an)\s+(website|game|app|dashboard|portfolio|blog)/i.test(t);
-
-  if (!isProjectRequest) { return false; }
-
-  // If task has substantial detail (>60 chars or contains key detail words), don't ask
-  const hasDetail =
-    t.length > 70 ||
-    /for\s+\w|with\s+(a|an|the|dark|light|blue|red|green|my|our)\b/i.test(t) ||
-    /\b(portfolio|personal|business|blog|dashboard|e-commerce|ecommerce|landing|admin|crud|rest|fastapi|express)\b/i.test(t.replace(/build|create|make/gi, ''));
-
-  return !hasDetail;
+export async function isVagueProjectRequest(task: string, routing: RoutingService): Promise<boolean> {
+  // Fast-path: explicit file extension or modification verb → not a new-project request
+  if (/\b[\w/-]+\.(ts|js|py|html|css|json)\b/i.test(task)) { return false; }
+  if (/\b(fix|update|modify|change|edit|add to|remove from)\b/i.test(task)) { return false; }
+  try {
+    const prompt = `Task: "${task.slice(0, 250)}"\nIs this a vague new-project request that lacks specific details (purpose, audience, key features)? Reply with one word: vague or clear`;
+    const res = await routing.prompt(prompt, 12_000);
+    return res.success && !!res.text && res.text.trim().toLowerCase().startsWith('vague');
+  } catch {
+    return false; // never block builds on AI failure
+  }
 }
 
 /**
@@ -96,36 +85,30 @@ export async function askScopeQuestions(
 
 /**
  * Parse a scope answer and return hints for the wizard pre-selection.
+ * [RULE 18] AI classifier — keyword matching cannot reliably detect complexity or purpose from free-form answers.
  */
-export function parseScopeAnswer(answer: string): {
+export async function parseScopeAnswer(answer: string, routing: RoutingService): Promise<{
   complexity: 'simple' | 'medium' | 'full';
   purposeHint: string;
   enrichedTask: string;
-} {
-  const a = answer.toLowerCase();
+}> {
+  let complexity: 'simple' | 'medium' | 'full' = 'simple';
+  let purposeHint = 'general';
+  try {
+    const prompt = `Scope answer: "${answer.slice(0, 300)}"\nClassify this in JSON with two fields:\n- complexity: "simple", "medium", or "full"\n- purpose: "portfolio", "business", "blog", "dashboard", "game", "tool", "api", or "general"\nReturn ONLY JSON like: {"complexity":"simple","purpose":"portfolio"}`;
+    const res = await routing.prompt(prompt, 12_000);
+    if (res.success && res.text) {
+      const m = res.text.match(/\{[^}]+\}/);
+      if (m) {
+        const parsed = JSON.parse(m[0]);
+        if (parsed.complexity === 'medium' || parsed.complexity === 'full') { complexity = parsed.complexity; }
+        if (parsed.purpose) { purposeHint = parsed.purpose; }
+      }
+    }
+  } catch { /* use defaults */ }
 
-  const complexity: 'simple' | 'medium' | 'full' =
-    /\bfull\b|backend|database|auth|login|e-commerce|ecommerce|api|server|node|python|react|vue|angular/i.test(answer) ? 'full' :
-    /\bmedium\b|multi|several|section|js|javascript|dynamic|form|animation|carousel|chart/i.test(answer) ? 'medium' :
-    'simple';
-
-  const purposeHint =
-    /portfolio|personal|about me|my work|resume|cv/i.test(answer) ? 'portfolio' :
-    /business|company|product|service|landing|startup|saas/i.test(answer) ? 'business' :
-    /blog|article|post|write|content|news/i.test(answer) ? 'blog' :
-    /dashboard|admin|panel|analytics|stats|chart/i.test(answer) ? 'dashboard' :
-    /game|play|arcade|puzzle/i.test(answer) ? 'game' :
-    /tool|utility|cli|convert|generate|calculate/i.test(answer) ? 'tool' :
-    /api|rest|endpoint|backend|server/i.test(answer) ? 'api' :
-    'general';
-
-  // Keep enrichedTask short and regex-friendly so runTemplateWizard's isTemplateRequest check matches it
-  const typeWord = purposeHint === 'game' ? 'game' :
-    purposeHint === 'api' ? 'api' :
-    purposeHint === 'tool' ? 'tool' :
-    'website';
+  const typeWord = purposeHint === 'game' ? 'game' : purposeHint === 'api' ? 'api' : purposeHint === 'tool' ? 'tool' : 'website';
   const enrichedTask = `Build me a ${purposeHint} ${typeWord} (${complexity}). Details: ${answer}`;
-
   return { complexity, purposeHint, enrichedTask };
 }
 
