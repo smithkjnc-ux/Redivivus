@@ -5,6 +5,7 @@
 //        If postToWebview is not available, bail immediately so the build continues normally.
 
 import { TEMPLATE_CATEGORIES, TemplateDef, matchTaskToTemplate, fetchTemplate } from './templateRegistry.js';
+import { RoutingService } from '../../services/ai/routingService.js';
 
 export interface TemplateWizardResult {
   handled: boolean;
@@ -35,26 +36,26 @@ export function resolveTemplateWizard(msg: { type: string; subId?: string; regis
  * Detect if a task is a template-type request and run the centered WebView wizard if so.
  * postToWebview is required — if absent, returns { handled: false } immediately.
  */
-export async function runTemplateWizard(task: string, postToWebview?: (msg: any) => void): Promise<TemplateWizardResult> {
+// [DONE] Rule 18 fix: both isSmallUnit and isTemplateRequest now use AI classifier calls, not regex.
+export async function runTemplateWizard(task: string, postToWebview?: (msg: any) => void, routing?: RoutingService): Promise<TemplateWizardResult> {
   // Can't show WebView modal without postToWebview — bail cleanly
   if (!postToWebview) { return { handled: false }; }
 
-  // [WARN][RULE 18] isSmallUnit and isTemplateRequest below are Rule 18 violations — keyword regex
-  // simulating intent understanding. runTemplateWizard is currently unwired (no active caller).
-  // [NEXT] When wiring this function, replace both checks with 50-token AI classifier calls:
-  //   "Is this a small code unit or a full project? Reply: snippet or project"
-  //   "Is this requesting a template-type project (website/game/app/dashboard)? Reply: yes or no"
-  const isSmallUnit = /function|snippet|utility|helper|class|method|hook|component|script/i.test(task)
-    && !/website|web site|game|app|dashboard|landing|portfolio|api|backend|server/i.test(task);
-  if (isSmallUnit) { return { handled: false }; }
-
-  const isTemplateRequest =
-    /build\s+(me\s+)?(a|an)\s+([\w\s]{0,30}?)(website|web site|game|app|dashboard|portfolio|landing page|api|backend|blog|tool|cli)/i.test(task) ||
-    /create\s+(a|an)\s+([\w\s]{0,20}?)(website|game|app|dashboard|portfolio)/i.test(task) ||
-    /make\s+(a|an)\s+([\w\s]{0,20}?)(website|game|app|dashboard|portfolio)/i.test(task) ||
-    /\b(website|portfolio|dashboard|blog|game|landing page)\b/i.test(task);
-
-  if (!isTemplateRequest) { return { handled: false }; }
+  if (routing) {
+    try {
+      // [RULE 18] 50-token classifier: is this a small snippet or a full project?
+      const unitRes = await routing.prompt(`Task: "${task.slice(0, 200)}"\nIs this a small code snippet/utility/function, or a full standalone app/project?\nReply with one word: snippet or project`, 12_000);
+      if (unitRes.success && unitRes.text?.trim().toLowerCase().startsWith('snippet')) { return { handled: false }; }
+      // [RULE 18] 50-token classifier: is this a template-type project (website/game/dashboard/app)?
+      const tmplRes = await routing.prompt(`Task: "${task.slice(0, 200)}"\nIs this requesting a full-project template like a website, game, dashboard, app, portfolio, or blog? Reply: yes or no`, 12_000);
+      if (!tmplRes.success || !tmplRes.text?.trim().toLowerCase().startsWith('yes')) { return { handled: false }; }
+    } catch { return { handled: false }; }
+  } else {
+    // Keyword fallback when no routing service is available
+    if (/\b(function|snippet|utility|helper|class|method|hook|component)\b/i.test(task) &&
+        !/\b(website|game|app|dashboard|landing|portfolio|api|backend|blog)\b/i.test(task)) { return { handled: false }; }
+    if (!/\b(website|portfolio|dashboard|blog|game|landing page|app)\b/i.test(task)) { return { handled: false }; }
+  }
 
   // Auto-detect category+sub to pre-select in the modal
   const autoMatch = matchTaskToTemplate(task);

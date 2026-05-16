@@ -2,73 +2,18 @@
 // These seed the vault on first install so every user gets quality reference patterns from day one.
 // Categories: component, utility, api, auth, algorithm, pattern, error, validation, network, config
 // [WARN] All patterns here must be verified working before adding. Test before committing.
-// [NEXT] Add patterns per category as they are validated: React hooks, Python utils, CLI tools
+// [DONE] Added DOM utils, storage wrapper, string utils, array utils — see starterPatternsUtils.ts
+// Utility patterns + makeItem factory -> starterPatternsUtils.ts
 
-import * as crypto from 'crypto';
-import { VaultItem, VaultCategory } from '../vault/vaultTypes.js';
-
-function makeItem(
-  name: string, code: string, language: string,
-  category: VaultCategory, description: string, tags: string[]
-): VaultItem {
-  const hash = crypto.createHash('sha256').update(code).digest('hex').slice(0, 16);
-  return {
-    id: hash, name, code, language, category, description,
-    sourceProject: 'chassis-starter', sourceFile: 'starterPatterns.ts',
-    tags, lineCount: code.split('\n').length,
-    importCount: 0, createdAt: new Date().toISOString(), contentHash: hash,
-  };
-}
+import { VaultItem } from '../vault/vaultTypes.js';
+import { makeItem, getUtilityPatterns, getDOMPatterns, getStoragePatterns, getStringPatterns } from './starterPatternsUtils.js';
 
 export function getStarterPatterns(): VaultItem[] {
   return [
-
-    // ── Utility ──────────────────────────────────────────────────────────────
-    makeItem('debounce', `
-function debounce(fn, delay) {
-  let timer;
-  return function(...args) {
-    clearTimeout(timer);
-    timer = setTimeout(() => fn.apply(this, args), delay);
-  };
-}`.trim(), 'js', 'utility', 'Debounce — delays function execution until after wait ms have elapsed', ['debounce', 'performance', 'events']),
-
-    makeItem('throttle', `
-function throttle(fn, limit) {
-  let inThrottle;
-  return function(...args) {
-    if (!inThrottle) {
-      fn.apply(this, args);
-      inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
-    }
-  };
-}`.trim(), 'js', 'utility', 'Throttle — limits function to fire at most once per limit ms', ['throttle', 'performance', 'events']),
-
-    makeItem('deepClone', `
-function deepClone(obj) {
-  if (obj === null || typeof obj !== 'object') { return obj; }
-  if (obj instanceof Date) { return new Date(obj.getTime()); }
-  if (Array.isArray(obj)) { return obj.map(deepClone); }
-  return Object.fromEntries(Object.entries(obj).map(([k, v]) => [k, deepClone(v)]));
-}`.trim(), 'js', 'utility', 'Deep clone an object without external libraries', ['clone', 'deep-copy', 'object']),
-
-    makeItem('slugify', `
-function slugify(str) {
-  return str.toLowerCase().trim()
-    .replace(/[^a-z0-9\\s-]/g, '')
-    .replace(/[\\s_-]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}`.trim(), 'js', 'utility', 'Convert a string to a URL-safe slug', ['slug', 'url', 'string', 'format']),
-
-    makeItem('formatBytes', `
-function formatBytes(bytes, decimals = 2) {
-  if (bytes === 0) { return '0 Bytes'; }
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(decimals)) + ' ' + sizes[i];
-}`.trim(), 'js', 'utility', 'Format byte count to human-readable string (KB, MB, GB)', ['bytes', 'format', 'filesize']),
+    ...getUtilityPatterns(),
+    ...getDOMPatterns(),
+    ...getStoragePatterns(),
+    ...getStringPatterns(),
 
     // ── API ──────────────────────────────────────────────────────────────────
     makeItem('fetchWithRetry', `
@@ -130,7 +75,7 @@ function binarySearch(arr, target) {
     if (arr[mid] < target) { lo = mid + 1; } else { hi = mid - 1; }
   }
   return -1;
-}`.trim(), 'js', 'algorithm', 'Binary search on a sorted array — O(log n)', ['binary-search', 'search', 'sorted', 'algorithm']),
+}`.trim(), 'js', 'algorithm', 'Binary search on a sorted array -- O(log n)', ['binary-search', 'search', 'sorted', 'algorithm']),
 
     makeItem('memoize', `
 function memoize(fn) {
@@ -142,7 +87,7 @@ function memoize(fn) {
     cache.set(key, result);
     return result;
   };
-}`.trim(), 'js', 'algorithm', 'Memoize any function — caches results by serialized args', ['memoize', 'cache', 'performance', 'optimization']),
+}`.trim(), 'js', 'algorithm', 'Memoize any function -- caches results by serialized args', ['memoize', 'cache', 'performance', 'optimization']),
 
     makeItem('groupBy', `
 function groupBy(arr, keyFn) {
@@ -157,47 +102,25 @@ function groupBy(arr, keyFn) {
     makeItem('EventEmitter', `
 class EventEmitter {
   constructor() { this._events = {}; }
-  on(event, listener) {
-    (this._events[event] = this._events[event] || []).push(listener);
-    return this;
-  }
-  off(event, listener) {
-    this._events[event] = (this._events[event] || []).filter(l => l !== listener);
-    return this;
-  }
-  emit(event, ...args) {
-    (this._events[event] || []).forEach(l => l(...args));
-    return this;
-  }
-  once(event, listener) {
-    const wrapper = (...args) => { listener(...args); this.off(event, wrapper); };
-    return this.on(event, wrapper);
-  }
-}`.trim(), 'js', 'pattern', 'Minimal EventEmitter — on/off/emit/once', ['event-emitter', 'observer', 'pattern', 'events']),
+  on(event, listener) { (this._events[event] = this._events[event] || []).push(listener); return this; }
+  off(event, listener) { this._events[event] = (this._events[event] || []).filter(l => l !== listener); return this; }
+  emit(event, ...args) { (this._events[event] || []).forEach(l => l(...args)); return this; }
+  once(event, listener) { const w = (...args) => { listener(...args); this.off(event, w); }; return this.on(event, w); }
+}`.trim(), 'js', 'pattern', 'Minimal EventEmitter -- on/off/emit/once', ['event-emitter', 'observer', 'pattern', 'events']),
 
     makeItem('singleton', `
 class Singleton {
   static _instance = null;
-  constructor() {
-    if (Singleton._instance) { return Singleton._instance; }
-    Singleton._instance = this;
-  }
-  static getInstance() {
-    if (!Singleton._instance) { new Singleton(); }
-    return Singleton._instance;
-  }
-}`.trim(), 'js', 'pattern', 'Singleton pattern — ensures only one instance exists', ['singleton', 'pattern', 'instance']),
+  constructor() { if (Singleton._instance) { return Singleton._instance; } Singleton._instance = this; }
+  static getInstance() { if (!Singleton._instance) { new Singleton(); } return Singleton._instance; }
+}`.trim(), 'js', 'pattern', 'Singleton pattern -- ensures only one instance exists', ['singleton', 'pattern', 'instance']),
 
     // ── Error ─────────────────────────────────────────────────────────────────
     makeItem('tryCatchAsync', `
 async function tryCatch(promise) {
-  try {
-    const result = await promise;
-    return [null, result];
-  } catch (err) {
-    return [err, null];
-  }
-}`.trim(), 'js', 'error', 'Async try/catch that returns [error, result] tuple — no try/catch needed at callsite', ['error', 'async', 'promise', 'tuple']),
+  try { const result = await promise; return [null, result]; }
+  catch (err) { return [err, null]; }
+}`.trim(), 'js', 'error', 'Async try/catch that returns [error, result] tuple -- no try/catch needed at callsite', ['error', 'async', 'promise', 'tuple']),
 
     // ── Validation ────────────────────────────────────────────────────────────
     makeItem('validateEmail', `

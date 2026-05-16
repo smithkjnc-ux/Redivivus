@@ -8,7 +8,7 @@ import { VaultItem, VaultCategory } from './vaultTypes.js';
 import { VaultService } from './vaultService.js';
 import { getStarterPatterns } from '../project/starterPatterns.js';
 
-// [NEXT] Add more search queries as patterns are validated
+// [DONE] Added: localStorage, date format, DOM helpers, array utilities, CSS animation
 const GITHUB_SEARCHES: Array<{ query: string; category: VaultCategory; language: string; tags: string[] }> = [
   { query: 'canvas animation trail requestAnimationFrame', category: 'component', language: 'js', tags: ['canvas', 'animation', 'trail', 'html'] },
   { query: 'debounce throttle utility function', category: 'utility', language: 'js', tags: ['debounce', 'throttle', 'performance'] },
@@ -20,6 +20,9 @@ const GITHUB_SEARCHES: Array<{ query: string; category: VaultCategory; language:
   { query: 'observer pattern event emitter typescript', category: 'pattern', language: 'ts', tags: ['observer', 'event-emitter', 'pattern'] },
   { query: 'input validation sanitize form typescript', category: 'validation', language: 'ts', tags: ['validation', 'sanitize', 'form'] },
   { query: 'error boundary react component', category: 'error', language: 'tsx', tags: ['error-boundary', 'react', 'component'] },
+  { query: 'localStorage wrapper getItem setItem JSON', category: 'utility', language: 'js', tags: ['storage', 'localstorage', 'json', 'persistence'] },
+  { query: 'format date relative time ago javascript', category: 'utility', language: 'js', tags: ['date', 'format', 'relative', 'time'] },
+  { query: 'useLocalStorage hook react custom', category: 'component', language: 'tsx', tags: ['react', 'hook', 'storage', 'localstorage'] },
 ];
 
 const ALLOWED_LICENSES = ['mit', 'apache-2.0', 'bsd-2-clause', 'bsd-3-clause', 'isc', '0bsd'];

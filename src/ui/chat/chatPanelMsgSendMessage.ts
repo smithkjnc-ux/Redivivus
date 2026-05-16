@@ -12,6 +12,7 @@ import { _pendingGuidedBuilds } from './chatPanelMsgSpecial.js';
 import { _scanChassisProjects } from '../chassisProjectScanner.js';
 import { handleAIChat } from './chatPanelMsgSendAI.js';
 import { handleFixRequest } from './chatPanelMsgFix.js';
+import { runTemplateWizard } from '../../services/project/templateWizard.js';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { chassis, routing, usageTracker, conversation, panel, refresh } = deps;
@@ -177,6 +178,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
         conversation.push({ role: 'assistant', content: buildGapPromptMessage(gapResult, userText), timestamp: Date.now() });
         refresh(); return;
       }
+    }
+    // Template wizard — fires in plan mode only, prompts user to pick a template category + fill answers
+    if (deps.buildMode === 'plan') {
+      const wiz = await runTemplateWizard(userText, (m) => panel.webview.postMessage(m), deps.routing);
+      if (wiz.handled && wiz.customizationPrompt) { await deps.handleBuildRequest(wiz.customizationPrompt); return; }
     }
     await deps.handleBuildRequest(userText);
     return;

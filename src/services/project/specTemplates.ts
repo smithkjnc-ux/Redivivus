@@ -11,7 +11,7 @@ export interface SpecTemplate {
   codeTemplate?: string;
 }
 
-// [TODO] Add more templates as patterns are confirmed working
+// [DONE] Added: todo-list, calculator, markdown-preview, color-picker
 const TEMPLATES: SpecTemplate[] = [
   {
     name: 'canvas-trail-animation',
@@ -105,6 +105,50 @@ JS structure — in this exact order:
 4. setup(); animate();
 
 CRITICAL: ageFactor uses trail.length (not maxTrailLength). speed derived from Math.hypot, not hardcoded. shadowBlur reset to 0 after loop. No classes, no split files.`,
+  },
+  {
+    name: 'todo-list-html',
+    match: (task) => {
+      const t = task.toLowerCase();
+      return (t.includes('todo') || t.includes('to-do') || t.includes('task list')) && t.includes('html') && !t.includes('react') && !t.includes('vue');
+    },
+    spec: `Single HTML file. localStorage persistence. No frameworks, no external deps.
+CSS: dark background (#1a1a2e), card container, input row with text field + Add button, list items with checkbox + text + Delete button. Completed items get line-through + muted color.
+JS: load tasks from localStorage on DOMContentLoaded. addTask(): trim input, push {id:Date.now(),text,done:false} to array, save, render. toggleTask(id): flip done flag, save, render. deleteTask(id): filter out, save, render. save(): localStorage.setItem('todos', JSON.stringify(tasks)). render(): clear list, forEach task → create li with checkbox (checked=task.done, onchange=toggleTask), span with text, delete button.
+CRITICAL: Enter key on input triggers addTask. Empty input is ignored. Tasks persist across page reload.`,
+  },
+  {
+    name: 'calculator-html',
+    match: (task) => {
+      const t = task.toLowerCase();
+      return (t.includes('calculator') || t.includes('calc')) && t.includes('html') && !t.includes('scientific') && !t.includes('react');
+    },
+    spec: `Single HTML file. CSS Grid layout. No external deps.
+CSS: body centered dark bg. Calculator card 320px wide, display div (right-aligned text, large font, #0d0d0d bg, #00ff88 color), button grid 4 columns. Buttons: digit buttons gray, operator buttons orange (#ff9500), equals button green (#00ff88 text on dark), clear button red-tinted. All buttons same height ~60px, font-size 1.4rem.
+JS: let display='', pendingOp='', pendingVal=null. pressDigit(d): display+=d, show. pressDot(): if no dot yet, display+='.', show. pressOp(op): pendingVal=parseFloat(display), pendingOp=op, display=''. pressEquals(): compute result based on pendingOp (+,-,*,/), display=String(result), pendingOp='', pendingVal=null. pressClear(): display='',pendingOp='',pendingVal=null,show.
+CRITICAL: Division by zero shows 'Error'. Chained operations work (3+4*2 computes left-to-right as typed). Display shows '0' when empty.`,
+  },
+  {
+    name: 'markdown-preview-html',
+    match: (task) => {
+      const t = task.toLowerCase();
+      return (t.includes('markdown') || t.includes('md preview') || t.includes('markdown preview')) && t.includes('html');
+    },
+    spec: `Single HTML file. Uses marked.js from CDN (https://cdn.jsdelivr.net/npm/marked/marked.min.js). Split-pane layout.
+CSS: full-height flex row. Left pane: dark textarea 50% width, monospace font, no resize. Right pane: 50% width, white bg, padding 20px, overflow-y auto, standard prose styles (h1-h6, p, code, pre, blockquote). Divider: 2px solid #333.
+JS: const md = document.getElementById('editor'), preview = document.getElementById('preview'); function update() { preview.innerHTML = marked.parse(md.value); } md.addEventListener('input', update); update() on load with starter markdown text showing h1, paragraphs, code block, list.
+CRITICAL: Live update on every keystroke. Starter text must be valid markdown. Code blocks must be visually distinct (dark bg, monospace).`,
+  },
+  {
+    name: 'color-picker-html',
+    match: (task) => {
+      const t = task.toLowerCase();
+      return (t.includes('color picker') || t.includes('colour picker') || (t.includes('color') && t.includes('picker'))) && t.includes('html');
+    },
+    spec: `Single HTML file. No external deps. Shows HEX, RGB, and HSL values simultaneously.
+CSS: centered card, large color swatch (200x200px, border-radius 12px), native <input type="color"> picker, three read-only text outputs labeled HEX / RGB / HSL, copy button per output.
+JS: const picker = document.getElementById('color'), swatch = document.getElementById('swatch'). function hexToRgb(hex): parse r,g,b. function rgbToHsl(r,g,b): compute h,s,l. function update(): swatch.style.background=picker.value, set HEX=picker.value, set RGB=rgb(r,g,b), set HSL=hsl(h,s%,l%). Copy buttons: navigator.clipboard.writeText(value) then show 'Copied!' for 1.5s. picker.addEventListener('input', update); update() on load with #6366f1.
+CRITICAL: All three formats update on every color change. Copy feedback must auto-reset.`,
   },
 ];
 
