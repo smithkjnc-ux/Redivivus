@@ -137,8 +137,10 @@ function preFilterByCategory(task: string, items: VaultItem[], limit = 30): Vaul
     .map(s => s.item);
 }
 
-/** Returns true when the task intent and vault item are on opposite sides of the frontend/backend divide.
- *  Prevents a backend model/form/route from blocking a frontend UI build and vice versa. */
+// [WARN][RULE 18] detectIntentMismatch uses frontend/backend keyword lists to simulate domain classification.
+// This function is called inside semanticVaultSearch which already has a callAI param — should pass that
+// through and ask: "Is this task frontend, backend, or mixed? Is this vault item frontend, backend, or mixed?"
+// [NEXT] Make detectIntentMismatch async and replace the regex signals with a single AI call.
 function detectIntentMismatch(task: string, item: VaultItem): boolean {
   const frontendSignals  = /\b(ui|form|page|component|input|button|screen|modal|layout|view|render|style|css|html|react|vue|svelte|widget|panel|card|sidebar|header|nav|footer|menu|dropdown|toast|dialog|table|grid|list|icon|theme)\b/i;
   const backendSignals   = /\b(api|endpoint|route|controller|model|schema|migration|django|fastapi|express|flask|sqlalchemy|orm|database|db|repository|service layer|serializer|middleware|auth|jwt|crud|rest|graphql|prisma)\b/i;

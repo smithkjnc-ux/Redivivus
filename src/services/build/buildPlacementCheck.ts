@@ -9,9 +9,12 @@ export interface PlacementCheckResult {
   projectName: string;
 }
 
-/** Keywords that mark backend-only intent in a task */
+// [WARN][RULE 18] BACKEND_SIGNALS and FRONTEND_SIGNALS below are Rule 18 violations — keyword lists
+// simulating domain classification. taskDomain() and blueprintDomain() should use a 50-token AI
+// classifier call: "Is this task frontend, backend, or mixed? Reply: frontend/backend/mixed/unknown"
+// Requires making checkBuildPlacement() async, which cascades to chatPanelIntent.ts callers.
+// [NEXT] Replace taskDomain() with AI classifier in a dedicated session.
 const BACKEND_SIGNALS = /\b(api|endpoint|route|controller|model|schema|migration|database|db|server|backend|django|fastapi|flask|express|sqlalchemy|orm|rest|graphql|prisma|middleware|auth|jwt|crud|repository|serializer)\b/i;
-/** Keywords that mark frontend-only intent in a task */
 const FRONTEND_SIGNALS = /\b(ui|page|component|form|input|button|screen|modal|layout|style|css|html|react|vue|svelte|widget|panel|card|header|nav|menu|sidebar|dropdown|toast|dialog|table|grid|theme|render)\b/i;
 
 /** Derive the domain implied by a blueprintContext string (WHO/WHAT/WHERE fields). */

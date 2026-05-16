@@ -1,7 +1,30 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10Q: Full multi-AI orchestration wired into deep complexity phase builds*
+*Last updated: May 16, 2026 — Session 10S: Rule 18 full audit — AI classifiers replace all critical regex NL decisions*
+
+## Recent Fixes — May 16, 2026 (Session 10S: Rule 18 — full audit, 4 critical fixes + 6 flagged)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/complexityAssessment.ts` | `assessComplexity` made async with `routing` param. AI classifier now sets final tier (nano/standard/deep). Regex scoring still computes score + reasons (math, not NL). Callers in `chatPanelOrchestrator.ts` updated to `await`. | Regex keyword scoring routinely misclassified tier — e.g. a 4-sound player scored as "standard" but a follow-up improvement scored "nano" because "realistic" had no DEEP_SIGNAL hits. Wrong tier = wrong pipeline path. | Low — regex-derived tier used as fallback if AI fails. |
+| `src/services/blueprint/expandedInterview.ts` | `generateVagueWarning` made async with `routing` param. AI classifier asks "specific enough to build? Reply: clear or vague." Fast path kept only for bare minimum requests ("build me a game" with nothing else). Caller in `chatPanelOrchestrator.ts` updated to `await`. | Regex blocked valid requests ("build me a multiplayer game") because they matched the bare "build me a game" pattern. Also allowed vague requests through that didn't match any pattern. | Low — on AI failure, returns null (never blocks). |
+| `src/ui/chat/chatPanelBuild.ts` | `isChunkedBuildRequest` made async with `routing` param. AI classifier: "single or multi file?" Fast path kept for explicit "full-stack"/"multi-file" phrasing. Caller in `chatPanelBuildRunner.ts` updated to `await isChunkedBuildRequest(task, ctx.routing)`. | Regex missed "build me a website with a login page and database" — second clause had to match both app-type AND complexity modifier simultaneously. AI handles any phrasing. | Low — returns false on AI failure (single-file fallback). |
+| `src/ui/chat/chatPanelBuildRunner.ts` | `isSimpleUnit` regex replaced with async AI classifier: "snippet or project?" Regex kept as catch on AI failure. | "build a password generator" → regex returned false (no function/snippet keyword) → showed new-project wizard for a simple one-file tool. | Low — regex fallback on AI error. |
+| `src/services/build/buildPlacementCheck.ts` | Added `[WARN][RULE 18]` + `[NEXT]` to `BACKEND_SIGNALS`/`FRONTEND_SIGNALS` regex. | Flagged for future fix — making `checkBuildPlacement` async cascades to `chatPanelIntent.ts`. | None — no code changed, annotation only. |
+| `src/services/project/templateWizard.ts` | Added `[WARN][RULE 18]` + `[NEXT]` to `isSmallUnit` and `isTemplateRequest`. | Flagged for future fix — function is currently unwired (no active callers). | None. |
+| `src/ui/chat/chatPanelAutoSave.ts` | Added `[WARN][RULE 18]` + `[NEXT]` to `BUILD_VERB_RE` and `DELETE_RE`. | Flagged — making `shouldAutoSave` async cascades to `chatPanelMsgSendAI.ts`. | None. |
+| `src/services/vault/vaultSemanticSearch.ts` | Added `[WARN][RULE 18]` + `[NEXT]` to `detectIntentMismatch`. | Flagged — already in async context, can be fixed when revisiting vault search. | None. |
+| `src/services/clarificationService.ts` | Added `[WARN][RULE 18]` + `[NEXT]` to `needsClarification`. | Flagged — ambiguous-pronoun regex simulating intent understanding. | None. |
+| `src/services/project/templateScopeService.ts` | Added `[WARN][RULE 18]` + `[NEXT]` to `isVagueProjectRequest` and `parseScopeAnswer`. | Flagged — keyword lists simulating vagueness and complexity parsing. | None. |
+
+## Recent Fixes — May 16, 2026 (Session 10R: Rule 18 — AI classifier for modification detection)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuildInference.ts` | `isModificationRequest` changed from sync regex to async AI classifier. Fast paths kept for obvious verbs and explicit file extensions. AI call handles natural follow-up phrasing ("make them realistic", "improve the sounds", "make it faster") that regex cannot catch. [RULE 18] compliant. | "Make them realistic" after a working sound player was not detected as a modification. CHASSIS treated it as a fresh build, wrote a new file without reading the existing code, AI regenerated from scratch using fetch-based audio files that don't exist → no sounds. Root cause: `isModificationRequest` regex required `modify\|update\|change\|fix` etc. — "make" was absent. | Low — fast paths fire before AI call for obvious cases. AI fallback returns `false` on error, which means worst case is a fresh build (same as before). |
+| `src/ui/chat/chatPanelBuild.ts` | `Inf.isModificationRequest(task)` → `await Inf.isModificationRequest(task, routing)`. | Required by async signature change. | None. |
+| `src/ui/chat/chatPanelOrchestrator.ts` | Replaced inline 2-clause `isModify` regex with `hasFileMention \|\| await isModificationRequest(taskLow, deps.routing)`. Added import. Net: file reduced from 200 to 199 lines. | Same Rule 18 violation as above — the fast-path modification check in the orchestrator also used a narrow verb list. | None. |
 
 ## Recent Fixes — May 16, 2026 (Session 10Q: Orchestrated phase build wiring)
 

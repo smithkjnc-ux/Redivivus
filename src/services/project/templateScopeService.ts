@@ -45,6 +45,11 @@ export function clearPendingScopeQuestion(): void {
  * "Build me a portfolio website for Jane Smith, dark theme" → false (already has detail)
  * "Add a contact form" → false (modification, not a new project)
  */
+// [WARN][RULE 18] isVagueProjectRequest and parseScopeAnswer below use keyword regex to simulate
+// understanding of project type, vagueness, and complexity. Both should use 50-token AI classifier calls.
+// [NEXT] Make both functions async with routing param. Replace regex with:
+//   "Is this a vague new-project request lacking type/features/audience? Reply: vague or clear"
+//   "What complexity is this scope answer? Reply: simple, medium, or full"
 export function isVagueProjectRequest(task: string): boolean {
   const t = task.trim();
 
@@ -66,25 +71,17 @@ export function isVagueProjectRequest(task: string): boolean {
 }
 
 /**
- * Asks 2 scope questions in the chat and waits for the user's reply.
- * Returns the user's answer string, or null if timed out / skipped.
- * postChatMessage: function that adds a message to the conversation and refreshes.
+ * Shows a centered modal in the webview with 2 scope questions.
+ * Returns the user's combined answer string, or null if skipped / timed out.
+ * postToWebview: sends a message to the webview panel.
  */
 export async function askScopeQuestions(
   task: string,
-  postChatMessage: (content: string) => void,
+  postToWebview: (msg: any) => void,
 ): Promise<string | null> {
-  const projectType = extractProjectType(task);
+  postToWebview({ type: 'show-scope-modal', task });
 
-  const question =
-    `Before I start building, two quick questions:\n\n` +
-    `1. **What's it for?** (e.g. personal portfolio, business landing page, blog, e-commerce, tool, "just a simple page")\n` +
-    `2. **How big?** Simple (1-2 pages) / Medium (multi-section with JS) / Full (backend, forms, data)\n\n` +
-    `One reply covers both — or just describe what you need and I'll figure it out.`;
-
-  postChatMessage(question);
-
-  // Wait for user reply — 5 minute timeout then bail
+  // Wait for modal submit — 5 minute timeout then bail
   return new Promise<string | null>((resolve) => {
     _pendingScopeResolve = resolve;
     _scopeQuestionTimestamp = Date.now();

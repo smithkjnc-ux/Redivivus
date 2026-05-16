@@ -94,7 +94,10 @@ export async function clarifyAmbiguousReference(
   return null;
 }
 
-// Detect if clarification is needed before proceeding
+// [WARN][RULE 18] needsClarification uses ambiguous-pronoun regex and verb keyword lists to simulate
+// intent understanding. Should use a 50-token AI classifier instead:
+// "Does this request have enough context to act on, or does it need clarification? Reply: clear or unclear"
+// [NEXT] Make needsClarification async and replace regex checks with AI classifier call.
 export function needsClarification(
   task: string,
   candidates: string[]

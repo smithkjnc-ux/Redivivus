@@ -1,6 +1,5 @@
 // [SCOPE] Chat Panel Build Orchestrator — complexity assessment, phased builds, expanded interviews
-// Handles deep complexity builds with the "car assembly line" approach
-
+// Handles deep complexity builds with the "car assembly line" approach.
 import * as vscode from 'vscode';
 import { ChatMessage } from './chatPanelHtml.js';
 import { RoutingService } from '../../services/ai/routingService.js';
@@ -15,6 +14,8 @@ import { VaultSearchResult } from '../../services/vault/buildFromVaultSearch.js'
 import { inspectPhase, PhaseInspection } from '../../services/phaseInspector.js';
 import { formatInspectionReport } from '../../services/phaseInspectorReport.js';
 import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor.js';
+import { isValidBuildRoot } from './chatPanelBuildUtils.js';
+import { isModificationRequest } from './chatPanelBuildInference.js';
 
 export interface OrchestratorDeps {
   chassis: ChassisService;
@@ -41,15 +42,14 @@ export async function handleComplexityRoutedBuild(
   // Vague-request warnings must NEVER fire on these — they are for brand-new project requests only.
   const taskLow = task.toLowerCase();
   const hasFileMention = /\b[\w/-]+\.(ts|tsx|js|jsx|py|html|css|scss|json|go|rs)\b/i.test(task);
-  const isModify = /\b(add|fix|update|change|modify|edit|refactor)\b/.test(taskLow) &&
-                   /\b(to|in|this|the|existing|index|src|file)\b/.test(taskLow);
-  if ((isModify || hasFileMention) && !skipInterview) {
-    const complexity = assessComplexity(task);
+  const isModify = hasFileMention || await isModificationRequest(taskLow, deps.routing);
+  if (isModify && !skipInterview) {
+    const complexity = await assessComplexity(task, deps.routing);
     return handleNanoBuild(task, deps, complexity);
   }
 
   // ── STEP 1: Check for vague requests (fresh new-project builds only) ──
-  const vagueWarning = generateVagueWarning(task);
+  const vagueWarning = await generateVagueWarning(task, deps.routing);
   if (vagueWarning) {
     deps.conversation.push({
       role: 'assistant',
@@ -61,7 +61,7 @@ export async function handleComplexityRoutedBuild(
   }
 
   // ── STEP 2: Assess complexity ──
-  const complexity = assessComplexity(task);
+  const complexity = await assessComplexity(task, deps.routing);
 
   // Show complexity assessment in chat (transparent to user)
   const complexityBadge = complexity.tier === 'nano' ? '🟢' : complexity.tier === 'standard' ? '🟡' : '🔴';
@@ -97,7 +97,8 @@ async function handleNanoBuild(
   deps: OrchestratorDeps,
   complexity: ComplexityResult
 ): Promise<boolean> {
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const rawRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = isValidBuildRoot(rawRoot) ? rawRoot : undefined;
   if (!root) {
     // No folder — AI-extract 5W answers then show wizard with pre-fills
     deps.setPendingTask(task);
@@ -121,7 +122,8 @@ async function handleStandardBuild(
   deps: OrchestratorDeps,
   complexity: ComplexityResult
 ): Promise<boolean> {
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const rawRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = isValidBuildRoot(rawRoot) ? rawRoot : undefined;
 
   deps.setPendingTask(task);
 
@@ -156,7 +158,8 @@ async function handleDeepBuild(
   deps: OrchestratorDeps,
   complexity: ComplexityResult
 ): Promise<boolean> {
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const rawRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = isValidBuildRoot(rawRoot) ? rawRoot : undefined;
 
   // Show the "this is complex" warning with phased approach
   const phaseCount = complexity.recommendedPhases;

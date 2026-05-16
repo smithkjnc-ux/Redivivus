@@ -39,13 +39,15 @@ export async function runTemplateWizard(task: string, postToWebview?: (msg: any)
   // Can't show WebView modal without postToWebview — bail cleanly
   if (!postToWebview) { return { handled: false }; }
 
-  // Quick bail — if task is clearly a small code unit, skip wizard
+  // [WARN][RULE 18] isSmallUnit and isTemplateRequest below are Rule 18 violations — keyword regex
+  // simulating intent understanding. runTemplateWizard is currently unwired (no active caller).
+  // [NEXT] When wiring this function, replace both checks with 50-token AI classifier calls:
+  //   "Is this a small code unit or a full project? Reply: snippet or project"
+  //   "Is this requesting a template-type project (website/game/app/dashboard)? Reply: yes or no"
   const isSmallUnit = /function|snippet|utility|helper|class|method|hook|component|script/i.test(task)
     && !/website|web site|game|app|dashboard|landing|portfolio|api|backend|server/i.test(task);
   if (isSmallUnit) { return { handled: false }; }
 
-  // Check for explicit template trigger words
-  // [WARN] Allow adjectives between article and type word — e.g. "Build a medium portfolio website"
   const isTemplateRequest =
     /build\s+(me\s+)?(a|an)\s+([\w\s]{0,30}?)(website|web site|game|app|dashboard|portfolio|landing page|api|backend|blog|tool|cli)/i.test(task) ||
     /create\s+(a|an)\s+([\w\s]{0,20}?)(website|game|app|dashboard|portfolio)/i.test(task) ||

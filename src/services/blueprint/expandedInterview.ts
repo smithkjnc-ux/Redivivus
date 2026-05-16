@@ -47,6 +47,7 @@ export interface InterviewQuestion {
 }
 
 import { EXPANDED_QUESTIONS } from './expandedInterviewQuestions.js';
+import type { RoutingService } from '../ai/routingService.js';
 
 export function getQuestionsForTier(tier: 'standard' | 'deep'): InterviewQuestion[] {
   return EXPANDED_QUESTIONS.filter(q => {
@@ -61,16 +62,22 @@ export function organizeByCategory(questions: InterviewQuestion[]): Record<strin
   return byCategory;
 }
 
-export function generateVagueWarning(task: string): string | null {
-  const lowerTask = task.toLowerCase();
-  if (/^\s*(build|make|create)\s+(me\s+)?a\s+(game|app|platform|system)\s*$/i.test(task)) {
-    return `Too Vague -- Cannot Proceed\n\n"${task}" is like saying "build me a vehicle." That could mean:\n- A bicycle (1 day, simple)\n- A family car (1 month, moderate)\n- A cargo ship (1 year, complex)\n\nYou must specify:\n1. What TYPE of ${lowerTask.includes('game') ? 'game' : 'app'} (puzzle, action, RPG, tool...)\n2. For WHO (kids, developers, general public...)\n3. Core FEATURES (3 things it MUST do)\n\nPlease reply with a more specific request, or type "help me refine this" to run the full interview.`;
+// [RULE 18] AI classifier determines vagueness — regex cannot reliably judge whether a request
+// has enough context to build from. Fast path for single-word builds only.
+export async function generateVagueWarning(task: string, routing: RoutingService): Promise<string | null> {
+  // Fast path: bare minimum ("build me a game" — no type, no features, no users)
+  if (/^\s*(build|make|create)\s+(me\s+)?(a\s+)?(game|app|platform|system)\s*$/i.test(task.trim())) {
+    const noun = /game/i.test(task) ? 'game' : 'app';
+    return `Too Vague -- Cannot Proceed\n\n"${task}" is like saying "build me a vehicle." Specify:\n1. What TYPE of ${noun} (puzzle, action, tool...)\n2. For WHO (kids, developers, general public...)\n3. Core FEATURES (3 things it must do)\n\nOr type "help me refine this" to run the full interview.`;
   }
-  const isModificationTask = /\b(fix|update|change|edit|modify|add|refactor|in|to|the|my)\b/i.test(lowerTask);
-  const hasFileMentionInTask = /\b[\w/-]+\.(ts|tsx|js|jsx|py|html|css|scss|json)\b/i.test(task);
-  if (/\bapp\b/i.test(task) && !/\b(web|mobile|desktop|for|that|with)\b/i.test(lowerTask) && !isModificationTask && !hasFileMentionInTask) {
-    return `"App" Needs Specification\n\n"App" is extremely broad. Please clarify:\n- Platform: Web, mobile, desktop?\n- Core function: What is the ONE thing it does?\n- Users: Who will use this?\n\nOr type "run full interview" to go through the structured questions.`;
-  }
+  // AI classifier for everything else — regex cannot reliably detect vagueness in natural language
+  try {
+    const prompt = `Is this software build request specific enough to build without clarification?\nTask: "${task.slice(0, 300)}"\nSpecific enough = has at least a type/domain AND core feature/purpose.\nReply with one word: clear or vague`;
+    const res = await routing.prompt(prompt, 12_000);
+    if (res.success && res.text && res.text.trim().toLowerCase().startsWith('vague')) {
+      return `Request Needs More Detail\n\nTo build this well, please clarify:\n- What specific type of ${task.slice(0, 40).toLowerCase().replace(/build|make|create|a |an /g, '').trim()} do you want?\n- Who will use it?\n- What are the 3 core features?\n\nOr type "help me refine this" to run the full interview.`;
+    }
+  } catch { /* on AI failure, allow the request through — never block on classifier error */ }
   return null;
 }
 

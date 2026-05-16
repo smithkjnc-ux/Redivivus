@@ -21,7 +21,10 @@ const EXT_MAP: Record<string, string> = {
   sql: 'sql', md: 'md', markdown: 'md', xml: 'xml', svg: 'svg',
 };
 
-// [WARN] Must match user intent — only auto-save when user clearly wants a file, not when asking questions
+// [WARN][RULE 18] BUILD_VERB_RE below is a Rule 18 violation — keyword list simulating intent detection.
+// shouldAutoSave() should use a 50-token AI classifier: "Did the user ask to create/build a file? yes or no"
+// Requires making shouldAutoSave() async, which cascades to chatPanelMsgSendAI.ts caller.
+// [NEXT] Replace with AI classifier when refactoring chatPanelMsgSendAI.ts.
 const BUILD_VERB_RE = /\b(build|create|make|generate|write|add|implement|code|develop|produce|convert|turn|transform|rewrite|replace|port|refactor|rebuild|redo)\b/i;
 
 interface AutoSaveTarget {
@@ -101,14 +104,20 @@ function deriveFilenameFromMessage(message: string, ext: string): string {
 
 /** Writes code to disk, opens in editor, returns confirmation message */
 export async function autoSaveAndOpen(code: string, filename: string, root: string): Promise<string> {
-  const absPath = path.join(root, filename);
-
-  // [WARN] If file exists, check if user explicitly asked to replace — if so, skip the dialog
-  if (fs.existsSync(absPath)) {
-    const userWantsReplace = /\b(replace|overwrite|rewrite|redo|rebuild)\b/i.test(filename + root);
-    // Always overwrite without asking — the user already asked for the file to be created/replaced
-    // The old overwrite dialog was blocking auto-save flow and defeating the purpose
+  // [WARN] If no workspace is open, ask the user where to save instead of silently failing
+  if (!root || root === 'none') {
+    const picked = await vscode.window.showOpenDialog({
+      canSelectFolders: true,
+      canSelectFiles: false,
+      canSelectMany: false,
+      openLabel: 'Save here',
+      title: `Choose where to save ${filename}`,
+    });
+    if (!picked || picked.length === 0) { return '⚠️ No folder selected — file was not saved.'; }
+    root = picked[0].fsPath;
   }
+
+  const absPath = path.join(root, filename);
 
   // Apply CHASSIS structure rules (generate first, structure after)
   let finalCode = applyChassisStructure(code, filename);
@@ -131,9 +140,12 @@ export async function autoSaveAndOpen(code: string, filename: string, root: stri
     await vscode.window.showTextDocument(doc, { preview: false });
   } catch { /* best-effort */ }
 
-  return `Saved: \`${filename}\``;
+  // [CHASSIS] Show full path so non-technical users know exactly where the file went
+  const friendlyDir = root.replace(/^\/home\/\w+/, '~');
+  return `✅ Saved: \`${filename}\` → \`${friendlyDir}/\``;
 }
 
+// [WARN][RULE 18] DELETE_RE is a Rule 18 violation — should use AI: "Does user want to delete files? yes or no"
 const DELETE_RE = /\b(delete|remove|clean up|get rid of|trash)\b/i;
 const FILE_EXT_RE = /\b(\w+\.\w{2,5})\b/g;
 
