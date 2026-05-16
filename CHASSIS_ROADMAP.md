@@ -1,7 +1,13 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10T: Blueprint context wired into edit builds + auto-create 5W inference + vagueness warning*
+*Last updated: May 16, 2026 — Session 10U: Plan It is now the default; Just Build demoted to secondary option*
+
+## Recent Fixes — May 16, 2026 (Session 10U: Plan It as default UX)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelHtml.ts` | Launcher: replaced two equal Plan/Build buttons with one full-width "Start New Project" (plan mode) primary button + small "⚡ Just Build — skip questions" secondary text link. Project-ready screen: replaced two-button mode toggle with a single small "⚡ Skip questions — Just Build" link (plan is the implied default). | Plan mode should be the default path — blueprint context makes builds better. "Just Build" is still accessible but visually secondary. | None — same message types sent on click, only visual hierarchy changed. |
 
 ## Recent Fixes — May 16, 2026 (Session 10T: Blueprint context gaps closed)
 

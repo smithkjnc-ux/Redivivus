@@ -35,6 +35,7 @@ export interface ChatHeaderInfo {
   blueprintStatus?: 'complete' | 'incomplete' | 'missing';
   // [CHASSIS] AI roster for multi-badge display — all active AIs with roles
   rosterDisplay?: Array<{ ai: string; label: string; role: 'Supervisor' | 'Worker' | 'Guardian'; emoji: string }>;
+  buildMode?: 'plan' | 'direct';
 }
 
 export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderInfo, progress?: SetupProgress): string {
@@ -56,6 +57,12 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
     if (header.sessionActive) {
       badges.push(`<span class="badge session">🟢 Session</span>`);
     }
+    // [CHASSIS] Mode indicator pill — clickable to switch modes mid-session
+    if (header.buildMode) {
+      const modeLabel = header.buildMode === 'plan' ? '📋 Plan' : '⚡ Direct';
+      const modeTooltip = header.buildMode === 'plan' ? 'Plan Mode: full blueprint interview before building. Click to switch.' : 'Direct Build: skip interview, execute immediately. Click to switch.';
+      badges.push(`<span class="badge mode mode-${header.buildMode}" data-action="switch-mode" title="${modeTooltip}">${modeLabel}</span>`);
+    }
     // [DEAD] Static time badge removed — showed panel open time, never updated. Message timestamps show time per message.
   }
   const headerHtml = header ? `<div class="header-badges">${badges.join('')}</div>` : '';
@@ -63,7 +70,12 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
   const emptyState = (() => {
     // If workspace has a .chassis folder, show the project-ready screen
     if (header && header.workspaceHasChassis) {
+      const modeToggleHtml = !header.buildMode ? `
+      <div style="text-align:center;margin-bottom:16px;">
+        <button class="mode-btn" data-action="set-mode" data-mode="direct" style="background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:12px;opacity:0.8;padding:4px 8px;">⚡ Skip questions — Just Build</button>
+      </div>` : '';
       return `<div class="empty-state">
+      ${modeToggleHtml}
       <div class="icon">🚀</div>
       <div class="onboarding-title">Ready to Build: ${escapeHtml(header.projectName || '')}</div>
       ${progress ? `<div style="margin:15px auto;width:100%;max-width:400px;text-align:left;padding:15px;background:var(--vscode-editor-inactiveSelectionBackground);border-radius:6px;border:1px solid var(--vscode-panel-border);">
@@ -95,13 +107,17 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       <div class="onboarding-sub" style="font-size:15px;color:var(--vscode-descriptionForeground);margin-bottom:28px;">What would you like to build today?</div>
 
       <div class="launcher-grid" style="display:flex;flex-direction:column;gap:12px;max-width:400px;margin:0 auto;">
-        <button class="launcher-btn launcher-btn-primary" data-action="start-new-project" style="padding:16px 20px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;display:flex;align-items:center;gap:12px;transition:all 0.2s;">
+        <!-- Start New Project: Plan It Out is the default, Just Build is secondary -->
+        <button class="launcher-btn" data-action="start-new-project" data-mode="plan" style="width:100%;padding:18px 20px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all 0.2s;">
           <span style="font-size:24px;">🚀</span>
           <div style="text-align:left;">
-            <div>Start New Project</div>
-            <div style="font-size:12px;font-weight:400;opacity:0.8;">Create a new project with the setup wizard</div>
+            <div style="font-size:15px;font-weight:600;">Start New Project</div>
+            <div style="font-size:12px;font-weight:400;opacity:0.8;">Answer a few questions, then build</div>
           </div>
         </button>
+        <div style="text-align:center;padding:2px 0;">
+          <button class="launcher-btn" data-action="start-new-project" data-mode="direct" style="background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:12px;opacity:0.8;padding:4px 8px;">⚡ Just Build — skip questions</button>
+        </div>
 
         <button class="launcher-btn launcher-btn-secondary" data-action="open-existing-project" style="padding:16px 20px;background:var(--vscode-editor-inactiveSelectionBackground);color:var(--vscode-foreground);border:1px solid var(--vscode-input-border);border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;display:flex;align-items:center;gap:12px;transition:all 0.2s;">
           <span style="font-size:24px;">📂</span>
