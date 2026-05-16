@@ -1,7 +1,17 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 10Z: Vault fully functional — quality gate wired, context injected into builds, semantic threshold fixed, AI enrichment command, assembly build uses AI*
+*Last updated: May 16, 2026 — Session 11: Fix intent — bug reports now trigger code diagnosis instead of build modal*
+
+## Recent Fixes — May 16, 2026 (Session 11: Fix intent — bug reports diagnosed, not modal'd)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelClassifier.ts` | Added `'fix'` to `IntentType`. Added fix intent description to system prompt. Changed 3 wrong examples (fix/debug/button broken) from `build` to `fix`. Added 7 new fix examples. Added `fix` to JSON return format list and to valid-intent check. | Bug reports like "it runs but doesn't produce sounds" were classified as `build`, triggering the build modal — completely wrong for an existing project. | None — new type, backward compatible. |
+| `src/ui/chat/chatPanelClassifierOverrides.ts` | Updated fallback classifier: fix/debug/repair/broken verbs now return `fix` type instead of `build`. | Fallback was treating all action verbs including `fix`, `debug`, `repair` as build intent. | None — fallback only fires when no routing AI is available. |
+| `src/ui/chat/chatPanelMsgFix.ts` | New file (108 lines). `handleFixRequest`: reads up to 10 source files from project root, sends AI a diagnosis prompt with problem description + code, replies with specific findings. No modal, no mode picker. Ends with invite to apply fix. | No fix path existed — the only response to any problem report was the build approach modal. | Low — reads files read-only, AI response goes to chat. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Added `fix` intent handler before `build` handler: calls `handleFixRequest` and returns. | Without this, `fix` intent would fall through to the build modal handler. | None. |
+| `src/ui/chat/chatPanelMessages.ts` | Added `'fix'` to `classifyIntent` return type union in `MessageHandlerDeps`. | TS compile error — inline return type didn't include `fix`. | None. |
 
 ## Recent Fixes — May 16, 2026 (Session 10X: Task #1 — Build→Run→Error→Fix loop)
 
