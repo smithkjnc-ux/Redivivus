@@ -9,6 +9,7 @@ import { callProvider } from '../../services/ai/routingProviders.js';
 import { BuildPlan, BuildPhase } from '../../services/build/buildOrchestrator.js';
 import { OrchestratorDeps } from './chatPanelOrchestrator.js';
 import { writeBuiltFile } from './chatPanelBuildWriter.js';
+import { readProjectDeadEnds, readProjectRules } from './chatPanelMsgFixUtils.js';
 
 const AI_LABELS: Record<string, string> = {
   gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi',
@@ -97,7 +98,8 @@ export async function runOrchestratedPhaseBuild(
   const callAI = (ai: string, prompt: string) => callProvider(ai, prompt, fetchFn);
 
   const phaseTask = buildPhaseTask(phase, plan);
-  const context = blueprintContext || '';
+  const [_de, _pr] = [readProjectDeadEnds(root), readProjectRules(root)];
+  const context = [blueprintContext||'', _de?`PREVIOUSLY FAILED APPROACHES:\n${_de}`:'', _pr?`PROJECT RULES:\n${_pr}`:''].filter(Boolean).join('\n\n');
   const supervisorLabel = AI_LABELS[ranked[0]] || ranked[0];
 
   // ── Step 1: Supervisor plans ──────────────────────────────────────────────

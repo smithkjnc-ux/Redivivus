@@ -5,20 +5,25 @@ import * as vscode from 'vscode';
 import { ChatMessage } from './chatPanelHtml.js';
 import { MessageHandlerDeps } from './chatPanelMessages.js';
 import { buildAIPrefix, processAIResponse } from './chatPanelAI.js';
-import { _architectReviews } from './chatPanelMsgArchitect.js';
+import { _architectReviews, _architectActions, ArchitectAction } from './chatPanelMsgArchitect.js';
 
 export async function handleMapContext(msg: any, deps: MessageHandlerDeps): Promise<void> {
   const { routing, conversation, panel, refresh } = deps;
   const { nodeId, label, lines: nodeLines, health, todos } = msg;
+  const isArchitectReview = msg._displayLabel === 'Architect Review';
   const prompt = msg._explainPrompt
     || ('You are a code reviewer. Answer concisely about this file.\n\nFile: ' + nodeId
       + '\nDescription: ' + (label || 'No description')
       + '\nLines: ' + nodeLines + ', Health: ' + health + ', TODOs: ' + todos
       + '\n\nExplain what this file does, any concerns, and what a developer should know about it. Keep it under 150 words.');
+  // [FIX] Don't append empty nodeId in backticks — for Architect Review nodeId is intentionally ''
   const displayMsg = msg._displayLabel
-    ? msg._displayLabel + ' `' + nodeId + '`'
+    ? (nodeId ? msg._displayLabel + ' `' + nodeId + '`' : msg._displayLabel)
     : ('Tell me about `' + nodeId + '`');
-  const prefix = buildAIPrefix(deps.chassis, [], routing);
+  // [FIX] Architect review prompt is fully self-contained — skip buildAIPrefix entirely.
+  // buildAIPrefix injects an activeFileContext code block that may be empty (no open file),
+  // causing the AI to see empty backtick fences and respond "code section appears to be empty".
+  const prefix = isArchitectReview ? '' : buildAIPrefix(deps.chassis, [], routing);
   conversation.push({ role: 'user', content: displayMsg, timestamp: Date.now() });
   refresh();
   try {
@@ -28,10 +33,21 @@ export async function handleMapContext(msg: any, deps: MessageHandlerDeps): Prom
     const estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
     await deps.usageTracker?.recordUsage(estimatedTokens, estimatedCost, routing.getAvailableAI().ai);
     let mapText = aiResponse.text || '';
-    if (routing.isGuardianActive()) {
+    // [FIX] Skip Guardian for Architect Review — Guardian lacks project context and rejects real reviews,
+    // replacing them with a generic "Architecture Review Framework" template. Same pattern as buildAIPrefix skip.
+    if (routing.isGuardianActive() && !isArchitectReview) {
       const review = await routing.guardianReview(displayMsg, mapText, routing.getAvailableAI().ai, '').catch(() => null);
       if (review && !review.passed && review.correctedText) {
         mapText = review.correctedText + '\n\n---\n*Guardian reviewed this response.*';
+      }
+    }
+    // Parse and strip ACTIONS_JSON before rendering — AI appends this block when prompt requests it
+    let reviewActions: ArchitectAction[] = [];
+    if (isArchitectReview) {
+      const actMatch = mapText.match(/ACTIONS_JSON:\s*(\[[\s\S]*?\])\s*$/m);
+      if (actMatch) {
+        try { reviewActions = JSON.parse(actMatch[1]); } catch { /* malformed JSON — ignore */ }
+        mapText = mapText.replace(/\s*ACTIONS_JSON:[\s\S]*$/m, '').trim();
       }
     }
     const { text: processedResponse } = processAIResponse(mapText);
@@ -39,11 +55,12 @@ export async function handleMapContext(msg: any, deps: MessageHandlerDeps): Prom
     if (msg._displayLabel === 'Architect Review') {
       const reviewId = 'ar-' + Date.now();
       _architectReviews.set(reviewId, mapText);
+      if (reviewActions.length > 0) { _architectActions.set(reviewId, reviewActions); }
       finalContent += '\n\n__ARCHITECT_ACTIONS__' + reviewId + '|||END_ARCH_ACTIONS__';
     }
     conversation.push({ role: 'assistant', content: finalContent, timestamp: Date.now(), tokens: estimatedTokens, cost: estimatedCost });
   } catch (err) {
-    conversation.push({ role: 'assistant', content: 'Error: ' + (err instanceof Error ? err.message : 'Unknown error'), timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: '❌ Something went wrong — please try again.', timestamp: Date.now() });
   } finally {
     setTimeout(() => { panel.webview.postMessage({ type: 'set-status', status: 'ready' }); }, 800);
   }

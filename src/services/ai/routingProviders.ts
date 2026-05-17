@@ -48,15 +48,18 @@ export async function callProvider(ai: string, text: string, fetchWithTimeout: (
 
   if (ai === 'claude') {
     const key = getClaudeKey()!;
+    // 'pro' tier = Sonnet 4 (supervisor planning, guardian review — needs reasoning)
+    // default = Haiku 4.5 (worker code generation — fast, cheap, still excellent for code)
+    const model = geminiModel === 'pro' ? 'claude-sonnet-4-20250514' : 'claude-haiku-4-5-20251001';
+    const modelLabel = geminiModel === 'pro' ? 'claude-sonnet-4' : 'claude-haiku-4';
     try {
       const url = 'https://api.anthropic.com/v1/messages';
-      // [WARN] 1024 was too low for code generation — full game conversions need 4000+ tokens
-      const body = JSON.stringify({ model: 'claude-3-5-haiku-20241022', max_tokens: 8192, messages: [{ role: 'user', content: text }] });
+      const body = JSON.stringify({ model, max_tokens: 8192, messages: [{ role: 'user', content: text }] });
       const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body });
       const data = await res.json() as any;
-      if (!res.ok) return { text: '', model: 'claude-3-5-haiku', success: false, error: `Claude API error ${res.status}: ${data.error?.message || res.statusText}` };
-      return { text: (data.content?.[0]?.text || '').trim(), model: 'claude-3-5-haiku', success: true, usingFallback: undefined };
-    } catch (err: any) { return { text: '', model: 'claude-3-5-haiku', success: false, error: classifyError(err, 'Claude') }; }
+      if (!res.ok) return { text: '', model: modelLabel, success: false, error: `Claude API error ${res.status}: ${data.error?.message || res.statusText}` };
+      return { text: (data.content?.[0]?.text || '').trim(), model: modelLabel, success: true, usingFallback: undefined };
+    } catch (err: any) { return { text: '', model: modelLabel, success: false, error: classifyError(err, 'Claude') }; }
   }
 
   if (ai === 'openai') {

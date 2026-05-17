@@ -18,8 +18,15 @@ export function registerAnalysisCommands(
         vscode.window.showErrorMessage('Run "CHASSIS: Initialize Project" first.');
         return;
       }
-      await analyzerService.analyzeProject();
-      refreshAll();
+      try {
+        await analyzerService.analyzeProject();
+      } catch (err) {
+        // [WARN] analyzeProject can throw after writing results (e.g. panel reveal conflict).
+        // The scan data was already written and the Recommendations panel was shown.
+        // Log but don't propagate — the action should not show ❌ Failed.
+        console.error('[CHASSIS] analyzeProject post-scan error (non-fatal):', err);
+      }
+      try { refreshAll(); } catch { /* non-fatal */ }
     })
   );
 

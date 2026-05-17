@@ -19,6 +19,9 @@ import * as Review from './chatPanelBuildReview.js';
 import * as Writer from './chatPanelBuildWriter.js';
 import { tracer } from '../../services/pipelineTracer.js';
 import { formatVaultContext } from '../../services/vault/vaultContextService.js';
+import { readProjectDeadEnds, readProjectRules, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils.js';
+import { autoCommitIfEnabled } from '../../services/gitAutoCommitService.js';
+import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel.js';
 
 export interface BuildContext {
   task: string; root: string; blueprintContext: string; vault?: VaultService; routing: RoutingService; conversation: ChatMessage[]; refresh: () => void; logError: (t: string, p: string, e: string, l: number) => void; postToWebview?: (msg: any) => void; onBuildFinished?: (t: string, f?: string[]) => void;
@@ -70,16 +73,23 @@ function appendMsg(ctx: BuildContext, content: string): void {
 }
 
 export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
-  const { task, root, blueprintContext, routing } = ctx;
+  const { task, root, routing } = ctx;
+  const deadEnds = readProjectDeadEnds(root);
+  const projectRules = readProjectRules(root);
+  const blueprintContext = [
+    ctx.blueprintContext,
+    deadEnds ? `PREVIOUSLY FAILED APPROACHES (do not repeat):\n${deadEnds}` : '',
+    projectRules ? `PROJECT RULES (must not violate):\n${projectRules}` : '',
+  ].filter(Boolean).join('\n\n');
   const buildStart = Date.now();
   const ledger = new BuildLedger();
   // Supervisor = highest-ranked available AI (AI_RANK). Used for labeling AND the actual API call.
   const { supervisor: supervisorAI } = routing.selectSupervisorAndWorker();
 
-  appendMsg(ctx, '🔍 Searching vault...');
+  appendMsg(ctx, '🔍 Checking your saved code library...');
   const vaultItems = ctx.vault ? ctx.vault.listItems() : [];
   const searchResult = findRelevantByTask(task, vaultItems);
-  updateLastMsg(ctx, `🔍 Vault: ${searchResult.items.length} relevant items found`);
+  updateLastMsg(ctx, `🔍 Found ${searchResult.items.length} useful match${searchResult.items.length !== 1 ? 'es' : ''} in your code library`);
 
   const isMod = await Inf.isModificationRequest(task.toLowerCase(), routing);
   const existingTarget = isMod ? await Inf.findExistingTarget(root, task) : null;
@@ -88,14 +98,14 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const relPath = existingTarget ? path.relative(root, existingTarget) : (ext === '.html' ? 'index.html' : `src/${fileBase}${ext}`);
   const absPath = path.join(root, relPath);
 
-  appendMsg(ctx, `📋 Supervisor planning \`${relPath}\`...`);
+  appendMsg(ctx, `📋 Planning \`${relPath}\`...`);
   const _supT0 = Date.now(); const _supSid = tracer.step('SUPERVISOR', supervisorAI, task.slice(0, 80));
   const spec = await routing.supervisorPlan(task, relPath, blueprintContext).catch(() => null);
   const _supTok = spec ? Math.ceil((task.length + blueprintContext.length + spec.length) / 4) : 0;
   tracer.done(_supSid, spec ? 'success' : 'fail', Date.now() - _supT0, spec ? `${spec.split('\n').length} steps` : 'no supervisor plan', Math.ceil((task.length + blueprintContext.length) / 4), _supTok);
   if (spec) {
     ledger.record(supervisorAI, 'supervisor', 'planned', _supTok);
-    updateLastMsg(ctx, `📋 Plan ready (${spec.split('\n').length} steps) — handing off to worker AI...`);
+    updateLastMsg(ctx, `📋 Plan ready — writing your code...`);
   }
 
   // Worker AI is determined at build time by routeByComplexity — show placeholder until routedTo is known
@@ -109,7 +119,7 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
     tracer.done(_workSid, 'fail', Date.now() - _workT0, res.error || 'AI returned no response');
     tracer.end([], 0, 0);
     ctx.logError(task, prompt, res.error || 'Failed', 0);
-    updateLastMsg(ctx, `❌ Build failed: ${res.error || 'AI returned no response. Check .chassis/build_errors.log for details.'}`);
+    updateLastMsg(ctx, `❌ Something went wrong — try again or describe what you want differently.`);
     return;
   }
 
@@ -122,7 +132,7 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
   const rawLines = res.text.trim().split('\n');
   const previewLines = rawLines.slice(0, 20).join('\n') + (rawLines.length > 20 ? '\n...' : '');
-  updateLastMsg(ctx, `⚙️ ${aiLabels[workerAI] || workerAI} wrote ${rawLines.length} lines — Guardian reviewing...\n\`\`\`\n${previewLines}\n\`\`\``);
+  updateLastMsg(ctx, `⚙️ ${aiLabels[workerAI] || workerAI} wrote ${rawLines.length} lines — doing a final check...\n\`\`\`\n${previewLines}\n\`\`\``);
 
   let code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
   const _grdT0 = Date.now(); const _grdSid = tracer.step('GUARDIAN', undefined, relPath);
@@ -146,7 +156,16 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const ledgerSummary = ledger.hasData() ? ledger.getSummary() : undefined;
   const totalTokens = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.tokens, 0) : 0;
   const totalCost = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.costUSD, 0) : 0;
-  ctx.usageTracker?.recordUsage(totalTokens, totalCost, workerAI);
+  // [FIX] Record supervisor and worker tokens separately so usage shows correct per-AI breakdown.
+  // Previously recorded total to workerAI only — supervisor tokens were invisible in usage report.
+  if (spec && workerAI !== supervisorAI) {
+    const supCost = (_supTok / 1_000_000) * 0.30;
+    ctx.usageTracker?.recordUsage(_supTok, supCost, supervisorAI);
+    const workerCost = (workerTokens / 1_000_000) * 0.30;
+    ctx.usageTracker?.recordUsage(workerTokens, workerCost, workerAI);
+  } else {
+    ctx.usageTracker?.recordUsage(totalTokens, totalCost, workerAI);
+  }
 
   const elapsed = (Date.now() - buildStart) / 1000;
   const resultCard = buildResultCard([relPath, ...scaffoldedFiles], searchResult.items.length, totalTokens, totalCost, elapsed, snapshotId, 0, !!existingTarget, ledgerSummary);
@@ -158,7 +177,13 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   tracer.end([relPath, ...scaffoldedFiles], totalTokens, totalCost);
   Writer.captureToVault(ctx, absPath, relPath);
   Writer.openBuiltFile(absPath);
+  writeProjectRoadmapEntry(root, `AI build: ${task.slice(0, 60)}`, [
+    ...[relPath, ...scaffoldedFiles].map(f => `Built \`${f}\``),
+    `AI: ${workerAI}  Tokens: ~${totalTokens}  Cost: $${totalCost.toFixed(4)}`,
+  ]);
   ctx.onBuildFinished?.(task, [relPath]);
+  await autoCommitIfEnabled(root, `CHASSIS added: ${task.slice(0, 80)}`, [relPath, ...scaffoldedFiles]);
+  refreshSetupProgressIfOpen().catch(() => {});
 }
 
 export { runChunkedBuild } from './chatPanelChunked.js';

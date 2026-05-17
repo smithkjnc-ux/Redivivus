@@ -52,15 +52,24 @@ export const MAP_SCRIPT_ACTIONS = `
       const src=e.source||'',tgt=e.target||'';
       if (/service|controller|handler|manager/i.test(src)&&/ui|view|component|screen|page|\.css|\.html/i.test(tgt)) violations.push(src+' -> '+tgt);
     });
+    // [FIX] Prompt must NOT start with "You are a..." — Claude refuses user-role persona reassignment.
+    // Frame as a data analysis task. Explicitly say this is graph topology, not source code.
+    const hasData = nodes.length > 0;
     const prompt =
-      'You are a senior software architect reviewing a project dependency map.\\n\\n' +
-      '**Project:** '+nodes.length+' files, '+edges.length+' connections\\n\\n' +
-      '**Most connected files (hotspots):**\\n'+hotspots.map(n=>'- '+n.id+' (in:'+n.in+' out:'+n.out+', '+n.lines+' lines, health:'+n.health+')').join('\\n')+'\\n\\n' +
-      (orphans.length?'**Orphan files (possibly dead code):**\\n'+orphans.map(n=>'- '+n.id).join('\\n')+'\\n\\n':'') +
-      (unhealthy.length?'**Files with health issues:**\\n'+unhealthy.map(n=>'- '+n.id+' ('+n.health+', '+n.todos+' TODOs)').join('\\n')+'\\n\\n':'') +
-      (large.length?'**Oversized files (>200 lines):**\\n'+large.map(n=>'- '+n.id+' ('+n.lines+' lines)').join('\\n')+'\\n\\n':'') +
-      (violations.length?'**Layer violations (service -> UI):**\\n'+violations.slice(0,5).map(v=>'- '+v).join('\\n')+'\\n\\n':'') +
-      'Provide: 1. Overall architecture pattern and health. 2. Top 3 structural problems with specific files. 3. Quick wins. 4. Plain-English summary for a non-programmer. Be direct, no fluff.';
+      'Analyze the following project dependency graph and give a structural assessment.\\n' +
+      'This is file topology metadata (connections, line counts, health scores) -- not source code.\\n\\n' +
+      'PROJECT STATS: '+nodes.length+' file'+(nodes.length!==1?'s':'')+', '+edges.length+' connection'+(edges.length!==1?'s':'')+'\\n\\n' +
+      (hasData?'MOST CONNECTED FILES (hotspots):\\n'+hotspots.map(n=>'  '+n.id+' (in:'+n.in+' out:'+n.out+', '+n.lines+' lines, health:'+n.health+')').join('\\n')+'\\n\\n':'') +
+      (orphans.length?'ISOLATED FILES (no connections -- possibly dead code):\\n'+orphans.map(n=>'  '+n.id+' ('+n.lines+' lines)').join('\\n')+'\\n\\n':'') +
+      (unhealthy.length?'FILES WITH HEALTH ISSUES:\\n'+unhealthy.map(n=>'  '+n.id+' ('+n.health+', '+n.todos+' TODOs)').join('\\n')+'\\n\\n':'') +
+      (large.length?'OVERSIZED FILES (over 200 lines):\\n'+large.map(n=>'  '+n.id+' ('+n.lines+' lines)').join('\\n')+'\\n\\n':'') +
+      (violations.length?'LAYER VIOLATIONS (service imports UI):\\n'+violations.slice(0,5).map(v=>'  '+v).join('\\n')+'\\n\\n':'') +
+      'Based on this topology data, provide:\\n' +
+      '1. Overall structure pattern and health (e.g. monolith, layered, hub-and-spoke)\\n' +
+      '2. Top structural problems with specific file names\\n' +
+      '3. Quick wins a developer could do today\\n' +
+      '4. Plain-English summary (1-2 sentences) for a non-programmer\\n' +
+      'Be direct. No filler.';
     vs.postMessage({ type: 'architectReview', prompt: prompt });
   };
 

@@ -58,7 +58,7 @@ export function panelSetLastModel(panel: ChatPanel, model: string): void {
 export async function panelRefresh(panel: ChatPanel): Promise<void> {
   const state = (panel as any).state;
   const usageTracker = (panel as any).usageTracker;
-  const headerInfo = buildHeaderInfo((panel as any).chassis, (panel as any).routing, usageTracker, state.lastModel, ChatPanel.extensionContext);
+  const headerInfo = buildHeaderInfo((panel as any).chassis, (panel as any).routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode);
   const _panel = (panel as any)._panel;
   const _initialized = (panel as any)._initialized;
   if (!_initialized) {

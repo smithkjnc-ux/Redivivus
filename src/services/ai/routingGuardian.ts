@@ -76,6 +76,8 @@ export async function supervisorPlanImpl(
   blueprintContext: string,
   neverDoContext?: string
 ): Promise<string | null> {
+  // Supervisor = highest-ranked available AI by AI_RANK (Claude > OpenAI > xAI > Gemini > Kimi > Groq).
+  // Do NOT use getPreferredAI() here — defaultAI is the user's chat default, not a supervisor override.
   const { supervisor, worker } = svc.selectSupervisorAndWorker();
   if (!worker || worker === supervisor) { return null; }
   const fetch = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, 20_000);

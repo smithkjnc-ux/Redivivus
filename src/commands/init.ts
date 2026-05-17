@@ -10,7 +10,16 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
   ChatPanel.onNewProject = async (name: string, answers: Record<string, string>, folderPath?: string) => {
     const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     const suggestedParent = currentRoot ? path.dirname(currentRoot) : (process.env.HOME ? path.join(process.env.HOME, 'projects') : '');
-    const targetFolder = folderPath || path.join(suggestedParent, name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase());
+    const slug = name.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase();
+    // [FIX] When folderPath is a browsed parent directory, append the project slug.
+    // If folderPath already ends with the slug (default full path or manual entry), use it directly.
+    let targetFolder = folderPath || path.join(suggestedParent, slug);
+    if (folderPath) {
+      const base = path.basename(folderPath);
+      if (base !== slug && !base.startsWith(slug)) {
+        targetFolder = path.join(folderPath, slug);
+      }
+    }
     const pendingTask = (answers['_originalTask'] || '').trim() || ChatPanel.currentPanel?.getPendingTask?.() || (answers['what'] || '').trim();
     require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] name=${name} folder=${targetFolder} task=${pendingTask.slice(0,60)}\n`);
     if (!fs.existsSync(targetFolder)) { fs.mkdirSync(targetFolder, { recursive: true }); }
@@ -31,6 +40,20 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
     }
     await context.globalState.update('pendingChassisInit', undefined);
     require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] init complete, resuming build in-place\n`);
+
+    // [FIX] Add the new folder to the workspace so the VS Code explorer shows it.
+    // This runs without reloading the window, preserving chat state.
+    try {
+      const currentFolders = vscode.workspace.workspaceFolders || [];
+      const alreadyOpen = currentFolders.some(f => f.uri.fsPath === targetFolder);
+      if (!alreadyOpen) {
+        const added = vscode.workspace.updateWorkspaceFolders(currentFolders.length, 0, { uri: vscode.Uri.file(targetFolder), name });
+        require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] workspace folder added=${added} path=${targetFolder}\n`);
+      }
+    } catch (e) {
+      require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] workspace folder add failed: ${e}\n`);
+    }
+
     if (pendingTask && ChatPanel.currentPanel) {
       ChatPanel.currentPanel.resumeBuildTask(pendingTask, targetFolder);
     }

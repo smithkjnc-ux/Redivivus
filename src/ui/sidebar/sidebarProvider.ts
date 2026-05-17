@@ -60,18 +60,12 @@ export class SidebarProvider implements vscode.TreeDataProvider<SidebarNode> {
     const COMING_SOON = 'Coming Soon -- not yet implemented';
 
     return [
-      {
-        id: 'sec-profile', label: '-- PROFILE', type: 'section', description: 'Coming Soon',
-        children: [
-          { id: 'profile-me',   label: 'My Profile',   type: 'disabled', icon: 'account',       tooltip: COMING_SOON },
-          { id: 'profile-pref', label: 'Preferences',  type: 'disabled', icon: 'settings-gear',  tooltip: COMING_SOON },
-        ],
-      },
+      // [NEXT] Profile section — re-add when user preferences are implemented
       {
         id: 'sec-setup', label: '-- SETUP', type: 'section',
         children: [
           { id: 'setup-guide',  label: 'Getting Started', type: 'action', icon: 'question',   command: 'chassis.guide' },
-          { id: 'setup-api',    label: 'AI API Setup',    type: 'action', icon: 'key',        command: 'chassis.apiSetup' },
+          { id: 'setup-api',    label: 'AI API Setup',    type: 'action', icon: 'key',        command: 'chassis.openSettings' },
           { id: 'setup-rules',  label: 'Generate Rules',  type: 'action', icon: 'file-code',  command: 'chassis.generateRules' },
           { id: 'setup-retro',  label: 'Retrofit',        type: 'action', icon: 'tools',      command: 'chassis.retrofit' },
         ],
@@ -88,7 +82,7 @@ export class SidebarProvider implements vscode.TreeDataProvider<SidebarNode> {
       {
         id: 'sec-project', label: '-- PROJECT', type: 'section',
         children: [
-          { id: 'proj-new',  label: 'New Project',       type: 'action', icon: 'new-file',       command: 'chassis.newProject' },
+          { id: 'proj-new',  label: 'New Project',       type: 'action', icon: 'new-file',       command: 'chassis.wizard' },
           { id: 'proj-open', label: 'Open Project',      type: 'action', icon: 'folder-opened',  command: 'chassis.openProject' },
           { id: 'proj-bp',   label: 'Blueprint',         type: 'action', icon: 'book',           command: 'chassis.blueprint' },
           { id: 'proj-map',  label: 'Architecture Map',  type: 'action', icon: 'type-hierarchy', command: 'chassis.showMap' },
@@ -101,23 +95,23 @@ export class SidebarProvider implements vscode.TreeDataProvider<SidebarNode> {
           { id: 'build-vault',    label: 'Open Vault',       type: 'action', icon: 'database',           command: 'chassis.openVault' },
           { id: 'build-bfv',      label: 'Build from Vault', type: 'action', icon: 'package',            command: 'chassis.buildFromVault' },
           { id: 'build-validate', label: 'Validate Vault',   type: 'action', icon: 'check-all',          command: 'chassis.validateVault' },
-          { id: 'build-github',   label: 'GitHub Backup',    type: 'action', icon: 'github',             command: 'chassis.githubBackup' },
+          { id: 'build-github',   label: 'GitHub Backup',    type: 'action', icon: 'github',             command: 'chassis.configureGitHubBackup' },
         ],
       },
       {
         id: 'sec-review', label: '-- REVIEW', type: 'section',
         children: [
-          { id: 'rev-scan',  label: 'Scan Project', type: 'action', icon: 'search',    command: 'chassis.scanProject' },
-          { id: 'rev-check', label: 'Check File',   type: 'action', icon: 'file-text', command: 'chassis.checkFile' },
-          { id: 'rev-clean', label: 'Clean File',   type: 'action', icon: 'wand',      command: 'chassis.cleanFile' },
+          { id: 'rev-scan',  label: 'Scan Project', type: 'action', icon: 'search',    command: 'chassis.analyze' },
+          { id: 'rev-check', label: 'Check File',   type: 'action', icon: 'file-text', command: 'chassis.checkFileHealth' },
+          { id: 'rev-clean', label: 'Clean File',   type: 'action', icon: 'wand',      command: 'chassis.cleanUpFile' },
         ],
       },
       {
         id: 'sec-history', label: '-- HISTORY', type: 'section',
         children: [
           { id: 'hist-save', label: 'Save Points', type: 'action', icon: 'history',  command: 'chassis.savePoint' },
-          { id: 'hist-log',  label: 'Work Log',    type: 'action', icon: 'notebook', command: 'chassis.workLog' },
-          { id: 'hist-dead', label: 'Dead Ends',   type: 'action', icon: 'warning',  command: 'chassis.deadEnds' },
+          { id: 'hist-log',  label: 'Work Log',    type: 'action', icon: 'notebook', command: 'chassis.log' },
+          { id: 'hist-dead', label: 'Dead Ends',   type: 'action', icon: 'warning',  command: 'chassis.deadends' },
         ],
       },
     ];

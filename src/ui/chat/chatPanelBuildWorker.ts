@@ -2,6 +2,8 @@
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import { BuildContext } from './chatPanelBuild.js';
+import { tracer } from '../../services/pipelineTracer.js';
+import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules.js';
 
 // AI display names for user messages
 const AI_LABELS: Record<string, string> = {
@@ -31,6 +33,7 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string): Pro
       for (const fallbackAI of availableAIs) {
         if (fallbackAI === failedAI) continue;
         
+        tracer.failover(failedAI, fallbackAI, 'timed out');
         // Notify user of failover
         ctx.conversation.push({
           role: 'assistant',
@@ -61,13 +64,13 @@ export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifyin
   const isHtml = relPath.endsWith('.html');
   const role = supervisorSpec ? 'CHASSIS Worker AI. Implementation only.' : 'CHASSIS AI. Generate complete code.';
   
-  const rules = isHtml 
+  const rules = isHtml
     ? '- COMPLETE, self-contained HTML file. CSS/JS inline. No external files. No modules.\n- Must open via double-click on file://.'
-    : '- [SCOPE] comment at top.\n- // NARRATOR: comment on first line describing the file.';
+    : '- [SCOPE] comment at top.\n- // NARRATOR: comment on first line describing the file.\n- Use EVERY input variable in the actual computation — if you parse or declare it, it MUST appear in the formula or logic, not just in a comment or unused variable.\n- CLI tools: every command-line argument that is parsed MUST affect the output. If args include distance, pay, and fuelCost, all three must participate in the calculation.';
 
   const modRules = isModifying 
     ? '- SURGICAL EDIT. Output COMPLETE file including all existing code plus your changes.\n- DO NOT OMIT ANYTHING.'
     : '- Creating NEW file.';
 
-  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\nVAULT:\n${vaultSummary}\n\n${isModifying ? 'EXISTING CONTENT:\\n' + existingContent : ''}\n\nRULES:\n${rules}\n${modRules}\n\nReturn ONLY the code.`;
+  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\nVAULT:\n${vaultSummary}\n\n${isModifying ? 'EXISTING CONTENT:\\n' + existingContent : ''}\n\nRULES:\n${rules}\n${modRules}\n\n${CHASSIS_WORKER_RULES}\n\nReturn ONLY the code.`;
 }

@@ -1,7 +1,152 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 16, 2026 — Session 13: fix pipeline capture-phase Web Audio pattern + direct index.html fix*
+*Last updated: May 16, 2026 — Session 14: Fix "Generate Rules failed: sidebarProvider.refresh is not a function"*
+
+## Recent Fixes — May 16, 2026 (Session 14: Generate Rules refresh crash)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/sidebar/chassisSidebar.ts` | Added `refresh()` method to `ChassisSidebarProvider` — re-sets `_view.webview.html` if the view is open. | `refreshAll()` in `extension.ts` always called `sidebarProvider.refresh()` but the method never existed on the class. After any command that called `refreshAll()` (generate rules, lock blueprint, etc.) the call would throw "is not a function", propagating through `handleAction`'s catch and showing "X failed" in the Setup Progress panel even though the underlying action succeeded. | None — method is additive; no existing paths changed. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Retrofit Blueprint-from-Scan)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/retrofitBlueprint.ts` | Rewrote `scanCodebase()`: now reads README (up to 2000 chars), package.json/pyproject.toml/Cargo.toml metadata, and `[SCOPE]` tags from up to 40 source files via `getCodeFiles()`. Added `saveToConfig(blueprint)`: writes the 5 W's directly into `.chassis/config.json` (creates the file if missing — works on non-CHASSIS projects). Improved AI prompt to return plain-English answers. | Previous scanner read first 20 lines of 50 arbitrary files — mostly imports and boilerplate, low signal. More critically, it only saved a markdown file that CHASSIS never read; the actual config blueprint was never updated so CHASSIS couldn't use the generated 5 W's in builds. | Low — `saveToConfig` catches all errors; creates `.chassis/` dir if absent. |
+| `src/commands/retrofitBlueprint.ts` | Rewrote UX: plain-English prompt ("CHASSIS will look at your project and figure out what it does"), `withProgress` notification during scan, modal result showing all 4 key fields, "Looks right" / "Edit it now" choice that opens the blueprint panel. Removed developer jargon throughout. | Command was using "scan your codebase" and "CHASSIS blueprint" — meaningless to non-coders. No progress indicator made it feel broken during the 30-second scan. | None — same command ID; behavior improved only. |
+
+## Recent Fixes — May 16, 2026 (Session 14: AI Delegation Button)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/delegationCodeLens.ts` | New file (41 lines). `DelegationCodeLensProvider` — scans every open file for `[TODO]` and `[WARN]` tags in any comment style (`//`, `#`, `--`, `<!--`). For `[TODO]`: shows `Fix this with CHASSIS` button. For `[WARN]`: shows `Ask CHASSIS about this` button. Both call `chassis.postToChat` with a plain-English message that routes through the existing fix pipeline. | Non-coders see `[TODO]` and `[WARN]` tags highlighted in their files (from `annotationService.ts`) but had no way to act on them without knowing what they are or typing commands. The CodeLens button appears right above the tag — one click to fix. | Low — CodeLens is read-only until clicked; all actual execution goes through existing `chassis.postToChat` / fix pipeline. |
+| `src/extensionCommands.ts` | Added `DelegationCodeLensProvider` import + `vscode.languages.registerCodeLensProvider({ scheme: 'file' }, ...)` at end of `registerAllCommands`. | Registers the provider for all files in the workspace. | None — additive, no existing code changed. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Built-in git auto-commit)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/gitAutoCommitService.ts` | New file (68 lines). `autoCommit(root, message, files?)` — silently inits git if the project has no repo, writes a default `.gitignore` on first init, stages files, checks if anything is staged, commits with a plain-English message. All errors swallowed — never blocks builds. `hasGit()` result cached at module level so the `git --version` check only runs once per session. | Non-coders have no safety net between CHASSIS save points. Git gives them full change history automatically without them needing to know what git is. | Low — runs after build success, any failure is silent. commit message is sanitized (double-quotes → single-quotes) before shell injection. |
+| `src/ui/chat/chatPanelBuild.ts` | Added `autoCommit` import + call after `onBuildFinished`. Message: `"CHASSIS added: [task]"`. Files: `[relPath, ...scaffoldedFiles]`. | Wire point for single-file builds. | None — call is after the build is already done and result card shown. |
+| `src/ui/chat/chatPanelChunked.ts` | Added `autoCommit` import + call after `onBuildFinished`. Message: `"CHASSIS added N files: [task]"`. Files: `builtFiles`. | Wire point for multi-file chunked builds. | None — same pattern as single-file. |
+| `src/ui/chat/chatPanelEditHandler.ts` | Added `autoCommit` import + call after `runEditFileBuild`. Message: `"CHASSIS updated: [filePath]"`. No files list (add -A covers the edit). | Wire point for edit/fix builds. Placed here (not in chatPanelEditBuild.ts) because chatPanelEditBuild.ts is at the 200-line limit. | None — runs after edit write is complete. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Plain-English language audit)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuild.ts` | Replaced "Searching vault..." → "Checking your saved code library..."; "Vault: N relevant items found" → "Found N useful matches in your code library"; "Supervisor planning..." → "Planning..."; "Plan ready (N steps) — handing off to worker AI..." → "Plan ready — writing your code..."; "Build failed: ... Check .chassis/build_errors.log..." → "Something went wrong — try again or describe what you want differently."; "Guardian reviewing..." → "doing a final check..." | CHASSIS is built for non-coders and vibe coders. "Vault", "Supervisor", "Guardian", "build_errors.log", "handing off to worker AI" are all developer jargon that would confuse someone who has never coded. | None — string-only changes. |
+| `src/ui/chat/chatPanelChunked.ts` | Replaced "Searching vault..." → "Checking your saved code library..."; vault hit message reworded; "Planning build — X generating file list..." → "Planning your build..."; "Build plan failed... Full details in .chassis/build_errors.log" → "Couldn't plan your build... Try again or describe what you want differently." | Same jargon audit — multi-file pipeline had identical problems. | None — string-only changes. |
+| `src/ui/chat/chatPanelChunkedLoop.ts` | Replaced "Building file X of Y" → "Writing part X of Y"; "quota exceeded — Supervisor taking over" → "Switching AI — continuing..."; "Supervisor corrected phase N" → "Making corrections to part N..."; "Failed on file N... Full details in .chassis/build_errors.log" → "Hit a snag on part N..."; "Could not write... Full details in .chassis/build_errors.log" → "Could not save... Try again — if it keeps failing, check your disk space." | Chunked loop is the most user-visible part of a multi-file build — every status message was developer-speak. | None — string-only changes. |
+| `src/ui/chat/chatPanelEditBuild.ts` | Replaced "Edit failed... Prompt was ~N tokens. Full details in .chassis/build_errors.log" → "Edit failed... Try again or describe the change differently." | Same jargon audit — error message referenced internal token count and log file path that mean nothing to a non-coder. | None — string-only change. File stays at 200 lines. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Architect Review per-action fix buttons)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/map/mapPanelMessages.ts` | Appended `ACTIONS_JSON:` request to architect review prompt. AI now outputs a structured JSON array at the end of each review: `[{file, action, label, description}]`. | Per-action buttons require structured data from the AI — without this the renderer has no way to know what specific fixes are available beyond the raw review text. | If AI ignores the instruction or outputs malformed JSON, the parse fails silently and the review renders without per-action buttons (graceful degradation). Fix All still works. |
+| `src/ui/chat/chatPanelMsgMapContext.ts` | Parses `ACTIONS_JSON:` block from AI response before rendering. Strips it from the displayed text and stores in `_architectActions` (keyed by reviewId). | Actions must be available at render time so `renderArchitectActions` can generate the buttons. | Regex targets end-of-string `ACTIONS_JSON:` line — if AI outputs it mid-response, it won't be parsed. Acceptable — the prompt explicitly says "at the very end." |
+| `src/ui/chat/chatPanelMsgArchitect.ts` | Added `ArchitectAction` interface, `_architectActions` map, `handleArchitectPerAction()`, `handleArchitectActionConfirm()`. Per-action shows a confirmation message in chat (what CHASSIS will do + Confirm/Cancel). Confirm routes to `chassis.runEditFix` (fix), `fs.unlinkSync` (delete), or `chassis.postToChat` (create). | User needs a direct path from each specific suggestion to executing it without navigating files or writing commands. | Delete uses `fs.unlinkSync` — irreversible if no save point exists. Mitigated by: (1) the confirmation message warns "a snapshot is saved automatically," (2) CHASSIS save points capture project state. |
+| `src/ui/chat/chatPanelRendererArchitect.ts` | `renderArchitectActions()` now reads `_architectActions` for the reviewId and renders per-action buttons (blue, labeled `[fix]`, `[!]`, `[+]`) above Fix All/Dismiss. Added `renderArchitectConfirm()` which renders Confirm/Cancel buttons for the in-chat confirmation message. | Architect review action bar was a single "Fix All" with no per-suggestion access. | None — renders gracefully when `_architectActions` has no entry (just shows Fix All). |
+| `src/ui/chat/chatPanelRenderer.ts` | Added `__ARCH_CONFIRM__reviewId|||actionIndex|||END_ARCH_CONFIRM__` token replacement — calls `renderArchitectConfirm(reviewId, actionIndex)`. | Confirmation messages are added to conversation as text strings with embedded tokens, same pattern as all other action UI in CHASSIS. | None. |
+| `src/ui/chat/chatPanelMessages.ts` | Added routes for `architect-per-action`, `architect-action-confirm`, `architect-action-cancel`. Removed leftover `require('fs').appendFileSync(...)` debug log that was writing to `~/chassis_debug.log` (freed 2 lines to stay at 200-line limit). | New message types from per-action buttons must be routed to extension handlers. Debug log was a temporary artifact. | None. |
+| `src/ui/chat/chatPanelScriptActions.ts` | Expanded arch action click handler with `per-action`, `confirm`, `cancel` dispatch. Split feedback/toggle/recent handlers to new `chatPanelScriptActionsB.ts` to stay under 200 lines. | File was at 200-line limit; the expanded arch handler required 6 new lines. | None — second `document.addEventListener` is additive. |
+| `src/ui/chat/chatPanelScriptActionsB.ts` | New file containing feedback rating, toggle-auto-open, and recent project item click handlers extracted from `chatPanelScriptActions.ts`. | Required split to keep parent file under 200 lines. | None. |
+| `src/ui/chat/chatPanelScript.ts` | Added `buildActionsScriptB` import and call. | Wire new B script into the webview. | None. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Architect Review — skip Guardian)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgMapContext.ts` | Guardian review skipped for Architect Review (`isArchitectReview && !isArchitectReview` guard added). | Guardian received `displayMsg = "Architect Review"` and `mapText = Claude's real response`. Without project context, Guardian judged the real response as "not answering the question" and replaced it with a generic "Architecture Review Framework" boilerplate template visible as "*Guardian reviewed this response.*" in the chat. The pattern matches the `buildAIPrefix` skip — Architect Review is a fully server-enriched prompt that doesn't need Guardian intervention. | None — Guardian continues to run for all other map-context messages (file explain, trace, test, improve). |
+
+## Recent Fixes — May 16, 2026 (Session 14: Architect Review — real file content injection)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/map/mapPanelMessages.ts` | `architectReview` handler now enriches the client prompt with actual file content before forwarding to AI. Reads top-5 files (sorted by todos+warns count), first 80 lines each, appended as "ACTUAL FILE CONTENT" section. | Webview builds a topology-only prompt (graph metadata: connection counts, health, line counts). For single-file projects (like `animal_sound_player`) with 0 edges, the graph data is nearly empty. Claude receives "1 file, 0 connections" and refuses: "I cannot provide an architectural review without the actual codebase." Real file content gives Claude something substantive to analyze regardless of project size. Pattern copied from `explainFile` and `analyzeFile` handlers in the same file (lines 68-69, 81-82). | Adds a file-read loop (up to 5 files, 80 lines each). Read errors are silently caught — falls back to topology-only prompt if all reads fail. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Architect Review — prompt format fix)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/map/mapScriptActions.ts` | Restructured `doArchitectReview` prompt. Old prompt started with `"You are a senior software architect reviewing..."` — sent as a `role: 'user'` message, Claude interprets this as a persona reassignment attempt and refuses with "I cannot provide an architecture review without knowing what system, codebase, or files you'd like me to examine." New prompt starts with task: `"Analyze the following project dependency graph..."`, explicitly labels the data as topology metadata (not source code), and uses ALL-CAPS section headers instead of markdown bold (works in plain text context). | Root cause of Architect Review returning help-request boilerplate after the first fix (empty prefix) was applied. The prompt format itself was the final failure point. | None — pure prompt text change inside a template literal string. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Architect Review — empty code + display bug)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgMapContext.ts` | For Architect Review: (1) Display message no longer appends empty `` `nodeId` `` when `nodeId` is `''` — shows just "Architect Review" instead of "Architect Review ``". (2) `buildAIPrefix` is skipped entirely for Architect Review. The prefix injects an `activeFileContext` code block; when no file is open the backtick fences are empty, causing the AI to say "code section appears to be empty." The architect review prompt is fully self-contained (contains map graph data inline) so no prefix is needed. | Root cause of "I notice you've requested an Architect Review but the code section appears to be empty" response. `buildAIPrefix` was prepending an empty `` ```\n\n``` `` block that the AI interpreted as the code to review, finding nothing. | None — Architect Review prompt includes all needed context inline. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Dead buttons + usage attribution)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelScript.ts` | Added `data-cmd` click handler to primary `document.addEventListener('click', ...)`. Reads `data-cmd` attribute from closest matching element and posts `{ type: 'run-command', command: cmd }` to the extension. Removed dead ID-based handlers for `save-point-btn`, `map-btn`, `blueprint-btn` (those element IDs don't exist in the HTML). | All header buttons (Map, Save Point, Blueprint, Capabilities), onboarding pills (Start Session, Build from Vault, View Checklist), and sidebar pills (Vault, AI Team) use `data-cmd` but no handler existed. Clicking any of them silently did nothing. | None — `run-command` message type already handled by extension. |
+| `src/ui/chat/chatPanelChunkedLoop.ts` | Per-file build recording changed from `worker \|\| supervisor` to `(res as any).routedTo \|\| worker \|\| supervisor`. | `routeByComplexity` picks the best available AI (Claude first, then fallback) independently of the Supervisor/Worker role split. Recording to the role-assigned `worker` ('gemini') meant all tokens appeared under Gemini even when Claude made the actual API calls. | None — `routedTo` is always set on successful responses. |
+| `src/ui/chat/chatPanelBuild.ts` | Single-file builds now record supervisor and worker tokens separately. When supervisor ≠ worker and a plan was generated: `recordUsage(_supTok, supCost, supervisorAI)` + `recordUsage(workerTokens, workerCost, workerAI)`. Falls back to recording total under `workerAI` when solo (no supervisor/worker split). | Previously recorded total under `workerAI` only — supervisor planning tokens were invisible in the per-AI usage breakdown. | None. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Audit #5 — post-change roadmap logging)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixUtils.ts` | Added `writeProjectRoadmapEntry(root, heading, bullets[])`. Reads project `CHASSIS_ROADMAP.md`, inserts new `## Recent Fixes` entry after `*Last updated*` line, updates the Last Updated line. No-ops when roadmap is absent (non-CHASSIS projects unaffected). | Audit #5: pipelines make changes to user files but never log those changes to the project's own CHASSIS_ROADMAP.md — violating the rule that every file change gets an entry. | None -- best-effort, all errors silently caught. |
+| `src/ui/chat/chatPanelMsgFixUtils.ts` | Moved `modelLabel()` from `chatPanelMsgFix.ts` to utils (exported). | `chatPanelMsgFix.ts` hit 205 lines after audit #5 additions; extracting `modelLabel` brings it to 196. Keeps both files under the 200-line hard stop. | None -- same function, now exported. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Import `modelLabel` from utils. Import `writeProjectRoadmapEntry`. Call `writeProjectRoadmapEntry` after successful file writes. | Audit #5 wiring for fix pipeline. | None. |
+| `src/ui/chat/chatPanelBuild.ts` | Import `writeProjectRoadmapEntry`. Call after `Writer.writeBuiltFile` and scaffold. Logs file names, AI used, tokens, cost. | Audit #5 wiring for single-file build. | None. |
+| `src/ui/chat/chatPanelChunked.ts` | Import `writeProjectRoadmapEntry`. Call after `tracer.end()` with full built file list and AI pair. | Audit #5 wiring for chunked multi-file build. | None. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Audit #4 — pre-flight rules.md injection)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixUtils.ts` | Added `readProjectRules(root)`. Reads `.chassis/rules.md`, caps at 4KB, returns empty string if absent. | Pre-flight step 2 ("Read .chassis/rules.md") was never performed by any AI pipeline. Projects can have custom rules (e.g. "never use AudioContext", "always use WAV blob") that the Supervisor needs to know before suggesting a fix. | None -- best-effort, returns empty on error. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Import `readProjectRules`, call it, inject into Supervisor prompt under "PROJECT RULES (must not violate)". | Fix Supervisor was proposing fixes without knowing project-specific constraints. | None -- empty when rules.md absent. |
+| `src/ui/chat/chatPanelBuild.ts` | Import `readProjectRules`, include in `blueprintContext` enrichment alongside dead_ends. | Single-file build Supervisor had no access to project rules. | None. |
+| `src/ui/chat/chatPanelChunked.ts` | Import `readProjectRules`, inject `rulesBlock` into `planPrompt` alongside `deadEndsBlock`. | Chunked build Supervisor planned files without knowing project rules. | None. |
+| `src/ui/chat/chatPanelBuildOrchestrated.ts` | Import `readProjectRules`, combine dead_ends + rules into context array. Refactored to avoid double file reads. | Orchestrated Supervisor had no access to project rules or dead_ends until #2+#4. | None. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Rule 17 causation-first debugging)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixUtils.ts` | Added `getRecentBuildContext(root, sourceFiles)`. Reads `build_history.json` via `BuildHistoryService`, filters to the 5 most recent non-undone builds, finds which source files overlap with currently-broken files, returns a formatted causation alert with file names, build task, age, and AI used. Returns empty string when no overlap. | Rule 17: "always check build_history.json BEFORE suggesting any other cause." Supervisor was diagnosing blind — it never knew whether the file it was reading had just been written by a CHASSIS build. If a build created the bug, the Supervisor should say that first, not discover it by accident. | None -- best-effort, all errors return empty string. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Import `getRecentBuildContext`. Call it after `collectSourceFiles`. Inject `buildContext` at the TOP of the Supervisor prompt, before user report text. | Causation alert must precede everything else so the Supervisor's first frame of reference is "did a build cause this?" not "what is wrong with the code?" | None -- empty string when no recent builds match. |
+
+## Recent Fixes — May 16, 2026 (Session 14: Rule 5 dead_ends in all build pipelines)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuild.ts` | Import `readProjectDeadEnds`. Shadow `blueprintContext` with dead_ends-enriched version at start of `runSingleFileBuild`. Flows into `supervisorPlan` call and `buildWorkerPrompt` automatically. | Rule 5 (don't repeat dead ends) was enforced in the fix pipeline but not the single-file build pipeline. Supervisor could plan approaches already known to fail in this project. | None -- `readProjectDeadEnds` is best-effort; returns empty string if file absent. |
+| `src/ui/chat/chatPanelChunked.ts` | Import `readProjectDeadEnds`. Add `deadEndsBlock` injected into `planPrompt` before the file-plan JSON request. | Chunked build Supervisor planned files without knowing what had failed before. | None. |
+| `src/ui/chat/chatPanelBuildOrchestrated.ts` | Import `readProjectDeadEnds`. Enrich `context` passed to `createPlan` with dead_ends content. | Orchestrated build Supervisor had no dead_ends awareness. | None -- only affects Supervisor prompt content. |
+
+## Recent Fixes — May 16, 2026 (Session 14: CHASSIS_WORKER_RULES + build-info fix)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/chassisWorkerRules.ts` | New file (22 lines). Exports `CHASSIS_WORKER_RULES` constant — 6 rules covering [SCOPE], [WARN], [DEAD], tag preservation, 200-line limit, no non-ASCII. Single source of truth for annotation rules across all AI Worker prompts. | Annotation rules existed in external config files (CLAUDE.md, .windsurfrules) but were never wired into CHASSIS's own internal Worker/Supervisor AI prompts. Build and fix pipelines were generating unannotated code. | None -- read-only constant, imported wherever needed. |
+| `src/ui/chat/chatPanelBuildWorker.ts` | Import + append `CHASSIS_WORKER_RULES` to `buildWorkerPrompt()` return value. | Single-file build Worker had no annotation rules. | None. |
+| `src/ui/chat/chatPanelChunkedLoop.ts` | Import + append `CHASSIS_WORKER_RULES` to per-file `filePrompt`. | Chunked build per-file prompts had partial rules ([SCOPE] only, no [WARN]/[DEAD]/no-ASCII). | None. |
+| `src/services/build/buildOrchestratorPrompt.ts` | Import + append `CHASSIS_WORKER_RULES` to `generatePhasePromptImpl`. | Orchestrated build phase prompt had zero annotation rules. | None. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Import + inject `CHASSIS_WORKER_RULES` into fix Worker prompt before FORMAT section. | Fix Worker already had [DEAD] rule but lacked [SCOPE], [WARN], tag preservation, no-ASCII. | None. |
+| `scripts/postcompile.js` | Replace hardcoded `'0.3.4'` version in build-info.json write with dynamic read from package.json. | build-info.json was stuck at 0.3.4 despite package.json being 0.3.6. Rule 20 violation -- version mismatch. | None -- reads package.json at compile time, falls back to '0.0.0' on error. |
+
+## Recent Fixes — May 16, 2026 (Session 14: dead-end annotation + pattern validation)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixUtils.ts` | Added `readProjectDeadEnds(root)` and `appendProjectDeadEnd(root, ...)`. Reads/writes `<project>/.chassis/dead_ends.md`. Creates file with header if absent. Truncates read at 8KB. | Fix pipeline had no connection to the project's dead_ends.md. Supervisor could suggest approaches already known to fail in the project. Successful fixes never recorded what was replaced. | None -- best-effort, all errors caught. |
+| `src/ui/chat/chatPanelMsgFixPatterns.ts` | Added `triedWhat`, `whyFails`, `doInstead` fields to `FailurePattern` interface. Filled in for web-audio pattern. | `appendProjectDeadEnd` needs human-readable strings, not raw regex objects. | None. |
+| `src/ui/chat/chatPanelMsgFix.ts` | (1) Reads project dead_ends.md before Phase 1, injects into Supervisor prompt under "PREVIOUSLY FAILED APPROACHES". (2) Added Worker Rule 5: annotate every removed/replaced block with [DEAD] comment in correct syntax for the file type. (3) Bumped pattern rules from index 5 to 6. (4) After validated fix: calls `appendProjectDeadEnd` for each resolved pattern. | Rule 5 (don't repeat dead ends) and Rule 8 (don't remove code without [DEAD] logging) were completely absent from the fix pipeline. Worker generated fixes with no annotations. Supervisor had no memory of what failed before. | Low -- dead_ends read/write is best-effort. Supervisor prompt grows by ~8KB max when dead_ends.md exists. |
+
+## Recent Fixes — May 16, 2026 (Session 14: post-write pattern validation)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixPatterns.ts` | New file (78 lines). `KNOWN_PATTERNS` registry with Web Audio API silent-failure pattern. `detectPatterns()` scans source before Phase 1. `buildSupervisorNotes()` / `buildWorkerRules()` inject domain guidance dynamically. `validateOutputFiles()` scans written files post-write for known-bad patterns. | Hardcoded prompt guidance in the Worker was routinely ignored — fix pipeline had no way to know whether the Worker followed instructions. Now output is scanned after write; if AudioContext still appears, user sees `[VALIDATION FAIL]` and knows to retry. | None — validation is read-only; it never blocks writes, only annotates the result message. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Removed hardcoded Web Audio guidance (now in patterns file). Added `detectPatterns(filesBlock)` before Phase 1. Injected `buildSupervisorNotes(activePatterns)` into Supervisor prompt and `buildWorkerRules(activePatterns, 5)` into Worker prompt. Added post-write `validateOutputFiles()` call and `[VALIDATION PASS/FAIL]` line in result message. File: 186→180 lines. | Guidance was static and generic. Dynamic injection means guidance only appears when the pattern is actually present in the source. Validation closes the loop that was invisible before. | None — fails gracefully; empty patterns list means no injected text. |
 
 ## Recent Fixes — May 16, 2026 (Session 13: fix pipeline phantom files + Web Audio fix)
 

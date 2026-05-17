@@ -1,11 +1,11 @@
-// [SCOPE] CHASSIS Retrofit Blueprint Command — scan codebase, auto-generate 5 W's
+// [SCOPE] CHASSIS Retrofit Blueprint Command — scan project, auto-generate 5 W's, save to config
 
 import * as vscode from 'vscode';
 import { RetrofitBlueprintService } from '../services/retrofitBlueprint.js';
 import { RoutingService } from '../services/ai/routingService.js';
 import { ChassisService } from '../services/chassisService.js';
-import * as path from 'path';
-import * as fs from 'fs';
+import { openBlueprintPanel } from '../ui/views/blueprintInterviewPanel.js';
+import { Blueprint5W } from '../services/retrofitBlueprint.js';
 
 export function registerRetrofitBlueprintCommand(
   context: vscode.ExtensionContext,
@@ -15,41 +15,47 @@ export function registerRetrofitBlueprintCommand(
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.retrofitBlueprint', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) {
-        vscode.window.showErrorMessage('No workspace open.');
-        return;
-      }
+      if (!root) { vscode.window.showErrorMessage('Open a project folder first.'); return; }
 
-      const confirm = await vscode.window.showWarningMessage(
-        'This will scan your codebase and generate a CHASSIS blueprint from the existing code. Continue?',
-        { modal: true },
-        'Generate'
+      const confirm = await vscode.window.showInformationMessage(
+        'CHASSIS will look at your project and figure out what it does, who it\'s for, and why it exists. Takes about 30 seconds.',
+        'Scan my project',
+        'Cancel'
       );
-
-      if (confirm !== 'Generate') { return; }
-
-      vscode.window.showInformationMessage('Scanning codebase... this may take a moment.');
+      if (confirm !== 'Scan my project') { return; }
 
       const service = new RetrofitBlueprintService(root, routing);
-      const blueprint = await service.generateBlueprint();
+      const ref: { blueprint: Blueprint5W | null } = { blueprint: null };
 
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'CHASSIS is reading your project...', cancellable: false },
+        async () => { ref.blueprint = await service.generateBlueprint(); }
+      );
+
+      const blueprint = ref.blueprint;
       if (!blueprint) {
-        vscode.window.showErrorMessage('Failed to generate blueprint. Check your AI key and try again.');
+        vscode.window.showErrorMessage('Couldn\'t read your project — check your AI key and try again.');
         return;
       }
 
-      const blueprintPath = path.join(root, '.chassis', 'CHASSIS_BLUEPRINT.md');
-      const markdown = service.formatMarkdown(blueprint);
-      fs.writeFileSync(blueprintPath, markdown);
+      service.saveToConfig(blueprint);
 
-      const open = await vscode.window.showInformationMessage(
-        'Blueprint generated and saved to .chassis/CHASSIS_BLUEPRINT.md',
-        'Open Blueprint'
+      const detail = [
+        `What it does: ${blueprint.what}`,
+        `Who it's for: ${blueprint.who}`,
+        `Where it runs: ${blueprint.where}`,
+        `Why it exists: ${blueprint.why}`,
+      ].join('\n');
+
+      const next = await vscode.window.showInformationMessage(
+        'Got it — here\'s what CHASSIS found about your project:',
+        { modal: true, detail: detail + '\n\nThis is now saved. You can edit it anytime.' },
+        'Looks right',
+        'Edit it now'
       );
 
-      if (open === 'Open Blueprint') {
-        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(blueprintPath));
-        await vscode.window.showTextDocument(doc, { preview: false });
+      if (next === 'Edit it now') {
+        openBlueprintPanel(context, chassis, routing);
       }
     })
   );

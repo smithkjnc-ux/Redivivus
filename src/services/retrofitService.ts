@@ -26,7 +26,7 @@ export class RetrofitService {
 
   async runRetrofit(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) { vscode.window.showErrorMessage('No workspace open.'); return; }
+    if (!root) { vscode.window.showErrorMessage('No project folder is open. Open a project first, then try again.'); return; }
 
     const mapPath = path.join(this.chassis.chassisDir, 'project_map.md');
     if (!fs.existsSync(mapPath)) {

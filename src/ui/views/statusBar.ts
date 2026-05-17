@@ -45,8 +45,8 @@ export class StatusBar {
 
   private updateBlueprintItem(): void {
     if (!this.chassis.isInitialized()) {
-      this.blueprintItem.text = '🏗️ CHASSIS: Not initialized';
-      this.blueprintItem.tooltip = 'Run "CHASSIS: Initialize Project" to get started';
+      this.blueprintItem.text = '🏗️ CHASSIS: Getting started';
+      this.blueprintItem.tooltip = 'Click here to set up your project with CHASSIS';
       this.blueprintItem.command = 'chassis.init';
       this.blueprintItem.color = '#888';
       return;
@@ -68,7 +68,7 @@ export class StatusBar {
       this.blueprintItem.color = '#f5a623';
     } else {
       this.blueprintItem.text = `\u{1F3D7}\uFE0F CHASSIS: ${name}`;
-      this.blueprintItem.tooltip = `${name} — Blueprint not yet filled in. Click to run the setup interview.`;
+      this.blueprintItem.tooltip = `${name} — Click to finish setting up your project`;
       this.blueprintItem.command = 'chassis.blueprint';
       this.blueprintItem.color = '#f5a623';
     }

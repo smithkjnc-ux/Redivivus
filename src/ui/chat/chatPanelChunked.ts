@@ -16,6 +16,9 @@ import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build
 import { runFileBuildLoop, FileBuildLoopResult } from './chatPanelChunkedLoop.js';
 import { tracer } from '../../services/pipelineTracer.js';
 import { formatVaultContext } from '../../services/vault/vaultContextService.js';
+import { readProjectDeadEnds, readProjectRules, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils.js';
+import { autoCommitIfEnabled } from '../../services/gitAutoCommitService.js';
+import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel.js';
 
 export function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
   ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined });
@@ -71,23 +74,27 @@ export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<
   }
 
   // Vault search
-  appendMsg(ctx, '🔍 Searching vault...');
+  appendMsg(ctx, '🔍 Checking your saved code library...');
   const vaultItems = vault ? vault.listItems() : [];
   const searchResult: VaultSearchResult = vaultItems.length > 0 ? findRelevantByTask(task, vaultItems) : { items: [], totalScanned: 0, matchedCount: 0, highConfidenceCount: 0 };
   const relevant = searchResult.items;
   const vaultMsg = relevant.length > 0
-    ? `🔍 Vault: ${relevant.length} relevant from ${searchResult.totalScanned} scanned (${searchResult.highConfidenceCount} high confidence)`
-    : `🔍 Vault: No matches found in ${searchResult.totalScanned} items`;
+    ? `🔍 Found ${relevant.length} useful match${relevant.length !== 1 ? 'es' : ''} in your code library`
+    : `🔍 No matches found in your code library`;
   updateLastMsg(ctx, vaultMsg);
 
   // Planning
   const plannerLabel = workerLabel ? `${supervisorLabel} (Supervisor)` : supervisorLabel;
-  appendMsg(ctx, `📋 Planning build — ${plannerLabel} generating file list...`);
+  appendMsg(ctx, `📋 Planning your build...`);
 
   // [FIX] Inject vault context into planner so supervisor knows what already exists
   const vaultCtxBlock = relevant.length > 0 ? formatVaultContext(relevant) + '\n' : '';
+  const deadEnds = readProjectDeadEnds(root);
+  const projectRules = readProjectRules(root);
+  const deadEndsBlock = deadEnds ? `PREVIOUSLY FAILED APPROACHES (do not repeat):\n${deadEnds}\n` : '';
+  const rulesBlock = projectRules ? `PROJECT RULES (must not violate):\n${projectRules}\n` : '';
   const planPrompt = `I need to build: "${task}"
-${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${vaultCtxBlock}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
+${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${vaultCtxBlock}${deadEndsBlock}${rulesBlock}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
 Return ONLY a JSON array — no markdown, no explanation, no code:
 [
   {"file": "src/models.py", "purpose": "Data models for expenses"},
@@ -120,7 +127,7 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
     const errMsg = err instanceof Error ? err.message : String(err);
     ctx.logError(task, planPrompt, `Build plan failed: ${errMsg}`, promptLen);
     conversation.pop(); conversation.pop();
-    appendMsg(ctx, `❌ Build plan failed\n\n**Reason:** ${errMsg}\n\n_Prompt was ~${promptLen} tokens. Full details in \`.chassis/build_errors.log\`_`);
+    appendMsg(ctx, `❌ Couldn't plan your build\n\n**Reason:** ${errMsg}\n\nTry again or describe what you want differently.`);
     return;
   }
 
@@ -166,7 +173,13 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
 
   tracer.vault('save', `${builtFiles.length} files saved to vault`);
   tracer.end(builtFiles, totalTokens, totalCost);
+  writeProjectRoadmapEntry(root, `AI build: ${task.slice(0, 60)}`, [
+    ...builtFiles.map(f => `Built \`${f}\``),
+    `Supervisor: ${supervisorLabel}${workerLabel ? `  Worker: ${workerLabel}` : ''}  Tokens: ~${totalTokens}  Cost: $${totalCost.toFixed(4)}`,
+  ]);
   if (ctx.onBuildFinished) { ctx.onBuildFinished(task, builtFiles); }
+  await autoCommitIfEnabled(root, `CHASSIS added ${builtFiles.length} file${builtFiles.length !== 1 ? 's' : ''}: ${task.slice(0, 60)}`, builtFiles);
+  refreshSetupProgressIfOpen().catch(() => {});
 
   // Build history
   try {

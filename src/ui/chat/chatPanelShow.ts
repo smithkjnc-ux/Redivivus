@@ -17,8 +17,13 @@ export function doShowChatPanel(
   vault?: VaultService,
 ): void {
   if ((ChatPanel as any)._instance) {
-    (ChatPanel as any)._instance._panel.reveal((ChatPanel as any)._instance._panel.viewColumn ?? vscode.ViewColumn.One, false);
-    if (vault) { (ChatPanel as any)._instance.vault = vault; }
+    const existing = (ChatPanel as any)._instance;
+    existing._panel.reveal(existing._panel.viewColumn ?? vscode.ViewColumn.One, false);
+    if (vault) { existing.vault = vault; }
+    existing._panel.webview.postMessage({
+      type: 'update-title',
+      html: '<span style="color:#a78bfa;-webkit-text-fill-color:#a78bfa;">C</span><span style="color:#4d9eff;-webkit-text-fill-color:#4d9eff;"> H A S S I S</span>',
+    });
     return;
   }
   const panel = vscode.window.createWebviewPanel(

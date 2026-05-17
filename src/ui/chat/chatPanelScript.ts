@@ -6,6 +6,7 @@ import { buildProjectsScript } from './chatPanelScriptProjects.js';
 import { buildTemplatesScript } from './chatPanelScriptTemplates.js';
 import { buildInterviewScript } from './chatPanelScriptInterview.js';
 import { buildActionsScript } from './chatPanelScriptActions.js';
+import { buildActionsScriptB } from './chatPanelScriptActionsB.js';
 import { buildGatesScript } from './chatPanelScriptGates.js';
 import { buildExpandedInterviewScript } from './chatPanelScriptExpandedInterview.js';
 
@@ -75,6 +76,15 @@ export function buildChatScript(): string {
         vscode.postMessage({ type: 'switch-mode', mode: nextMode });
         return;
       }
+      // Generic data-cmd handler: header buttons, sidebar pills, onboarding pills
+      // [FIX] All button/pill elements use data-cmd — previous ID-based handlers (map-btn, blueprint-btn)
+      // referenced elements that no longer exist. All header buttons were silently dead.
+      const cmdEl = e.target.closest ? e.target.closest('[data-cmd]') : null;
+      if (cmdEl) {
+        const cmd = cmdEl.getAttribute('data-cmd');
+        if (cmd) { try { vscode.postMessage({ type: 'run-command', command: cmd }); } catch(err) {} }
+        return;
+      }
       // Launcher buttons: Start New Project (Plan It Out / Just Build) and Open Existing
       const launcherBtn = e.target.closest ? e.target.closest('[data-action]') : null;
       if (launcherBtn) {
@@ -91,12 +101,8 @@ export function buildChatScript(): string {
       }
     });
     clearBtn.addEventListener('click', () => vscode.postMessage({ type: 'clear-chat' }));
-    const savePointBtn = document.getElementById('save-point-btn');
-    if (savePointBtn) savePointBtn.addEventListener('click', () => vscode.postMessage({ type: 'save-point' }));
-    const mapBtn = document.getElementById('map-btn');
-    if (mapBtn) mapBtn.addEventListener('click', () => vscode.postMessage({ type: 'run-command', command: 'chassis.showMap' }));
-    const blueprintBtn = document.getElementById('blueprint-btn');
-    if (blueprintBtn) blueprintBtn.addEventListener('click', () => vscode.postMessage({ type: 'run-command', command: 'chassis.blueprintInterview' }));
+    // [DEAD] ID-based listeners for save-point-btn, map-btn, blueprint-btn removed --
+    // those element IDs no longer exist; all header buttons now use data-cmd (handled above).
 
     function showGettingStarted() {
       if (document.getElementById('getting-started')) return;
@@ -162,6 +168,7 @@ export function buildChatScript(): string {
         else showContentPanel(msg.title, msg.content);
       }
       if (msg.type === 'inject-text' && input && msg.text) { input.value = msg.text; input.focus(); }
+      if (msg.type === 'update-title') { var ts = document.querySelector('.header-left strong'); if (ts && msg.html) { ts.innerHTML = msg.html; } }
       if (msg.type === 'bi-start') showBlueprintInterview();
       if (msg.type === 'bi-layers') { window._biLayers = msg.layers || []; window._biLayerIdx = 0; window._biRender(window._biLayers[0]); }
       if (msg.type === 'bi-done') { document.getElementById('blueprint-interview-root')?.remove(); document.body.style.overflow = ''; }
@@ -178,6 +185,7 @@ export function buildChatScript(): string {
     ${buildTemplatesScript()}
     ${buildInterviewScript()}
     ${buildActionsScript()}
+    ${buildActionsScriptB()}
     ${buildGatesScript()}
     ${buildExpandedInterviewScript()}
   `;

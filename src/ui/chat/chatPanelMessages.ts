@@ -11,7 +11,7 @@ import { resolveVaultHit } from './chatPanelBuild.js';
 import { handleSendMessage } from './chatPanelMsgSendMessage.js';
 import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser } from './chatPanelMsgFileOps.js';
 import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder } from './chatPanelMsgProjectOps.js';
-import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne } from './chatPanelMsgArchitect.js';
+import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne, handleArchitectPerAction, handleArchitectActionConfirm } from './chatPanelMsgArchitect.js';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial.js';
 import { handleMapContext } from './chatPanelMsgMapContext.js';
 import { handleExpandedInterviewSubmit } from './chatPanelMsgExpandedInterview.js';
@@ -83,8 +83,6 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     if (deps.onSwitchAI) { await deps.onSwitchAI(msg.ai || 'gemini'); }
 
   } else if (msg.type === 'new-project') {
-    require('fs').appendFileSync(require('os').homedir() + '/chassis_debug.log', `[chatPanelMessages] new-project received name=${msg.name}
-`);
     if (deps.onNewProject) {
       const answers = msg.answers || {};
       if (msg.originalTask) { answers._originalTask = msg.originalTask; }
@@ -168,6 +166,15 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
 
   } else if (msg.type === 'architect-fix-one') {
     await handleArchitectFixOne(msg, conversation, refresh);
+
+  } else if (msg.type === 'architect-per-action') {
+    await handleArchitectPerAction(msg, conversation, refresh);
+
+  } else if (msg.type === 'architect-action-confirm') {
+    await handleArchitectActionConfirm(msg, conversation, refresh);
+
+  } else if (msg.type === 'architect-action-cancel') {
+    conversation.push({ role: 'assistant', content: 'Cancelled.', timestamp: Date.now() }); refresh();
 
   } else if (msg.type === 'blueprint-gap-answer') {
     await handleBlueprintGapAnswer(msg, deps, conversation, refresh);

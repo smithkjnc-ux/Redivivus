@@ -22,7 +22,7 @@ export class AnalyzerService {
 
   async analyzeProject(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) { vscode.window.showErrorMessage('No workspace folder open.'); return; }
+    if (!root) { vscode.window.showErrorMessage('No project folder is open. Open a project first, then try again.'); return; }
 
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
@@ -60,17 +60,25 @@ export class AnalyzerService {
         `- TODOs found: ${result.todoItems.length}\n- Files needing comments: ${result.uncommentedFiles.length}`
       );
 
-      const hasIssues = result.todoItems.length > 0 || result.largeFiles.length > 0 || result.uncommentedFiles.length > 0;
-      if (hasIssues) {
-        _showRecommendationsPanel(result);
-      } else {
-        const doc = await vscode.workspace.openTextDocument(mapPath);
-        await vscode.window.showTextDocument(doc);
-        const choice = await vscode.window.showInformationMessage(
-          '\u2705 Scan complete \u2014 no issues found! ' + result.totalFiles + ' files, ' + result.totalLines.toLocaleString() + ' lines.',
-          'View Recommendations'
+      // Persist scan results so Setup Progress survives reload
+      try {
+        const cfg = this.chassis.loadConfig();
+        if (cfg) {
+          cfg.lastScan = new Date().toISOString();
+          cfg.scanResults = {
+            largeFiles: result.largeFiles.map(f => ({ relativePath: f.relativePath, lines: f.lines })),
+            todos: result.todoItems.map(t => ({ file: t.file, line: t.line })),
+            uncommented: result.uncommentedFiles.map(f => ({ relativePath: f.relativePath, lines: f.lines })),
+          };
+          this.chassis.saveConfig(cfg);
+        }
+      } catch { /* non-fatal */ }
+
+      _showRecommendationsPanel(result);
+      if (result.todoItems.length === 0 && result.largeFiles.length === 0 && result.uncommentedFiles.length === 0) {
+        vscode.window.showInformationMessage(
+          '\u2705 Scan complete \u2014 no issues found! ' + result.totalFiles + ' files, ' + result.totalLines.toLocaleString() + ' lines.'
         );
-        if (choice === 'View Recommendations') { _showRecommendationsPanel(result); }
       }
     });
   }

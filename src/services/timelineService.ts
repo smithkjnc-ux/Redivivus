@@ -119,7 +119,7 @@ export class TimelineService {
   static showInChat(conversation: any[], refresh: () => void): void {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
-      conversation.push({ role: 'assistant', content: '⚠️ No workspace open.', timestamp: Date.now() });
+      conversation.push({ role: 'assistant', content: '⚠️ No project folder is open.', timestamp: Date.now() });
       refresh();
       return;
     }

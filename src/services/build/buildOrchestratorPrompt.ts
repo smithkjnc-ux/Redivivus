@@ -3,6 +3,7 @@
 
 import { BuildOrchestrator, BuildPlan, PhaseDefinition, BuildPhase } from './buildOrchestrator.js';
 import { BUILD_PHASES } from './buildPhaseDefinitions.js';
+import { CHASSIS_WORKER_RULES } from '../ai/chassisWorkerRules.js';
 
   export function getPlanSummaryImpl(orch: BuildOrchestrator, planId: string): string {
     const plan = (orch as any).plans.get(planId);
@@ -64,5 +65,6 @@ import { BUILD_PHASES } from './buildPhaseDefinitions.js';
     }
     prompt += `\n6. NO placeholders — generate working code\n`;
     prompt += `7. NO markdown fences in response\n`;
+    prompt += `\n${CHASSIS_WORKER_RULES}\n`;
     return prompt;
   }

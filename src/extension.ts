@@ -174,6 +174,14 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
+  // ── pipeline trace viewer ──
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.showPipelineTrace', async () => {
+      const { tracer } = await import('./services/pipelineTracer.js');
+      tracer.show();
+    })
+  );
+
   // ── register all commands ──
   const githubBackupService = new GitHubBackupService(context);
   registerAllCommands(context, chassisService, routingService, usageTracker, vaultService, measureTwice, changeTracker, analyzerService, rulesService, retrofitService, sessionService, guideService, blueprintService, statusBar, sidebarProvider, refreshAll, githubBackupService, guardianService, { value: _suppressNextFolderAdd });

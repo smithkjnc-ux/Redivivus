@@ -25,6 +25,25 @@ export const AI_RANK: Record<string, number> = {
   groq:   5,    // Groq — fastest, weaker reasoning
 };
 
+// [SCOPE] AI capability descriptors — used by the Supervisor to assign work
+// Each AI has strengths the Supervisor can match to task steps
+export interface AICapability {
+  rank: number;
+  label: string;
+  strengths: string[];
+  bestFor: string;      // one-line summary for the Supervisor prompt
+  contextLimit: number; // approximate token limit
+}
+
+export const AI_CAPABILITIES: Record<string, AICapability> = {
+  claude: { rank: 10, label: 'Claude', strengths: ['architecture', 'complex logic', 'error handling', 'code review', 'refactoring'], bestFor: 'Complex architecture, multi-file coordination, code review', contextLimit: 200_000 },
+  openai: { rank: 9, label: 'GPT-4o', strengths: ['APIs', 'data processing', 'full-stack', 'documentation'], bestFor: 'API integration, data pipelines, full-stack apps', contextLimit: 128_000 },
+  xai:    { rank: 8, label: 'Grok', strengths: ['reasoning', 'web-aware', 'creative'], bestFor: 'Creative solutions, web-aware tasks', contextLimit: 128_000 },
+  gemini: { rank: 7, label: 'Gemini', strengths: ['rapid generation', 'HTML/CSS', 'browser games', 'prototyping', 'UI'], bestFor: 'Fast prototyping, HTML/CSS/JS, browser games, UI work', contextLimit: 1_000_000 },
+  kimi:   { rank: 6, label: 'Kimi', strengths: ['large files', 'bulk annotation', 'long context'], bestFor: 'Large file processing, bulk operations', contextLimit: 200_000 },
+  groq:   { rank: 5, label: 'Groq', strengths: ['speed', 'simple completions', 'quick iterations'], bestFor: 'Fast simple completions, rapid iteration', contextLimit: 32_000 },
+};
+
 /**
  * Returns the guardian AI id (highest-ranked available that is NOT the worker).
  * [CHASSIS] Consistent with selectSupervisorAndWorker() in routingService —
@@ -85,6 +104,7 @@ Review this the way a senior engineer would in a real code review. Do not check 
 - Are there correctness bugs? Wrong variable scope (const reassigned), inverted logic, off-by-one errors, operations in the wrong order?
 - Does it use real APIs that exist, or did the AI hallucinate function names or libraries?
 - Would a real user be able to run this immediately, or would it fail on first use?
+- Are ALL input arguments (argv, constructor params, function parameters) that are parsed or declared actually used in the core computation? If a variable is parsed from args[] but never appears in the formula, the output is mathematically wrong — this is a critical logic bug, not a style issue.
 
 DOMAIN GOTCHAS — things junior AIs consistently get wrong (use your judgment, do not treat as a checklist):
 - Canvas animations: trail alpha math '1 - index/max' is almost always inverted — oldest should be most transparent, newest most opaque
@@ -100,6 +120,7 @@ DOMAIN GOTCHAS — things junior AIs consistently get wrong (use your judgment, 
 - ageFactor = i / maxTrailLength instead of i / trail.length — when trail is still filling up all early points appear dim/tiny; must divide by trail.length (actual current length)
 - resizeCanvas() called before x/y are initialized, then clamps x/y producing NaN — causes black screen; guard the clamp: only clamp if x and y are already numbers (typeof x === 'number')
 - speed hardcoded as a fixed number instead of Math.hypot(canvas.width, canvas.height) / 180 — ball moves too slow/fast on different screen sizes
+- CLI input shadowing: args parsed into named variables (distance, pay, fuelCost) but formula only uses some — e.g. netProfit = pay - fuelCost while distance was parsed and is never referenced — all parsed argv inputs MUST appear in the output computation
 
 INSTRUCTIONS:
 - If the code is correct and ready to use, reply with EXACTLY: GUARDIAN_PASS

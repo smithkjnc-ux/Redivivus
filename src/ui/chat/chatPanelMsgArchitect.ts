@@ -12,6 +12,43 @@ export const _architectReviews = new Map<string, string>();
 // [CHASSIS] Fix-one-at-a-time state — keyed by reviewId
 export const _architectFixState = new Map<string, { issues: string[]; index: number }>();
 
+export interface ArchitectAction { file: string; action: 'fix' | 'delete' | 'create'; label: string; description: string; }
+// [CHASSIS] Per-action buttons — populated by chatPanelMsgMapContext when AI returns ACTIONS_JSON
+export const _architectActions = new Map<string, ArchitectAction[]>();
+
+export async function handleArchitectPerAction(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
+  const actions = _architectActions.get(msg.reviewId || '');
+  const act = actions?.[msg.actionIndex];
+  if (!act) { return; }
+  const verb = act.action === 'delete' ? 'Delete' : act.action === 'create' ? 'Create' : 'Fix';
+  const warning = act.action === 'delete' ? '\n\n> A snapshot is saved automatically — use Save Point to restore if needed.' : '';
+  const detail = `**${verb} \`${act.file}\`?**\n\n${act.description}${warning}\n\n__ARCH_CONFIRM__${msg.reviewId}|||${msg.actionIndex}|||END_ARCH_CONFIRM__`;
+  conversation.push({ role: 'assistant', content: detail, timestamp: Date.now() });
+  refresh();
+}
+
+export async function handleArchitectActionConfirm(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
+  const actions = _architectActions.get(msg.reviewId || '');
+  const act = actions?.[msg.actionIndex];
+  if (!act) { return; }
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+  if (act.action === 'delete') {
+    const absPath = path.join(root, act.file);
+    try {
+      if (!fs.existsSync(absPath)) { conversation.push({ role: 'assistant', content: `\`${act.file}\` not found — nothing to delete.`, timestamp: Date.now() }); refresh(); return; }
+      fs.unlinkSync(absPath);
+      conversation.push({ role: 'assistant', content: `✅ Deleted \`${act.file}\`.`, timestamp: Date.now() });
+    } catch (err) {
+      conversation.push({ role: 'assistant', content: `❌ Delete failed: ${err instanceof Error ? err.message : String(err)}`, timestamp: Date.now() });
+    }
+  } else if (act.action === 'fix') {
+    await vscode.commands.executeCommand('chassis.runEditFix', act.description, act.file, 'refactor');
+  } else {
+    await vscode.commands.executeCommand('chassis.postToChat', act.description);
+  }
+  refresh();
+}
+
 export async function handleArchitectExplain(msg: any, routing: RoutingService, conversation: ChatMessage[], refresh: () => void): Promise<void> {
   const reviewText = _architectReviews.get(msg.reviewId || '');
   if (!reviewText) { return; }
@@ -24,7 +61,7 @@ export async function handleArchitectExplain(msg: any, routing: RoutingService, 
     const aiRes = await routing.prompt(explainPrompt);
     conversation.push({ role: 'assistant', content: aiRes.text || 'Could not generate explanation.', timestamp: Date.now() });
   } catch (err) {
-    conversation.push({ role: 'assistant', content: 'Error generating explanation: ' + (err instanceof Error ? err.message : String(err)), timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: '❌ Could not generate explanation — please try again.', timestamp: Date.now() });
   }
   refresh();
 }
@@ -33,7 +70,7 @@ export function handleArchitectAddTodos(msg: any, conversation: ChatMessage[], r
   const reviewText = _architectReviews.get(msg.reviewId || '');
   if (!reviewText) { return; }
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root) { conversation.push({ role: 'assistant', content: 'No workspace open.', timestamp: Date.now() }); refresh(); return; }
+  if (!root) { conversation.push({ role: 'assistant', content: '⚠️ No project folder is open. Open a project first, then try again.', timestamp: Date.now() }); refresh(); return; }
   const bpPath = path.join(root, '.chassis', 'blueprint.md');
   const dateStr = new Date().toISOString().slice(0, 10);
   const lines = reviewText.split('\n').filter(l => l.trim().startsWith('-') || /^\d+\./.test(l.trim()) || /^\*\*/.test(l.trim()));
@@ -46,9 +83,9 @@ export function handleArchitectAddTodos(msg: any, conversation: ChatMessage[], r
       fs.mkdirSync(path.join(root, '.chassis'), { recursive: true });
       fs.writeFileSync(bpPath, '# Blueprint\n' + section, 'utf8');
     }
-    conversation.push({ role: 'assistant', content: 'Added ' + todoLines.length + ' TODOs to `.chassis/blueprint.md` under **Architect Review TODOs -- ' + dateStr + '**.', timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: '✅ Added ' + todoLines.length + ' to-do items to your blueprint. Open `.chassis/blueprint.md` to see them.', timestamp: Date.now() });
   } catch (err) {
-    conversation.push({ role: 'assistant', content: 'Could not write TODOs: ' + (err instanceof Error ? err.message : String(err)), timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: '❌ Could not save to-do items — please try again.', timestamp: Date.now() });
   }
   refresh();
 }

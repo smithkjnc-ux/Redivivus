@@ -28,7 +28,8 @@ if (fs.existsSync(roadmapPath)) {
 const buildTimestamp = new Date().toISOString();
 const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
 // [WARN] File system operation: `fs.writeFileSync` can fail due to permissions or disk space issues.
-fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: '0.3.4' }, null, 2));
+const pkgVersion = (() => { try { return JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf-8')).version; } catch { return '0.0.0'; } })();
+fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: pkgVersion }, null, 2));
 
 // Auto-commit logic
 try {

@@ -1,8 +1,10 @@
 // [SCOPE] CHASSIS Retrofit Blueprint — scan existing codebase, auto-generate 5 W's blueprint
+// Saves generated blueprint directly into .chassis/config.json so CHASSIS uses it immediately.
 
 import * as fs from 'fs';
 import * as path from 'path';
 import { RoutingService } from './ai/routingService.js';
+import { getCodeFiles } from './retrofitFileScanner.js';
 
 export interface Blueprint5W {
   who: string;
@@ -15,90 +17,99 @@ export interface Blueprint5W {
 export class RetrofitBlueprintService {
   constructor(private root: string, private routing: RoutingService) {}
 
-  /** Scan codebase and collect file summaries */
+  /** Build a rich project summary: README, package.json, [SCOPE] lines, file list */
   async scanCodebase(): Promise<string> {
-    const files: string[] = [];
-    const extensions = ['.ts', '.js', '.tsx', '.jsx', '.py', '.go', '.rs', '.java'];
+    const parts: string[] = [];
 
-    const scanDir = (dir: string) => {
-      const entries = fs.readdirSync(dir, { withFileTypes: true });
-      for (const entry of entries) {
-        if (entry.isDirectory()) {
-          if (entry.name !== 'node_modules' && entry.name !== '.git' && entry.name !== 'dist' && entry.name !== 'build') {
-            scanDir(path.join(dir, entry.name));
-          }
-        } else if (extensions.some(ext => entry.name.endsWith(ext))) {
-          files.push(path.join(dir, entry.name));
-        }
+    // README gives the best high-level signal
+    for (const name of ['README.md', 'README.txt', 'readme.md']) {
+      const p = path.join(this.root, name);
+      if (fs.existsSync(p)) {
+        parts.push('=== README ===\n' + fs.readFileSync(p, 'utf-8').slice(0, 2000));
+        break;
       }
-    };
-
-    scanDir(this.root);
-
-    let summary = '';
-    for (const filePath of files.slice(0, 50)) { // Limit to 50 files for context window
-      const relPath = path.relative(this.root, filePath);
-      const content = fs.readFileSync(filePath, 'utf-8');
-      const lines = content.split('\n').slice(0, 20).join('\n'); // First 20 lines
-      summary += `\n\n=== ${relPath} ===\n${lines}`;
     }
 
-    return summary;
+    // package.json / pyproject.toml for name, description, dependencies
+    for (const manifest of ['package.json', 'pyproject.toml', 'Cargo.toml']) {
+      const p = path.join(this.root, manifest);
+      if (!fs.existsSync(p)) { continue; }
+      try {
+        if (manifest === 'package.json') {
+          const pkg = JSON.parse(fs.readFileSync(p, 'utf-8'));
+          parts.push('=== package.json ===\n' + JSON.stringify({
+            name: pkg.name, description: pkg.description,
+            main: pkg.main, scripts: pkg.scripts,
+            deps: Object.keys(pkg.dependencies || {}).slice(0, 12),
+          }, null, 2));
+        } else {
+          parts.push(`=== ${manifest} ===\n` + fs.readFileSync(p, 'utf-8').slice(0, 500));
+        }
+      } catch { /* skip */ }
+      break;
+    }
+
+    // [SCOPE] tags from source files — best per-file signal
+    const files = getCodeFiles(this.root).slice(0, 40);
+    const lines: string[] = [];
+    for (const f of files) {
+      try {
+        const content = fs.readFileSync(f, 'utf-8').split('\n');
+        const scope = content.find(l => /\[SCOPE\]/.test(l));
+        const rel = path.relative(this.root, f);
+        lines.push(scope ? `${rel}: ${scope.trim()}` : rel);
+      } catch { /* skip */ }
+    }
+    if (lines.length > 0) { parts.push('=== FILES ===\n' + lines.join('\n')); }
+
+    return parts.join('\n\n');
   }
 
-  /** Use AI to generate 5 W's blueprint from code scan */
+  /** Use AI to generate 5 W's from the project scan */
   async generateBlueprint(): Promise<Blueprint5W | null> {
-    const codeSummary = await this.scanCodebase();
-
-    const prompt = `Analyze this codebase and generate a "5 W's" blueprint.
-
-Code summary (first 50 files, first 20 lines each):
-${codeSummary}
-
-Return ONLY a JSON object like this:
+    const summary = await this.scanCodebase();
+    const prompt = `Analyze this project and return a JSON object with exactly these 5 fields:
 {
-  "who": "Solo developer, vibe coder, or team size",
-  "what": "What this project does in plain English",
-  "when": "Development timeline or release cadence",
-  "where": "Target platforms (web, desktop, mobile, CLI)",
-  "why": "The problem this project solves and its purpose"
+  "who": "Who will use this — e.g. 'solo developer', 'small team', 'general public'",
+  "what": "What this project does in plain English (1-2 sentences)",
+  "when": "Development stage — e.g. 'early prototype', 'v1 in active use', 'just starting'",
+  "where": "Target platform — e.g. 'web browser', 'desktop app', 'command line', 'mobile'",
+  "why": "The problem it solves or the goal it serves (1-2 sentences)"
 }
 
-Keep each answer concise (1-2 sentences).`;
+PROJECT DATA:
+${summary}
+
+Return ONLY the JSON object. No markdown, no explanation.`;
 
     const res = await this.routing.prompt(prompt, 60_000);
     if (!res.success || !res.text) { return null; }
-
     try {
-      const jsonMatch = res.text.match(/\{[\s\S]*\}/);
-      if (!jsonMatch) { return null; }
-      return JSON.parse(jsonMatch[0]);
-    } catch {
-      return null;
-    }
+      const m = res.text.match(/\{[\s\S]*\}/);
+      return m ? JSON.parse(m[0]) : null;
+    } catch { return null; }
   }
 
-  /** Format blueprint as markdown */
+  // [WARN] Creates .chassis/config.json if it doesn't exist — safe for non-CHASSIS projects
+  saveToConfig(blueprint: Blueprint5W): void {
+    const cfgPath = path.join(this.root, '.chassis', 'config.json');
+    try {
+      const existing = fs.existsSync(cfgPath)
+        ? JSON.parse(fs.readFileSync(cfgPath, 'utf-8'))
+        : { projectName: path.basename(this.root), createdAt: new Date().toISOString(), version: '0.3.6', sessions: [] };
+      existing.blueprint = {
+        ...(existing.blueprint || {}),
+        who: blueprint.who, what: blueprint.what,
+        where: blueprint.where, when: blueprint.when, why: blueprint.why,
+        health: { confirmed: 0, assumed: 5, unknown: 0, confidence: 'medium' },
+        locked: false, version: '1.0',
+      };
+      fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
+      fs.writeFileSync(cfgPath, JSON.stringify(existing, null, 2), 'utf-8');
+    } catch { /* never block */ }
+  }
+
   formatMarkdown(blueprint: Blueprint5W): string {
-    return `# CHASSIS Blueprint (Retrofit)
-
-Generated from existing codebase scan.
-
----
-
-## Who
-${blueprint.who}
-
-## What
-${blueprint.what}
-
-## When
-${blueprint.when}
-
-## Where
-${blueprint.where}
-
-## Why
-${blueprint.why}`;
+    return `# CHASSIS Blueprint (Retrofit)\nGenerated from project scan.\n\n---\n\n## Who\n${blueprint.who}\n\n## What\n${blueprint.what}\n\n## When\n${blueprint.when}\n\n## Where\n${blueprint.where}\n\n## Why\n${blueprint.why}`;
   }
 }

@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import { BuildContext } from './chatPanelBuild.js';
 import { appendMsg, updateLastMsg } from './chatPanelChunked.js';
 import { extractAllNarrators, encodeStoryToken } from './chatPanelStory.js';
+import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules.js';
 import { reviewPhase, ProviderCaller } from '../../services/ai/supervisorReview.js';
 
 export interface FileBuildLoopContext {
@@ -54,7 +55,7 @@ export async function runFileBuildLoop(lctx: FileBuildLoopContext): Promise<File
     const phaseName = `File ${fileNum}: ${entry.filename}`;
 
     phaseUndo.snapshotBeforePhase(buildId, phaseName, [entry.filename], `Build ${entry.filename}: ${entry.purpose}`);
-    appendMsg(ctx, `⚙️ Building file ${fileNum} of ${total}: \`${entry.filename}\`...`);
+    appendMsg(ctx, `⚙️ Writing part ${fileNum} of ${total}: \`${entry.filename}\`...`);
 
     const allFiles = filePlan.map(f => `  - ${f.filename}: ${f.purpose}`).join('\n');
     const vaultSnippets = relevant.slice(0, 4).map(v => `# FROM VAULT: ${v.name}\n${v.code}`).join('\n\n');
@@ -72,7 +73,9 @@ ${relevant.length > 0 ? `VAULT ITEMS (reuse where relevant):\n${vaultSnippets}\n
 - Add a [SCOPE] comment at the top
 - On the FIRST line, add a \`// NARRATOR:\` comment describing in plain English what this file does
 - Write working, production-ready code with correct imports
-- Return ONLY the code — no markdown fences, no explanation`;
+- Return ONLY the code -- no markdown fences, no explanation
+
+${CHASSIS_WORKER_RULES}`;
 
     const filePromptLen = Math.ceil(filePrompt.length / 4);
     let code: string;
@@ -84,7 +87,7 @@ ${relevant.length > 0 ? `VAULT ITEMS (reuse where relevant):\n${vaultSnippets}\n
       const is429 = !res.success && (res.error?.includes('429') || res.error?.includes('quota') || res.error?.includes('insufficient'));
       if (is429 && worker && worker !== supervisor) {
         ctx.logError(task, filePrompt, `[SUPERVISOR FALLBACK] Worker 429 on file ${entry.filename} — Supervisor (${supervisor}) taking over`, filePromptLen);
-        appendMsg(ctx, `⚠️ ${workerLabel} quota exceeded — ${supervisorLabel} (Supervisor) taking over for this file`);
+        appendMsg(ctx, `⚠️ Switching AI — continuing...`);
         const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 60_000);
         const { callProvider } = await import('../../services/ai/routingProviders.js');
         res = await callProvider(supervisor, filePrompt, f) as typeof res;
@@ -101,8 +104,11 @@ ${relevant.length > 0 ? `VAULT ITEMS (reuse where relevant):\n${vaultSnippets}\n
       totalTokens += fileTokens;
       totalCost += fileCost;
       if (!is429) {
-        ledger.record(worker || supervisor, worker ? 'worker' : 'solo', 'built', fileTokens);
-        ctx.usageTracker?.recordUsage(fileTokens, fileCost, worker || supervisor);
+        // [FIX] Use res.routedTo (actual AI that made the call) not the role-assigned 'worker'.
+        // routeByComplexity picks the best available AI independently of the supervisor/worker role split.
+        const actualAI = (res as any).routedTo || worker || supervisor;
+        ledger.record(actualAI, worker ? 'worker' : 'solo', 'built', fileTokens);
+        ctx.usageTracker?.recordUsage(fileTokens, fileCost, actualAI);
       }
       if (i === 0) {
         const pairLabel = worker ? `🧠 ${supervisorLabel} → ${workerLabel}` : `🧠 ${supervisorLabel}`;
@@ -134,14 +140,14 @@ ${relevant.length > 0 ? `VAULT ITEMS (reuse where relevant):\n${vaultSnippets}\n
           const corrCost = (corrTokens / 1_000_000) * 0.30;
           ctx.usageTracker?.recordUsage(corrTokens, corrCost, supervisor);
           code = review.correctedCode.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
-          appendMsg(ctx, `🔍 Supervisor (${supervisorLabel}) corrected phase ${fileNum}: ${review.issues.join('; ')}`);
+          appendMsg(ctx, `🔍 Making corrections to part ${fileNum}...`);
         }
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       ctx.logError(task, filePrompt, `File ${entry.filename}: ${errMsg}`, filePromptLen);
       conversation.pop();
-      appendMsg(ctx, `❌ Failed on file ${fileNum} of ${total}: \`${entry.filename}\`\n\n**Reason:** ${errMsg}\n\n_Built ${builtFiles.length > 0 ? builtFiles.length + ' file(s) before this. ' : ''}Full details in \`.chassis/build_errors.log\`_`);
+      appendMsg(ctx, `❌ Hit a snag on part ${fileNum} of ${total}: \`${entry.filename}\`\n\n**Reason:** ${errMsg}${builtFiles.length > 0 ? `\n\n_${builtFiles.length} part${builtFiles.length !== 1 ? 's' : ''} completed before this._` : ''}`);
       return { success: false, builtFiles, totalTokens, totalCost, storyLines };
     }
 
@@ -158,7 +164,7 @@ ${relevant.length > 0 ? `VAULT ITEMS (reuse where relevant):\n${vaultSnippets}\n
       const errMsg = err instanceof Error ? err.message : String(err);
       ctx.logError(task, filePrompt, `Write failed for ${entry.filename}: ${errMsg}`, filePromptLen);
       conversation.pop();
-      appendMsg(ctx, `❌ Could not write \`${entry.filename}\`\n\n**Reason:** ${errMsg}\n\n_Full details in \`.chassis/build_errors.log\`_`);
+      appendMsg(ctx, `❌ Could not save \`${entry.filename}\`\n\n**Reason:** ${errMsg}\n\nTry again — if it keeps failing, check your disk space.`);
       return { success: false, builtFiles, totalTokens, totalCost, storyLines };
     }
 

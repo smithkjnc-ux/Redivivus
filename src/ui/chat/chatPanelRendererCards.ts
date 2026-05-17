@@ -17,7 +17,7 @@ export function renderStoryBlock(content: string, timeStr: string, bubbleClass: 
 }
 
 export function renderAIByline(raw: string): string {
-  const aiLabels: Record<string, string> = { gemini: 'Gemini 2.5', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq/Llama', xai: 'Grok', kimi: 'Kimi 32k' };
+  const aiLabels: Record<string, string> = { gemini: 'Gemini 2.5', claude: 'Claude Haiku', openai: 'GPT-4o', groq: 'Groq/Llama', xai: 'Grok', kimi: 'Kimi 32k' };
   const rows = raw.split('|||').filter(Boolean).map((entry: string) => {
     const [ai, role, actionsStr, tokensStr, costStr, fallbackStr, ...reasonParts] = entry.split('~');
     const label = aiLabels[ai] || ai;

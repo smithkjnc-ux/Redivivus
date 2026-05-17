@@ -12,7 +12,8 @@ export function buildHeaderInfo(
   routing: RoutingService,
   usageTracker?: UsageTracker,
   lastModel?: string,
-  extensionContext?: vscode.ExtensionContext
+  extensionContext?: vscode.ExtensionContext,
+  buildMode?: 'plan' | 'direct',
 ): ChatHeaderInfo {
   const available = routing.getAvailableAI();
   const config = chassis.isInitialized() ? chassis.loadConfig() : null;
@@ -80,6 +81,7 @@ export function buildHeaderInfo(
     shouldAutoOpenLastProject,
     blueprintStatus,
     rosterDisplay,
+    buildMode,
   };
 }
 

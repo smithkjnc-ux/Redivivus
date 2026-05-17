@@ -74,7 +74,7 @@ export function registerBlueprintCommands(
         config.blueprint.locked = true;
         chassis.saveConfig(config);
         vscode.window.showInformationMessage('Blueprint successfully locked.');
-        refreshAll();
+        try { refreshAll(); } catch { /* never block the lock on a refresh error */ }
       }
     })
   );

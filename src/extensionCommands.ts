@@ -26,6 +26,7 @@ import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
 import { ChassisSidebarProvider } from './ui/sidebar/chassisSidebar.js';
 import { registerOnNewProject } from './commands/init.js';
 import { registerInitCommands } from './commands/initCommands.js';
+import { DelegationCodeLensProvider } from './services/delegationCodeLens.js';
 import { registerSessionCommands } from './commands/session.js';
 import { registerBlueprintCommands } from './commands/blueprint.js';
 import { registerAnalysisCommands } from './commands/analysis.js';
@@ -127,4 +128,5 @@ export function registerAllCommands(
   try {   registerDuplicateCodeCommand(context, routingService); } catch (e) { console.error('Failed to register ' + 'registerDuplicateCodeCommand(context, routingService);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerDuplicateCodeCommand(context, routingService); failed: ' + e + '\n'); }
   try {   registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, null as any, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, null as any, refreshAll);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, null as any, refreshAll); failed: ' + e + '\n'); }
   registerInlineCommands(context, chassisService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd);
+  context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
 }

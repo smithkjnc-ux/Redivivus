@@ -1,0 +1,83 @@
+// [SCOPE] Setup Progress Step Checkers — 10 step-check functions for SetupProgressService
+// Extracted from setupProgressService.ts to keep it under 200 lines.
+
+import * as path from 'path';
+import * as fs from 'fs/promises';
+import { ChassisService } from '../chassisService.js';
+import { SetupStep } from './setupProgressService.js';
+
+type Ctx = { chassis: ChassisService; root: string };
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try { await fs.access(filePath); return true; } catch { return false; }
+}
+
+export async function checkStep1({ root }: Ctx): Promise<SetupStep> {
+  const exists = await pathExists(path.join(root, '.chassis'));
+  return { id: 1, title: 'Project initialized (.chassis/ created)', completed: exists, inProgress: false, action: exists ? undefined : 'Run "new project" or "retrofit project" to initialize' };
+}
+
+export async function checkStep2({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 2, title: "Blueprint completed (5 W's answered)", completed: false, inProgress: false }; }
+  const has = !!chassis.loadConfig()?.blueprint;
+  return { id: 2, title: "Blueprint completed (5 W's answered)", completed: has, inProgress: false, action: has ? undefined : 'Run "open blueprint" to complete the 5 Ws interview' };
+}
+
+export async function checkStep3({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 3, title: 'Blueprint locked', completed: false, inProgress: false }; }
+  const locked = chassis.loadConfig()?.blueprint?.locked === true;
+  return { id: 3, title: 'Blueprint locked', completed: locked, inProgress: false, action: locked ? undefined : 'Run "lock blueprint" to lock your blueprint' };
+}
+
+export async function checkStep4({ root }: Ctx): Promise<SetupStep> {
+  const ruleFiles = ['.cursorrules', '.windsurfrules', 'CLAUDE.md', 'GEMINI.md', '.clinerules'];
+  const results = await Promise.all(ruleFiles.map(f => pathExists(path.join(root, f))));
+  const completed = results.every(Boolean);
+  return { id: 4, title: 'Editor rules generated (.cursorrules, CLAUDE.md, etc.)', completed, inProgress: false, action: completed ? undefined : 'Run "generate rules" to create editor shim files' };
+}
+
+export async function checkStep5({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 5, title: 'Project scanned', completed: false, inProgress: false }; }
+  const config = chassis.loadConfig();
+  const hasScan = !!config?.lastScan;
+  const subItems: string[] = [];
+  if (hasScan) {
+    const largeFiles = config?.scanResults?.largeFiles?.length || 0;
+    const todos = config?.scanResults?.todos?.length || 0;
+    const uncommented = config?.scanResults?.uncommented?.length || 0;
+    if (largeFiles > 0) { subItems.push(`${largeFiles} oversized files -- click to fix`); }
+    if (todos > 0) { subItems.push(`${todos} TODOs to convert`); }
+    if (uncommented > 0) { subItems.push(`${uncommented} files need [SCOPE] tags`); }
+  }
+  return { id: 5, title: 'Project scanned', completed: hasScan && subItems.length === 0, inProgress: false, subItems: subItems.length > 0 ? subItems : undefined, action: hasScan ? undefined : 'Run "scan project" to analyze your codebase' };
+}
+
+export async function checkStep6({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 6, title: 'All files under 200 lines', completed: false, inProgress: false }; }
+  const largeFiles = chassis.loadConfig()?.scanResults?.largeFiles?.length || 0;
+  return { id: 6, title: 'All files under 200 lines', completed: largeFiles === 0, inProgress: false, action: largeFiles === 0 ? undefined : `Split ${largeFiles} large file${largeFiles > 1 ? 's' : ''} into smaller files` };
+}
+
+export async function checkStep7({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 7, title: 'All files have [SCOPE] tags', completed: false, inProgress: false }; }
+  const uncommented = chassis.loadConfig()?.scanResults?.uncommented?.length || 0;
+  return { id: 7, title: 'All files have [SCOPE] tags', completed: uncommented === 0, inProgress: false, action: uncommented === 0 ? undefined : `Add [SCOPE] tags to ${uncommented} file${uncommented > 1 ? 's' : ''}` };
+}
+
+export async function checkStep8({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 8, title: 'All TODOs converted to CHASSIS format', completed: false, inProgress: false }; }
+  const todos = chassis.loadConfig()?.scanResults?.todos?.length || 0;
+  return { id: 8, title: 'All TODOs converted to CHASSIS format', completed: todos === 0, inProgress: false, action: todos === 0 ? undefined : `Convert ${todos} TODO${todos > 1 ? 's' : ''} to CHASSIS format` };
+}
+
+export async function checkStep9({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 9, title: 'First session completed', completed: false, inProgress: false }; }
+  const hasSessions = !!chassis.loadConfig()?.sessions?.length;
+  return { id: 9, title: 'First session completed', completed: hasSessions, inProgress: false, action: hasSessions ? undefined : 'Run "start session" to begin tracking your work' };
+}
+
+export async function checkStep10({ chassis }: Ctx): Promise<SetupStep> {
+  if (!chassis.isInitialized()) { return { id: 10, title: 'First save point created', completed: false, inProgress: false }; }
+  const hasSavePoints = !!chassis.loadConfig()?.savePoints?.length;
+  return { id: 10, title: 'First save point created', completed: hasSavePoints, inProgress: false, action: hasSavePoints ? undefined : 'Run "create save point" to save your progress' };
+}

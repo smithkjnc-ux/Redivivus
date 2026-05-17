@@ -4,6 +4,8 @@
 import * as vscode from 'vscode';
 import { BuildRequestDeps } from './chatPanelIntent.js';
 import { runEditFileBuild, EditBuildContext } from './chatPanelEditBuild.js';
+import { autoCommitIfEnabled } from '../../services/gitAutoCommitService.js';
+import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel.js';
 
 export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, 'pendingTask' | 'setPendingTask' | 'setActiveBuildCtx'>): Promise<void> {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -29,4 +31,6 @@ export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, '
     onBuildFailed: (task, reason) => { vscode.commands.executeCommand('chassis.buildFailed', task, reason); },
   };
   await runEditFileBuild(ctx);
+  await autoCommitIfEnabled(root, `CHASSIS updated: ${msg.filePath}`);
+  refreshSetupProgressIfOpen().catch(() => {});
 }

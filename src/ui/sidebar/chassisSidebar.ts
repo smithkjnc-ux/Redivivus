@@ -38,16 +38,7 @@ export function getSidebarHtml(): string {
 </head>
 <body>
 
-  <!-- PROFILE -->
-  <div class="section">
-    <div class="section-header collapsed" data-section="profile">
-      <span>&#x2014; PROFILE</span><span class="chevron">&#9660;</span>
-    </div>
-    <div class="section-body hidden" id="body-profile">
-      <button class="item disabled" title="Coming Soon -- not yet implemented">&#128100; My Profile</button>
-      <button class="item disabled" title="Coming Soon -- not yet implemented">&#9881; Preferences</button>
-    </div>
-  </div>
+  <!-- [NEXT] Profile section — re-add when user preferences are implemented -->
 
   <!-- SETUP -->
   <div class="section">
@@ -56,7 +47,7 @@ export function getSidebarHtml(): string {
     </div>
     <div class="section-body hidden" id="body-setup">
       <button class="item" data-cmd="chassis.guide">&#10067; Getting Started</button>
-      <button class="item" data-cmd="chassis.apiSetup">&#128273; AI API Setup</button>
+      <button class="item" data-cmd="chassis.openSettings">&#128273; AI API Setup</button>
       <button class="item" data-cmd="chassis.generateRules">&#128196; Generate Rules</button>
       <button class="item" data-cmd="chassis.retrofit">&#128296; Retrofit</button>
     </div>
@@ -81,7 +72,7 @@ export function getSidebarHtml(): string {
       <span>&#x2014; PROJECT</span><span class="chevron">&#9660;</span>
     </div>
     <div class="section-body" id="body-project">
-      <button class="item" data-cmd="chassis.newProject">&#128196; New Project</button>
+      <button class="item" data-cmd="chassis.wizard">&#128196; New Project</button>
       <button class="item" data-cmd="chassis.openProject">&#128193; Open Project</button>
       <button class="item" data-cmd="chassis.blueprint">&#128218; Blueprint</button>
       <button class="item" data-cmd="chassis.showMap">&#128506; Architecture Map</button>
@@ -98,7 +89,7 @@ export function getSidebarHtml(): string {
       <button class="item" data-cmd="chassis.openVault">&#128190; Open Vault</button>
       <button class="item" data-cmd="chassis.buildFromVault">&#128230; Build from Vault</button>
       <button class="item" data-cmd="chassis.validateVault">&#10003; Validate Vault</button>
-      <button class="item" data-cmd="chassis.githubBackup">&#128279; GitHub Backup</button>
+      <button class="item" data-cmd="chassis.configureGitHubBackup">&#128279; GitHub Backup</button>
     </div>
   </div>
 
@@ -108,9 +99,9 @@ export function getSidebarHtml(): string {
       <span>&#x2014; REVIEW</span><span class="chevron">&#9660;</span>
     </div>
     <div class="section-body hidden" id="body-review">
-      <button class="item" data-cmd="chassis.scanProject">&#128269; Scan Project</button>
-      <button class="item" data-cmd="chassis.checkFile">&#128196; Check File</button>
-      <button class="item" data-cmd="chassis.cleanFile">&#10024; Clean File</button>
+      <button class="item" data-cmd="chassis.analyze">&#128269; Scan Project</button>
+      <button class="item" data-cmd="chassis.checkFileHealth">&#128196; Check File</button>
+      <button class="item" data-cmd="chassis.cleanUpFile">&#10024; Clean File</button>
     </div>
   </div>
 
@@ -121,8 +112,8 @@ export function getSidebarHtml(): string {
     </div>
     <div class="section-body hidden" id="body-history">
       <button class="item" data-cmd="chassis.savePoint">&#128336; Save Points</button>
-      <button class="item" data-cmd="chassis.workLog">&#128218; Work Log</button>
-      <button class="item" data-cmd="chassis.deadEnds">&#9888; Dead Ends</button>
+      <button class="item" data-cmd="chassis.log">&#128218; Work Log</button>
+      <button class="item" data-cmd="chassis.deadends">&#9888; Dead Ends</button>
     </div>
   </div>
 
@@ -158,6 +149,10 @@ export function getSidebarHtml(): string {
 export class ChassisSidebarProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'chassisSidebar';
   private _view?: vscode.WebviewView;
+
+  refresh(): void {
+    if (this._view) { this._view.webview.html = getSidebarHtml(); }
+  }
 
   resolveWebviewView(
     webviewView: vscode.WebviewView,

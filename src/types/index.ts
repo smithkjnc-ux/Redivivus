@@ -25,6 +25,7 @@ export interface SessionInfo {
   ai: string;
   goal: string;
   changes: ChangeEntry[];
+  buildMode?: 'plan' | 'direct';
 }
 
 export interface ChangeEntry {

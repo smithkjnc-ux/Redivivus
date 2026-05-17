@@ -129,6 +129,18 @@ export function buildActionsScript(): string {
         }
         return;
       }
+      const openFileBtn = target.closest ? target.closest('.open-file-btn') : (target.classList&&target.classList.contains('open-file-btn')?target:null);
+      if (openFileBtn) {
+        const b64path = openFileBtn.getAttribute('data-path') || '';
+        if (b64path) { try { vscode.postMessage({ type: 'open-file', path: b64path }); } catch(e) {} }
+        return;
+      }
+      const previewBtn = target.closest ? target.closest('.preview-browser-btn') : (target.classList&&target.classList.contains('preview-browser-btn')?target:null);
+      if (previewBtn) {
+        const b64path = previewBtn.getAttribute('data-path') || '';
+        if (b64path) { try { vscode.postMessage({ type: 'preview-browser', path: b64path }); } catch(e) {} }
+        return;
+      }
       const undoEl = target.closest ? target.closest('[data-undo-build]') : (target.getAttribute&&target.getAttribute('data-undo-build')?target:null);
       if (undoEl) {
         const snapshotId=undoEl.getAttribute('data-undo-build');
@@ -148,46 +160,12 @@ export function buildActionsScript(): string {
       if (archEl) {
         const action = archEl.getAttribute('data-arch-action');
         const rid = archEl.getAttribute('data-review-id') || '';
+        const aidx = parseInt(archEl.getAttribute('data-action-index') || '0');
         if (action === 'fix-all') vscode.postMessage({type:'architect-fix-all',reviewId:rid});
+        else if (action === 'per-action') vscode.postMessage({type:'architect-per-action',reviewId:rid,actionIndex:aidx});
+        else if (action === 'confirm') vscode.postMessage({type:'architect-action-confirm',reviewId:rid,actionIndex:aidx});
+        else if (action === 'cancel') vscode.postMessage({type:'architect-action-cancel'});
         else if (action === 'dismiss') archEl.closest('div[style]')?.remove();
-        return;
-      }
-      var feedbackBtn = target.closest ? target.closest('[data-feedback]') : (target.getAttribute&&target.getAttribute('data-feedback')?target:null);
-      if (feedbackBtn) {
-        var fbRating = feedbackBtn.getAttribute('data-feedback');
-        var fbId = feedbackBtn.getAttribute('data-feedback-id');
-        if (fbRating === 'good') {
-          vscode.postMessage({type:'build-feedback',feedbackId:fbId,rating:'good',note:''});
-          var fbBox = document.getElementById('feedback-'+fbId);
-          if (fbBox) fbBox.innerHTML = '<span style="font-size:11px;color:#4caf50;font-style:italic;">Thanks!</span>';
-        } else if (fbRating === 'bad') {
-          var noteDiv = document.getElementById('feedback-note-'+fbId);
-          if (noteDiv) noteDiv.style.display = 'block';
-        }
-        return;
-      }
-      // Launcher buttons
-      const launcherBtn = target.closest ? target.closest('[data-action]') : (target.getAttribute&&target.getAttribute('data-action')?target:null);
-      if (launcherBtn) {
-        const action = launcherBtn.getAttribute('data-action');
-        if (action === 'start-new-project') {
-          vscode.postMessage({type:'start-new-project'});
-        } else if (action === 'open-existing-project') {
-          vscode.postMessage({type:'open-existing-project'});
-        } else if (action === 'toggle-auto-open') {
-          const checkbox = launcherBtn.querySelector('input[type="checkbox"]') || launcherBtn;
-          const isChecked = checkbox.checked !== undefined ? checkbox.checked : checkbox.getAttribute('checked');
-          vscode.postMessage({type:'toggle-setting', setting:'startupBehavior', value:isChecked ? 'lastProject' : 'launcher'});
-        }
-        return;
-      }
-      // Recent project items
-      const recentItem = target.closest ? target.closest('[data-recent-path]') : (target.getAttribute&&target.getAttribute('data-recent-path')?target:null);
-      if (recentItem) {
-        const projectPath = recentItem.getAttribute('data-recent-path');
-        if (projectPath) {
-          vscode.postMessage({type:'open-recent-project', folderPath: projectPath});
-        }
         return;
       }
     });

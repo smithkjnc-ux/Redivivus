@@ -153,7 +153,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
 </head><body>
   <div class="header">
     <div class="header-left">
-      <strong style="font-size: 15px; letter-spacing: 0.5px;">C H A S S I S</strong>
+      <strong style="font-size: 15px; letter-spacing: 2px; font-weight: 700;"><span style="color:#a78bfa;-webkit-text-fill-color:#a78bfa;">C</span><span style="color:#4d9eff;-webkit-text-fill-color:#4d9eff;"> H A S S I S</span></strong>
       <span id="chassis-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);">${header && header.sessionActive ? '&#x25cf; working' : '&#x25cf; ready'}</span>
     </div>
     <div class="header-right">

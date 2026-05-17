@@ -3,7 +3,7 @@
 
 import { ChatMessage } from './chatPanelHtml.js';
 import { renderStoryBlock, renderAIByline, renderActionCard, renderResultCard } from './chatPanelRendererCards.js';
-import { renderFeedbackBlock, renderArchitectActions, renderUndoButton } from './chatPanelRendererArchitect.js';
+import { renderFeedbackBlock, renderArchitectActions, renderArchitectConfirm, renderUndoButton } from './chatPanelRendererArchitect.js';
 
 export function escapeHtml(text: string): string {
   const map: { [key: string]: string } = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'": '&#039;' };
@@ -32,14 +32,21 @@ export function renderMessages(conversation: ChatMessage[]): string {
     html = html.replace(/__AI_BREAKDOWN__([\s\S]*?)\|\|\|END_BREAKDOWN__/g, (_m, r) => renderAIByline(r));
     html = html.replace(/__BUILD_FEEDBACK__([^|]+)\|\|\|END_FEEDBACK__/g, (_m, f) => renderFeedbackBlock(f));
     html = html.replace(/__ARCHITECT_ACTIONS__([^|]+)\|\|\|END_ARCH_ACTIONS__/g, (_m, r) => renderArchitectActions(r));
+    html = html.replace(/__ARCH_CONFIRM__([^|]+)\|\|\|([^|]+)\|\|\|END_ARCH_CONFIRM__/g, (_m, r, i) => renderArchitectConfirm(r, i));
     html = html.replace(/__UNDO_BUILD__([^|]+)\|\|\|END_UNDO__/g, (_m, s) => renderUndoButton(s));
     // [FIX] Bug 1: Parse __BUILD_RESULT__ token into Open File button — never show raw token
     html = html.replace(/__BUILD_RESULT__([^|]+)\|\|\|([^|]+)\|\|\|END__/g, (_m, filename, filepath) => {
       const b64path = encodeBase64(filepath);
       return `<div class="build-result"><button class="open-file-btn" data-path="${b64path}">📂 Open ${escapeHtml(filename)}</button></div>`;
     });
+    // [CHASSIS] Preview in Browser button for HTML/web builds
+    html = html.replace(/__PREVIEW_BROWSER__([^|]+)\|\|\|END_PREVIEW_BROWSER__/g, (_m, filepath) => {
+      const b64path = encodeBase64(filepath);
+      return `<div class="build-result" style="margin-top:6px;"><button class="preview-browser-btn" data-path="${b64path}">🌐 Preview in Browser</button></div>`;
+    });
     // [FALLBACK] If regex fails, strip any remaining raw BUILD_RESULT tokens to prevent chat blocking
     html = html.replace(/__BUILD_RESULT__[^\n]*/g, '');
+    html = html.replace(/__PREVIEW_BROWSER__[^\n]*/g, '');
     
     // [CHASSIS] Guided Blueprint Mode token — renders inline gap question form
     html = html.replace(/__BLUEPRINT_GAPS__([a-z0-9]+)\|\|\|(\[.*?\])\|\|\|([^|]*)\|\|\|END_BLUEPRINT_GAPS__/g, (_m, sid, gapsJson, encodedTask) => {

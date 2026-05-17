@@ -24,7 +24,7 @@ export interface VaultItem {
   code: string;           // the actual code block
   language: string;       // ts, js, py, etc.
   category: string;       // component, utility, auth, database, etc.
-  description: string;    // one-line description
+  description: string;    // one-line AI-generated description
   sourceProject: string;  // project it came from
   sourceFile: string;     // original file path
   tags: string[];         // searchable tags
@@ -32,4 +32,8 @@ export interface VaultItem {
   importCount: number;    // times imported into projects
   createdAt: string;      // ISO timestamp
   contentHash: string;    // hash of code for dedup
+  // [CHASSIS] AI quality gate fields — populated by vaultQualityGate.ts
+  useCase?: string;       // AI: "when you would use this"
+  qualityScore?: number;  // AI: 1-5 quality rating (3+ = worth saving)
+  reusable?: boolean;     // AI: judgment on reusability
 }

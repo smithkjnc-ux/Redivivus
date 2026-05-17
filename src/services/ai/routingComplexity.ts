@@ -28,16 +28,11 @@ export async function routeByComplexityImpl(
   const isLargeContext = tokens.total > 50_000;
   const isSpeedTask = complexity === 'simple' && tokens.total < 1500;
 
-  // [FIX] Respect user's explicitly selected AI (the header chip / chassis.defaultAI setting).
-  // Previously hardcoded Gemini as the "medium complexity" pick — Claude was never chosen if Gemini was configured.
-  const preferredAI = svc.getPreferredAI?.() || '';
-
+  // Worker AI = highest-capability available AI by rank (Claude > OpenAI > xAI > Gemini > Kimi > Groq).
+  // Do NOT use getPreferredAI() — defaultAI setting is not a supervisor/worker override.
   let chosenAI: string | null = null;
   let routingReason = '';
-  if (preferredAI && has(preferredAI) && !isSpeedTask) {
-    chosenAI = preferredAI;
-    routingReason = `Using your selected AI: ${preferredAI}`;
-  } else if (isLargeContext && has('kimi')) {
+  if (isLargeContext && has('kimi')) {
     chosenAI = 'kimi';   routingReason = 'Very large prompt (>' + tokens.total.toLocaleString() + ' tokens) — Kimi chosen for maximum context';
   } else if (isSpeedTask && has('groq')) {
     chosenAI = 'groq';   routingReason = 'Simple short task — Groq/Llama is fastest for quick builds';

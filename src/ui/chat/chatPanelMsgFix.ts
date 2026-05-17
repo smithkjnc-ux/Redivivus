@@ -9,18 +9,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { MessageHandlerDeps } from './chatPanelMessages.js';
-import { parseFixResponse, takeSnapshot, collectSourceFiles } from './chatPanelMsgFixUtils.js';
+import { parseFixResponse, takeSnapshot, collectSourceFiles, readProjectDeadEnds, appendProjectDeadEnd, getRecentBuildContext, readProjectRules, writeProjectRoadmapEntry, modelLabel } from './chatPanelMsgFixUtils.js';
+import { detectPatterns, buildSupervisorNotes, buildWorkerRules, validateOutputFiles } from './chatPanelMsgFixPatterns.js';
+import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules.js';
 
-function modelLabel(model: string): string {
-  const m = (model || '').toLowerCase();
-  if (m.includes('claude')) { return 'Claude'; }
-  if (m.includes('gemini')) { return 'Gemini'; }
-  if (m.includes('gpt') || m.includes('openai')) { return 'GPT-4o'; }
-  if (m.includes('llama') || m === 'groq') { return 'Groq'; }
-  if (m.includes('grok') || m === 'xai') { return 'Grok'; }
-  if (m.includes('kimi') || m.includes('moonshot')) { return 'Kimi'; }
-  return model || 'AI';
-}
+// [DEAD] modelLabel defined here -- moved to chatPanelMsgFixUtils.ts to keep this file under 200 lines
 
 export async function handleFixRequest(userText: string, deps: MessageHandlerDeps): Promise<void> {
   const { routing, conversation, refresh } = deps;
@@ -38,6 +31,10 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   const allowedRels = new Set(sourceFiles.map(f => f.rel));
   const fileNames = sourceFiles.map(f => f.rel).join(', ');
   const filesBlock = sourceFiles.map(f => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
+  const activePatterns = detectPatterns(filesBlock);
+  const projectDeadEnds = readProjectDeadEnds(root);
+  const buildContext = getRecentBuildContext(root, sourceFiles);
+  const projectRules = readProjectRules(root);
 
   // Phase 1: Supervisor diagnoses ALL bugs
   // [WARN] Use routing.prompt() not routeByComplexity() -- short bug reports get misrouted to Groq
@@ -47,7 +44,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   let diagnosis = ''; let supervisorLabel = 'AI';
   try {
     const diagPrompt = `You are the Supervisor AI. A user reports a bug in their existing project.
-User reports: "${userText}"
+${buildContext ? buildContext + '\n\n' : ''}User reports: "${userText}"
 
 Source files:
 ${filesBlock}
@@ -58,18 +55,7 @@ Find EVERY bug contributing to this problem. For each bug:
 - What is wrong and why it causes this symptom
 - What the correct code should do
 
-Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.
-
-Known patterns:
-- Web Audio API / no sound (CRITICAL -- switch approach entirely): On Linux Chrome and file:// URLs,
-  AudioContext.destination silently routes to a null device -- no error is thrown, code runs, zero audio.
-  This is invisible from source code; it is a runtime environment problem not fixable by adjusting AudioContext.
-  CORRECT FIX: abandon Web Audio API output entirely. Generate PCM samples in JS, write a WAV blob,
-  play with new Audio(url).play(). This uses the HTML5 Audio pipeline which works on all systems.
-  Diagnose ANY use of AudioContext / OscillatorNode / createGain as CRITICAL when the bug is "no sound".
-  The WAV blob pattern:
-    function playSound(name) { var url = buildWAV(name); new Audio(url).play(); }
-    function buildWAV(name) { /* generate Float32Array samples, write 44-byte WAV header, return createObjectURL */ }`;
+Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.${buildSupervisorNotes(activePatterns)}${projectDeadEnds ? `\n\nPREVIOUSLY FAILED APPROACHES (from this project's dead_ends.md -- DO NOT suggest these again):\n${projectDeadEnds}` : ''}${projectRules ? `\n\nPROJECT RULES (from .chassis/rules.md -- your fix must not violate these):\n${projectRules}` : ''}`;
 
     const diagRes = await routing.prompt(diagPrompt, 60_000);
     if (!diagRes.success || !diagRes.text?.trim()) {
@@ -105,13 +91,12 @@ RULES:
 2. Return the COMPLETE corrected file for every file that changes -- every line, no truncation
 3. Do NOT add unrequested features. Fix only what is diagnosed.
 4. ONLY modify files listed above (${fileNames}). Do NOT create new files or invent file paths.
-5. Web Audio API / no sound: DO NOT use AudioContext/OscillatorNode. Use WAV blob + Audio element.
-   AudioContext.destination outputs silence on Linux Chrome (no error thrown) -- HTML5 Audio works.
-   Pattern: function playSound(name){new Audio(buildWAV(name)).play();}
-   buildWAV(name): allocate Float32Array, fill with sine/square wave segments using
-   phase accumulator (phase+=2*PI*freq/sr), apply attack/release envelope (Math.min(t*30,1)*Math.min((dur-t)*20,1)),
-   write standard 44-byte WAV header (RIFF/WAVE/fmt/data chunks, sr=44100, 16-bit mono),
-   return URL.createObjectURL(new Blob([buf],{type:'audio/wav'})).
+5. For every block of code you REMOVE or REPLACE, add a [DEAD] comment immediately above the replacement.
+   Use correct syntax for the file type: // [DEAD] for JS/TS, <!-- [DEAD] --> for HTML, # [DEAD] for Python.
+   Format: [DEAD] <what was there> -- <why it fails here>
+   Example: // [DEAD] AudioContext.destination -- silently null on Linux Chrome, no error thrown${buildWorkerRules(activePatterns, 6)}
+
+${CHASSIS_WORKER_RULES}
 
 FORMAT (exact -- required):
 ## Fix: relative/path/to/file
@@ -171,13 +156,38 @@ FORMAT (exact -- required):
   const fileList = written.map(f => `- \`${f}\``).join('\n');
   const skipLine = skipped.length > 0 ? `\n[WARN] Worker invented ${skipped.length} non-existent file(s) -- skipped: ${skipped.join(', ')}` : '';
   const failLine = failed.length > 0 ? `\n[WARN] Could not write: ${failed.join(', ')}` : '';
+
+  // [WARN] Post-write pattern validation -- catch fixes that ignored guidance
+  const writtenFixes = fixes.filter(f => written.includes(f.rel));
+  const patternViolations = validateOutputFiles(writtenFixes);
+  const validationLine = patternViolations.length > 0
+    ? '\n[VALIDATION FAIL] Fix still contains known failure pattern(s): ' +
+      patternViolations.map(v => `${v.pattern.name} in ${v.files.join(', ')}`).join('; ') +
+      ' -- the issue may persist. Describe the problem again to retry with stronger constraints.'
+    : (activePatterns.length > 0 ? '\n[VALIDATION PASS] Known failure patterns resolved.' : '');
+
+  // Write dead-end entries for patterns that were present and are now resolved
+  if (patternViolations.length === 0) {
+    for (const p of activePatterns) {
+      appendProjectDeadEnd(root, p.name, p.triedWhat, p.whyFails, p.doInstead);
+    }
+  }
+
+  // Audit #5: log every AI-driven file change to project CHASSIS_ROADMAP.md
+  if (written.length > 0) {
+    writeProjectRoadmapEntry(root, `AI fix: ${userText.slice(0, 60)}`, [
+      ...written.map(f => `Fixed \`${f}\` -- ${userText.slice(0, 80)}`),
+      `Supervisor: ${supervisorLabel}  Worker: ${workerLabel}  Guardian: ${guardianLabel}`,
+    ]);
+  }
+
   const previewToken = written.some(f => f.endsWith('.html'))
     ? `\n__PREVIEW_BROWSER__${path.join(root, written.find(f => f.endsWith('.html'))!)}|||END_PREVIEW_BROWSER__`
     : '';
 
   conversation[conversation.length - 1].content =
     `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\n` +
-    `**Fixed ${written.length} file${written.length !== 1 ? 's' : ''}** (Worker: ${workerLabel})\n${guardianNote}\n${fileList}${skipLine}${failLine}${previewToken}`;
+    `**Fixed ${written.length} file${written.length !== 1 ? 's' : ''}** (Worker: ${workerLabel})\n${guardianNote}\n${fileList}${skipLine}${failLine}${validationLine}${previewToken}`;
   refresh();
 
   if (written.length > 0) {

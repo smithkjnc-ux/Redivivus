@@ -10,7 +10,7 @@ export async function handleUndoBuild(msg: any, deps: MessageHandlerDeps, conver
   const { snapshotId } = msg;
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root || !snapshotId) {
-    conversation.push({ role: 'assistant', content: 'Undo failed -- no workspace or snapshot ID.', timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: '⚠️ Can\'t undo — no project is open or nothing to undo.', timestamp: Date.now() });
     refresh(); return;
   }
   try {
@@ -18,13 +18,13 @@ export async function handleUndoBuild(msg: any, deps: MessageHandlerDeps, conver
     const snap = new SnapshotService(root);
     const { restored, deleted, error } = snap.restore(snapshotId);
     if (error) {
-      conversation.push({ role: 'assistant', content: `Undo failed -- ${error}`, timestamp: Date.now() });
+      conversation.push({ role: 'assistant', content: `❌ Could not undo — ${error}`, timestamp: Date.now() });
     } else {
-      conversation.push({ role: 'assistant', content: `Undone. Restored ${restored} file${restored !== 1 ? 's' : ''}, deleted ${deleted} new file${deleted !== 1 ? 's' : ''}.`, timestamp: Date.now() });
+      conversation.push({ role: 'assistant', content: `✅ Undone! Restored ${restored} file${restored !== 1 ? 's' : ''} to the previous version.`, timestamp: Date.now() });
       try { const { BuildHistoryService } = await import('../../services/build/buildHistoryService.js'); new BuildHistoryService(root).markUndone(snapshotId); } catch { /* best-effort */ }
     }
   } catch (err) {
-    conversation.push({ role: 'assistant', content: `Undo error -- ${err instanceof Error ? err.message : 'Unknown'}`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `❌ Something went wrong while undoing — please try again.`, timestamp: Date.now() });
   }
   refresh();
 }
@@ -57,8 +57,13 @@ export async function handleBuildFeedback(msg: any, deps: MessageHandlerDeps, co
   }
 }
 
+function decodePath(b64: string | undefined): string | undefined {
+  if (!b64) { return undefined; }
+  try { return Buffer.from(b64, 'base64').toString('utf8'); } catch { return undefined; }
+}
+
 export async function handleOpenFile(msg: any): Promise<void> {
-  const filePath = msg.filePath;
+  const filePath = decodePath(msg.path) || msg.filePath;
   if (filePath && fs.existsSync(filePath)) {
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
     await vscode.window.showTextDocument(doc, { preview: false });
@@ -66,7 +71,7 @@ export async function handleOpenFile(msg: any): Promise<void> {
 }
 
 export async function handleOpenInBrowser(msg: any): Promise<void> {
-  const filePath = msg.filePath;
+  const filePath = decodePath(msg.path) || msg.filePath;
   if (filePath && fs.existsSync(filePath)) {
     const uri = vscode.Uri.file(filePath);
     try {
@@ -74,6 +79,14 @@ export async function handleOpenInBrowser(msg: any): Promise<void> {
     } catch {
       await vscode.env.openExternal(uri);
     }
+  }
+}
+
+export async function handlePreviewBrowser(msg: any): Promise<void> {
+  const filePath = decodePath(msg.path);
+  if (filePath && fs.existsSync(filePath)) {
+    const uri = vscode.Uri.file(filePath);
+    await vscode.env.openExternal(uri);
   }
 }
 

@@ -8,6 +8,7 @@ import { ChassisService } from '../../services/chassisService.js';
 import { LearnedMemoryService } from '../../services/learnedMemoryService.js';
 import { getSystemPrompt } from './chatPanelAIPrompt.js';
 import { buildProjectAnnotationContext } from './chatPanelProjectContext.js';
+import { extractFileMentions } from './chatPanelFileContext.js';
 
 /** Builds the AI prompt prefix — question path gets CHASSIS identity + annotations, code gen gets focused prompt */
 export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string): string {
@@ -25,18 +26,27 @@ export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] 
     bpStr = ['who','what','where','when','why'].map(f => `${f.toUpperCase()}: ${String(bp[f as keyof typeof bp] || '(not set)').trim()}`).join('\n');
   }
 
+  // [CHASSIS] If user mentions a specific file, find and inject it — never make the user paste content.
   let activeFileContext = '';
-  try {
-    const editor = vscode.window.activeTextEditor;
-    if (editor) {
-      const filePath = editor.document.uri.fsPath;
-      const relPath = workspaceRoot !== 'none' ? path.relative(workspaceRoot, filePath) : filePath;
-      const lines = editor.document.getText().split('\n');
-      const maxLines = Math.min(lines.length, 500);
-      const truncNote = lines.length > maxLines ? `\n(truncated: showing ${maxLines} of ${lines.length} lines)` : '';
-      activeFileContext = `\n--- ACTIVE FILE: ${relPath} (${lines.length} lines) ---\n\`\`\`\n${lines.slice(0, maxLines).join('\n')}\n\`\`\`${truncNote}\n`;
+  if (userText && workspaceRoot !== 'none') {
+    const mentioned = extractFileMentions(userText, workspaceRoot);
+    if (mentioned.length > 0) {
+      activeFileContext = mentioned.map(f => `\n--- FILE: ${f.relPath} (${f.content.split('\n').length} lines) ---\n\`\`\`\n${f.content.slice(0, 10000)}\n\`\`\``).join('\n') + '\n';
     }
-  } catch {}
+  }
+  if (!activeFileContext) {
+    try {
+      const editor = vscode.window.activeTextEditor;
+      if (editor) {
+        const filePath = editor.document.uri.fsPath;
+        const relPath = workspaceRoot !== 'none' ? path.relative(workspaceRoot, filePath) : filePath;
+        const lines = editor.document.getText().split('\n');
+        const maxLines = Math.min(lines.length, 500);
+        const truncNote = lines.length > maxLines ? `\n(truncated: showing ${maxLines} of ${lines.length} lines)` : '';
+        activeFileContext = `\n--- ACTIVE FILE: ${relPath} (${lines.length} lines) ---\n\`\`\`\n${lines.slice(0, maxLines).join('\n')}\n\`\`\`${truncNote}\n`;
+      }
+    } catch {}
+  }
 
   let conversationContext = '';
   if (fullConversation) {
