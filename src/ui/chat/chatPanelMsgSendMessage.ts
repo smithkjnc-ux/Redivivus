@@ -13,6 +13,7 @@ import { _scanChassisProjects } from '../chassisProjectScanner.js';
 import { handleAIChat } from './chatPanelMsgSendAI.js';
 import { handleFixRequest } from './chatPanelMsgFix.js';
 import { runTemplateWizard } from '../../services/project/templateWizard.js';
+import { handleRunIntent, handleScaffoldIntent, handleServiceIntent } from './chatPanelMsgIntentActions.js';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { chassis, routing, usageTracker, conversation, panel, refresh } = deps;
@@ -32,20 +33,27 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (/what\s+templates|show.*templates|list.*templates|templates.*available|templates.*do\s+you\s+have|what\s+can\s+you\s+build|what\s+types.*build|what.*project.*types/i.test(lowerText)) {
     try {
       const { TEMPLATE_CATEGORIES } = await import('../../services/project/templateRegistry.js');
-      const lines: string[] = ['**CHASSIS Template Library** -- here\'s what I can build:\n'];
-      for (const cat of TEMPLATE_CATEGORIES) {
-        lines.push(`**${cat.label}** -- ${cat.description}`);
-        for (const sub of cat.subcategories) {
-          const tags = sub.tags?.slice(0, 3).join(', ') || '';
-          lines.push(`  - **${sub.label}**: ${sub.description}${tags ? ' (' + tags + ')' : ''}`);
-        }
-      }
-      lines.push('\nJust say **"build me a [type]"** and I\'ll walk you through it.');
+      const lines = ['**CHASSIS Template Library** -- here\'s what I can build:\n', ...TEMPLATE_CATEGORIES.flatMap(cat => [`**${cat.label}** -- ${cat.description}`, ...cat.subcategories.map(sub => `  - **${sub.label}**: ${sub.description}${sub.tags?.length ? ' (' + sub.tags.slice(0, 3).join(', ') + ')' : ''}`)]), '\nJust say **"build me a [type]"** and I\'ll walk you through it.'];
       conversation.push({ role: 'assistant', content: lines.join('\n'), timestamp: Date.now() });
     } catch {
       conversation.push({ role: 'assistant', content: 'I have templates for **Websites**, **Games**, **Apps/Tools**, and **APIs/Backends**. Just say "build me a [type]" to start.', timestamp: Date.now() });
     }
     refresh(); return;
+  }
+
+  // Run / open program — check BEFORE AI classifier to avoid vault/build path
+  if (/^(run|open|launch|show|preview|view)\s+(it|the\s+(program|app|site|page|game|file|project|result|output)|my\s+(program|app|site|game))/i.test(lowerText) || lowerText.trim() === 'run it') {
+    const _runRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (_runRoot) {
+      const { detectPostBuildInfo } = await import('./chatPanelPostBuild.js');
+      const _info = detectPostBuildInfo(_runRoot, []);
+      if (_info.entryFile) {
+        const _p = require('path') as typeof import('path');
+        await vscode.env.openExternal(vscode.Uri.file(_p.join(_runRoot, _info.entryFile)));
+        conversation.push({ role: 'assistant', content: `Opening \`${_info.entryFile}\` in your browser.`, timestamp: Date.now() });
+        refresh(); return;
+      }
+    }
   }
 
   // Scan project
@@ -63,14 +71,13 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
 
   // Setup progress
   if (/how'?s\s+my\s+setup|setup\s+progress|what'?s\s+left|what\s+to\s+do\s+next/i.test(lowerText)) {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (root && chassis) {
+    const _spRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (_spRoot && chassis) {
       const { SetupProgressService } = await import('../../services/project/setupProgressService.js');
       const { showSetupProgressPanel } = await import('../../services/project/setupProgressPanel.js');
-      const progressService = new SetupProgressService(chassis, root);
-      const progress = await progressService.getProgress();
-      showSetupProgressPanel(progress, () => progressService.getProgress());
-      conversation.push({ role: 'assistant', content: `I've opened the setup progress panel. You're **${progress.percentage}% complete** (${progress.completedCount} of ${progress.totalCount} steps done).`, timestamp: Date.now() });
+      const svc = new SetupProgressService(chassis, _spRoot); const prog = await svc.getProgress();
+      showSetupProgressPanel(prog, () => svc.getProgress());
+      conversation.push({ role: 'assistant', content: `Setup progress panel opened. You're **${prog.percentage}% complete** (${prog.completedCount} of ${prog.totalCount} steps done).`, timestamp: Date.now() });
       refresh(); return;
     }
   }
@@ -79,22 +86,23 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (/list.*project|show.*project|available.*project|my.*project/i.test(lowerText)) {
     const projects = _scanChassisProjects();
     const reply = projects.length ? `Found **${projects.length} CHASSIS project${projects.length === 1 ? '' : 's'}** -- opening the picker now.` : 'No CHASSIS projects found.';
-    conversation.push({ role: 'assistant', content: reply, timestamp: Date.now() });
-    refresh();
+    conversation.push({ role: 'assistant', content: reply, timestamp: Date.now() }); refresh();
     if (projects.length) { panel.webview.postMessage({ type: 'show-projects-modal', projects }); }
     return;
   }
-
-  // [FIX] Just Build (direct) mode: everything the user types is a build request.
-  // Skip VS Code command intercept, offtopic pre-screen, and intent classifier entirely.
-  if (deps.buildMode === 'direct') {
-    await deps.handleBuildRequest(userText);
-    return;
+  // Explain project files — non-tech file explanation, before AI classifier
+  if (/explain.*files?|what.*files?|what.*folder|why.*extra.*code|what.*all.*this/i.test(lowerText)) {
+    const _exRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (_exRoot) { const { explainProjectFiles } = await import('./chatPanelFileExplainer.js'); conversation.push({ role: 'assistant', content: await explainProjectFiles(_exRoot), timestamp: Date.now() }); refresh(); return; }
   }
+  // [FIX] Just Build (direct) mode skips classifier ONLY for pure build tasks — fix/bug/broken words fall through to classifier
+  // [DEAD] Was: skip classifier entirely — routed "this needs fixed" to build pipeline, wiped the project
+  if (deps.buildMode === 'direct' && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
 
   // [RULE 18] AI intent classification — never use regex to simulate language understanding.
-  // classifyIntent makes a ~50-token AI call: build / command / question / offtopic.
-  const intent = deps.classifyIntent ? await deps.classifyIntent(userText) : { type: 'question' as const };
+  // [WARN] If classifyIntent throws (e.g. no API key), fall back to keyword check.
+  const _BUILD_FALLBACK = /^\s*(add|change|update|remove|delete|rename|replace|fix|edit|make|give|put|set|increase|decrease|toggle|enable|disable|switch|move|style|color)\b/i;
+  let intent = deps.classifyIntent ? (await deps.classifyIntent(userText).catch(() => _BUILD_FALLBACK.test(lowerText) ? { type: 'build' as const } : { type: 'question' as const })) : { type: 'question' as const };
 
   if (intent.type === 'offtopic') {
     conversation.push({ role: 'assistant', content: "I'm a coding assistant -- I can help you build, fix, explain, or review code. What are you building today?", timestamp: Date.now() });
@@ -114,58 +122,21 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
 
-  if (intent.type === 'run') {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) {
-      conversation.push({ role: 'assistant', content: 'No project is open — open a project folder first.', timestamp: Date.now() });
-      refresh(); return;
-    }
-    const fs = require('fs') as typeof import('fs');
-    const path = require('path') as typeof import('path');
-
-    // Install deps subtype: detect package manager and run install in terminal
-    if (intent.subtype === 'install') {
-      const hasPkg = fs.existsSync(path.join(root, 'package.json'));
-      const hasReqs = fs.existsSync(path.join(root, 'requirements.txt'));
-      const hasCargo = fs.existsSync(path.join(root, 'Cargo.toml'));
-      const hasGoMod = fs.existsSync(path.join(root, 'go.mod'));
-      let installCmd = 'npm install';
-      let depsLabel = 'Node.js';
-      if (hasReqs && !hasPkg) { installCmd = 'pip install -r requirements.txt'; depsLabel = 'Python'; }
-      else if (hasCargo) { installCmd = 'cargo build'; depsLabel = 'Rust'; }
-      else if (hasGoMod) { installCmd = 'go mod download'; depsLabel = 'Go'; }
-      else if (!hasPkg && !hasReqs) {
-        conversation.push({ role: 'assistant', content: 'No package.json or requirements.txt found — nothing to install.', timestamp: Date.now() });
-        refresh(); return;
-      }
-      const terminal = vscode.window.createTerminal(`CHASSIS: Install (${depsLabel})`);
-      terminal.show();
-      terminal.sendText(installCmd);
-      conversation.push({ role: 'assistant', content: `&#x23F3; Running \`${installCmd}\` in terminal...`, timestamp: Date.now() });
-      refresh(); return;
-    }
-
-    // Default run: open main entry file
-    const candidates = ['index.html', 'main.html', 'index.js', 'main.js', 'app.js', 'main.py', 'app.py', 'index.py'];
-    const main = candidates.find(f => fs.existsSync(path.join(root, f)));
-    if (main) {
-      await vscode.env.openExternal(vscode.Uri.file(path.join(root, main)));
-      conversation.push({ role: 'assistant', content: `Opening \`${main}\` in your browser.`, timestamp: Date.now() });
-    } else {
-      conversation.push({ role: 'assistant', content: 'I couldn\'t find a main file to run (looked for index.html, main.js, etc.). Which file would you like to open?', timestamp: Date.now() });
-    }
-    refresh(); return;
-  }
+  if (intent.type === 'run') { await handleRunIntent(intent, deps, conversation, refresh); return; }
 
   if (intent.type === 'fix') {
-    await handleFixRequest(userText, deps);
+    await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
     return;
   }
 
+  if (intent.type === 'scaffold') { await handleScaffoldIntent(userText, deps, conversation, refresh); return; }
+  if (intent.type === 'service') { await handleServiceIntent(userText, deps, conversation, refresh); return; }
+
   if (intent.type === 'build') {
-    // [RULE] If no mode chosen yet, send popover back to webview — don't ask here in chat.
-    // The webview stores the pending text and resends it after the user picks a mode.
+    // [RULE] If no mode chosen yet: initialized projects auto-route to direct build (user is modifying, not starting fresh).
+    // Only show mode popover for brand-new uninitialized projects.
     if (!deps.buildMode) {
+      if (deps.chassis?.isInitialized?.()) { await deps.handleBuildRequest(userText); return; }
       panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
       return;
     }
@@ -179,8 +150,8 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
         refresh(); return;
       }
     }
-    // Template wizard — fires in plan mode only, prompts user to pick a template category + fill answers
-    if (deps.buildMode === 'plan') {
+    // Template wizard — new projects only; initialized projects skip it (user is modifying, not starting fresh)
+    if (deps.buildMode === 'plan' && !deps.chassis?.isInitialized?.()) {
       const wiz = await runTemplateWizard(userText, (m) => panel.webview.postMessage(m), deps.routing);
       if (wiz.handled && wiz.customizationPrompt) { await deps.handleBuildRequest(wiz.customizationPrompt); return; }
     }

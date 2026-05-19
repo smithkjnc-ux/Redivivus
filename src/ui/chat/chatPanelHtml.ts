@@ -5,6 +5,7 @@ import { getNonce } from '../getNonce.js';
 import { renderMessages, escapeHtml } from './chatPanelRenderer.js';
 import { buildChatCss } from './chatPanelStyles.js';
 import { buildChatScript } from './chatPanelScript.js';
+import { buildProjectDashboard, DashboardData } from './chatPanelDashboard.js';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -30,12 +31,14 @@ export interface ChatHeaderInfo {
   lastModel?: string;
   hasProjectOpen: boolean;
   workspaceHasChassis: boolean;
+  workspaceFolderIsOpen: boolean; workspaceIsAssistMode: boolean; assistMode?: boolean;
   recentProjects: Array<{ path: string; name: string }>;
   shouldAutoOpenLastProject?: boolean;
   blueprintStatus?: 'complete' | 'incomplete' | 'missing';
   // [CHASSIS] AI roster for multi-badge display — all active AIs with roles
   rosterDisplay?: Array<{ ai: string; label: string; role: 'Supervisor' | 'Worker' | 'Guardian'; emoji: string }>;
-  buildMode?: 'plan' | 'direct';
+  buildMode?: 'plan' | 'direct'; dashData?: DashboardData;
+  projectTokens?: { tokens: number; cost: number };
 }
 
 export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderInfo, progress?: SetupProgress): string {
@@ -63,36 +66,22 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       const modeTooltip = header.buildMode === 'plan' ? 'Plan Mode: full blueprint interview before building. Click to switch.' : 'Direct Build: skip interview, execute immediately. Click to switch.';
       badges.push(`<span class="badge mode mode-${header.buildMode}" data-action="switch-mode" title="${modeTooltip}">${modeLabel}</span>`);
     }
-    // [DEAD] Static time badge removed — showed panel open time, never updated. Message timestamps show time per message.
+    if (header.assistMode || header.workspaceIsAssistMode) { badges.push(`<span class="badge mode" style="background:#1e3a5f;color:#60a5fa;border-color:#2563eb;" title="Assist Mode: CHASSIS runs silently. No code annotations or roadmap. Click to upgrade." data-action="retrofit-project">&#x26A1; Assist Mode</span>`); }
+    else if (header.workspaceHasChassis) { badges.push(`<span class="badge mode" style="background:#14291a;color:#4ade80;border-color:#16a34a;" title="Full CHASSIS Mode: code annotations, roadmap, and blueprint active">&#x1F9E9; CHASSIS</span>`); }
   }
   const headerHtml = header ? `<div class="header-badges">${badges.join('')}</div>` : '';
 
   const emptyState = (() => {
     // If workspace has a .chassis folder, show the project-ready screen
-    if (header && header.workspaceHasChassis) {
-      const modeToggleHtml = !header.buildMode ? `
-      <div style="text-align:center;margin-bottom:16px;">
-        <button class="mode-btn" data-action="set-mode" data-mode="direct" style="background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:12px;opacity:0.8;padding:4px 8px;">⚡ Skip questions — Just Build</button>
-      </div>` : '';
-      return `<div class="empty-state">
-      ${modeToggleHtml}
-      <div class="icon">🚀</div>
-      <div class="onboarding-title">Ready to Build: ${escapeHtml(header.projectName || '')}</div>
-      ${progress ? `<div style="margin:15px auto;width:100%;max-width:400px;text-align:left;padding:15px;background:var(--vscode-editor-inactiveSelectionBackground);border-radius:6px;border:1px solid var(--vscode-panel-border);">
-        <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><strong>Setup Progress</strong><span style="color:var(--vscode-descriptionForeground);font-size:0.9em;">${progress.percentage}%</span></div>
-        <div style="width:100%;height:6px;background:var(--vscode-editorWidget-background);border-radius:3px;overflow:hidden;margin-bottom:12px;"><div style="height:100%;width:${progress.percentage}%;background:${progress.percentage === 100 ? '#4ec959' : '#3b9dff'};"></div></div>
-        <div style="font-size:0.85em;color:var(--vscode-descriptionForeground);text-align:center;margin-bottom:10px;">${progress.completedCount} of ${progress.totalCount} steps completed</div>
-        <div style="text-align:center;"><button class="onboarding-pill" data-cmd="chassis.showSetupProgress" style="display:inline-block;padding:6px 12px;margin:0;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer;border-radius:4px;font-size:0.9em;">📊 View Full Checklist</button></div>
-      </div>` : ''}
-      <div class="onboarding-examples">
-        <div class="onboarding-pill" data-cmd="chassis.startSession">▶️ Start Session</div>
-        <div class="onboarding-pill" data-cmd="chassis.buildFromVault">🏗️ Build from Vault</div>
-      </div>
-      <div class="onboarding-hint">Or just type your request and hit Enter.</div>
-    </div>`;
+    if (header && header.workspaceHasChassis && !header.workspaceIsAssistMode && !header.assistMode) {
+      return buildProjectDashboard(header, progress, header.dashData);
     }
 
-    // LAUNCHER SCREEN: No .chassis folder — show the three options
+    const _featureTable = `<table style="width:100%;max-width:440px;margin:0 auto 18px;border-collapse:collapse;font-size:12px;text-align:left;"><thead><tr><th style="padding:5px 8px;border-bottom:1px solid #444;"></th><th style="padding:5px 8px;border-bottom:1px solid #444;text-align:center;">&#x26A1; Assist</th><th style="padding:5px 8px;border-bottom:1px solid #444;text-align:center;">&#x1F9E9; Full CHASSIS</th></tr></thead><tbody>${[['AI quality (Supervisor+Worker+Guardian)','&#x2705;','&#x2705;'],['Vault &mdash; reuse code across projects','&#x2705;','&#x2705;'],['Undo / snapshots before every change','&#x2705;','&#x2705;'],['Token tracking &amp; cost breakdown','&#x2705;','&#x2705;'],['Dead-end memory &mdash; never repeats a failed fix','&#x2705;','&#x2705;'],['Code annotations ([SCOPE]/[WARN]/[DEAD])','&#x274C;','&#x2705;'],['CHASSIS_ROADMAP.md &mdash; full change log','&#x274C;','&#x2705;'],['Blueprint &mdash; AI always knows your project','&#x274C;','&#x2705;'],['Auto-commits after every build/fix','&#x274C;','&#x2705;']].map(([f,a,c])=>`<tr><td style="padding:4px 8px;opacity:0.85;">${f}</td><td style="padding:4px 8px;text-align:center;">${a}</td><td style="padding:4px 8px;text-align:center;">${c}</td></tr>`).join('')}</tbody></table>`;
+    if (header?.workspaceIsAssistMode) { const n = escapeHtml(header.projectName || 'your project'); return `<div class="empty-state" style="padding:24px 30px;"><div class="icon" style="font-size:36px;">&#x26A1;</div><div class="onboarding-title" style="font-size:19px;font-weight:700;margin:8px 0 4px;">${n} &mdash; Assist Mode</div><div style="font-size:13px;color:var(--vscode-descriptionForeground);margin-bottom:16px;">Your code stays exactly as-is. CHASSIS runs silently in the background.</div>${_featureTable}<button data-action="retrofit-project" style="display:block;margin:0 auto;padding:8px 18px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;">&#x1F9E9; Switch to Full CHASSIS &mdash; add tracking now</button><div class="onboarding-hint" style="margin-top:14px;font-size:12px;">Or just type your request below</div></div>`; }
+    if (header?.workspaceFolderIsOpen && !header.workspaceHasChassis) { const n = escapeHtml(header.projectName || 'your project'); return `<div class="empty-state" style="padding:24px 30px;"><div class="icon" style="font-size:40px;">&#x1F4C2;</div><div class="onboarding-title" style="font-size:20px;font-weight:700;margin:8px 0 4px;">Project detected: ${n}</div><div style="font-size:13px;color:var(--vscode-descriptionForeground);margin-bottom:16px;">Choose how CHASSIS works with this project. You can switch at any time.</div>${_featureTable}<div style="display:flex;gap:10px;max-width:440px;margin:0 auto;"><button class="launcher-btn" data-action="start-new-project" data-mode="direct" data-assist="true" style="flex:1;padding:12px 14px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:8px;cursor:pointer;text-align:center;font-size:14px;font-weight:600;">&#x26A1; Assist Mode<div style="font-size:11px;font-weight:400;opacity:0.85;margin-top:3px;">Code stays as-is</div></button><button class="launcher-btn" data-action="retrofit-project" style="flex:1;padding:12px 14px;background:var(--vscode-editor-inactiveSelectionBackground);color:var(--vscode-foreground);border:1px solid var(--vscode-input-border);border-radius:8px;cursor:pointer;text-align:center;font-size:14px;font-weight:600;">&#x1F9E9; Full CHASSIS<div style="font-size:11px;font-weight:400;opacity:0.85;margin-top:3px;">Full tracking added</div></button></div><div class="onboarding-hint" style="margin-top:14px;font-size:12px;">Or just type below &mdash; CHASSIS will ask which mode to use</div></div>`; }
+
+    // LAUNCHER SCREEN: No folder open — show the three options
     const recentProjectsHtml = header && header.recentProjects.length > 0
       ? header.recentProjects.map(p =>
           `<div class="launcher-recent-item" data-recent-path="${escapeHtml(p.path)}" style="padding:8px 12px;margin:4px 0;background:var(--vscode-editor-inactiveSelectionBackground);border-radius:4px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;">` +
@@ -106,26 +95,10 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       <div class="onboarding-title" style="font-size:22px;font-weight:700;margin-bottom:8px;">Welcome to CHASSIS</div>
       <div class="onboarding-sub" style="font-size:15px;color:var(--vscode-descriptionForeground);margin-bottom:28px;">What would you like to build today?</div>
 
-      <div class="launcher-grid" style="display:flex;flex-direction:column;gap:12px;max-width:400px;margin:0 auto;">
-        <!-- Start New Project: Plan It Out is the default, Just Build is secondary -->
-        <button class="launcher-btn" data-action="start-new-project" data-mode="plan" style="width:100%;padding:18px 20px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:12px;transition:all 0.2s;">
-          <span style="font-size:24px;">🚀</span>
-          <div style="text-align:left;">
-            <div style="font-size:15px;font-weight:600;">Start New Project</div>
-            <div style="font-size:12px;font-weight:400;opacity:0.8;">Answer a few questions, then build</div>
-          </div>
-        </button>
-        <div style="text-align:center;padding:2px 0;">
-          <button class="launcher-btn" data-action="start-new-project" data-mode="direct" style="background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:12px;opacity:0.8;padding:4px 8px;">⚡ Just Build — skip questions</button>
-        </div>
-
-        <button class="launcher-btn launcher-btn-secondary" data-action="open-existing-project" style="padding:16px 20px;background:var(--vscode-editor-inactiveSelectionBackground);color:var(--vscode-foreground);border:1px solid var(--vscode-input-border);border-radius:8px;cursor:pointer;font-size:15px;font-weight:600;display:flex;align-items:center;gap:12px;transition:all 0.2s;">
-          <span style="font-size:24px;">📂</span>
-          <div style="text-align:left;">
-            <div>Open Existing Project</div>
-            <div style="font-size:12px;font-weight:400;opacity:0.7;">Browse for a project folder to open</div>
-          </div>
-        </button>
+      <div class="onboarding-examples" style="margin-bottom:4px;">
+        <button class="onboarding-pill" data-action="start-new-project" data-mode="plan">&#x1F680; Start New Project</button>
+        <button class="onboarding-pill" data-action="start-new-project" data-mode="direct">&#x26A1; Just Build</button>
+        <button class="onboarding-pill" data-action="open-existing-project">&#x1F4C2; Open Project</button>
       </div>
 
       <div class="launcher-recent" style="margin-top:28px;max-width:400px;margin-left:auto;margin-right:auto;">
@@ -160,8 +133,9 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       ${header && header.hasProjectOpen ? `
       <button class="header-btn" data-cmd="chassis.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">📋 ${header.projectName}</button>
       <button class="header-btn" data-cmd="chassis.showMap" title="Map">🗺️ Map</button>
-      <button class="header-btn" data-cmd="chassis.savePoint" title="Save Point">💾 Save Point</button>
+      <button class="header-btn" data-cmd="chassis.showBuildHistory" title="Build History">&#x1F4CB; History</button>
       ` : ''}
+      ${header && header.projectTokens ? `<button class="header-btn" data-cmd="chassis.viewUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="chassis.viewUsage" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
       <button class="header-btn" id="clear-btn" title="Clear Chat">🗑️</button>
       <button class="header-btn capabilities-btn" data-cmd="chassis.showCapabilities" title="CHASSIS Capabilities">⚡ Capabilities</button>
     </div>
@@ -175,7 +149,8 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       </div>
       <div id="input-bottom">
         <div id="input-left">
-          <button class="input-pill" data-cmd="chassis.openVault" title="Browse Vault">⊞ Vault</button>
+          <button class="input-pill" data-cmd="chassis.openVault" title="Browse Vault">&#x229E; Vault</button>
+          ${header && header.hasProjectOpen ? `<button class="input-pill input-pill--run" data-cmd="chassis.runProject" title="Run your project in the terminal">&#x25B6; Run</button>` : ''}
           ${header ? (header.rosterDisplay && header.rosterDisplay.length > 0
             ? `<span class="input-pill input-pill--ai" data-cmd="chassis.openSettings" title="AI Team: ${header.rosterDisplay.map(r => r.emoji + ' ' + r.label + ' (' + r.role + ')').join(', ')}">${header.rosterDisplay[0].emoji} ${header.rosterDisplay[0].label}${header.rosterDisplay.length > 1 ? ' +' + (header.rosterDisplay.length - 1) : ''}</span>`
             : `<span class="input-pill input-pill--ai" data-cmd="chassis.openSettings" title="Click to configure AI model">${!header.hasKey ? '⚠️ No AI key' : '🧠 ' + header.aiLabel}</span>`

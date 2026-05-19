@@ -1,10 +1,10 @@
 // [SCOPE] Usage HTML template — full webview HTML for CHASSIS usage report
 // CSS extracted to usageHtmlStyles.ts. Imported by usageCommands.ts.
 
-import { UsageReport } from '../services/usageTracker.js';
+import { UsageReport, UsageEntry } from '../services/usageTracker.js';
 import { getUsageCss } from './usageHtmlStyles.js';
 
-export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>): string {
+export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>, history?: UsageEntry[]): string {
   const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
 
   const formatPeriod = (p: { tokens: number; cost: number; messages: number }) => ({
@@ -104,6 +104,23 @@ export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; l
     &#x1F4A1; <strong>Tip:</strong> Use the reset buttons to track specific project costs or billing periods.
     Your lifetime total is always preserved and serves as your complete usage audit trail.
   </div>
+  ${history && history.length > 0 ? `
+  <h2 style="margin:32px 0 12px;font-size:16px;font-weight:700;">Activity Log <span style="font-size:12px;font-weight:400;opacity:0.6;">(most recent first)</span></h2>
+  <table style="width:100%;border-collapse:collapse;font-size:12px;">
+    <thead><tr style="text-align:left;border-bottom:2px solid #333;">
+      <th style="padding:6px 10px;">Time</th><th style="padding:6px 10px;">AI</th>
+      <th style="padding:6px 10px;">Role</th><th style="padding:6px 10px;">Project</th>
+      <th style="padding:6px 10px;text-align:right;">In</th><th style="padding:6px 10px;text-align:right;">Out</th>
+      <th style="padding:6px 10px;text-align:right;">Cost</th>
+    </tr></thead>
+    <tbody>${[...history].reverse().slice(0, 200).map(e => {
+      const aiLabels2: Record<string,string> = { gemini:'Gemini', claude:'Claude', openai:'GPT-4o', groq:'Groq', xai:'Grok', kimi:'Kimi' };
+      const roleEmoji: Record<string,string> = { supervisor:'&#x1F50D; Supervisor', worker:'&#x2699;&#xFE0F; Worker', guardian:'&#x1F6E1;&#xFE0F; Guardian', qa:'&#x1F4AC; Q&amp;A', solo:'&#x1F3AF; Solo' };
+      const d = new Date(e.timestamp);
+      const t = d.toLocaleDateString() + ' ' + d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
+      return `<tr style="border-bottom:1px solid #222;"><td style="padding:5px 10px;opacity:0.8;">${t}</td><td style="padding:5px 10px;">${aiLabels2[e.aiProvider]||e.aiProvider}</td><td style="padding:5px 10px;">${roleEmoji[e.role||'']||e.role||'&#x2014;'}</td><td style="padding:5px 10px;opacity:0.8;">${e.project||'&#x2014;'}</td><td style="padding:5px 10px;text-align:right;">${(e.inputTokens||0).toLocaleString()}</td><td style="padding:5px 10px;text-align:right;">${(e.outputTokens||0).toLocaleString()}</td><td style="padding:5px 10px;text-align:right;">$${e.cost.toFixed(4)}</td></tr>`;
+    }).join('')}</tbody>
+  </table>` : '<p style="opacity:0.5;font-size:13px;margin-top:32px;">No activity logged yet.</p>'}
   <script>
     const vscode = acquireVsCodeApi();
     function resetSession() { vscode.postMessage({ type: 'reset', period: 'session' }); }

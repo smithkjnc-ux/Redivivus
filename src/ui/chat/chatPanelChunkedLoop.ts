@@ -58,7 +58,10 @@ export async function runFileBuildLoop(lctx: FileBuildLoopContext): Promise<File
     appendMsg(ctx, `⚙️ Writing part ${fileNum} of ${total}: \`${entry.filename}\`...`);
 
     const allFiles = filePlan.map(f => `  - ${f.filename}: ${f.purpose}`).join('\n');
-    const vaultSnippets = relevant.slice(0, 4).map(v => `# FROM VAULT: ${v.name}\n${v.code}`).join('\n\n');
+    const vaultSnippets = relevant.slice(0, 4).map(v => `// [FROM VAULT: ${v.name}]\n${v.code}`).join('\n\n');
+    const vaultBlock = relevant.length > 0
+      ? `VAULT CODE (strict rules):\n- COPY any vault item that fits into your output as-is, marked // [FROM VAULT: name].\n- Do NOT rewrite or create a parallel version of vault code.\n- Only write NEW code for what vault doesn't cover.\n${vaultSnippets}\n`
+      : '';
     const filePrompt = `You are CHASSIS. Build one file as part of a larger project.
 
 PROJECT TASK: "${task}"
@@ -67,7 +70,7 @@ ${allFiles}
 
 FILE TO BUILD NOW: ${entry.filename}
 PURPOSE: ${entry.purpose}
-${relevant.length > 0 ? `VAULT ITEMS (reuse where relevant):\n${vaultSnippets}\n` : ''}RULES:
+${vaultBlock}RULES:
 - Implement ONLY ${entry.filename} — do not output any other file
 - Keep it under 200 lines
 - Add a [SCOPE] comment at the top
@@ -94,7 +97,7 @@ ${CHASSIS_WORKER_RULES}`;
         const fallbackTokens = Math.ceil((res.text || '').length / 4);
         ledger.record(supervisor, 'supervisor', 'fallback', fallbackTokens);
         const fallbackCost = (fallbackTokens / 1_000_000) * 0.30;
-        ctx.usageTracker?.recordUsage(fallbackTokens, fallbackCost, supervisor);
+        ctx.usageTracker?.recordUsage(fallbackTokens, fallbackCost, supervisor, res.inputTokens, res.outputTokens);
       }
       if (!res.success) { throw new Error(res.error || 'AI generation failed'); }
       code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
@@ -108,7 +111,7 @@ ${CHASSIS_WORKER_RULES}`;
         // routeByComplexity picks the best available AI independently of the supervisor/worker role split.
         const actualAI = (res as any).routedTo || worker || supervisor;
         ledger.record(actualAI, worker ? 'worker' : 'solo', 'built', fileTokens);
-        ctx.usageTracker?.recordUsage(fileTokens, fileCost, actualAI);
+        ctx.usageTracker?.recordUsage(fileTokens, fileCost, actualAI, res.inputTokens, res.outputTokens);
       }
       if (i === 0) {
         const pairLabel = worker ? `🧠 ${supervisorLabel} → ${workerLabel}` : `🧠 ${supervisorLabel}`;

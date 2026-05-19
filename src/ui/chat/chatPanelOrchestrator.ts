@@ -27,8 +27,8 @@ export interface OrchestratorDeps {
   logError: (task: string, prompt: string, error: string, promptTokens?: number) => void;
   postToWebview: (msg: unknown) => void;
   setPendingTask: (t: string | undefined) => void;
-  /** Pre-computed vault search from handleBuildRequest — skips re-running vault search */
   precomputedVaultSearch?: VaultSearchResult;
+  assistMode?: boolean;
 }
 
 // Main entry: assess complexity and route appropriately

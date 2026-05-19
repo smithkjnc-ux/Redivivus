@@ -28,11 +28,13 @@ export async function awaitPlacementConfirmation(
 /** Shows cost estimate modal and waits (async) for user to confirm or cancel. Returns true = proceed. */
 export async function awaitCostConfirmation(task: string, deps: BuildRequestDeps): Promise<boolean> {
   const model = deps.routing.getModelName?.() || deps.routing.getAvailableAI().ai || 'gemini';
-  const estimate = estimateBuild(task, model);
-  // [CHASSIS] Fast-path: small builds (< 3k tokens, < $0.01) skip cost modal for responsiveness
-  if (estimate.tokens < 3000 && estimate.costUSD < 0.01) {
-    return true;
-  }
+  const roster = deps.routing.buildRoster?.();
+  const supervisorModel = roster?.supervisor !== (deps.routing.getAvailableAI().ai || 'gemini') ? roster?.supervisor : undefined;
+  const guardianModel = roster?.guardian || undefined;
+  const estimate = estimateBuild(task, model, supervisorModel, guardianModel);
+  // [CHASSIS] Fast-path: single-phase micro tasks (1-step snippets) auto-approve — no need to gate.
+  // Everything else shows the estimate slip so the user sees what will be built before we start.
+  if (estimate.phases <= 1) { return true; }
   const buildId = `build-${Date.now()}`;
   const confirmed = await new Promise<boolean>((resolve) => {
     _pendingBuildConfirms.set(buildId, resolve);

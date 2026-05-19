@@ -86,6 +86,7 @@ export function registerAllCommands(
   try {   registerRetrofitCommands(context, chassisService, retrofitService, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerRetrofitCommands(context, chassisService, retrofitService, refreshAll);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerRetrofitCommands(context, chassisService, retrofitService, refreshAll); failed: ' + e + '\n'); }
   try {   registerVaultCommands(context, chassisService, vaultService, routingService, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerVaultCommands(context, chassisService, vaultService, routingService, refreshAll);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerVaultCommands(context, chassisService, vaultService, routingService, refreshAll); failed: ' + e + '\n'); }
   try {   registerVaultBrowseCommand(context, vaultService); } catch (e) { console.error('Failed to register ' + 'registerVaultBrowseCommand(context, vaultService);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerVaultBrowseCommand(context, vaultService); failed: ' + e + '\n'); }
+  try { const { BuildFromVaultService } = require('./services/vault/buildFromVaultService.js'); registerBuildFromVaultCommand(context, new BuildFromVaultService(vaultService, routingService)); } catch (e) { console.error('Failed to register buildFromVault', e); }
   
   // [CHASSIS] Vault Deduplication command — scan + confirm merge via Quick Pick
   context.subscriptions.push(
@@ -129,4 +130,30 @@ export function registerAllCommands(
   try {   registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, null as any, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, null as any, refreshAll);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerMiscCommands(context, chassisService, sessionService, guideService, rulesService, null as any, refreshAll); failed: ' + e + '\n'); }
   registerInlineCommands(context, chassisService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd);
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
+
+  // chassis.compileProject — triggered by "Package as Executable" action card button
+  context.subscriptions.push(vscode.commands.registerCommand('chassis.compileProject', async () => {
+    const { _lastCompileTarget, runCompilePipeline, getCompilePipeline } = require('./ui/chat/chatPanelBuildPipeline.js');
+    let target = _lastCompileTarget;
+    if (!target) {
+      // Fallback: scan workspace for a compilable file
+      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!root) { vscode.window.showWarningMessage('No project open — open a project folder first.'); return; }
+      const fs = require('fs'), path = require('path');
+      const exts = ['.py', '.rs', '.go', '.c', '.cpp'];
+      const srcDir = path.join(root, 'src');
+      const searchDirs = [srcDir, root].filter((d: string) => fs.existsSync(d));
+      let found: string | null = null;
+      for (const dir of searchDirs) {
+        const files: string[] = fs.readdirSync(dir).filter((f: string) => exts.some((e: string) => f.endsWith(e)));
+        if (files.length) { found = path.join(dir, files[0]); break; }
+      }
+      if (!found) { vscode.window.showWarningMessage('No compilable file found (.py, .rs, .go, .c, .cpp).'); return; }
+      const relPath = require('path').relative(root, found);
+      const pipeline = getCompilePipeline(relPath, root);
+      if (!pipeline) { vscode.window.showWarningMessage('No compile pipeline for this file type.'); return; }
+      target = { root, relPath, pipeline };
+    }
+    runCompilePipeline(target.pipeline, target.root);
+  }));
 }

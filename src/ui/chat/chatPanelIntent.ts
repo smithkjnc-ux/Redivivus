@@ -17,6 +17,7 @@ import { generateVagueWarning, getQuestionsForTier, organizeByCategory } from '.
 import { isVagueProjectRequest, askScopeQuestions, parseScopeAnswer, hasPendingScopeQuestion, resolveScopeQuestion } from '../../services/project/templateScopeService.js';
 import { handleComplexityRoutedBuild, OrchestratorDeps } from './chatPanelOrchestrator.js';
 import { runBuildAfterGates } from './chatPanelBuildRunner.js';
+import { autoCreateProject } from './chatPanelBuildAutoCreate.js';
 import { estimateBuild } from '../../services/costEstimatorService.js';
 import { checkBuildPlacement } from '../../services/build/buildPlacementCheck.js';
 import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor.js';
@@ -78,7 +79,8 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
   // [WARN] Only fires on fresh project-type requests with no detail. Never fires on skipComplex=true
   //        (that's a resumed build that already went through the wizard).
   // Direct mode: skip scope clarification entirely (auto-approve scope)
-  if (!skipComplex && deps.buildMode !== 'direct' && await isVagueProjectRequest(task, deps.routing)) {
+  // Initialized projects: skip scope clarification — user is modifying, not starting fresh
+  if (!skipComplex && deps.buildMode !== 'direct' && !deps.chassis?.isInitialized?.() && await isVagueProjectRequest(task, deps.routing)) {
     const scopeAnswer = await askScopeQuestions(task, deps.postToWebview);
     if (scopeAnswer) {
       const { enrichedTask } = await parseScopeAnswer(scopeAnswer, deps.routing);
@@ -108,23 +110,54 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
   let precomputedVaultSearch: VaultSearchResult | undefined;
   if (!skipComplex && deps.vault) {
     const vaultHits = findRelevantByTask(task, deps.vault.listItems());
-    if (vaultHits.items.length > 0 || semanticHit) {
-      tracer.vault('hit', `${vaultHits.items.length} match${vaultHits.items.length !== 1 ? 'es' : ''} — "${task.slice(0, 40)}"`);
-      tracer.gate('Vault-Hit', `${vaultHits.items.length} matches — showing choice modal`);
-      precomputedVaultSearch = vaultHits;
+    // AI relevance pre-filter — keyword search produces false positives; only show modal for genuinely relevant items
+    let relevantItems = vaultHits.items;
+    if (relevantItems.length > 2) {
+      try {
+        const itemList = relevantItems.slice(0,12).map((it:any,i:number)=>`${i+1}. ${it.name}: ${(it.description||'').slice(0,80)}`).join('\n');
+        const checkRes = await deps.routing.routeByComplexity(task, `Task: "${task.slice(0,200)}"\n\nVault components:\n${itemList}\n\nWhich are directly relevant to this task? Reply ONLY with comma-separated numbers (e.g. "1,3") or "none".`, 12_000);
+        const reply = ((checkRes as any).text||'').trim().toLowerCase();
+        const nums = (reply.match(/\d+/g)||[]).map(Number);
+        if (reply==='none'||nums.length===0){relevantItems=[];}else{relevantItems=relevantItems.filter((_:any,i:number)=>nums.includes(i+1));}
+      } catch {}
+    }
+    if (relevantItems.length > 0 || semanticHit) {
+      tracer.vault('hit', `${relevantItems.length} relevant (${vaultHits.items.length} raw) — "${task.slice(0, 40)}"`);
+      tracer.gate('Vault-Hit', `${relevantItems.length} relevant matches — showing choice modal`);
+      precomputedVaultSearch = { ...vaultHits, items: relevantItems };
       const resolverId = `vault-${Date.now()}`;
       const choice = await new Promise<'use-vault' | 'build-fresh' | 'cancel'>((resolve) => {
-        // We can just use the map directly or register VaultHitResolver if we import it.
-        // But since this was extracted, let's just use the exported map.
-        // Wait, _pendingBuildConfirms, etc. Let's import registerVaultHitResolver.
-        registerVaultHitResolver(resolverId, resolve as any); // cast to any to fix strict TS return type
-        deps.postToWebview({ type: 'show-vault-hit', resolverId, task, matchCount: vaultHits.items.length, isSemantic: semanticHit });
-        setTimeout(() => resolve('cancel'), 60000); // 1 min timeout
+        registerVaultHitResolver(resolverId, resolve as any);
+        deps.postToWebview({ type: 'show-vault-hit', resolverId, task, matchCount: relevantItems.length, isSemantic: semanticHit });
+        setTimeout(() => resolve('cancel'), 60000);
       });
       if (choice === 'cancel') { deps.postToWebview({ type: 'set-status', status: 'ready' }); return; }
       if (choice === 'use-vault') {
-        const ctx = { task, root: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '', blueprintContext: deps.blueprintContext, vault: deps.vault, chassis: deps.chassis, routing: deps.routing, conversation: deps.conversation, refresh: deps.refresh, logError: deps.logError, postToWebview: deps.postToWebview };
-        await runVaultAssemblyBuild(ctx, vaultHits.items);
+        let vaultRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        let vaultBlueprintContext = deps.blueprintContext;
+        let autoCreated = false;
+        if (!vaultRoot) {
+          try {
+            const created = await autoCreateProject(task, deps);
+            vaultRoot = created.dir;
+            vaultBlueprintContext = created.blueprintContext;
+            autoCreated = true;
+          } catch (e) {
+            deps.conversation.push({ role: 'assistant', content: `Could not create project folder: ${e instanceof Error ? e.message : String(e)}`, timestamp: Date.now() });
+            deps.refresh();
+            deps.postToWebview({ type: 'set-status', status: 'ready' });
+            return;
+          }
+        }
+        const ctx = { task, root: vaultRoot!, blueprintContext: vaultBlueprintContext, vault: deps.vault, chassis: deps.chassis, routing: deps.routing, conversation: deps.conversation, refresh: deps.refresh, logError: deps.logError, postToWebview: deps.postToWebview };
+        await runVaultAssemblyBuild(ctx, relevantItems);
+        if (autoCreated && vaultRoot) {
+          const projectName = require('path').basename(vaultRoot);
+          const openChoice = await vscode.window.showInformationMessage(
+            `Project "${projectName}" built. Open it in the Explorer?`, 'Open Folder'
+          );
+          if (openChoice === 'Open Folder') { vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(vaultRoot)); }
+        }
         deps.postToWebview({ type: 'set-status', status: 'ready' });
         return;
       }

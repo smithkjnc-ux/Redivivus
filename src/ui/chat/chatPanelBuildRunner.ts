@@ -37,6 +37,7 @@ export async function runBuildAfterGates(
   isFixRequest: boolean,
   precomputedVaultSearch: VaultSearchResult | undefined,
 ): Promise<void> {
+  deps.postToWebview({ type: 'set-status', status: 'working' });
   let root = getLiveRoot(deps);
   let autoCreatedProject = false;
 
@@ -179,7 +180,7 @@ export async function runBuildAfterGates(
     deps.setActiveBuildCtx(undefined);
     deps.postToWebview({ type: 'set-status', status: 'ready' });
   }
-
+  if (root) { import('../../services/blueprint/blueprintRevisionService.js').then(m => m.tryBlueprintRevision(root!, deps.chassis, deps.routing)).catch(() => {}); }
   // [CHASSIS] After auto-create build: prompt user to open the new project folder in the Explorer
   if (autoCreatedProject && root) {
     const projectName = path.basename(root);

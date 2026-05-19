@@ -40,35 +40,42 @@ export function buildGatesScript(): string {
 
     function showCostEstimatePanel(buildId, estimate) {
       const existing = document.getElementById('gate-modal-overlay'); if(existing) existing.remove();
-      const ov=document.createElement('div'); ov.id='gate-modal-overlay'; ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
-      const cd=document.createElement('div'); cd.style.cssText='background:#1e2740;color:#e8edf8;border-radius:12px;padding:28px 32px;width:400px;max-width:90vw;box-shadow:0 12px 48px rgba(0,0,0,0.6);border:1px solid #2d3a55;font-family:inherit;';
-      
-      const tt=document.createElement('div'); tt.style.cssText='font-size:17px;font-weight:700;margin-bottom:16px;color:#e8edf8;display:flex;align-items:center;gap:8px;'; 
-      tt.innerHTML = '<span style="font-size:20px">\uD83D\uDCB8</span> Cost Estimate Warning'; 
-      cd.appendChild(tt);
-      
-      const sub=document.createElement('div'); sub.style.cssText='font-size:13px;color:#8899bb;margin-bottom:20px;line-height:1.5;'; 
-      sub.innerHTML = 'This is a complex build that will require multiple AI calls. Are you sure you want to proceed?';
-      cd.appendChild(sub);
+      const ov=document.createElement('div'); ov.id='gate-modal-overlay'; ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;';
+      const cd=document.createElement('div'); cd.style.cssText='background:#1a2035;color:#e8edf8;border-radius:12px;padding:24px 28px;width:420px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,0.7);border:1px solid #2d3a55;font-family:inherit;';
 
-      const stats=document.createElement('div'); stats.style.cssText='background:#1a2035;border:1px solid #2d3a55;border-radius:8px;padding:16px;margin-bottom:24px;display:grid;grid-template-columns:1fr 1fr;gap:12px;';
-      stats.innerHTML = 
-        '<div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:11px;color:#8899bb;text-transform:uppercase;letter-spacing:0.5px;">Est. Cost</span><span style="font-size:18px;font-weight:700;color:#4ec959;">' + estimate.costFormatted + '</span></div>' +
-        '<div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:11px;color:#8899bb;text-transform:uppercase;letter-spacing:0.5px;">Model</span><span style="font-size:14px;font-weight:600;color:#e8edf8;">' + estimate.modelLabel + '</span></div>' +
-        '<div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:11px;color:#8899bb;text-transform:uppercase;letter-spacing:0.5px;">Phases</span><span style="font-size:14px;font-weight:600;color:#e8edf8;">' + estimate.phases + ' steps</span></div>' +
-        '<div style="display:flex;flex-direction:column;gap:4px;"><span style="font-size:11px;color:#8899bb;text-transform:uppercase;letter-spacing:0.5px;">Tokens</span><span style="font-size:14px;font-weight:600;color:#e8edf8;">~' + (estimate.tokens/1000).toFixed(1) + 'k</span></div>';
+      // Header \u2014 shop estimate slip style
+      const hdr=document.createElement('div'); hdr.style.cssText='font-size:11px;font-weight:700;letter-spacing:1.5px;color:#4d9eff;text-transform:uppercase;margin-bottom:6px;'; hdr.textContent='CHASSIS BUILD ESTIMATE'; cd.appendChild(hdr);
+      const div=document.createElement('div'); div.style.cssText='border-top:1px solid #2d3a55;margin-bottom:16px;'; cd.appendChild(div);
+
+      // What will be built
+      if (estimate.description) {
+        const dsc=document.createElement('div'); dsc.style.cssText='font-size:13px;color:#c8d8f0;margin-bottom:16px;line-height:1.5;';
+        dsc.innerHTML = 'Planning to create: <strong>' + estimate.description + '</strong> (~' + (estimate.fileCount||3) + ' files)';
+        cd.appendChild(dsc);
+      }
+
+      // Stats grid — total cost (all passes) in highlight cell
+      function formatUSD(v){if(!v||v===0)return'Free';if(v<0.0001)return'~$0.0001';return'~$'+(Math.ceil(v*10000)/10000).toFixed(4);}
+      const stats=document.createElement('div'); stats.style.cssText='background:#0f1629;border:1px solid #2d3a55;border-radius:8px;padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:10px;';
+      const cell=(label,val,highlight)=>'<div style="display:flex;flex-direction:column;gap:2px;"><span style="font-size:10px;color:#8899bb;text-transform:uppercase;letter-spacing:0.5px;display:block;">'+label+'</span><span style="font-size:'+(highlight?'20':'14')+'px;font-weight:700;color:'+(highlight?'#4ec959':'#e8edf8')+';">'+val+'</span></div>';
+      const totalTok = (estimate.tokens + (estimate.supervisorTokens||0) + (estimate.guardianTokens||0));
+      stats.innerHTML = cell('Total Cost', estimate.totalCostFormatted, true) + cell('AI Worker', estimate.modelLabel, false) + cell('Build Phases', estimate.phases+' steps', false) + cell('Total Tokens', '~'+(totalTok/1000).toFixed(1)+'k', false);
       cd.appendChild(stats);
-      
-      const btns=document.createElement('div'); btns.style.cssText='display:flex;justify-content:flex-end;gap:12px;';
-      
-      const cn=document.createElement('button'); cn.textContent='Cancel'; cn.style.cssText='padding:8px 18px;border:1px solid #2d3a55;border-radius:8px;background:transparent;color:#8899bb;cursor:pointer;font-size:13px;'; 
-      cn.addEventListener('click',() => { ov.remove(); vscode.postMessage({ type: 'confirm-build', buildId, confirmed: false }); }); 
-      btns.appendChild(cn);
+      // AI breakdown — supervisor and guardian rows
+      if (estimate.supervisorLabel || estimate.guardianLabel) {
+        const brk=document.createElement('div'); brk.style.cssText='background:#0a1020;border:1px solid #1e2a40;border-radius:8px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:#8899bb;';
+        let rows='<div style="font-size:10px;text-transform:uppercase;letter-spacing:0.8px;color:#4d9eff;margin-bottom:8px;">AI Cost Breakdown</div>';
+        rows+='<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>&#x2699; Worker: '+estimate.modelLabel+'</span><span>~'+(estimate.tokens/1000).toFixed(1)+'k tok &bull; '+estimate.costFormatted+'</span></div>';
+        if (estimate.supervisorLabel && estimate.supervisorTokens != null) { rows+='<div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span>&#x1F3AF; Supervisor: '+estimate.supervisorLabel+'</span><span>~'+(estimate.supervisorTokens/1000).toFixed(1)+'k tok &bull; '+formatUSD(estimate.supervisorCostUSD)+'</span></div>'; }
+        if (estimate.guardianLabel && estimate.guardianTokens != null) { rows+='<div style="display:flex;justify-content:space-between;"><span>&#x1F6E1; Guardian: '+estimate.guardianLabel+'</span><span>~'+(estimate.guardianTokens/1000).toFixed(1)+'k tok &bull; '+formatUSD(estimate.guardianCostUSD)+'</span></div>'; }
+        brk.innerHTML=rows; cd.appendChild(brk);
+      }
 
-      const np=document.createElement('button'); np.textContent='Proceed with Build'; np.style.cssText='padding:8px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#2563eb,#4d9eff);color:#fff;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(77,158,255,0.3);'; 
-      np.addEventListener('click',() => { ov.remove(); vscode.postMessage({ type: 'confirm-build', buildId, confirmed: true }); }); 
-      btns.appendChild(np);
-      
+      const btns=document.createElement('div'); btns.style.cssText='display:flex;justify-content:flex-end;gap:10px;';
+      const cn=document.createElement('button'); cn.textContent='Not Yet'; cn.style.cssText='padding:8px 18px;border:1px solid #2d3a55;border-radius:8px;background:transparent;color:#8899bb;cursor:pointer;font-size:13px;';
+      cn.addEventListener('click',() => { ov.remove(); vscode.postMessage({ type: 'confirm-build', buildId, confirmed: false }); }); btns.appendChild(cn);
+      const np=document.createElement('button'); np.textContent="Let\u2019s Build It!"; np.style.cssText='padding:8px 22px;border:none;border-radius:8px;background:linear-gradient(135deg,#2563eb,#4d9eff);color:#fff;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(77,158,255,0.3);';
+      np.addEventListener('click',() => { ov.remove(); vscode.postMessage({ type: 'confirm-build', buildId, confirmed: true }); }); btns.appendChild(np);
       cd.appendChild(btns); ov.appendChild(cd); document.body.appendChild(ov);
     }
 

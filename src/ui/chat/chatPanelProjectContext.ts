@@ -64,6 +64,16 @@ export function buildProjectAnnotationContext(root: string): string {
         if (deads > 0) { tags.push(`${deads} DEAD`); }
         if (tags.length > 0) { entry += ` [${tags.join(', ')}]`; }
 
+        // [CHASSIS] For small config/data files, include a content preview so the AI knows
+        // what is ACTUALLY defined — not just what the original blueprint said.
+        // Triggers for: files ≤ 80 lines whose name suggests configuration or data.
+        const baseName = path.basename(rel).toLowerCase();
+        const isDataFile = /config|data|types?|constants?|sounds?|animals?|registry|entries|items|list|map/.test(baseName);
+        if (isDataFile && lines <= 80) {
+          const preview = content.split('\n').filter(l => l.trim() && !l.trim().startsWith('//')).slice(0, 25).join('\n');
+          if (preview.trim()) { entry += `\n    CONTENT:\n${preview.split('\n').map(l => '    ' + l).join('\n')}`; }
+        }
+
         entries.push(entry);
       } catch { /* skip unreadable files */ }
     }

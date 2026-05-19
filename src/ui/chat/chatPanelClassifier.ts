@@ -5,7 +5,7 @@ import { RoutingService } from '../../services/ai/routingService.js';
 import { tracer } from '../../services/pipelineTracer.js';
 import { checkHardcodedOverrides, fallbackClassify } from './chatPanelClassifierOverrides.js';
 
-export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix';
+export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service';
 export type AvailableCommand =
   | 'chassis.openProject'
   | 'chassis.wizardRetrofit'
@@ -32,9 +32,10 @@ export interface IntentResult {
 }
 
 export async function classifyIntent(
-  text: string, 
+  text: string,
   routing?: RoutingService,
-  context?: { projectName?: string; workspacePath?: string; blueprintStatus?: string }
+  context?: { projectName?: string; workspacePath?: string; blueprintStatus?: string },
+  onUsage?: (inputTokens: number, outputTokens: number, model: string) => void
 ): Promise<IntentResult> {
   const t = text.toLowerCase().trim();
   const override = checkHardcodedOverrides(t);
@@ -48,6 +49,8 @@ Intents:
 - fix: user is reporting a BUG, PROBLEM, or MALFUNCTION in EXISTING code — something that used to or should work is broken, wrong, or missing behavior
 - convert: user wants to TRANSFORM or PORT existing code (convert, rewrite, refactor, port, turn X into Y, change language/format)
 - run: user wants to RUN, PREVIEW, LAUNCH, TEST, or SEE the existing project/app/file in action
+- scaffold: user wants to SET UP a NEW PROJECT from a template (new React app, new Flask API, new Go service, new Express server, set up a project)
+- service: user wants to SET UP or INTEGRATE an EXTERNAL SERVICE (Firebase, Supabase, Stripe, OpenAI API, add auth, add database, add payments)
 - question: user asking about their project, code, or any software development topic
 - command: user wants to trigger a CHASSIS action
 - offtopic: no connection to software development, coding, architecture, databases, APIs, or technical topics
@@ -108,6 +111,16 @@ Examples (follow these exactly):
 "port this to Go" → {"intent": "convert"}
 "refactor this into components" → {"intent": "convert"}
 "transform this JSON into CSV" → {"intent": "convert"}
+"scaffold a new React app" → {"intent": "scaffold"}
+"set up a Flask API" → {"intent": "scaffold"}
+"create a new Go service" → {"intent": "scaffold"}
+"init a Node Express project" → {"intent": "scaffold"}
+"start a new React project" → {"intent": "scaffold"}
+"set up Firebase auth" → {"intent": "service"}
+"add Stripe payments" → {"intent": "service"}
+"integrate Supabase database" → {"intent": "service"}
+"configure OpenAI API" → {"intent": "service"}
+"add Firebase to my project" → {"intent": "service"}
 
 Return ONLY JSON:
 { "intent": "command", "command": "chassis.openProject" }
@@ -115,6 +128,8 @@ Return ONLY JSON:
 { "intent": "fix" }
 { "intent": "convert" }
 { "intent": "run" }
+{ "intent": "scaffold" }
+{ "intent": "service" }
 { "intent": "question" }
 { "intent": "offtopic" }
 
@@ -127,6 +142,7 @@ OFFTOPIC definition: No connection to software development, coding, architecture
     _sid = tracer.step('INTENT', 'AI classifier', text.slice(0, 60));
     // Use Supervisor AI (Gemini) for classification with max_tokens: 50
     const result = await (routing as any).prompt(systemPrompt);
+    if (result && onUsage) { onUsage(result.inputTokens ?? 0, result.outputTokens ?? 0, result.model ?? ''); }
 
     if (!result || !result.text) {
       throw new Error('No response from AI classifier');
@@ -148,7 +164,7 @@ OFFTOPIC definition: No connection to software development, coding, architecture
       return { type: 'command', command: parsed.command as AvailableCommand };
     }
     
-    if (intent === 'build' || intent === 'convert' || intent === 'run' || intent === 'fix') {
+    if (intent === 'build' || intent === 'convert' || intent === 'run' || intent === 'fix' || intent === 'scaffold' || intent === 'service') {
       tracer.done(_sid, 'success', Date.now() - _t0, `classified as "${intent}"`, Math.ceil(systemPrompt.length / 4), Math.ceil(result.text.length / 4));
       return { type: intent };
     }

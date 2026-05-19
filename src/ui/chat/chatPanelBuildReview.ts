@@ -3,19 +3,39 @@
 
 import { BuildContext } from './chatPanelBuild.js';
 import { LearnedMemoryService } from '../../services/learnedMemoryService.js';
+import { extractCodeFromResponse } from './chatPanelBuildInference.js';
 
-export async function runGuardianReview(ctx: BuildContext, code: string, relPath: string, supervisorSpec: string | null): Promise<string> {
+export interface GuardianReviewResult {
+  code: string;
+  qualityScore: number;
+}
+
+export async function runGuardianReview(ctx: BuildContext, code: string, relPath: string, supervisorSpec: string | null): Promise<GuardianReviewResult> {
   const { routing, blueprintContext, root, task } = ctx;
   try {
     const guardianContext = supervisorSpec ? `${blueprintContext}\n\nSPEC:\n${supervisorSpec}` : blueprintContext;
     const review = await routing.guardianReview(task, code, 'worker', guardianContext);
-    if (review && !review.passed && review.correctedText) {
+
+    // [FIX] Compute quality score based on review signals
+    let positiveSignals = 0;
+    if (review?.passed) positiveSignals += 2;              // Passed review: +2
+    if (code.split('\n').length > 50) positiveSignals += 1; // Substantial code: +1
+    if (!/TODO|FIXME|XXX/i.test(code)) positiveSignals += 1; // No TODO comments: +1
+    if (supervisorSpec && review?.passed) positiveSignals += 1; // Supervisor + worker both ran: +1
+    const qualityScore = Math.min(5, positiveSignals);
+
+    // [FIX] Guard: correctedText starting with prose means Guardian failed to parse the code — don't write it to disk.
+    const correctedLooksLikeCode = review?.correctedText && !review.correctedText.trimStart().startsWith('Since the worker') && !review.correctedText.trimStart().startsWith('GUARDIAN_PASS cannot');
+    if (review && !review.passed && review.correctedText && correctedLooksLikeCode) {
       const learned = new LearnedMemoryService(root);
       review.issues.forEach(issue => learned.addNeverDo(issue, relPath.split('.').pop() || 'code'));
-      return review.correctedText;
+      return { code: extractCodeFromResponse(review.correctedText), qualityScore };
     }
-  } catch {}
-  return code;
+    return { code, qualityScore };
+  } catch {
+    // Return original code with default quality score on error
+    return { code, qualityScore: 3 };
+  }
 }
 
 export async function runStaticValidation(code: string, relPath: string): Promise<string> {
@@ -35,7 +55,7 @@ export async function runImportValidation(ctx: BuildContext, code: string, absPa
       const repairPrompt = buildImportRepairPrompt(ctx.task, code, check, absPath);
       const res = await ctx.routing.routeByComplexity(ctx.task, repairPrompt);
       if (res.success && res.text) {
-        return res.text.replace(/^```[a-zA-Z]*\\n?/m, '').replace(/\\n?```$/m, '').trim();
+        return extractCodeFromResponse(res.text);
       }
     }
   } catch {}

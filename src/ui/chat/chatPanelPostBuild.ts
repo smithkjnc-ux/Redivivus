@@ -16,8 +16,10 @@ export interface PostBuildInfo {
 export function detectPostBuildInfo(root: string, builtFiles: string[]): PostBuildInfo {
   const all = builtFiles.map(f => f.toLowerCase());
 
-  // HTML — open in browser
-  const htmlFile = builtFiles.find(f => f.endsWith('.html'));
+  // HTML — open in browser (check built files first, then scan root for index.html)
+  const htmlFile = builtFiles.find(f => f.endsWith('.html'))
+    || ['index.html', 'src/index.html', 'public/index.html'].find(f => fs.existsSync(path.join(root, f)))
+    || null;
   if (htmlFile) {
     return { type: 'html', entryFile: htmlFile, runCmd: null, needsDeps: false, depsCmd: null };
   }
@@ -71,6 +73,21 @@ export function detectPostBuildInfo(root: string, builtFiles: string[]): PostBui
     return { type: 'shell', entryFile: shFile, runCmd: `bash ${shFile}`, needsDeps: false, depsCmd: null };
   }
 
+  // TypeScript (standalone, no package.json)
+  const tsFile = builtFiles.find(f => f.endsWith('.ts') || f.endsWith('.tsx'));
+  if (tsFile) {
+    // Detect browser-only TypeScript — needs an HTML wrapper, not ts-node
+    try {
+      const absTs = path.join(root, tsFile);
+      const tsContent = fs.existsSync(absTs) ? fs.readFileSync(absTs, 'utf-8') : '';
+      const isBrowserCode = /\b(window|document|navigator|AudioContext|MediaRecorder|MediaStream|fetch\(|WebSocket|localStorage|sessionStorage|HTMLElement)\b/.test(tsContent);
+      if (isBrowserCode) {
+        return { type: 'html', entryFile: tsFile, runCmd: null, needsDeps: false, depsCmd: null };
+      }
+    } catch { /* ignore read errors */ }
+    return { type: 'node', entryFile: tsFile, runCmd: `npx ts-node ${tsFile}`, needsDeps: false, depsCmd: null };
+  }
+
   return { type: 'unknown', entryFile: null, runCmd: null, needsDeps: false, depsCmd: null };
 }
 
@@ -79,29 +96,35 @@ export function buildPostBuildGuidance(root: string, builtFiles: string[]): stri
   const info = detectPostBuildInfo(root, builtFiles);
   const lines: string[] = ['\n---', '**What to do next:**'];
 
-  if (info.type === 'html' && info.entryFile) {
-    lines.push(`&#x1F310; Type _"run it"_ to open \`${info.entryFile}\` in your browser.`);
+  if (info.type === 'html') {
+    if (info.entryFile && (info.entryFile.endsWith('.ts') || info.entryFile.endsWith('.tsx'))) {
+      lines.push(`This is a **browser module** (uses Web APIs). Type _"make a test page for this"_ to create an HTML wrapper you can open in your browser.`);
+    } else if (info.entryFile) {
+      lines.push(`Type _"run it"_ to open \`${info.entryFile}\` in your browser.`);
+    }
   } else if (info.type === 'node') {
     if (info.needsDeps) {
-      lines.push(`&#x26A0; **Dependencies not installed.** Type _"install dependencies"_ or open a terminal and run:`);
+      lines.push(`**Dependencies not installed.** Type _"install dependencies"_ or open a terminal and run:`);
       lines.push(`\`\`\`\nnpm install\n\`\`\``);
     }
     if (info.runCmd) {
-      lines.push(`&#x25B6; Then run: \`${info.runCmd}\``);
+      lines.push(`**Run:** \`${info.runCmd}\``);
     }
   } else if (info.type === 'python') {
     if (info.needsDeps) {
-      lines.push(`&#x26A0; **Dependencies needed.** Type _"install dependencies"_ or run:`);
+      lines.push(`**Dependencies needed.** Type _"install dependencies"_ or run:`);
       lines.push(`\`\`\`\n${info.depsCmd}\n\`\`\``);
     }
     if (info.runCmd) {
-      lines.push(`&#x25B6; Run: \`${info.runCmd}\``);
+      lines.push(`**Run:** \`${info.runCmd}\``);
     }
   } else if (info.runCmd) {
-    lines.push(`&#x25B6; Run: \`${info.runCmd}\``);
+    lines.push(`**Run:** \`${info.runCmd}\``);
   }
 
   lines.push('');
   lines.push('_If something doesn\'t work, paste the error here and I\'ll fix it._');
+  lines.push('');
+  lines.push('> **Your program is just the file(s) above.** The `.chassis/` folder is CHASSIS\'s workbench — snapshots, rules, vault. It adds zero weight to your program and is invisible to your users. Share or deploy only the files listed.');
   return lines.join('\n');
 }

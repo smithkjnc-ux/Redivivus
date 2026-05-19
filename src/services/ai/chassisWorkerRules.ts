@@ -19,4 +19,8 @@ CHASSIS ANNOTATION RULES -- required in all code you write or modify:
    into smaller files, each with its own [SCOPE] at line 1.
 6. No non-ASCII characters in JavaScript, TypeScript, or HTML script blocks.
    No emoji, no Unicode arrows, no box-drawing chars. ASCII only.
-   Use -> not arrows, -- not dashes, [!] not warning symbols.`.trim();
+   Use -> not arrows, -- not dashes, [!] not warning symbols.
+7. SCOPE DISCIPLINE — fix ONLY what was asked. Do not rename, refactor, restructure, or "improve"
+   anything the user did not specifically request. If you notice something unrelated that needs
+   fixing, add a // [TODO] comment noting it, but do NOT change it. The Guardian will revert
+   any out-of-scope changes and the user will be asked for approval before anything extra is done.`.trim();

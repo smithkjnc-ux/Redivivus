@@ -8,18 +8,41 @@ import { SnapshotService } from '../../services/snapshotService.js';
 import { autoCaptureFile } from '../../services/vault/vaultAutoCapture.js';
 import { BuildContext } from './chatPanelBuild.js';
 
-export function writeBuiltFile(absPath: string, code: string): void {
-  // [FIX 4] STRIP JSON COMMENTS
+export interface WriteOptions { root?: string; task?: string; }
+
+export function writeBuiltFile(absPath: string, code: string, options?: WriteOptions): void {
+  const isNewFile = !fs.existsSync(absPath);
   let finalCode = code;
+
+  // Strip JSON line comments (invalid JSON syntax)
   if (absPath.toLowerCase().endsWith('.json')) {
-    finalCode = code.split('\\n')
+    finalCode = code.split('\n')
       .filter(line => !line.trim().startsWith('//'))
-      .join('\\n');
+      .join('\n');
   }
-  
+
+  // [FIX] Strip any content after </html> for HTML files.
+  // AI sometimes appends markdown planning blocks after the closing tag — these render as visible
+  // text in the browser sidebar. Everything after </html> is garbage.
+  if (absPath.toLowerCase().endsWith('.html')) {
+    const closeMatch = finalCode.match(/<\/html\s*>/i);
+    if (closeMatch && closeMatch.index !== undefined) {
+      finalCode = finalCode.slice(0, closeMatch.index + closeMatch[0].length).trim();
+    }
+  }
+
   const dir = path.dirname(absPath);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(absPath, finalCode, 'utf8');
+
+  // [FIX] Auto-capture initial state for brand-new files — permanent baseline, never pruned.
+  // This is the save point the user can always revert to if future builds corrupt the file.
+  if (isNewFile && options?.root && options?.task) {
+    try {
+      const relPath = path.relative(options.root, absPath);
+      new SnapshotService(options.root).captureInitial(`First build: ${options.task.slice(0, 60)}`, [relPath]);
+    } catch {}
+  }
 }
 
 export function createSnapshot(root: string, task: string, relPath: string): string | undefined {
@@ -32,7 +55,7 @@ export function createSnapshot(root: string, task: string, relPath: string): str
 export async function openBuiltFile(absPath: string): Promise<void> {
   try {
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath));
-    await vscode.window.showTextDocument(doc, { preview: false });
+    await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true });
     await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(absPath));
   } catch {}
 }

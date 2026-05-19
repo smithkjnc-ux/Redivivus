@@ -1,6 +1,8 @@
 // [SCOPE] CHASSIS Retrofit Blueprint Command — scan project, auto-generate 5 W's, save to config
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { RetrofitBlueprintService } from '../services/retrofitBlueprint.js';
 import { RoutingService } from '../services/ai/routingService.js';
 import { ChassisService } from '../services/chassisService.js';
@@ -54,8 +56,39 @@ export function registerRetrofitBlueprintCommand(
         'Edit it now'
       );
 
-      if (next === 'Edit it now') {
-        openBlueprintPanel(context, chassis, routing);
+      // Both "Looks right" and "Edit it now" confirm acceptance — finalize the conversion
+      if (next === 'Looks right' || next === 'Edit it now') {
+        // Remove .chassis-assist to promote from Assist Mode → Full CHASSIS
+        const assistFile = path.join(root, '.chassis-assist');
+        if (fs.existsSync(assistFile)) { try { fs.unlinkSync(assistFile); } catch { /* ignore */ } }
+
+        // Create CHASSIS_ROADMAP.md at project root if missing
+        const roadmapPath = path.join(root, 'CHASSIS_ROADMAP.md');
+        if (!fs.existsSync(roadmapPath)) {
+          const projName = path.basename(root);
+          const today = new Date().toISOString().slice(0, 10);
+          fs.writeFileSync(roadmapPath,
+            `# CHASSIS Roadmap — ${projName}\n\n*Last updated: ${today}* — Converted from Assist Mode to Full CHASSIS\n\n## Recent Fixes\n\n_No changes logged yet._\n`,
+            'utf-8');
+        }
+
+        // Write blueprint.md to .chassis/ if missing
+        const bpMdPath = path.join(root, '.chassis', 'blueprint.md');
+        if (!fs.existsSync(bpMdPath)) {
+          try { fs.writeFileSync(bpMdPath, service.formatMarkdown(blueprint), 'utf-8'); } catch { /* ignore */ }
+        }
+
+        // Create work_log.md if missing (required by sessionService.appendWorkLog)
+        const wlPath = path.join(root, '.chassis', 'work_log.md');
+        if (!fs.existsSync(wlPath)) {
+          const projName = path.basename(root);
+          fs.writeFileSync(wlPath, `# Work Log — ${projName}\n\n`, 'utf-8');
+        }
+
+        // Refresh chat panel to show Full CHASSIS screen
+        vscode.commands.executeCommand('chassis.openChatPanel');
+
+        if (next === 'Edit it now') { openBlueprintPanel(context, chassis, routing); }
       }
     })
   );

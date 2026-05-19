@@ -26,6 +26,7 @@ export function createBuildContext(task: string, deps: OrchestratorDeps): BuildC
     logError: deps.logError,
     postToWebview: deps.postToWebview,
     precomputedVaultSearch: deps.precomputedVaultSearch,
+    assistMode: deps.assistMode,
   };
 }
 

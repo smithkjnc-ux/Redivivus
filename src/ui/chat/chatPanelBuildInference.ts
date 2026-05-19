@@ -59,12 +59,40 @@ export async function findExistingTarget(root: string, task: string): Promise<st
 }
 
 export function inferExtension(taskLow: string, where: string): string {
-  if (taskLow.includes('.py')) return '.py';
-  if (taskLow.includes('.rs')) return '.rs';
+  // Explicit extension in task
+  if (taskLow.includes('.py'))  return '.py';
+  if (taskLow.includes('.rs'))  return '.rs';
+  if (taskLow.includes('.go'))  return '.go';
+  if (taskLow.includes('.cpp') || taskLow.includes('c++')) return '.cpp';
+  if (/\bc file\b|\.c\b/.test(taskLow)) return '.c';
+  if (taskLow.includes('.java') && !taskLow.includes('javascript')) return '.java';
+  if (taskLow.includes('.rb'))  return '.rb';
+  if (taskLow.includes('.sh'))  return '.sh';
+
+  // Web targets always go HTML/CSS/TS
   if (isWebPageTask(taskLow)) return '.html';
   if (taskLow.includes('css')) return '.css';
   if (taskLow.includes('tsx') || where.includes('react')) return '.tsx';
-  if (where.includes('python')) return '.py';
+
+  // [RULE 18] Natural language language detection — keywords are unambiguous enough for fast-path
+  if (/\b(python|pygame|flask|django|fastapi|numpy|pandas|matplotlib|tkinter)\b/.test(taskLow) || where.includes('python')) return '.py';
+  if (/\b(rust|cargo|rustlang)\b/.test(taskLow) || where.includes('rust')) return '.rs';
+  if (/\b(golang|go\s+(program|app|cli|tool|lang|binary))\b/.test(taskLow) || where.includes('go lang')) return '.go';
+  if (/\b(c\+\+|cpp|cmake|sfml)\b/.test(taskLow)) return '.cpp';
+  if (/\b(c\s+program|c\s+code|ansi\s+c|gcc\s)\b/.test(taskLow)) return '.c';
+  if (/\b(java\s|spring|maven|gradle)\b/.test(taskLow) && !taskLow.includes('javascript')) return '.java';
+  if (/\b(ruby|rails|gem)\b/.test(taskLow)) return '.rb';
+  if (/\b(bash|shell\s+script|zsh)\b/.test(taskLow)) return '.sh';
+
+  // [FIX] Explicit exe/CLI request overrides blueprint 'where: web browser' — user intent wins.
+  // Must come BEFORE the where.includes('web') fallback or it gets swallowed by the blueprint field.
+  if (/\b(exe|\.exe|executable|standalone|command.?line|run.*terminal|terminal.*run|desktop\s+app|native\s+app|binary)\b/i.test(taskLow)) {
+    // Prefer Python for games; Go for CLI tools; Python as safe general default
+    if (/\b(game|pygame|arcade|snake|tetris|flappy|pong|pacman|platformer)\b/.test(taskLow)) return '.py';
+    if (/\b(cli|tool|utility|script|automation)\b/.test(taskLow)) return '.py';
+    return '.py';
+  }
+
   if (where.includes('web')) return '.html';
   return '.ts';
 }
@@ -84,4 +112,32 @@ export async function deriveFileBase(task: string, routing: RoutingService): Pro
   const stop = new Set(['build','create','make','write','add','generate','implement','i','need','want','require','a','an','the','me','my','new']);
   const words = task.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w => w.length > 1 && !stop.has(w));
   return words.slice(0, 3).join('_') || 'output';
+}
+
+/**
+ * Extracts runnable code from an AI response that may contain prose and/or markdown fences.
+ * Three-stage fallback:
+ *   1. Largest closed fence block (``` ... ```) — handles prose before/after code
+ *   2. Everything after the first ``` fence — handles missing closing fence
+ *   3. Raw text as-is — no fences at all
+ * [FIX] Stage 1 only works when the AI includes a closing fence. Without it, stage 2
+ *       finds the first ``` and slices from there, discarding any prose preamble.
+ *       The old single-replace fallback left prose text intact when no closing fence existed.
+ */
+export function extractCodeFromResponse(text: string): string {
+  // Stage 1: find all properly closed fence blocks, return the largest
+  const blocks: string[] = [];
+  const fenceRe = /```(?:[a-zA-Z0-9]*)\n([\s\S]*?)```/g;
+  let m: RegExpExecArray | null;
+  while ((m = fenceRe.exec(text)) !== null) { blocks.push(m[1]); }
+  if (blocks.length > 0) {
+    return blocks.reduce((a, b) => a.length >= b.length ? a : b).trim();
+  }
+  // Stage 2: no closing fence — slice from first ``` onward and strip the fence line
+  const fenceIdx = text.indexOf('```');
+  if (fenceIdx !== -1) {
+    return text.slice(fenceIdx).replace(/^```[a-zA-Z0-9]*\n?/, '').trim();
+  }
+  // Stage 3: no fences at all — return as-is
+  return text.trim();
 }

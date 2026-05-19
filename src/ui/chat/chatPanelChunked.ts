@@ -16,9 +16,11 @@ import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build
 import { runFileBuildLoop, FileBuildLoopResult } from './chatPanelChunkedLoop.js';
 import { tracer } from '../../services/pipelineTracer.js';
 import { formatVaultContext } from '../../services/vault/vaultContextService.js';
-import { readProjectDeadEnds, readProjectRules, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils.js';
+import { readProjectDeadEnds, readProjectRules, writeProjectRoadmapEntry, getRecentBuildsContext } from './chatPanelMsgFixUtils.js';
 import { autoCommitIfEnabled } from '../../services/gitAutoCommitService.js';
 import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel.js';
+import { runCompileAutoFix } from '../../services/build/compileAutoFix.js';
+import { runTestAutoFix } from '../../services/build/testAutoFix.js';
 
 export function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
   ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined });
@@ -91,10 +93,12 @@ export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<
   const vaultCtxBlock = relevant.length > 0 ? formatVaultContext(relevant) + '\n' : '';
   const deadEnds = readProjectDeadEnds(root);
   const projectRules = readProjectRules(root);
+  const recentBuildsBlock = getRecentBuildsContext(root);
   const deadEndsBlock = deadEnds ? `PREVIOUSLY FAILED APPROACHES (do not repeat):\n${deadEnds}\n` : '';
   const rulesBlock = projectRules ? `PROJECT RULES (must not violate):\n${projectRules}\n` : '';
+  const recentBlock = recentBuildsBlock ? `${recentBuildsBlock}\n` : '';
   const planPrompt = `I need to build: "${task}"
-${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${vaultCtxBlock}${deadEndsBlock}${rulesBlock}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
+${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${vaultCtxBlock}${recentBlock}${deadEndsBlock}${rulesBlock}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
 Return ONLY a JSON array — no markdown, no explanation, no code:
 [
   {"file": "src/models.py", "purpose": "Data models for expenses"},
@@ -115,10 +119,10 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
     const planTokens = Math.ceil(res.text.length / 4);
     ledger.record(supervisor, worker ? 'supervisor' : 'solo', 'planned', planTokens);
     const planCost = (planTokens / 1_000_000) * 0.30;
-    ctx.usageTracker?.recordUsage(planTokens, planCost, supervisor);
+    ctx.usageTracker?.recordUsage(planTokens, planCost, supervisor, res.inputTokens, res.outputTokens, 'supervisor', path.basename(root));
     let raw = res.text.trim().replace(/^```[a-zA-Z]*\n?/i, '').replace(/\n?```$/i, '').trim();
-    const arrMatch = raw.match(/\[[\s\S]*\]/);
-    if (arrMatch) { raw = arrMatch[0]; }
+    // [FIX] Walk balanced brackets instead of greedy regex — prevents over-capture when AI adds extra text after the array
+    const _s = raw.indexOf('['); if (_s !== -1) { let _d = 0; for (let _i = _s; _i < raw.length; _i++) { if (raw[_i]==='[') _d++; else if (raw[_i]===']' && --_d===0) { raw = raw.slice(_s, _i+1); break; } } }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) { throw new Error('AI returned empty plan'); }
     filePlan = parsed.map((e: any) => ({ filename: e.filename || e.file || 'src/output.py', purpose: e.purpose || '' }));
@@ -173,20 +177,18 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
 
   tracer.vault('save', `${builtFiles.length} files saved to vault`);
   tracer.end(builtFiles, totalTokens, totalCost);
-  writeProjectRoadmapEntry(root, `AI build: ${task.slice(0, 60)}`, [
-    ...builtFiles.map(f => `Built \`${f}\``),
-    `Supervisor: ${supervisorLabel}${workerLabel ? `  Worker: ${workerLabel}` : ''}  Tokens: ~${totalTokens}  Cost: $${totalCost.toFixed(4)}`,
-  ]);
+  if (!ctx.assistMode) { writeProjectRoadmapEntry(root, `AI build: ${task.slice(0, 60)}`, builtFiles.map(f=>`Built \`${f}\``).concat([`Supervisor: ${supervisorLabel} Tokens: ~${totalTokens} Cost: $${totalCost.toFixed(4)}`])); }
   if (ctx.onBuildFinished) { ctx.onBuildFinished(task, builtFiles); }
-  await autoCommitIfEnabled(root, `CHASSIS added ${builtFiles.length} file${builtFiles.length !== 1 ? 's' : ''}: ${task.slice(0, 60)}`, builtFiles);
+  if (!ctx.assistMode) { await autoCommitIfEnabled(root, `CHASSIS added ${builtFiles.length} files: ${task.slice(0, 60)}`, builtFiles); }
   refreshSetupProgressIfOpen().catch(() => {});
 
-  // Build history
+  // Build history — use supervisor/worker captured at start of build, not a re-poll
   try {
-    const swPair2 = ctx.routing ? (ctx.routing as any).selectSupervisorAndWorker?.() : null;
-    const hist2 = new BuildHistoryService(root);
-    hist2.record(makeBuildHistoryEntry({ snapshotId: snapshotId || Date.now().toString(), task, files: builtFiles, tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: swPair2?.supervisor || 'gemini', worker: swPair2?.worker || null, resultCardToken: resultCard }));
+    new BuildHistoryService(root).record(makeBuildHistoryEntry({ snapshotId: snapshotId || Date.now().toString(), task, files: builtFiles, tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: supervisor || 'gemini', worker: worker || null, resultCardToken: resultCard }));
   } catch { /* never block */ }
+
+  await runCompileAutoFix(ctx, builtFiles).catch(() => {});
+  await runTestAutoFix(ctx, builtFiles).catch(() => {});
 
   // Generate docs in background
   generateDocs(root, task, blueprintContext, filePlan, routing)

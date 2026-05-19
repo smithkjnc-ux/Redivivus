@@ -1,5 +1,5 @@
-// [SCOPE] Extension Inline Commands B — fix/resolve, map, chat, profiler, terminal error
-// Extracted from extensionInlineCommands.ts
+// [SCOPE] Extension Inline Commands B — fix/resolve, map, chat, profiler, expanded interview.
+// chassis.runProject + chassis.inspectElement + chassis.injectTerminalError extracted to extensionInlineCommandsC.ts.
 
 import * as vscode from 'vscode';
 import { debugLog } from './services/workspace/diagnosticLogger.js';
@@ -16,7 +16,8 @@ import { ChatPanel } from './ui/chat/chatPanel.js';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
-import { registerTerminalErrorService, getLastTerminalError } from './services/workspace/terminalErrorService.js';
+import { showBuildHistoryPanel } from './ui/views/buildHistoryPanel.js';
+import { registerInlineCommandsC } from './extensionInlineCommandsC.js';
 
 export function registerInlineCommandsB(
   context: vscode.ExtensionContext,
@@ -31,26 +32,20 @@ export function registerInlineCommandsB(
   _suppressNextFolderAdd: { value: boolean },
 ): void {
 
-  // [CHASSIS] Global command to notify the recommendations panel that a fix is complete
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.resolveFix', (task: string, builtFiles?: string[]) => {
       if (RecommendationsPanel.currentPanel) {
         RecommendationsPanel.currentPanel.postMessage({ type: 'buildFinished', task, builtFiles });
       }
-      // [CHASSIS] Post a plain English completion message to the chat panel
       if (ChatPanel.currentPanel) {
-        const fileList = builtFiles && builtFiles.length > 0
-          ? '\n\nFiles updated: ' + builtFiles.map(f => `\`${f}\``).join(', ')
-          : '';
-        const summary = `✅ **Fix complete!** The task is done and your project has been updated.${fileList}\n\nYou can re-run **Scan Project** from the Recommendations panel to see your updated progress.`;
+        const fileList = builtFiles && builtFiles.length > 0 ? '\n\nFiles updated: ' + builtFiles.map(f => `\`${f}\``).join(', ') : '';
+        const summary = `Fix complete! The task is done and your project has been updated.${fileList}\n\nYou can re-run **Scan Project** from the Recommendations panel to see your updated progress.`;
         ChatPanel.currentPanel.handleMessage({ type: 'assistant-message', text: summary });
       }
-      // Trigger a project-wide refresh to re-scan files and update the list
       vscode.commands.executeCommand('chassis.refreshAll');
     })
   );
 
-  // [CHASSIS] Notify recommendations panel when a build fails/times out — lets Fix All advance past stuck items
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.buildFailed', (task: string, reason: string) => {
       if (RecommendationsPanel.currentPanel) {
@@ -59,16 +54,15 @@ export function registerInlineCommandsB(
     })
   );
 
-  // [CHASSIS] Phase 4 — Architecture Map: close Chat first so Map gets the full editor width
+  // [WARN] Defer close+open to next tick — disposing panel mid-handler can swallow MapPanel.show()
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.showMap', () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) { vscode.window.showErrorMessage('CHASSIS: No workspace folder open.'); return; }
       const projectName = chassisService.loadConfig()?.projectName || vscode.workspace.workspaceFolders?.[0]?.name || 'Project';
-      debugLog(root, 'showMap', `fired — root: ${root}, project: ${projectName}`);
-      // [WARN] Defer close+open to next tick — disposing panel mid-handler can swallow MapPanel.show()
+      debugLog(root, 'showMap', `fired -- root: ${root}, project: ${projectName}`);
       setTimeout(() => {
-        debugLog(root, 'showMap', 'setTimeout fired — closing chat, opening MapPanel');
+        debugLog(root, 'showMap', 'setTimeout fired -- closing chat, opening MapPanel');
         ChatPanel.close();
         MapPanel.show(root, guardianService, projectName);
         debugLog(root, 'showMap', 'MapPanel.show() returned');
@@ -76,39 +70,29 @@ export function registerInlineCommandsB(
     })
   );
 
-  // [CHASSIS] Opens or reveals the chat panel — used by MapPanel back-to-chat button
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.openChat', () => {
       ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
     })
   );
 
-  // [CHASSIS] Blueprint Interview — opens as a dedicated full-width panel in ViewColumn.One
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.blueprintInterview', () => {
-      openBlueprintPanel(context, chassisService, routingService);
-    })
+    vscode.commands.registerCommand('chassis.showBuildHistory', () => { showBuildHistoryPanel(context); })
   );
 
-  // [CHASSIS] Register the refreshAll command formally
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.refreshAll', () => {
-      refreshAll();
-    })
+    vscode.commands.registerCommand('chassis.refreshAll', () => { refreshAll(); })
   );
 
-  // [CHASSIS] Register chassis.profileRuntime — Project Runtime Profiler
   try {
     registerProfileRuntimeCommand(context, chassisService, routingService, usageTracker, vaultService);
   } catch (e) { console.error('[CHASSIS] Failed to register chassis.profileRuntime', e); }
 
-  // [CHASSIS] Register chassis.startRuntimeAnalysis — Runtime Analysis Engine
   try {
     registerStartRuntimeAnalysisCommand(context, chassisService, routingService, usageTracker, vaultService);
   } catch (e) { console.error('[CHASSIS] Failed to register chassis.startRuntimeAnalysis', e); }
 
   // [DONE] chassis.startExpandedInterview — opens ChatPanel and triggers 5W interview form.
-  //        Previously forwarded to chassis.wizardRetrofit. Now wired to the real expanded interview.
   context.subscriptions.push(
     vscode.commands.registerCommand('chassis.startExpandedInterview', async () => {
       const panel = ChatPanel.currentPanel || await vscode.commands.executeCommand<any>('chassis.openChat');
@@ -116,48 +100,11 @@ export function registerInlineCommandsB(
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         const config = root && chassisService?.isInitialized?.() ? chassisService.loadConfig?.() : null;
         const prefillTask = config?.blueprint?.what || '';
-        (ChatPanel.currentPanel as any)._panel?.webview?.postMessage({
-          type: 'show-panel',
-          panelType: 'expanded-interview',
-          prefillTask,
-          complexity: null,
-        });
+        (ChatPanel.currentPanel as any)._panel?.webview?.postMessage({ type: 'show-panel', panelType: 'expanded-interview', prefillTask, complexity: null });
         (ChatPanel.currentPanel as any)._panel?.reveal?.();
       }
     })
   );
 
-  // [CHASSIS] Terminal Error Awareness — capture terminal output for "Fix this error" injection
-  // [CHASSIS] UI Inspector — describe a UI element to find its source code and inject into chat
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.inspectElement', async () => {
-      const input = await vscode.window.showInputBox({ prompt: 'Describe the UI element (class name, id, or description)', placeHolder: 'e.g., .submit-button, #navbar, the login form' });
-      if (!input) { return; }
-      const { LensService } = await import('./services/lensService.js');
-      const lens = new LensService(null as any, null as any);
-      await lens.inspectAndInject({ description: input, className: input.startsWith('.') ? input.slice(1) : undefined, id: input.startsWith('#') ? input.slice(1) : undefined });
-    })
-  );
-
-  registerTerminalErrorService(context);
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.injectTerminalError', () => {
-      const err = getLastTerminalError();
-      if (!err) {
-        vscode.window.showInformationMessage('CHASSIS: No terminal error detected. Run your project first.');
-        return;
-      }
-      if (ChatPanel.currentPanel) {
-        ChatPanel.currentPanel.handleMessage({ type: 'inject-terminal-error', error: err });
-        ChatPanel.currentPanel['_panel']?.reveal(undefined, false);
-      } else {
-        ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
-        // Brief delay for panel init, then inject
-        setTimeout(() => {
-          ChatPanel.currentPanel?.handleMessage({ type: 'inject-terminal-error', error: err });
-        }, 600);
-      }
-    })
-  );
-
+  registerInlineCommandsC(context, chassisService, routingService, usageTracker, vaultService);
 }

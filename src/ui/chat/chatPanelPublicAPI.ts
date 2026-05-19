@@ -6,6 +6,7 @@ import { ChatPanel } from './chatPanel.js';
 import { buildHeaderInfo } from './chatPanelHeader.js';
 import { SetupProgressService, SetupProgress } from '../../services/project/setupProgressService.js';
 import { buildChatHtml } from './chatPanelHtml.js';
+import { readDashboardData } from './chatPanelDashboard.js';
 
 export function panelShowGettingStarted(panel: ChatPanel): void {
   const _panel = (panel as any)._panel;
@@ -58,16 +59,17 @@ export function panelSetLastModel(panel: ChatPanel, model: string): void {
 export async function panelRefresh(panel: ChatPanel): Promise<void> {
   const state = (panel as any).state;
   const usageTracker = (panel as any).usageTracker;
-  const headerInfo = buildHeaderInfo((panel as any).chassis, (panel as any).routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode);
+  const headerInfo = buildHeaderInfo((panel as any).chassis, (panel as any).routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
   const _panel = (panel as any)._panel;
   const _initialized = (panel as any)._initialized;
   if (!_initialized) {
     let progress: SetupProgress | undefined;
-    if (headerInfo.isInitialized) {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (root && state.conversation.length === 0) {
-        try { progress = await new SetupProgressService((panel as any).chassis, root).getProgress(); } catch { }
-      }
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (headerInfo.isInitialized && root && state.conversation.length === 0) {
+      try { progress = await new SetupProgressService((panel as any).chassis, root).getProgress(); } catch { }
+    }
+    if (root && headerInfo.workspaceHasChassis && !headerInfo.workspaceIsAssistMode && state.conversation.length === 0) {
+      try { const config = (panel as any).chassis.isInitialized() ? (panel as any).chassis.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch { }
     }
     _panel.webview.html = buildChatHtml(state.conversation, headerInfo, progress);
     (panel as any)._initialized = true;

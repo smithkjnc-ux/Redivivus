@@ -1,15 +1,9 @@
-// [SCOPE] CHASSIS Chat Panel Build Pipeline — Main entry points
-// Extracted from chatPanelHtml.ts. Keep under 200 lines.
+// [SCOPE] CHASSIS Chat Panel Build Pipeline — single-file build entry point
+// Helpers (BuildContext, vault resolvers, msg utils) extracted to chatPanelBuildHelpers.ts.
 
-import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { RoutingService } from '../../services/ai/routingService.js';
-import { VaultService } from '../../services/vault/vaultService.js';
-import { ChassisService } from '../../services/chassisService.js';
-import { UsageTracker } from '../../services/usageTracker.js';
-import { findRelevantByTask, VaultSearchResult } from '../../services/vault/buildFromVaultSearch.js';
-import { ChatMessage } from './chatPanelHtml.js';
+import { findRelevantByTask } from '../../services/vault/buildFromVaultSearch.js';
 import { extractNarrator, buildResultCard } from './chatPanelStory.js';
 import { buildPostBuildGuidance } from './chatPanelPostBuild.js';
 import { BuildLedger } from '../../services/build/buildLedgerService.js';
@@ -17,73 +11,35 @@ import * as Inf from './chatPanelBuildInference.js';
 import * as Worker from './chatPanelBuildWorker.js';
 import * as Review from './chatPanelBuildReview.js';
 import * as Writer from './chatPanelBuildWriter.js';
+import { checkImports, formatMissingImports } from './chatPanelImportCheck.js';
 import { tracer } from '../../services/pipelineTracer.js';
 import { formatVaultContext } from '../../services/vault/vaultContextService.js';
-import { readProjectDeadEnds, readProjectRules, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils.js';
+import { readProjectDeadEnds, readProjectRules, writeProjectRoadmapEntry, getRecentBuildsContext } from './chatPanelMsgFixUtils.js';
 import { autoCommitIfEnabled } from '../../services/gitAutoCommitService.js';
 import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel.js';
+import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService.js';
+import { BuildContext, updateLastMsg, appendMsg, diffSummary } from './chatPanelBuildHelpers.js';
+import { runCompileAutoFix } from '../../services/build/compileAutoFix.js';
+import { runTestAutoFix } from '../../services/build/testAutoFix.js';
+import { buildGitContextBlock } from '../../services/workspace/gitContext.js';
 
-export interface BuildContext {
-  task: string; root: string; blueprintContext: string; vault?: VaultService; routing: RoutingService; conversation: ChatMessage[]; refresh: () => void; logError: (t: string, p: string, e: string, l: number) => void; postToWebview?: (msg: any) => void; onBuildFinished?: (t: string, f?: string[]) => void;
-  chassis?: ChassisService;
-  usageTracker?: UsageTracker;
-  onClarifySubmit?: (answers: Record<string, string>) => void;
-  buildStartMessage?: string;
-  isFix?: boolean;
-  precomputedVaultSearch?: VaultSearchResult;
-  onBuildFailed?: (t: string, reason: string) => void;
-  buildMode?: 'plan' | 'direct';
-}
-
-// ── Vault-hit promise resolver — keyed by hitId, resolved by webview confirm/cancel ──
-const _vaultHitResolvers = new Map<string, (result: boolean) => void>();
-
-export function registerVaultHitResolver(hitId: string, resolve: (result: boolean) => void): void {
-  _vaultHitResolvers.set(hitId, resolve);
-}
-
-// [FIX] result accepts string choice ('build-fresh'|'cancel'|'use-vault') from gate handler
-export function resolveVaultHit(hitId: string, result: string | boolean): void {
-  const resolver = _vaultHitResolvers.get(hitId);
-  if (resolver) { _vaultHitResolvers.delete(hitId); resolver(result as any); }
-}
-
-// [RULE 18] AI classifier decides multi-file vs single-file — regex cannot reliably detect this from phrasing.
-export async function isChunkedBuildRequest(task: string, routing: RoutingService): Promise<boolean> {
-  // Fast path: explicit multi-file keywords
-  if (/\b(full[- ]?stack|multi[- ]?file|multiple\s+files|several\s+files)\b/i.test(task)) { return true; }
-  try {
-    const prompt = `Does this build request require multiple separate files (e.g. HTML + CSS + JS, or frontend + backend + database), or can it be one self-contained file?\nTask: "${task.slice(0, 200)}"\nReply with one word: single or multi`;
-    const res = await routing.prompt(prompt, 12_000);
-    if (res.success && res.text) { return res.text.trim().toLowerCase().startsWith('multi'); }
-  } catch { /* fall through to safe default */ }
-  return false;
-}
-
-function updateLastMsg(ctx: BuildContext, content: string): void {
-  const last = ctx.conversation[ctx.conversation.length - 1];
-  if (last && last.role === 'assistant') last.content = content;
-  else ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() });
-  ctx.refresh();
-}
-
-function appendMsg(ctx: BuildContext, content: string): void {
-  ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() });
-  ctx.refresh();
-}
+export type { BuildContext } from './chatPanelBuildHelpers.js';
+export { registerVaultHitResolver, resolveVaultHit, isChunkedBuildRequest } from './chatPanelBuildHelpers.js';
 
 export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const { task, root, routing } = ctx;
   const deadEnds = readProjectDeadEnds(root);
   const projectRules = readProjectRules(root);
+  const gitCtx = buildGitContextBlock(root);
   const blueprintContext = [
     ctx.blueprintContext,
     deadEnds ? `PREVIOUSLY FAILED APPROACHES (do not repeat):\n${deadEnds}` : '',
     projectRules ? `PROJECT RULES (must not violate):\n${projectRules}` : '',
+    gitCtx,
+    getRecentBuildsContext(root),
   ].filter(Boolean).join('\n\n');
   const buildStart = Date.now();
   const ledger = new BuildLedger();
-  // Supervisor = highest-ranked available AI (AI_RANK). Used for labeling AND the actual API call.
   const { supervisor: supervisorAI } = routing.selectSupervisorAndWorker();
 
   appendMsg(ctx, '🔍 Checking your saved code library...');
@@ -95,7 +51,8 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const existingTarget = isMod ? await Inf.findExistingTarget(root, task) : null;
   const ext = Inf.inferExtension(task.toLowerCase(), blueprintContext);
   const fileBase = await Inf.deriveFileBase(task, routing);
-  const relPath = existingTarget ? path.relative(root, existingTarget) : (ext === '.html' ? 'index.html' : `src/${fileBase}${ext}`);
+  const isCrossLang = !!existingTarget && path.extname(existingTarget) !== ext;
+  const relPath = (existingTarget && !isCrossLang) ? path.relative(root, existingTarget) : (ext === '.html' ? 'index.html' : `src/${fileBase}${ext}`);
   const absPath = path.join(root, relPath);
 
   appendMsg(ctx, `📋 Planning \`${relPath}\`...`);
@@ -108,13 +65,20 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
     updateLastMsg(ctx, `📋 Plan ready — writing your code...`);
   }
 
-  // Worker AI is determined at build time by routeByComplexity — show placeholder until routedTo is known
-  appendMsg(ctx, `⚙️ Building \`${relPath}\`...`);
   // [FIX] Inject vault context into worker prompt — was always passing empty string
   const vaultSummary = searchResult.items.length > 0 ? formatVaultContext(searchResult.items) : '';
-  const prompt = Worker.buildWorkerPrompt(ctx, relPath, !!existingTarget, existingTarget ? fs.readFileSync(absPath, 'utf8') : '', spec, vaultSummary);
+  const prompt = Worker.buildWorkerPrompt(ctx, relPath, !!existingTarget && !isCrossLang, (existingTarget && !isCrossLang && fs.existsSync(absPath)) ? fs.readFileSync(absPath, 'utf8') : '', spec, vaultSummary, (existingTarget && isCrossLang && fs.existsSync(existingTarget)) ? fs.readFileSync(existingTarget, 'utf8').slice(0, 6000) : '');
   const _workT0 = Date.now(); const _workSid = tracer.step('WORKER', undefined, `Building ${relPath}`);
-  const res = await Worker.executeWorkerBuild(ctx, prompt);
+
+  // Real streaming: chunks arrive from the AI and update the message in real time
+  let streamAccum = '';
+  appendMsg(ctx, `⚙️ Writing \`${relPath}\`...\n\`\`\`\n\`\`\``);
+  const onChunk = (chunk: string) => {
+    streamAccum += chunk;
+    updateLastMsg(ctx, `⚙️ Writing \`${relPath}\`...\n\`\`\`\n${streamAccum}\n\`\`\``);
+  };
+
+  const res = await Worker.executeWorkerBuild(ctx, prompt, onChunk);
   if (!res.success) {
     tracer.done(_workSid, 'fail', Date.now() - _workT0, res.error || 'AI returned no response');
     tracer.end([], 0, 0);
@@ -127,16 +91,14 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const workerTokens = Math.ceil((prompt.length + res.text.length) / 4);
   tracer.done(_workSid, 'success', Date.now() - _workT0, relPath, Math.ceil(prompt.length / 4), Math.ceil(res.text.length / 4));
   ledger.record(workerAI, spec ? 'worker' : 'solo', 'built', workerTokens);
+  // Streaming already showed the code live — clear the preview bubble before Guardian runs
+  updateLastMsg(ctx, `⚙️ \`${relPath}\` written — reviewing...`);
 
-  // Show code preview with actual worker AI name now that routedTo is known
-  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
-  const rawLines = res.text.trim().split('\n');
-  const previewLines = rawLines.slice(0, 20).join('\n') + (rawLines.length > 20 ? '\n...' : '');
-  updateLastMsg(ctx, `⚙️ ${aiLabels[workerAI] || workerAI} wrote ${rawLines.length} lines — doing a final check...\n\`\`\`\n${previewLines}\n\`\`\``);
-
-  let code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
+  let code = Inf.extractCodeFromResponse(res.text);
   const _grdT0 = Date.now(); const _grdSid = tracer.step('GUARDIAN', undefined, relPath);
-  code = await Review.runGuardianReview(ctx, code, relPath, spec);
+  const reviewResult = await Review.runGuardianReview(ctx, code, relPath, spec);
+  code = reviewResult.code;
+  const qualityScore = reviewResult.qualityScore;
   code = await Review.runStaticValidation(code, relPath);
   if (['.ts', '.tsx', '.js'].some(e => relPath.endsWith(e))) code = await Review.runImportValidation(ctx, code, absPath, root);
   tracer.done(_grdSid, 'success', Date.now() - _grdT0, 'review complete');
@@ -144,7 +106,13 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
 
   const snapshotId = Writer.createSnapshot(root, task, relPath);
   const { narration, cleanCode } = extractNarrator(code);
-  Writer.writeBuiltFile(absPath, cleanCode);
+  const _oldContent = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
+  Writer.writeBuiltFile(absPath, cleanCode, { root, task });
+  const _diff = existingTarget && !isCrossLang ? diffSummary(_oldContent, cleanCode) : '';
+
+  // [FIX] Check imports in the newly written file and report missing dependencies
+  const importCheck = checkImports(root, absPath, cleanCode);
+  const importWarning = formatMissingImports(importCheck, relPath);
 
   // Auto-scaffold package.json + tsconfig.json for TypeScript Node.js projects
   const scaffoldedFiles: string[] = [];
@@ -157,33 +125,38 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const totalTokens = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.tokens, 0) : 0;
   const totalCost = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.costUSD, 0) : 0;
   // [FIX] Record supervisor and worker tokens separately so usage shows correct per-AI breakdown.
-  // Previously recorded total to workerAI only — supervisor tokens were invisible in usage report.
+  const _proj = path.basename(root);
   if (spec && workerAI !== supervisorAI) {
     const supCost = (_supTok / 1_000_000) * 0.30;
-    ctx.usageTracker?.recordUsage(_supTok, supCost, supervisorAI);
+    ctx.usageTracker?.recordUsage(_supTok, supCost, supervisorAI, undefined, undefined, 'supervisor', _proj);
     const workerCost = (workerTokens / 1_000_000) * 0.30;
-    ctx.usageTracker?.recordUsage(workerTokens, workerCost, workerAI);
+    ctx.usageTracker?.recordUsage(workerTokens, workerCost, workerAI, res.inputTokens, res.outputTokens, 'worker', _proj);
   } else {
-    ctx.usageTracker?.recordUsage(totalTokens, totalCost, workerAI);
+    ctx.usageTracker?.recordUsage(totalTokens, totalCost, workerAI, res.inputTokens, res.outputTokens, 'solo', _proj);
   }
 
   const elapsed = (Date.now() - buildStart) / 1000;
-  const resultCard = buildResultCard([relPath, ...scaffoldedFiles], searchResult.items.length, totalTokens, totalCost, elapsed, snapshotId, 0, !!existingTarget, ledgerSummary);
+  const resultCard = buildResultCard([relPath, ...scaffoldedFiles], searchResult.items.length, totalTokens, totalCost, elapsed, snapshotId, 0, !!existingTarget, ledgerSummary) + (_diff ? `\n_Changes: ${_diff}_` : '');
+
+  // [FIX] Record to build history so single-file builds appear in the Build History panel
+  new BuildHistoryService(root).record(makeBuildHistoryEntry({ snapshotId: snapshotId || Date.now().toString(), task, files: [relPath, ...scaffoldedFiles], tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: supervisorAI, worker: workerAI !== supervisorAI ? workerAI : null, resultCardToken: resultCard }));
+
   const previewToken = relPath.endsWith('.html') ? `\n__PREVIEW_BROWSER__${absPath}|||END_PREVIEW_BROWSER__` : '';
   const nextSteps = buildPostBuildGuidance(root, [relPath, ...scaffoldedFiles]);
-  appendMsg(ctx, `${narration ? '&#x1F4DD; ' + narration + '\n\n' : ''}${resultCard}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${previewToken}${nextSteps}`);
+  // [FIX] Include import validation warning in build result message
+  appendMsg(ctx, `${narration ? '&#x1F4DD; ' + narration + '\n\n' : ''}${resultCard}${importWarning}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${previewToken}${nextSteps}${(require('./chatPanelBuildPipeline.js') as any).appendCompileAction(relPath)}`);
 
-  tracer.vault('save', `${relPath} → vault`);
+  tracer.vault('save', `${relPath} -> vault`);
   tracer.end([relPath, ...scaffoldedFiles], totalTokens, totalCost);
   Writer.captureToVault(ctx, absPath, relPath);
   Writer.openBuiltFile(absPath);
-  writeProjectRoadmapEntry(root, `AI build: ${task.slice(0, 60)}`, [
-    ...[relPath, ...scaffoldedFiles].map(f => `Built \`${f}\``),
-    `AI: ${workerAI}  Tokens: ~${totalTokens}  Cost: $${totalCost.toFixed(4)}`,
-  ]);
+  await (require('./chatPanelBuildPipeline.js') as any).maybeAutoCompile(ctx, task, relPath, absPath).catch(() => {});
+  if (!ctx.assistMode) { writeProjectRoadmapEntry(root, `AI build: ${task.slice(0, 60)}`, [relPath,...scaffoldedFiles].map(f=>`Built \`${f}\``).concat([`AI: ${workerAI} Tokens: ~${totalTokens} Cost: $${totalCost.toFixed(4)}`])); }
   ctx.onBuildFinished?.(task, [relPath]);
-  await autoCommitIfEnabled(root, `CHASSIS added: ${task.slice(0, 80)}`, [relPath, ...scaffoldedFiles]);
+  if (!ctx.assistMode) { await autoCommitIfEnabled(root, `CHASSIS added: ${task.slice(0, 80)}`, [relPath,...scaffoldedFiles]); }
   refreshSetupProgressIfOpen().catch(() => {});
+  await runCompileAutoFix(ctx, [relPath, ...scaffoldedFiles]).catch(() => {});
+  await runTestAutoFix(ctx, [relPath, ...scaffoldedFiles]).catch(() => {});
 }
 
 export { runChunkedBuild } from './chatPanelChunked.js';

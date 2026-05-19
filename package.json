@@ -4,6 +4,11 @@
   "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
   "version": "0.3.6",
   "publisher": "papajoe",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/smithkjnc-ux/CHASSIS.git"
+  },
   "icon": "resources/chassis-icon-128.png",
   "engines": {
     "vscode": "^1.110.0"
@@ -251,6 +256,14 @@
       {
         "command": "chassis.viewTimeline",
         "title": "CHASSIS: View Project Timeline"
+      },
+      {
+        "command": "chassis.showBuildHistory",
+        "title": "CHASSIS: Show Build History"
+      },
+      {
+        "command": "chassis.runProject",
+        "title": "CHASSIS: Run Project"
       },
       {
         "command": "chassis.savePoint",
@@ -539,6 +552,7 @@
   "scripts": {
     "vscode:prepublish": "tsc -p ./",
     "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && node scripts/postcompile.js",
+    "package": "npm run compile && vsce package --no-dependencies",
     "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",

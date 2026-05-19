@@ -66,7 +66,7 @@ export async function handleOpenFile(msg: any): Promise<void> {
   const filePath = decodePath(msg.path) || msg.filePath;
   if (filePath && fs.existsSync(filePath)) {
     const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
-    await vscode.window.showTextDocument(doc, { preview: false });
+    await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true });
   }
 }
 

@@ -24,6 +24,32 @@ if (fs.existsSync(roadmapPath)) {
   }
 }
 
+// Line-count enforcer — warn on any src/*.ts file over 200 lines (CLAUDE.md Rule 9)
+const srcDir = path.join(workspaceRoot, 'src');
+if (fs.existsSync(srcDir)) {
+  const walkTs = (dir) => {
+    let results = [];
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory() && entry.name !== 'node_modules') { results = results.concat(walkTs(full)); }
+      else if (entry.isFile() && entry.name.endsWith('.ts')) { results.push(full); }
+    }
+    return results;
+  };
+  const overLimit = walkTs(srcDir).filter(f => {
+    try {
+      const lines = fs.readFileSync(f, 'utf-8').split('\n');
+      const count = lines[lines.length - 1] === '' ? lines.length - 1 : lines.length;
+      return count > 200;
+    } catch { return false; }
+  });
+  for (const f of overLimit) {
+    const rel = path.relative(workspaceRoot, f);
+    const lines = fs.readFileSync(f, 'utf-8').split('\n').length;
+    console.warn(`[CHASSIS RULE 9] ${rel} is ${lines} lines -- split required before editing`);
+  }
+}
+
 // Write build timestamp for visual verification
 const buildTimestamp = new Date().toISOString();
 const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');

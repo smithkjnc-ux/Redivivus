@@ -24,6 +24,7 @@ interface ChatPanelState {
   blueprintContext: string;
   lastModel?: string; // Track exact model from last AI response
   buildMode?: 'plan' | 'direct';
+  assistMode?: boolean; // When true: no CHASSIS tags, roadmap, or auto-commit injected
   planInterview?: import('./chatPanelPlanInterview.js').PlanInterviewState;
 }
 
@@ -71,6 +72,8 @@ export class ChatPanel {
     this._panel.webview.options = { enableScripts: true };
     this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('./chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
     this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
+    // [CHASSIS] Rebuild full HTML when workspace folder changes (e.g. user opens a non-CHASSIS project)
+    this._disposables.push(vscode.workspace.onDidChangeWorkspaceFolders(() => { this._initialized = false; this.refresh(); }));
     // [CHASSIS] Hot-reload roster when API key settings change
     this._disposables.push(vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration('chassis.geminiApiKey') ||

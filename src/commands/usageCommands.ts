@@ -12,13 +12,20 @@ export function registerUsageCommands(context: vscode.ExtensionContext, usageTra
     vscode.commands.registerCommand('chassis.viewUsage', async () => {
       const report = usageTracker.getReport();
       const roster = routing?.getRosterDisplay?.();
+      const history = usageTracker.getHistory();
       const panel = vscode.window.createWebviewPanel(
         'chassisUsage',
         'CHASSIS Usage Report',
         vscode.ViewColumn.One,
         { enableScripts: true }
       );
-      panel.webview.html = getUsageHtml(report, roster);
+      panel.webview.html = getUsageHtml(report, roster, history);
+      panel.webview.onDidReceiveMessage(async (msg) => {
+        if (msg.type === 'reset') {
+          const map: Record<string, Parameters<typeof usageTracker.reset>[0]> = { session: 'session', day: 'day', week: 'week', month: 'month', all: 'all-resettable' };
+          if (map[msg.period]) { await usageTracker.reset(map[msg.period]); panel.webview.html = getUsageHtml(usageTracker.getReport(), roster, usageTracker.getHistory()); }
+        }
+      });
     })
   );
 

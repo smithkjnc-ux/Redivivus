@@ -10,6 +10,7 @@ export interface QualityVerdict {
   useCase: string;       // 1-sentence "when you'd use this"
   qualityScore: number;  // 1-5
   reason: string;        // Why this verdict
+  tags: string[];        // 3-6 searchable keywords for retrieval
 }
 
 /** Default verdict when AI is unavailable — uses heuristic fallback */
@@ -18,12 +19,15 @@ function heuristicVerdict(name: string, code: string): QualityVerdict {
   const hasLogic = /\b(if|else|for|while|switch|try|catch|async|await|map|filter|reduce)\b/.test(code);
   const hasParams = /\(.*\w+.*\)/.test(code.split('\n')[0] || '');
   const score = Math.min(5, 1 + (hasLogic ? 1 : 0) + (hasParams ? 1 : 0) + (lines > 10 ? 1 : 0) + (lines > 20 ? 1 : 0));
+  // Derive basic tags from the function name (camelCase split)
+  const nameTags = name.replace(/([A-Z])/g,' $1').toLowerCase().trim().split(/\s+/).filter(w => w.length >= 3);
   return {
     reusable: score >= 3,
     description: `Function "${name}" (${lines} lines)`,
     useCase: hasLogic ? 'When you need similar logic' : 'Basic utility',
     qualityScore: score,
     reason: 'Heuristic evaluation (AI unavailable)',
+    tags: nameTags.slice(0, 5),
   };
 }
 
@@ -44,8 +48,12 @@ Evaluate and respond with ONLY valid JSON (no markdown, no explanation):
   "description": "one sentence: what this code does",
   "useCase": "one sentence: when you would use this",
   "qualityScore": 1-5,
-  "reason": "one sentence: why this score"
+  "reason": "one sentence: why this score",
+  "tags": ["keyword1", "keyword2", "keyword3"]
 }
+
+TAGS: 3-6 lowercase keywords that describe what this code does and what domain it belongs to.
+Example: ["audio", "playback", "sound", "html5"] or ["validation", "email", "form", "regex"]
 
 SCORING GUIDE:
 1 = Trivial (getters, setters, single returns) — NOT worth saving
@@ -73,12 +81,14 @@ export async function evaluateQuality(
     const clean = res.text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
     const parsed = JSON.parse(clean);
 
+    const aiTags = Array.isArray(parsed.tags) ? parsed.tags.map((t: any) => String(t).toLowerCase().trim()).filter((t: string) => t.length >= 3).slice(0, 6) : [];
     return {
       reusable: Boolean(parsed.reusable),
       description: String(parsed.description || '').slice(0, 200),
       useCase: String(parsed.useCase || '').slice(0, 200),
       qualityScore: Math.max(1, Math.min(5, Number(parsed.qualityScore) || 1)),
       reason: String(parsed.reason || '').slice(0, 200),
+      tags: aiTags,
     };
   } catch {
     // AI parse failed — fall back to heuristic

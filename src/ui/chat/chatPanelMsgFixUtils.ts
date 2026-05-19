@@ -11,6 +11,9 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
+import { SnapshotService } from '../../services/snapshotService.js';
+import { listSourceFiles } from '../../services/workspace/codebaseSearch.js';
+import { buildGitContextBlock } from '../../services/workspace/gitContext.js';
 
 /** Maps raw model ID strings to friendly display names for chat messages. */
 export function modelLabel(model: string): string {
@@ -24,10 +27,6 @@ export function modelLabel(model: string): string {
   return model || 'AI';
 }
 
-const SOURCE_EXTS = new Set(['.html', '.js', '.ts', '.jsx', '.tsx', '.py', '.css', '.sh']);
-const SKIP_DIRS = new Set(['node_modules', '.git', 'out', 'dist', '.chassis', '__pycache__', '.venv']);
-const MAX_FILES = 10;
-const MAX_FILE_BYTES = 20_000;
 
 /** Parse Worker fix blocks. Only returns fixes whose paths are in allowedRels.
  *  Phantom files (paths not in the original source list) are collected in skipped[]. */
@@ -57,38 +56,27 @@ export function parseFixResponse(
   return { fixes, skipped };
 }
 
-export function takeSnapshot(root: string, relPaths: string[]): void {
-  try {
-    const snapDir = path.join(root, '.chassis', 'fix-snapshots', `fix-${Date.now()}`);
-    fs.mkdirSync(snapDir, { recursive: true });
-    for (const rel of relPaths) {
-      const src = path.join(root, rel);
-      if (fs.existsSync(src)) { fs.copyFileSync(src, path.join(snapDir, rel.replace(/\//g, '__'))); }
-    }
-  } catch { /* best-effort */ }
+/** Snapshot files before an AI fix. Uses SnapshotService so Build History panel can undo fixes. Returns snapshot ID. */
+export function takeSnapshot(root: string, relPaths: string[], task?: string): string {
+  try { return new SnapshotService(root).prepare(task ? `[FIX] ${task.slice(0, 80)}` : 'fix', relPaths); } catch { return ''; }
 }
 
-export function collectSourceFiles(root: string): { rel: string; content: string }[] {
-  const results: { rel: string; content: string }[] = [];
-  function walk(dir: string, depth: number): void {
-    if (results.length >= MAX_FILES || depth > 4) { return; }
-    let entries: string[];
-    try { entries = fs.readdirSync(dir).sort(); } catch { return; }
-    for (const entry of entries) {
-      if (SKIP_DIRS.has(entry)) { continue; }
-      const full = path.join(dir, entry); const rel = path.relative(root, full);
-      let stat: fs.Stats; try { stat = fs.statSync(full); } catch { continue; }
-      if (stat.isDirectory()) { walk(full, depth + 1); continue; }
-      if (!SOURCE_EXTS.has(path.extname(entry).toLowerCase())) { continue; }
-      try {
-        let c = fs.readFileSync(full, 'utf-8');
-        if (c.length > MAX_FILE_BYTES) { c = c.slice(0, MAX_FILE_BYTES) + '\n// ...'; }
-        results.push({ rel, content: c });
-      } catch { continue; }
-      if (results.length >= MAX_FILES) { return; }
-    }
-  }
-  walk(root, 0); return results;
+// [FIX] Smart file selection: when userText is provided, send only files relevant to the bug
+// rather than all 50 source files. Mentioned files + their importers come first; others fill to 12.
+// When no userText or project is tiny (<= 15 files), returns all files as before.
+export function collectSourceFiles(root: string, userText?: string): { rel: string; content: string }[] {
+  const all = listSourceFiles(root, true, 50)
+    .filter(f => f.content)
+    .map(f => ({ rel: f.rel, content: f.content! }));
+  if (!userText || all.length <= 15) { return all; }
+  const textLower = userText.toLowerCase();
+  const mentioned = all.filter(f => textLower.includes(path.basename(f.rel).toLowerCase()));
+  const mentionedSet = new Set(mentioned.map(f => f.rel));
+  const importers = all.filter(f => !mentionedSet.has(f.rel) && mentioned.some(m => f.content.includes(path.basename(m.rel, path.extname(m.rel)))));
+  const selected = [...mentioned, ...importers];
+  if (selected.length >= 12) { return selected.slice(0, 12); }
+  const rest = all.filter(f => !mentionedSet.has(f.rel) && !importers.some(i => i.rel === f.rel)).sort((a, b) => a.content.length - b.content.length);
+  return [...selected, ...rest].slice(0, 12);
 }
 
 const DEAD_ENDS_PATH = (root: string) => path.join(root, '.chassis', 'dead_ends.md');
@@ -147,10 +135,12 @@ export function getRecentBuildContext(root: string, sourceFiles: { rel: string }
       lines.push(`- ${touched.join(', ')} -- last written by build: "${entry.task.slice(0, 80)}" (${ageStr}, AI: ${aiStr})`);
     }
     if (lines.length === 0) { return ''; }
-    return `CAUSATION-FIRST (Rule 17): These source files were recently written by CHASSIS builds.\n` +
+    const buildCtx = `CAUSATION-FIRST (Rule 17): These source files were recently written by CHASSIS builds.\n` +
       `Check whether the bug was INTRODUCED by a build before assuming it is a pre-existing issue.\n` +
       `If the reported symptom appeared AFTER a build, that build is the most likely cause.\n` +
       lines.join('\n');
+    const gitCtx = buildGitContextBlock(root);
+    return [buildCtx, gitCtx].filter(Boolean).join('\n\n');
   } catch { return ''; }
 }
 
@@ -179,6 +169,21 @@ export function writeProjectRoadmapEntry(root: string, heading: string, bullets:
     );
     fs.writeFileSync(roadmapPath, finalText, 'utf-8');
   } catch { /* best-effort -- never block a build */ }
+}
+
+/**
+ * Fix #5 — Multi-turn build continuity.
+ * Returns a brief summary of the last 3 builds so the AI knows what already exists
+ * and can extend the project rather than recreating it from scratch.
+ */
+export function getRecentBuildsContext(root: string): string {
+  try {
+    const svc = new BuildHistoryService(root);
+    const recent = svc.list().filter(e => !e.undone).slice(0, 3);
+    if (recent.length === 0) { return ''; }
+    const lines = recent.map(e => `- "${e.task.slice(0, 80)}" -> ${(e.files || []).slice(0, 3).join(', ')}`);
+    return `RECENTLY BUILT (already in this project -- build on top of these, do not recreate):\n${lines.join('\n')}`;
+  } catch { return ''; }
 }
 
 /** Appends a dead-end entry to the project's .chassis/dead_ends.md. Best-effort. */

@@ -4,6 +4,7 @@
 import { BuildContext } from './chatPanelBuild.js';
 import { tracer } from '../../services/pipelineTracer.js';
 import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules.js';
+import { streamProvider } from '../../services/ai/streamingProviders.js';
 
 // AI display names for user messages
 const AI_LABELS: Record<string, string> = {
@@ -15,11 +16,23 @@ const AI_LABELS: Record<string, string> = {
   kimi: 'Kimi'
 };
 
-export async function executeWorkerBuild(ctx: BuildContext, prompt: string): Promise<{ success: boolean; text: string; error?: string; routedTo?: string }> {
+export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onChunk?: (chunk: string) => void): Promise<{ success: boolean; text: string; error?: string; routedTo?: string; inputTokens?: number; outputTokens?: number; streamed?: boolean }> {
+  // Try real streaming first when the caller wants live chunks
+  if (onChunk) {
+    const { worker } = ctx.routing.selectSupervisorAndWorker();
+    const ai = worker || ctx.routing.getAvailableAI().ai;
+    const streamRes = await streamProvider(ai, prompt, onChunk, 300_000);
+    if (streamRes.success && streamRes.text) {
+      return { success: true, text: streamRes.text, routedTo: ai, streamed: true };
+    }
+    // Streaming failed — fall through to non-streaming with a single onChunk call at the end
+  }
+
   try {
-    // First attempt with primary AI
+    // Non-streaming path (also the fallback when streaming fails)
     let res = await ctx.routing.routeByComplexity(ctx.task, prompt);
-    
+    if (onChunk && res.success && res.text) { onChunk(res.text); }
+
     // If failed due to timeout, try fallback AIs with user notification
     if (!res.success && res.error?.toLowerCase().includes('time')) {
       const routing = ctx.routing as any;
@@ -27,12 +40,12 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string): Pro
       const availableAIs = Object.entries(keyMap)
         .filter(([_, getKey]) => typeof getKey === 'function' && getKey())
         .map(([ai]) => ai);
-      
+
       const failedAI = res.routedTo || 'primary AI';
-      
+
       for (const fallbackAI of availableAIs) {
         if (fallbackAI === failedAI) continue;
-        
+
         tracer.failover(failedAI, fallbackAI, 'timed out');
         // Notify user of failover
         ctx.conversation.push({
@@ -41,25 +54,25 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string): Pro
           timestamp: Date.now()
         });
         ctx.refresh();
-        
+
         // Try fallback
         const { callProvider } = await import('../../services/ai/routingProviders.js');
         const f = (url: string, opts: RequestInit) => routing.fetchWithTimeout(url, opts, 120_000);
         const fallbackRes = await callProvider(fallbackAI, prompt, f);
-        
+
         if (fallbackRes.success) {
           return { ...fallbackRes, routedTo: fallbackAI };
         }
       }
     }
-    
-    return res;
+
+    return { ...res, inputTokens: res.inputTokens, outputTokens: res.outputTokens };
   } catch (err) {
     return { success: false, text: '', error: err instanceof Error ? err.message : String(err) };
   }
 }
 
-export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifying: boolean, existingContent: string, supervisorSpec: string | null, vaultSummary: string): string {
+export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifying: boolean, existingContent: string, supervisorSpec: string | null, vaultSummary: string, sourceRef?: string): string {
   const { task, blueprintContext } = ctx;
   const isHtml = relPath.endsWith('.html');
   const role = supervisorSpec ? 'CHASSIS Worker AI. Implementation only.' : 'CHASSIS AI. Generate complete code.';
@@ -72,5 +85,11 @@ export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifyin
     ? '- SURGICAL EDIT. Output COMPLETE file including all existing code plus your changes.\n- DO NOT OMIT ANYTHING.'
     : '- Creating NEW file.';
 
-  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\nVAULT:\n${vaultSummary}\n\n${isModifying ? 'EXISTING CONTENT:\\n' + existingContent : ''}\n\nRULES:\n${rules}\n${modRules}\n\n${CHASSIS_WORKER_RULES}\n\nReturn ONLY the code.`;
+  const vaultBlock = vaultSummary
+    ? `VAULT CODE (already written and tested — strict rules apply):\n- If a vault item solves part of the task: COPY IT into your output as-is. Mark it with // [FROM VAULT: name].\n- DO NOT rewrite or duplicate vault code. Do not create a parallel version.\n- Only write NEW code for parts NOT covered by vault items.\n${vaultSummary}`
+    : '';
+  const chassisRules = ctx.assistMode ? '' : `\n\n${CHASSIS_WORKER_RULES}`;
+  const ext = relPath.split('.').pop()?.toUpperCase() || 'code';
+  const sourceBlock = sourceRef ? `\nSOURCE REFERENCE (existing implementation in a different language -- use this as a guide for game logic, physics, and behavior, but rewrite as native ${ext}):\n${sourceRef}` : '';
+  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${vaultBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${chassisRules}\n\nReturn ONLY the code.`;
 }

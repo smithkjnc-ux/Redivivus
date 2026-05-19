@@ -11,7 +11,7 @@ export function buildSetupProgressHtml(progress: SetupProgress): string {
       ? step.subItems.map(item => `<div class="sub-item">${item}</div>`).join('')
       : '';
     const actionHtml = step.action
-      ? `<button class="action-btn" data-action="${step.id}">${step.action}</button>`
+      ? `<div class="action-row"><button class="action-btn" data-action="${step.id}">${step.action}</button><button class="mark-done-btn" data-step="${step.id}" title="Mark as manually completed">&#x2713; Mark Done</button></div>`
       : '';
     return `<div class="step-row ${statusClass}"><div class="step-icon">${icon}</div><div class="step-content"><div class="step-title">${step.id}. ${step.title}</div>${subItemsHtml}${actionHtml}</div></div>`;
   }).join('');
@@ -42,8 +42,11 @@ export function buildSetupProgressHtml(progress: SetupProgress): string {
   .step-content { flex: 1; }
   .step-title { font-size: 13px; font-weight: 500; margin-bottom: 4px; }
   .sub-item { font-size: 11px; color: var(--vscode-descriptionForeground); padding: 2px 0 2px 16px; }
-  .action-btn { margin-top: 8px; cursor: pointer; border: 1px solid rgba(59,157,255,0.4); background: rgba(59,157,255,0.08); color: var(--vscode-textLink-foreground); border-radius: 4px; padding: 4px 12px; font-size: 11px; font-family: inherit; transition: background 0.15s; }
+  .action-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
+  .action-btn { cursor: pointer; border: 1px solid rgba(59,157,255,0.4); background: rgba(59,157,255,0.08); color: var(--vscode-textLink-foreground); border-radius: 4px; padding: 4px 12px; font-size: 11px; font-family: inherit; transition: background 0.15s; }
   .action-btn:hover { background: rgba(59,157,255,0.18); }
+  .mark-done-btn { cursor: pointer; border: 1px solid rgba(78,201,89,0.4); background: rgba(78,201,89,0.08); color: #4ec959; border-radius: 4px; padding: 4px 10px; font-size: 11px; font-family: inherit; transition: background 0.15s; }
+  .mark-done-btn:hover { background: rgba(78,201,89,0.2); }
   .celebration { text-align: center; font-size: 16px; font-weight: 600; color: #4ec959; padding: 20px; background: rgba(78,201,89,0.1); border: 1px solid rgba(78,201,89,0.3); border-radius: 8px; margin-top: 24px; }
 </style></head><body>
 <h1>${progress.projectName}</h1>
@@ -70,6 +73,15 @@ ${celebration}
       btn.textContent = SPIN + ' Running...';
       try { vscode.postMessage({ type: 'runAction', actionId: actionId }); }
       catch(e) { btn.classList.remove('working'); btn.textContent = CROSS + ' Failed'; }
+    });
+  });
+  document.querySelectorAll('.mark-done-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var stepId = btn.getAttribute('data-step');
+      btn.textContent = CHECK + ' Saving...';
+      btn.disabled = true;
+      try { vscode.postMessage({ type: 'markStepDone', stepId: stepId }); }
+      catch(e) { btn.disabled = false; btn.textContent = CROSS + ' Failed'; }
     });
   });
   window.addEventListener('message', function(e) {

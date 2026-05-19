@@ -22,6 +22,7 @@ export interface BuildHistoryEntry {
   worker: string | null;         // e.g. 'kimi' or null
   resultCardToken: string;       // raw buildResultCard() output — used to restore chat cards
   undone?: boolean;              // set true after undo
+  qualityScore?: number;         // 1-5 quality rating from Guardian review
 }
 
 export class BuildHistoryService {
@@ -83,6 +84,7 @@ export function makeBuildHistoryEntry(opts: {
   supervisor: string;
   worker: string | null;
   resultCardToken: string;
+  qualityScore?: number;
 }): BuildHistoryEntry {
   return {
     id: opts.snapshotId,
@@ -95,5 +97,6 @@ export function makeBuildHistoryEntry(opts: {
     supervisor: opts.supervisor,
     worker: opts.worker,
     resultCardToken: opts.resultCardToken,
+    qualityScore: opts.qualityScore ?? 3, // [FIX] Default quality score for vault dedup logic
   };
 }

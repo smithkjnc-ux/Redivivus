@@ -6,6 +6,7 @@ import { ChassisService } from '../../services/chassisService.js';
 import { RoutingService } from '../../services/ai/routingService.js';
 import { UsageTracker } from '../../services/usageTracker.js';
 import { ChatHeaderInfo } from './chatPanelHtml.js';
+import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
 
 export function buildHeaderInfo(
   chassis: ChassisService,
@@ -14,6 +15,7 @@ export function buildHeaderInfo(
   lastModel?: string,
   extensionContext?: vscode.ExtensionContext,
   buildMode?: 'plan' | 'direct',
+  assistMode?: boolean,
 ): ChatHeaderInfo {
   const available = routing.getAvailableAI();
   const config = chassis.isInitialized() ? chassis.loadConfig() : null;
@@ -24,12 +26,15 @@ export function buildHeaderInfo(
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const hasProjectOpen = !!vscode.workspace.workspaceFolders?.length && isInitialized;
+  const workspaceFolderIsOpen = !!vscode.workspace.workspaceFolders?.length;
+  const hasProjectOpen = workspaceFolderIsOpen && isInitialized;
 
-  // Check if current workspace has a .chassis/ folder
+  // Check if current workspace has a .chassis/ folder or .chassis-assist shim
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const fs = require('fs');
   const workspaceHasChassis = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.chassis')) : false;
+  // [FIX] Check .chassis-assist regardless of whether .chassis/ exists — .chassis/ now exists in both modes
+  const workspaceIsAssistMode = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.chassis-assist')) : false;
 
   // Get recent projects from globalState
   const recentProjects: Array<{ path: string; name: string }> = [];
@@ -68,6 +73,17 @@ export function buildHeaderInfo(
     && !workspaceHasChassis 
     && recentProjects.length > 0;
 
+  // Project-level token totals — sums all build history entries for the current workspace
+  let projectTokens: { tokens: number; cost: number } | undefined;
+  if (workspaceRoot) {
+    try {
+      const hist = new BuildHistoryService(workspaceRoot).list();
+      const tokens = hist.reduce((s, e) => s + (e.tokensUsed || 0), 0);
+      const cost = hist.reduce((s, e) => s + (e.costUSD || 0), 0);
+      if (tokens > 0) { projectTokens = { tokens, cost }; }
+    } catch {}
+  }
+
   return {
     projectName, aiName, aiLabel: displayModel,
     isFallback: hasKey && available.ai !== selectedAI,
@@ -77,11 +93,15 @@ export function buildHeaderInfo(
     lastModel,
     hasProjectOpen,
     workspaceHasChassis,
+    workspaceFolderIsOpen,
+    workspaceIsAssistMode,
+    assistMode,
     recentProjects,
     shouldAutoOpenLastProject,
     blueprintStatus,
     rosterDisplay,
     buildMode,
+    projectTokens,
   };
 }
 

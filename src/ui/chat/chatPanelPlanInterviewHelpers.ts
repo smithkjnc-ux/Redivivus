@@ -1,14 +1,29 @@
 // [SCOPE] Plan Mode Interview helpers — follow-up generation, summary, task building, blueprint save
 // Imported by chatPanelPlanInterview.ts. Not exported directly by the extension.
 
-/** Generates follow-up questions when 5W answers are too vague. */
-export function generateFollowups(answers: Record<string, string>): string[] {
+/** Generates follow-up questions when 5W answers are too vague.
+ * [RULE 18] Uses AI to check if game type / project specifics are already clear — no regex guessing. */
+export async function generateFollowups(answers: Record<string, string>, routing?: any): Promise<string[]> {
   const followups: string[] = [];
   const what = answers.what?.toLowerCase() || '';
 
-  if (/\b(game|gaming)\b/.test(what) && what.length < 50) {
-    followups.push("You mentioned a game -- what kind? Puzzle, RPG, action, strategy, platformer, idle?");
-    followups.push("Single player or multiplayer?");
+  // [RULE 18] AI decides if the game type is already implicit in the description.
+  // Regex cannot reliably tell "flappy bird game" (type=known) from "a game" (type=vague).
+  if (/\b(game|gaming)\b/.test(what) && what.length < 60) {
+    let gameTypeNeeded = true;
+    if (routing) {
+      try {
+        const r = await routing.prompt(
+          `The user wants to build: "${answers.what?.slice(0, 120)}"\nIs the specific game type (genre, mechanics, or well-known game name) already clear from this description? Reply with one word: yes or no`,
+          8_000
+        );
+        if (r.success && r.text?.trim().toLowerCase().startsWith('yes')) { gameTypeNeeded = false; }
+      } catch { /* keep default */ }
+    }
+    if (gameTypeNeeded) {
+      followups.push("You mentioned a game -- what kind? Puzzle, RPG, action, strategy, platformer, idle?");
+      followups.push("Single player or multiplayer?");
+    }
   }
 
   if ((/\b(app|application|website|site|tool|program)\b/.test(what) && what.length < 50) || what.length < 25) {
@@ -64,6 +79,37 @@ export function buildTaskFromAnswers(
   if (answers.when) { task += `. Timeline: ${answers.when}`; }
   if (answers.why)  { task += `. Purpose: ${answers.why}`; }
   return task;
+}
+
+/**
+ * [RULE 18] Uses AI to infer obvious W answers from the "what" description.
+ * Returns only fields the AI is confident about — empty string fields are omitted.
+ * Caller pre-fills interview.answers and skips those questions.
+ */
+export async function inferRemainingWs(what: string, routing: any): Promise<Record<string, string>> {
+  const prompt = `The user wants to build: "${what.slice(0, 200)}"
+
+Based on this description, fill in what you can CONFIDENTLY infer. Reply with JSON only:
+{
+  "who": "who will use it (e.g. 'myself', 'a team', 'customers') — or empty string if genuinely unclear",
+  "where": "where it runs (e.g. 'web browser', 'desktop app', 'mobile', 'command line') — or empty string if unclear",
+  "when": "timeline — almost always empty string unless the user explicitly stated a deadline",
+  "why": "purpose or goal (e.g. 'for fun and learning', 'to automate a task') — or empty string if unclear"
+}
+Only fill fields that are OBVIOUS from context. Leave empty string for anything that requires the user to clarify.`;
+  try {
+    const result = await routing.prompt(prompt, 10_000);
+    if (!result?.success || !result.text) { return {}; }
+    const clean = result.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(clean);
+    const out: Record<string, string> = {};
+    for (const key of ['who', 'where', 'when', 'why']) {
+      if (parsed[key] && typeof parsed[key] === 'string' && parsed[key].trim()) {
+        out[key] = parsed[key].trim();
+      }
+    }
+    return out;
+  } catch { return {}; }
 }
 
 /** Saves the 5W answers into the project config blueprint. */

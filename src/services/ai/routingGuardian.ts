@@ -126,9 +126,11 @@ export async function guardianReviewImpl(
   const keyMap = svc.getKeyMap();
   const guardianAI = selectGuardianAI(workerAI, keyMap);
   if (!guardianAI) {
-    return { passed: true, correctedText: null, issues: [], guardianAI: 'none', workerAI };
+    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
   }
   const fetch = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, 20_000);
-  const caller = (ai: string, prompt: string) => callProvider(ai, prompt, fetch, 'pro');
+  // [FIX] Guardian uses default (flash/haiku) tier — scope review needs accuracy not Sonnet reasoning
+  // [DEAD] Was: callProvider(..., 'pro') → every guardian pass cost Sonnet rates ($3/$15 per 1M)
+  const caller = (ai: string, prompt: string) => callProvider(ai, prompt, fetch);
   return runGuardianReview(originalTask, workerResponse, workerAI, guardianAI, blueprintContext, caller);
 }

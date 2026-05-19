@@ -1,8 +1,8 @@
-import * as vscode from 'vscode';
-import { UsageTracker, UsageEntry, UsagePeriod, UsagePeriodWithBreakdown, AIBreakdown, UsageReport, STORAGE_KEY, SESSION_START_KEY } from './usageTracker.js';
-
 // [SCOPE] CHASSIS Usage Tracker — report generation and reset helpers.
 // Extracted from usageTracker.ts to keep source files under 200 lines.
+
+import * as vscode from 'vscode';
+import { UsageTracker, UsageEntry, UsagePeriod, UsagePeriodWithBreakdown, AIBreakdown, UsageReport, STORAGE_KEY, SESSION_START_KEY } from './usageTracker.js';
 
   export function buildUsageReport(tracker: UsageTracker): UsageReport {
     const now = Date.now();

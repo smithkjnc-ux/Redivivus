@@ -108,7 +108,7 @@ export class RoutingService {
   // [CHASSIS] Failover callback — set by caller to show "Gemini timed out, retrying with Kimi..." in chat
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
 
-  async prompt(text: string, timeoutMs = 60_000): Promise<AIResponse & { usingFallback?: string }> {
+  async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string): Promise<AIResponse & { usingFallback?: string }> {
     const keyMap = this.getKeyMap();
     // Build ranked list of available AIs
     const ranked = Object.entries(AI_RANK)
@@ -125,21 +125,28 @@ export class RoutingService {
     for (let i = 0; i < ranked.length; i++) {
       const ai = ranked[i];
       const fetchFn = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
-      const result = await callProvider(ai, text, fetchFn);
+      const result = await callProvider(ai, text, fetchFn, undefined, imageBase64, imageType);
 
       if (result.success) {
         return { ...result, usingFallback: i > 0 ? ai : undefined };
       }
 
-      // Check if this is a timeout/network error (retryable) vs a content error (not retryable)
+      // Check if this error should trigger failover to next AI
       const err = (result.error || '').toLowerCase();
-      const isRetryable = err.includes('timed out') || err.includes('timeout') || err.includes('abort')
+      // Network/timeout errors: always failover
+      const isNetworkError = err.includes('timed out') || err.includes('timeout') || err.includes('abort')
         || err.includes('network') || err.includes('enotfound') || err.includes('econnrefused')
         || err.includes('fetch');
+      // Capacity errors: credit exhausted, rate limits, quota — failover to next AI
+      const isCapacityError = err.includes('credit') || err.includes('balance') || err.includes('quota')
+        || err.includes('rate limit') || err.includes('rate_limit') || err.includes('429')
+        || err.includes('402') || err.includes('insufficient') || err.includes('overloaded')
+        || err.includes('capacity') || err.includes('billing');
+      const isRetryable = isNetworkError || isCapacityError;
       lastError = result.error || 'Unknown error';
 
       if (!isRetryable) {
-        // Content error (bad API key, rate limit, etc.) — don't failover, return immediately
+        // Hard error (bad API key, invalid request, etc.) — don't failover
         return result;
       }
 

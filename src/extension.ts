@@ -27,6 +27,7 @@ import { runDiagnostic } from './services/selfDiagnostic.js';
 
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
+import { resumePendingState } from './extensionResumeState.js';
 
 // [WARN] Synchronous suppress flag — set BEFORE updateWorkspaceFolders fires onDidChangeWorkspaceFolders.
 // globalState.update() is async and loses the race against the folder-change event, causing a duplicate panel.
@@ -109,18 +110,8 @@ export function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // ── resume pending task after folder reload ──
-  const pendingBuildTask = context.globalState.get<string>('chassis.pendingBuildTask');
-  if (pendingBuildTask) {
-    context.globalState.update('chassis.pendingBuildTask', undefined);
-    setTimeout(async () => {
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
-      await new Promise(r => setTimeout(r, 400));
-      if (ChatPanel.currentPanel) {
-        ChatPanel.currentPanel.showNewProject('', pendingBuildTask, /function|script|snippet|utility|helper|class|method|component|hook|module/i.test(pendingBuildTask));
-      }
-    }, 800);
-  }
+  // ── resume state after folder close/reload (build task, vault build, new project) ──
+  resumePendingState(context, [chassisService, routingService, usageTracker, vaultService]);
 
   // ── chat panel command ──
   context.subscriptions.push(

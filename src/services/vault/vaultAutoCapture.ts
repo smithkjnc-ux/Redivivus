@@ -19,12 +19,22 @@ export interface CaptureResult {
   savedNames: string[];
 }
 
-/** Derives simple tags from a build prompt (top non-stop keywords). */
-function tagsFromPrompt(prompt: string): string[] {
-  const stop = new Set(['the','and','for','with','that','this','from','make','create','build','write','add','new','get','set','use','file','code']);
-  return prompt.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/)
-    .filter(w => w.length >= 4 && !stop.has(w))
-    .slice(0, 5);
+/** Derives tags from both the build prompt AND the code content (better retrieval signal). */
+function tagsFromPromptAndCode(prompt: string, code: string): string[] {
+  const stop = new Set(['the','and','for','with','that','this','from','make','create','build','write','add','new','get','set','use','file','code','return','const','function','async','await','class','import','export','type','interface','string','number','boolean','array','object']);
+  const promptWords = prompt.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/)
+    .filter(w => w.length >= 4 && !stop.has(w)).slice(0, 4);
+  // Extract dominant identifiers from code (camelCase split, 4+ chars, appears 2+ times)
+  const codeWords: string[] = [];
+  const identifiers = code.matchAll(/\b([a-zA-Z][a-zA-Z0-9]{3,})\b/g);
+  const counts = new Map<string, number>();
+  for (const m of identifiers) {
+    const parts = m[1].replace(/([A-Z])/g,' $1').toLowerCase().trim().split(/\s+/);
+    for (const p of parts) { if (p.length >= 4 && !stop.has(p)) { counts.set(p, (counts.get(p)||0)+1); } }
+  }
+  for (const [word, count] of counts) { if (count >= 2) { codeWords.push(word); } }
+  codeWords.sort((a,b) => (counts.get(b)||0)-(counts.get(a)||0));
+  return [...new Set([...promptWords, ...codeWords.slice(0,4)])].slice(0, 7);
 }
 
 /** Extracts functions/logic from a newly written file and saves unique items to vault.
@@ -42,10 +52,13 @@ export async function autoCaptureFile(
     const content = fs.readFileSync(absPath, 'utf8');
     const { items, filteredCount } = extractFromFile(absPath, content);
     result.totalExtracted = items.length + filteredCount;
-    const promptTags = tagsFromPrompt(buildPrompt);
-
     for (const item of items) {
       if (vault.isDuplicate(item.contentHash)) {
+        result.skippedDupes++;
+        continue;
+      }
+      // [CHASSIS] Pre-filter: never save deprecated, dead-end, or stub code
+      if (/\[(WARN|DEAD)\].*deprecated|stub|placeholder|TODO.*implement|not yet implemented/i.test(item.code.slice(0, 300))) {
         result.skippedDupes++;
         continue;
       }
@@ -61,9 +74,25 @@ export async function autoCaptureFile(
       (item as any).useCase = verdict.useCase;
       (item as any).qualityScore = verdict.qualityScore;
       (item as any).reusable = verdict.reusable;
-      if (promptTags.length > 0) {
-        item.tags = [...new Set([...item.tags, ...promptTags])];
+      // [CHASSIS] Tags from AI verdict + prompt + code — all three sources for best retrieval coverage
+      const itemTags = tagsFromPromptAndCode(buildPrompt, item.code);
+      const aiTags: string[] = (verdict as any).tags || [];
+      item.tags = [...new Set([...item.tags, ...aiTags, ...itemTags])];
+
+      // [CHASSIS] Replace if better: if a semantically similar item exists with a lower quality score,
+      // remove it so the vault always keeps the best version of each concept.
+      const similar = vault.findSimilar(item.name, 0.75);
+      if (similar.length > 0) {
+        const best = similar[0];
+        const existingScore = (best as any).qualityScore ?? 3;
+        if (verdict.qualityScore > existingScore) {
+          vault.deleteItem(best.id); // Evict inferior version before saving new one
+        } else {
+          result.skippedDupes++; // Existing version is as good or better — skip
+          continue;
+        }
       }
+
       vault.saveItem(item);
       result.newItems++;
       result.savedNames.push(item.name);

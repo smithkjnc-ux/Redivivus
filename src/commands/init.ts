@@ -41,12 +41,21 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
     await context.globalState.update('pendingChassisInit', undefined);
     require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] init complete, resuming build in-place\n`);
 
+    // [FIX] Save pending task BEFORE updateWorkspaceFolders — going from 0→1 folder causes extension host restart,
+    // which kills any in-flight build. resumePendingState on the new host will pick this up and resume correctly.
+    if (pendingTask) {
+      await context.globalState.update('chassis.pendingResumeTask', JSON.stringify({ task: pendingTask, projectRoot: targetFolder }));
+    }
+
     // [FIX] Add the new folder to the workspace so the VS Code explorer shows it.
-    // This runs without reloading the window, preserving chat state.
+    // [WARN] updateWorkspaceFolders on an empty workspace causes a re-activation (window reload).
+    //        Set suppressAutoOpen BEFORE adding the folder so the second auto-open timer doesn't
+    //        create a duplicate chat panel.
     try {
       const currentFolders = vscode.workspace.workspaceFolders || [];
       const alreadyOpen = currentFolders.some(f => f.uri.fsPath === targetFolder);
       if (!alreadyOpen) {
+        await context.globalState.update('chassis.suppressAutoOpen', targetFolder);
         const added = vscode.workspace.updateWorkspaceFolders(currentFolders.length, 0, { uri: vscode.Uri.file(targetFolder), name });
         require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] workspace folder added=${added} path=${targetFolder}\n`);
       }
@@ -56,6 +65,8 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
 
     if (pendingTask && ChatPanel.currentPanel) {
       ChatPanel.currentPanel.resumeBuildTask(pendingTask, targetFolder);
+      // [FIX] Clear pending task — build started successfully, reload recovery not needed
+      context.globalState.update('chassis.pendingResumeTask', undefined);
     }
   };
 }

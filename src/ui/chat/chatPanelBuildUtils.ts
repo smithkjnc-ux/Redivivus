@@ -23,6 +23,7 @@ export function panelBuildRequestDeps(panel: ChatPanel): BuildRequestDeps {
     chassis: (panel as any).chassis,
     routing: (panel as any).routing,
     vault: (panel as any).vault,
+    usageTracker: (panel as any).usageTracker, // [FIX] was missing — build pipeline tokens were never recorded
     conversation: (panel as any).state.conversation,
     blueprintContext: (panel as any).state.blueprintContext,
     refresh: () => panel.refresh(),
@@ -43,7 +44,11 @@ export async function panelClassifyIntent(panel: ChatPanel, text: string) {
     workspacePath: workspaceRoot || 'None',
     blueprintStatus: (panel as any).chassis.isInitialized() ? 'Initialized' : 'Not Initialized'
   };
-  return classifyIntent(text, (panel as any).routing, context);
+  const ut = (panel as any).usageTracker;
+  const onUsage = ut ? (inTok: number, outTok: number, model: string) => {
+    ut.recordUsage(0, 0, model, inTok, outTok, 'solo', undefined);
+  } : undefined;
+  return classifyIntent(text, (panel as any).routing, context, onUsage);
 }
 
 export async function panelIsBuildRequest(panel: ChatPanel, text: string) {
@@ -87,9 +92,11 @@ export async function panelVaultOnlyBuild(panel: ChatPanel, task: string): Promi
   const routing = (panel as any).routing;
 
   const prompt = `Generate a complete, reusable code snippet for: "${task}"\nReturn ONLY the code. No markdown fences, no explanation.`;
-  let res: { success: boolean; text: string; error?: string };
+  let res: any;
   try {
     res = await routing.routeByComplexity(task, prompt);
+    const ut = (panel as any).usageTracker;
+    if (res && ut) { ut.recordUsage(0, 0, res.routedTo || routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'solo', undefined); }
   } catch (e) {
     res = { success: false, text: '', error: e instanceof Error ? e.message : String(e) };
   }

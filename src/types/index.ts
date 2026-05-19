@@ -60,6 +60,8 @@ export interface ChassisConfig {
   lastScan?: string;  // timestamp of last project scan
   scanResults?: ScanResults;  // results from last project scan
   savePoints?: SavePoint[];  // git save points
+  manualCompletedSteps?: number[];  // steps manually marked done by user
+  totalBuilds?: number;
 }
 
 export interface ScanResults {

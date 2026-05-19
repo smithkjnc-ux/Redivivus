@@ -62,39 +62,42 @@ export async function handleAIChat(
         const targetFormat = /\b(html|web|browser)\b/i.test(userText) ? 'HTML/JavaScript' : 'the target format';
         conversation.push({ role: 'assistant', content: `Large file detected (${totalLines} lines). Generating in ${sections.length} parts...`, timestamp: Date.now() });
         refresh();
-        finalText = await chunkedGenerate(routing, mainFile.content, sections, userText, targetFormat, (progress) => {
+        const genResult = await chunkedGenerate(routing, mainFile.content, sections, userText, targetFormat, (progress) => {
           conversation.push({ role: 'assistant', content: progress, timestamp: Date.now() });
           refresh();
         });
+        finalText = genResult.text;
         estimatedTokens = Math.ceil(finalText.length / 4);
         estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
-        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, routing.getAvailableAI().ai);
+        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, routing.getAvailableAI().ai, genResult.inputTokens || undefined, genResult.outputTokens || undefined, 'qa');
         const lang = /\b(html|web|browser)\b/i.test(userText) ? 'html' : 'js';
         finalText = '```' + lang + '\n' + finalText + '\n```';
       } else {
-        const aiResponse = await routing.prompt(prefix + userText);
+        const aiResponse = await routing.prompt(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
         if (!aiResponse.success) {
-          conversation.push({ role: 'assistant', content: `Something went wrong -- ${aiResponse.error || 'please try again.'}`, timestamp: Date.now() });
+          const errMsg = aiResponse.error || 'please try again.';
+          conversation.push({ role: 'assistant', content: `Something went wrong -- ${errMsg}`, timestamp: Date.now() });
           refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); clearPendingScopeQuestion(); return;
         }
+        lastResponseModel = aiResponse.model;
         estimatedTokens = Math.ceil(aiResponse.text.length / 4);
         estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
-        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, routing.getAvailableAI().ai);
+        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, lastResponseModel || routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
         finalText = aiResponse.text || '';
-        lastResponseModel = aiResponse.model;
       }
     } else {
       // Question / answer path
-      const aiResponse = await routing.prompt(prefix + userText);
+      const aiResponse = await routing.prompt(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
       if (!aiResponse.success) {
-        conversation.push({ role: 'assistant', content: `Something went wrong -- please try again.`, timestamp: Date.now() });
+        const errMsg = aiResponse.error || 'please try again.';
+        conversation.push({ role: 'assistant', content: `Something went wrong -- ${errMsg}`, timestamp: Date.now() });
         refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); clearPendingScopeQuestion(); return;
       }
+      lastResponseModel = aiResponse.model;
       estimatedTokens = Math.ceil(aiResponse.text.length / 4);
       estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
-      await usageTracker?.recordUsage(estimatedTokens, estimatedCost, routing.getAvailableAI().ai);
+      await usageTracker?.recordUsage(estimatedTokens, estimatedCost, lastResponseModel || routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
       finalText = aiResponse.text || '';
-      lastResponseModel = aiResponse.model;
     }
 
     // [WARN] hasCodeBlock must only match FENCED code blocks, not inline backticks.
@@ -106,8 +109,18 @@ export async function handleAIChat(
       const blueprintCtx = chassis.isInitialized() ? (chassis.loadConfig()?.blueprint ? JSON.stringify(chassis.loadConfig()!.blueprint) : '') : '';
       const guardianTask = isConvert ? `Code conversion/transform task: ${userText}` : userText;
       const review = await routing.guardianReview(guardianTask, finalText, workerAI, blueprintCtx).catch(() => null);
+      if (review && review.guardianAI && review.guardianAI !== 'none') {
+        const reviewInput = guardianTask.length + finalText.length;
+        const reviewOutput = review.correctedText ? review.correctedText.length : 50;
+        const guardianTokens = Math.ceil((reviewInput + reviewOutput) / 4);
+        const guardianCost = (guardianTokens / 1_000_000) * 0.30;
+        await usageTracker?.recordUsage(guardianTokens, guardianCost, review.guardianAI, review.inputTokens, review.outputTokens);
+      }
       if (review && !review.passed && review.correctedText) {
         finalText = review.correctedText + `\n\n---\n*Guardian (${review.guardianAI}) reviewed and corrected this response.*`;
+      }
+      if (review?.scopeAlerts?.length) {
+        finalText += `\n\n---\n**Guardian also noticed (not applied -- say "also fix..." to address):**\n${review.scopeAlerts.map(a => `- ${a}`).join('\n')}`;
       }
     }
 

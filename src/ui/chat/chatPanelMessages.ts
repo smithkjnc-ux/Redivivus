@@ -10,7 +10,7 @@ import { resolveBuildConfirm, resolvePlacement } from './chatPanelIntent.js';
 import { resolveVaultHit } from './chatPanelBuild.js';
 import { handleSendMessage } from './chatPanelMsgSendMessage.js';
 import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser } from './chatPanelMsgFileOps.js';
-import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder } from './chatPanelMsgProjectOps.js';
+import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder, handleStartNewProject } from './chatPanelMsgProjectOps.js';
 import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne, handleArchitectPerAction, handleArchitectActionConfirm } from './chatPanelMsgArchitect.js';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial.js';
 import { handleMapContext } from './chatPanelMsgMapContext.js';
@@ -23,7 +23,7 @@ export interface MessageHandlerDeps {
   conversation: ChatMessage[];
   panel: vscode.WebviewPanel;
   isBuildRequest: (text: string) => Promise<boolean>;
-  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix'; command?: string; subtype?: string }>;
+  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service'; command?: string; subtype?: string }>;
   handleBuildRequest: (task: string, skipComplex?: boolean, isFixRequest?: boolean) => Promise<void>;
   buildFromVaultPrefill: () => { task?: string; targetFile?: string };
   refresh: () => void;
@@ -31,7 +31,7 @@ export interface MessageHandlerDeps {
   onStartSession?: (goal: string, ai: string) => Promise<void>;
   onSwitchAI?: (ai: string) => Promise<void>;
   onNewProject?: (name: string, answers: Record<string, string>, folderPath?: string) => Promise<void>;
-  buildMode?: 'plan' | 'direct';
+  buildMode?: 'plan' | 'direct'; assistMode?: boolean; vault?: import('../../services/vault/vaultService.js').VaultService;
   planInterview?: import('./chatPanelPlanInterview.js').PlanInterviewState;
   setBlueprintContext?: (ctx: string) => void;
 }
@@ -41,8 +41,8 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   const { routing, conversation, panel, refresh } = deps;
 
   if (msg.type === 'send-message') {
-    // [CHASSIS] Plan mode: if interview is active, route to conversational interview handler
-    if (deps.buildMode === 'plan' && deps.planInterview && deps.planInterview.step < 8) {
+    // [CHASSIS] Plan mode: if interview is active (including project-name step), route to handler
+    if (deps.buildMode === 'plan' && deps.planInterview && (deps.planInterview.step < 8 || deps.planInterview.needsProjectName)) {
       const { handlePlanInterviewAnswer } = await import('./chatPanelPlanInterview.js');
       await handlePlanInterviewAnswer(msg, deps);
       return;
@@ -93,16 +93,7 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     await handleOpenProject(msg);
 
   } else if (msg.type === 'start-new-project') {
-    deps.buildMode = msg.mode === 'plan' ? 'plan' : 'direct';
-    deps.planInterview = undefined;
-    if (msg.mode === 'plan') {
-      const { startPlanInterview } = await import('./chatPanelPlanInterview.js');
-      await startPlanInterview(deps);
-    } else {
-      // Just Build: prompt the user to describe what they want — AI handles it from there
-      conversation.push({ role: 'assistant', content: "What would you like to build? Describe it in plain English and I'll get started.", timestamp: Date.now() });
-    }
-    refresh();
+    await handleStartNewProject(msg, deps);
 
   } else if (msg.type === 'open-existing-project') {
     await handleOpenExistingProject(msg, conversation, refresh);
@@ -190,6 +181,8 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
 
   } else if (msg.type === 'inject-terminal-error') {
     handleInjectTerminalError(msg, conversation, refresh);
+    // [FIX] Auto-trigger fix immediately after injecting error — closes the run→crash→fix loop
+    if (msg.error?.errorBlock) { await handleFixTerminalError({ errorContext: msg.error.fullContext || msg.error.errorBlock }, deps, conversation, refresh); }
 
   } else if (msg.type === 'fix-terminal-error') {
     await handleFixTerminalError(msg, deps, conversation, refresh);

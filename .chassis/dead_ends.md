@@ -57,3 +57,21 @@ Things that didn't work and why. Learn from these.
 - **Never do this:** Do not replace the chunked build pipeline. Multi-AI coordination must hook *into* the existing pipeline phases (e.g. at the planning phase), not circumvent the pipeline entirely.
 - **Do this instead:** Use the existing supervisor/worker logic in `chatPanelChunked.ts` where the supervisor generates the plan array and the worker executes the file builds, triggering all appropriate pipeline hooks (auto-save, vault, ledger).
 - **Do this instead:** Keep conversion requests on the AI chat path (`handleAIChat`). Use `chatPanelAutoSave.ts` to auto-detect substantial code blocks in the AI response and save them to disk automatically.
+
+---
+
+## [DEAD] Vault keyword-overlap matching returns false positives for same-word, wrong-domain items
+- **What was tried:** `findSimilar("make yellow ball look like an actual bird")` returned 9 audio functions (`playSound`, `synthesizeSegment`, `getBirdDuration`, `decodeAudioData`, etc.) because they all contained "bird" from a previous sound build.
+- **What happened:** `chatPanelBuildVault.ts` assembled these 9 audio components into a visual modification request. The worker tried to incorporate irrelevant audio code into the bird sprite task. The assembly prompt said "do not rewrite from scratch" which forced all 9 in. Result: visual task got broken audio-contaminated output.
+- **Never do this:** Trust keyword overlap scoring alone to gate vault item selection. `findSimilar()` scores on word match — "bird" in task description matches `getBirdDuration` even though one is visual and the other is audio.
+- **Do this instead:** Run a fast AI relevance check (12s timeout) on matched vault items BEFORE assembly when > 2 items are found. If AI returns "none", fall through to `runSingleFileBuild`. This is implemented in `chatPanelBuildVault.ts`. The assembly prompt must also say "use ONLY what's relevant — skip unrelated components".
+
+---
+
+## [DEAD] Single-regex code extraction from AI responses that mix prose and code
+- **What was tried:** `res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim()` — strips the first ``` and last ``` from the response.
+- **What happened:** When the AI returned a response in the format "To fix the issues, you can modify... ```javascript\n// code\n``` Note that this is just one possible solution...", the `/m` flag makes `^` match any line start, so the first ``` fence is removed. But the prose text before AND after the code block stays. The result written to disk was the explanation text + raw code + trailing note, displayed as a broken page of text in the browser.
+- **Never do this:** Do not use a simple leading/trailing fence strip for AI responses that may contain explanation text.
+- **Do this instead:** Use `extractCodeFromResponse(text)` from `chatPanelBuildInference.ts`. It scans for ALL fenced code blocks with a non-greedy regex, then returns the LARGEST one. This correctly isolates just the code from mixed prose+code AI responses.
+
+**Follow-up (same bug, deeper case):** The stage-1 fix (non-greedy regex for closed blocks) failed when the AI returned a response with NO closing ``` fence. The regex requires both opening and closing fence — without a closing fence, no blocks are matched and the old single-replace fallback runs, which still leaves prose text intact. Stage-2 fix: `text.slice(text.indexOf('```')).replace(/^```[a-zA-Z0-9]*\n?/, '')` — finds the FIRST fence and slices from there, discarding all prose preamble even when the closing fence is absent.

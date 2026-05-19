@@ -93,9 +93,10 @@ export async function chunkedGenerate(
   userText: string,
   targetFormat: string,
   onProgress: (msg: string) => void
-): Promise<string> {
+): Promise<{ text: string; inputTokens: number; outputTokens: number }> {
   const chunks: string[] = [];
   const totalSections = sections.length;
+  let totalIn = 0; let totalOut = 0;
 
   for (let i = 0; i < totalSections; i++) {
     const section = sections[i];
@@ -138,10 +139,12 @@ ${fullSource}
       if (result.text) { chunks.push(cleanChunk(result.text)); }
       continue;
     }
+    totalIn += result.inputTokens ?? 0;
+    totalOut += result.outputTokens ?? 0;
     chunks.push(cleanChunk(result.text));
   }
 
-  return assembleOutput(chunks);
+  return { text: assembleOutput(chunks), inputTokens: totalIn, outputTokens: totalOut };
 }
 
 function cleanChunk(text: string): string {

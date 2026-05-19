@@ -12,10 +12,11 @@ import { MessageHandlerDeps } from './chatPanelMessages.js';
 import { parseFixResponse, takeSnapshot, collectSourceFiles, readProjectDeadEnds, appendProjectDeadEnd, getRecentBuildContext, readProjectRules, writeProjectRoadmapEntry, modelLabel } from './chatPanelMsgFixUtils.js';
 import { detectPatterns, buildSupervisorNotes, buildWorkerRules, validateOutputFiles } from './chatPanelMsgFixPatterns.js';
 import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules.js';
+import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService.js';
 
 // [DEAD] modelLabel defined here -- moved to chatPanelMsgFixUtils.ts to keep this file under 200 lines
 
-export async function handleFixRequest(userText: string, deps: MessageHandlerDeps): Promise<void> {
+export async function handleFixRequest(userText: string, deps: MessageHandlerDeps, imageBase64?: string, imageType?: string): Promise<void> {
   const { routing, conversation, refresh } = deps;
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
@@ -23,7 +24,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     refresh(); return;
   }
 
-  const sourceFiles = collectSourceFiles(root);
+  const sourceFiles = collectSourceFiles(root, userText);
   if (sourceFiles.length === 0) {
     conversation.push({ role: 'assistant', content: 'No source files found. Is the correct folder open?', timestamp: Date.now() });
     refresh(); return;
@@ -35,6 +36,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   const projectDeadEnds = readProjectDeadEnds(root);
   const buildContext = getRecentBuildContext(root, sourceFiles);
   const projectRules = readProjectRules(root);
+  deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
 
   // Phase 1: Supervisor diagnoses ALL bugs
   // [WARN] Use routing.prompt() not routeByComplexity() -- short bug reports get misrouted to Groq
@@ -55,18 +57,19 @@ Find EVERY bug contributing to this problem. For each bug:
 - What is wrong and why it causes this symptom
 - What the correct code should do
 
-Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.${buildSupervisorNotes(activePatterns)}${projectDeadEnds ? `\n\nPREVIOUSLY FAILED APPROACHES (from this project's dead_ends.md -- DO NOT suggest these again):\n${projectDeadEnds}` : ''}${projectRules ? `\n\nPROJECT RULES (from .chassis/rules.md -- your fix must not violate these):\n${projectRules}` : ''}`;
+Number each bug. Be specific -- name actual variable names, function names. Do NOT suggest rebuilding.
+SCOPE RULE: Diagnose ONLY bugs that directly cause the reported problem. If you notice unrelated issues, do NOT include them. Stay exactly on what the user reported.${buildSupervisorNotes(activePatterns)}${projectDeadEnds ? `\n\nPREVIOUSLY FAILED APPROACHES (from this project's dead_ends.md -- DO NOT suggest these again):\n${projectDeadEnds}` : ''}${projectRules ? `\n\nPROJECT RULES (from .chassis/rules.md -- your fix must not violate these):\n${projectRules}` : ''}`;
 
-    const diagRes = await routing.prompt(diagPrompt, 60_000);
+    const diagRes = await routing.prompt(diagPrompt, 60_000, imageBase64, imageType);
     if (!diagRes.success || !diagRes.text?.trim()) {
       conversation[conversation.length - 1].content = `[FAIL] Supervisor returned no response. Error: ${diagRes.error || 'unknown'}. Check your API key in Settings.`;
-      refresh(); return;
+      refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
     }
     diagnosis = diagRes.text.trim();
-    supervisorLabel = modelLabel(diagRes.model);
+    supervisorLabel = modelLabel(diagRes.model); deps.usageTracker?.recordUsage(Math.ceil((diagPrompt.length+diagnosis.length)/4), 0, diagRes.model||'claude', diagRes.inputTokens, diagRes.outputTokens, 'supervisor', require('path').basename(root));
   } catch (err) {
     conversation[conversation.length - 1].content = `[FAIL] Supervisor phase failed: ${err instanceof Error ? err.message : String(err)}`;
-    refresh(); return;
+    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
   // Phase 2: Worker generates complete corrected files
@@ -96,8 +99,7 @@ RULES:
    Format: [DEAD] <what was there> -- <why it fails here>
    Example: // [DEAD] AudioContext.destination -- silently null on Linux Chrome, no error thrown${buildWorkerRules(activePatterns, 6)}
 
-${CHASSIS_WORKER_RULES}
-
+${deps.assistMode ? '' : CHASSIS_WORKER_RULES + '\n'}
 FORMAT (exact -- required):
 ## Fix: relative/path/to/file
 \`\`\`
@@ -107,13 +109,13 @@ FORMAT (exact -- required):
     const fixRes = await routing.prompt(fixPrompt, 90_000);
     if (!fixRes.success || !fixRes.text?.trim()) {
       conversation[conversation.length - 1].content = `[FAIL] Worker returned no response. Error: ${fixRes.error || 'unknown'}.`;
-      refresh(); return;
+      refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
     }
     workerResponse = fixRes.text.trim();
-    workerLabel = modelLabel(fixRes.model);
+    workerLabel = modelLabel(fixRes.model); deps.usageTracker?.recordUsage(Math.ceil((fixPrompt.length+workerResponse.length)/4), 0, fixRes.model||'claude', fixRes.inputTokens, fixRes.outputTokens, 'worker', require('path').basename(root));
   } catch (err) {
     conversation[conversation.length - 1].content = `[FAIL] Worker phase failed: ${err instanceof Error ? err.message : String(err)}`;
-    refresh(); return;
+    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
   // Phase 3: Guardian reviews the fix
@@ -121,10 +123,11 @@ FORMAT (exact -- required):
     `[1/3] Supervisor (${supervisorLabel}): done\n[2/3] Worker (${workerLabel}): done\n[3/3] Guardian: reviewing fix...`;
   refresh();
 
-  let finalResponse = workerResponse; let guardianLabel = 'AI'; let guardianNote = '';
+  let finalResponse = workerResponse; let guardianLabel = 'AI'; let guardianNote = ''; let scopeNote = '';
   try {
     const guardianContext = `Original problem: "${userText}"\nDiagnosis:\n${diagnosis}`;
-    const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), '');
+    const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), ''); deps.usageTracker?.recordUsage(Math.ceil(workerResponse.length/4), 0, guardianResult.guardianAI||'', guardianResult.inputTokens, guardianResult.outputTokens, 'guardian', require('path').basename(root));
+    if (guardianResult.scopeAlerts?.length) { scopeNote = `\n\n**Guardian also noticed (not applied -- say "also fix..." to address):**\n${guardianResult.scopeAlerts.map(a => `- ${a}`).join('\n')}`; }
     guardianLabel = modelLabel(guardianResult.guardianAI || '');
     if (!guardianResult.passed && guardianResult.correctedText) {
       finalResponse = guardianResult.correctedText;
@@ -140,10 +143,10 @@ FORMAT (exact -- required):
     const skipNote = skipped.length > 0 ? `\n[WARN] Worker invented ${skipped.length} file(s) not in project: ${skipped.join(', ')}` : '';
     conversation[conversation.length - 1].content =
       `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\nWorker could not produce correctable file blocks. Describe the problem differently and try again.${skipNote}`;
-    refresh(); return;
+    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
-  takeSnapshot(root, fixes.map(f => f.rel));
+  const fixSnapId = takeSnapshot(root, fixes.map(f => f.rel), userText);
   const written: string[] = []; const failed: string[] = [];
   for (const fix of fixes) {
     try {
@@ -173,13 +176,7 @@ FORMAT (exact -- required):
     }
   }
 
-  // Audit #5: log every AI-driven file change to project CHASSIS_ROADMAP.md
-  if (written.length > 0) {
-    writeProjectRoadmapEntry(root, `AI fix: ${userText.slice(0, 60)}`, [
-      ...written.map(f => `Fixed \`${f}\` -- ${userText.slice(0, 80)}`),
-      `Supervisor: ${supervisorLabel}  Worker: ${workerLabel}  Guardian: ${guardianLabel}`,
-    ]);
-  }
+  if (written.length > 0 && !deps.assistMode) { writeProjectRoadmapEntry(root, `AI fix: ${userText.slice(0, 60)}`, written.map(f=>`Fixed \`${f}\``).concat([`Supervisor: ${supervisorLabel} Worker: ${workerLabel} Guardian: ${guardianLabel}`])); try { new BuildHistoryService(root).record(makeBuildHistoryEntry({ snapshotId: fixSnapId || `fix-${Date.now()}`, task: `[FIX] ${userText.slice(0, 80)}`, files: written, tokensUsed: 0, costUSD: 0, source: 'ai', supervisor: supervisorLabel, worker: workerLabel !== 'AI' ? workerLabel : null, resultCardToken: '' })); } catch { } }
 
   const previewToken = written.some(f => f.endsWith('.html'))
     ? `\n__PREVIEW_BROWSER__${path.join(root, written.find(f => f.endsWith('.html'))!)}|||END_PREVIEW_BROWSER__`
@@ -187,10 +184,17 @@ FORMAT (exact -- required):
 
   conversation[conversation.length - 1].content =
     `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\n` +
-    `**Fixed ${written.length} file${written.length !== 1 ? 's' : ''}** (Worker: ${workerLabel})\n${guardianNote}\n${fileList}${skipLine}${failLine}${validationLine}${previewToken}`;
-  refresh();
+    `**Fixed ${written.length} file${written.length !== 1 ? 's' : ''}** (Worker: ${workerLabel})\n${guardianNote}\n${fileList}${skipLine}${failLine}${validationLine}${scopeNote}${previewToken}`;
+  refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+  if (written.length > 0) { try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch { /* non-blocking */ } }
 
-  if (written.length > 0) {
-    try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: true, preserveFocus: true }); } catch { /* non-blocking */ }
+  // Auto-capture fixed files to vault so the fix pattern is reusable
+  if (deps.vault && written.length > 0) {
+    const absPaths = written.map(f => path.join(root, f));
+    const projectName = path.basename(root);
+    const fixTask = `fix: ${userText.slice(0, 120)}`;
+    const callAI = (p: string) => deps.routing.prompt(p, 12_000);
+    const { autoCaptureFiles } = await import('../../services/vault/vaultAutoCapture.js');
+    autoCaptureFiles(absPaths, projectName, deps.vault, fixTask, callAI).catch(() => { /* best-effort */ });
   }
 }

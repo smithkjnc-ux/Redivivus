@@ -172,7 +172,8 @@ export class VaultContextService {
       if (item.description) { lines.push(`// ${item.description}`); }
       if ((item as any).useCase) { lines.push(`// Use when: ${(item as any).useCase}`); }
       lines.push(`// Source: ${item.sourceFile}`);
-      lines.push(item.code.slice(0, 400)); // cap to avoid token bloat
+      // [WARN] 400-char limit was cutting most functions in half — increased to 1500 so workers see complete code
+      lines.push(item.code.slice(0, 1500));
       lines.push('');
     }
 

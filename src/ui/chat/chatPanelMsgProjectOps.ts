@@ -9,6 +9,8 @@ import { ChatMessage } from './chatPanelHtml.js';
 import { MessageHandlerDeps } from './chatPanelMessages.js';
 import { debugLog } from '../../services/workspace/diagnosticLogger.js';
 import { ChatPanel } from './chatPanel.js';
+import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
+import { detectPostBuildInfo } from './chatPanelPostBuild.js';
 
 export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel: vscode.WebviewPanel): Promise<void> {
   const command = msg.command;
@@ -17,6 +19,7 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
   if (!command) { return; }
   try {
     if (command === 'chassis.buildFromVault') {
+      // Run vault build directly — save dialog handles new-folder creation and opens it.
       await vscode.commands.executeCommand(command, deps.buildFromVaultPrefill());
     } else if (command === 'chassis.openVault' && msg.vaultItem) {
       await vscode.commands.executeCommand(command, msg.vaultItem);
@@ -46,6 +49,23 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
         await vscode.commands.executeCommand(command);
       }
       debugLog(_root, 'run-command', `executed OK: ${command}`);
+    } else if (command === 'chassis.runProject') {
+      // [FIX] Run directly — VS Code command dispatch unreliable for this command
+      const runRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!runRoot) { vscode.window.showWarningMessage('No project folder open.'); return; }
+      const recentFiles = new BuildHistoryService(runRoot).list().filter(e => !e.undone).slice(0, 1).flatMap(e => e.files);
+      const info = detectPostBuildInfo(runRoot, recentFiles);
+      if (!info.runCmd && info.type === 'unknown') { vscode.window.showInformationMessage('No runnable entry point detected. Build something first!'); return; }
+      if (info.type === 'html' && info.entryFile) {
+        vscode.env.openExternal(vscode.Uri.file(path.join(runRoot, info.entryFile)));
+        debugLog(runRoot, 'run-command', `runProject: opened ${info.entryFile} in browser`);
+        return;
+      }
+      const term = vscode.window.createTerminal({ name: 'CHASSIS: Run', cwd: runRoot });
+      term.show();
+      if (info.needsDeps && info.depsCmd) { term.sendText(info.depsCmd + ' && ' + (info.runCmd || '')); }
+      else if (info.runCmd) { term.sendText(info.runCmd); }
+      debugLog(runRoot, 'run-command', `runProject: terminal type=${info.type} cmd=${info.runCmd}`);
     } else {
       await vscode.commands.executeCommand(command);
       debugLog(_root, 'run-command', `executed OK: ${command}`);
@@ -152,6 +172,20 @@ export async function handleToggleSetting(msg: any, conversation: ChatMessage[],
     conversation.push({ role: 'assistant', content: `Setting saved: CHASSIS will ${behaviorText} on startup.`, timestamp: Date.now() });
     refresh();
   }
+}
+
+export async function handleStartNewProject(msg: any, deps: MessageHandlerDeps): Promise<void> {
+  // Always start new project flow in-place regardless of open folder.
+  // The project wizard will create the folder and add it to the workspace.
+  deps.buildMode = msg.mode === 'plan' ? 'plan' : 'direct';
+  deps.planInterview = undefined;
+  if (msg.mode === 'plan') {
+    const { startPlanInterview } = await import('./chatPanelPlanInterview.js');
+    await startPlanInterview(deps);
+  } else {
+    deps.conversation.push({ role: 'assistant', content: "What would you like to build? Describe it in plain English and I'll get started.", timestamp: Date.now() });
+  }
+  deps.refresh();
 }
 
 export async function handleBrowseFolder(msg: any, panel: vscode.WebviewPanel): Promise<void> {

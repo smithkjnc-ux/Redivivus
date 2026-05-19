@@ -2,6 +2,8 @@
 // HTML builder -> setupProgressPanelHtml.ts
 
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import { SetupProgress } from './setupProgressService.js';
 import { buildSetupProgressHtml } from './setupProgressPanelHtml.js';
 
@@ -34,6 +36,9 @@ export function showSetupProgressPanel(progress: SetupProgress, onRefresh?: () =
   panel.webview.onDidReceiveMessage(async (msg: any) => {
     if (msg.type === 'runAction') {
       await handleAction(parseInt(msg.actionId), panel);
+    } else if (msg.type === 'markStepDone') {
+      persistManualStepDone(parseInt(msg.stepId));
+      if (onRefresh) { const fresh = await onRefresh(); panel.webview.html = buildSetupProgressHtml(fresh); }
     } else if (msg.type === 'reloadProgress') {
       if (onRefresh) {
         const fresh = await onRefresh();
@@ -41,6 +46,17 @@ export function showSetupProgressPanel(progress: SetupProgress, onRefresh?: () =
       }
     }
   });
+}
+
+function persistManualStepDone(stepId: number): void {
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!root) { return; }
+  const cfgPath = path.join(root, '.chassis', 'config.json');
+  try {
+    const cfg = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf-8')) : {};
+    cfg.manualCompletedSteps = Array.from(new Set([...(cfg.manualCompletedSteps || []), stepId]));
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf-8');
+  } catch { /* never crash */ }
 }
 
 async function handleAction(actionId: number, panel: vscode.WebviewPanel): Promise<void> {

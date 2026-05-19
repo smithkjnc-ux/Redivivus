@@ -59,6 +59,13 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
     return { type: 'run' };
   }
 
+  // WH-questions and explain patterns — force 'question' before AI classifier fires.
+  // [RULE 18] Structural: starting with why/what/how/explain with no build/fix verbs is unambiguously a question.
+  const _buildFix = /\b(build|create|make|write|generate|add|update|remove|delete|edit|change|fix|repair|broken|bug)\b/i;
+  if (/^(why|what|how|explain|tell\s+me|do\s+you|does|can\s+you|is\s+(it|there|a)|are\s+(there|you)|should\s+i|when\s+do|where\s+is|who\s+is)\b/i.test(t) && !_buildFix.test(t)) {
+    return { type: 'question' };
+  }
+
   return null;
 }
 

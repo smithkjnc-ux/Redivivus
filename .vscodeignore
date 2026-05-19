@@ -14,3 +14,20 @@ CHASSIS_ROADMAP.md
 .chassis/**
 *.vsix
 scripts/**
+# Dev-only AI editor rules (not needed in distributed extension)
+.clinerules
+.cursorrules
+.windsurfrules
+CLAUDE.md
+GEMINI.md
+.claude/**
+.cursor/**
+.windsurf/**
+.github/**
+# Dev-only spec and report files
+CHASSIS-SPEC.md
+CHASSIS_CHAT_SPEC.md
+CHASSIS_UX_VISION.md
+REORGANIZATION_REPORT.md
+test_map.js
+docs/**

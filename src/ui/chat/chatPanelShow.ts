@@ -20,6 +20,16 @@ export function doShowChatPanel(
     const existing = (ChatPanel as any)._instance;
     existing._panel.reveal(existing._panel.viewColumn ?? vscode.ViewColumn.One, false);
     if (vault) { existing.vault = vault; }
+
+    // Sync in-memory assistMode with file system — catches Assist → Full CHASSIS conversion
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (existing.state.assistMode && wsRoot && !fs.existsSync(path.join(wsRoot, '.chassis-assist'))) {
+      existing.state.assistMode = false;
+      existing._initialized = false;
+      existing.refresh();
+      return;
+    }
+
     existing._panel.webview.postMessage({
       type: 'update-title',
       html: '<span style="color:#a78bfa;-webkit-text-fill-color:#a78bfa;">C</span><span style="color:#4d9eff;-webkit-text-fill-color:#4d9eff;"> H A S S I S</span>',

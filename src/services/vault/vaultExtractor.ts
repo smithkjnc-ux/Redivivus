@@ -50,11 +50,15 @@ export function extractFromFile(filePath: string, content: string): { items: Vau
     case '.ts': case '.tsx': case '.js': case '.jsx': rawBlocks = extractTSJS(lines, filePath); break;
     case '.py': rawBlocks = extractPython(lines, filePath); break;
     case '.md': rawBlocks = extractMarkdown(lines, filePath); break;
-    case '.html': case '.htm': case '.css': case '.svg':
-      if (content.trim().length > 50) {
-        rawBlocks = [{ name: path.basename(filePath, ext), type: 'component', code: content, lines: [1, lines.length], filePath, language: ext.replace('.', '') }];
+    case '.html': case '.htm': case '.css': case '.svg': {
+      // [CHASSIS] Skip entry files (index.*) and large files — whole-app files aren't reusable snippets
+      const baseName = path.basename(filePath, ext).toLowerCase();
+      const isEntryFile = ['index','main','app','home','page','style','styles','global'].includes(baseName);
+      if (!isEntryFile && content.trim().length > 50 && lines.length <= 150) {
+        rawBlocks = [{ name: baseName, type: 'component', code: content, lines: [1, lines.length], filePath, language: ext.replace('.', '') }];
       }
       break;
+    }
     default: rawBlocks = [];
   }
 

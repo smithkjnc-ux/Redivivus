@@ -9,6 +9,7 @@ import { buildActionsScript } from './chatPanelScriptActions.js';
 import { buildActionsScriptB } from './chatPanelScriptActionsB.js';
 import { buildGatesScript } from './chatPanelScriptGates.js';
 import { buildExpandedInterviewScript } from './chatPanelScriptExpandedInterview.js';
+import { buildImageScript } from './chatPanelScriptImage.js';
 
 export function buildChatScript(): string {
   return `
@@ -31,12 +32,10 @@ export function buildChatScript(): string {
 
     function doSend() {
       const text = input.value;
-      if (!text.trim()) { return; }
-      // Always send to backend — backend classifies intent first.
-      // Build requests with no mode will get show-mode-popover back from the backend.
-      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined });
-      input.value = '';
-      input.style.height = 'auto';
+      if (!text.trim() && !window._pendingImage) { return; }
+      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined });
+      input.value = ''; input.style.height = 'auto'; window._pendingImage = null; window._pendingImageType = null;
+      const _ip = document.getElementById('img-prev'); if (_ip) _ip.remove();
     }
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
@@ -91,11 +90,16 @@ export function buildChatScript(): string {
         const action = launcherBtn.getAttribute('data-action');
         if (action === 'start-new-project') {
           const mode = launcherBtn.getAttribute('data-mode');
-          try { vscode.postMessage({ type: 'start-new-project', mode: mode || undefined }); } catch(err) {}
+          const assistMode = launcherBtn.getAttribute('data-assist') === 'true';
+          try { vscode.postMessage({ type: 'start-new-project', mode: mode || undefined, assistMode }); } catch(err) {}
           return;
         }
         if (action === 'open-existing-project') {
           try { vscode.postMessage({ type: 'open-existing-project' }); } catch(err) {}
+          return;
+        }
+        if (action === 'retrofit-project') {
+          try { vscode.postMessage({ type: 'retrofit-project' }); } catch(err) {}
           return;
         }
       }
@@ -188,5 +192,6 @@ export function buildChatScript(): string {
     ${buildActionsScriptB()}
     ${buildGatesScript()}
     ${buildExpandedInterviewScript()}
+    ${buildImageScript()}
   `;
 }

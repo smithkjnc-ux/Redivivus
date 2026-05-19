@@ -8,6 +8,7 @@ import { RoutingService } from '../ai/routingService.js';
 import { BuildPlan } from './buildFromVaultTypes.js';
 import { findRelevantByTask, VaultSearchResult } from './buildFromVaultSearch.js';
 import { BuildFromVaultModal } from '../../ui/views/buildFromVaultModal.js';
+import { handleBuildOutput } from './buildFromVaultOutput.js';
 
 export class BuildFromVaultService {
   constructor(
@@ -138,45 +139,8 @@ Rules:
         return;
       }
 
-      // ── Step 7: Show result in new editor tab
-      const lang = targetFile
-        ? (targetFile.endsWith('.ts') || targetFile.endsWith('.tsx') ? 'typescript'
-          : targetFile.endsWith('.js') || targetFile.endsWith('.jsx') ? 'javascript'
-          : targetFile.endsWith('.py') ? 'python' : 'typescript')
-        : 'typescript';
-
-      const doc = await vscode.workspace.openTextDocument({
-        content: assembleResponse.text,
-        language: lang,
-      });
-      await vscode.window.showTextDocument(doc, { preview: false });
-
-      // ── Step 8: Offer to save
-      const saveTarget = targetFile?.trim();
-      if (saveTarget) {
-        const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (root) {
-          const saveTo = await vscode.window.showInformationMessage(
-            `Save to ${saveTarget}?`,
-            { modal: true },
-            'Save', 'Keep as Preview'
-          );
-          if (saveTo === 'Save') {
-            const fullPath = path.join(root, saveTarget);
-            const fs = await import('fs');
-            const dirPath = path.dirname(fullPath);
-            if (!fs.existsSync(dirPath)) { fs.mkdirSync(dirPath, { recursive: true }); }
-            fs.writeFileSync(fullPath, assembleResponse.text);
-            const savedDoc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
-            await vscode.window.showTextDocument(savedDoc, { preview: false });
-            vscode.window.showInformationMessage(`✅ CHASSIS: Saved to ${saveTarget} — ${selectedItems.length} vault items used, ${plan.gaps.length} gaps written.`);
-          }
-        }
-      } else {
-        vscode.window.showInformationMessage(
-          `✅ CHASSIS Build complete — ${selectedItems.length} vault items used, ${plan.gaps.length} gaps written fresh.`
-        );
-      }
+      // ── Steps 7-8: Save output and show summary (see buildFromVaultOutput.ts) ──
+      await handleBuildOutput({ task, targetFile, code: assembleResponse.text, selectedItems, gaps: plan.gaps });
     });
   }
 }

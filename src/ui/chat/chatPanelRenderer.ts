@@ -131,6 +131,13 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `<span id="save-all-stat" style="font-size:11px;color:var(--vscode-descriptionForeground);"></span></div>`;
     }
 
+    // Markdown: bold, italic, inline code, horizontal rule, line breaks
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/(?<![`\w])_([^_]+)_(?![`\w])/g, '<em>$1</em>');
+    html = html.replace(/`([^`]+)`/g, '<code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-size:0.92em;">$1</code>');
+    html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--vscode-input-border);margin:8px 0;">');
+    html = html.replace(/\n/g, '<br>');
+
     const meta = isUser ? '' : `<div class="message-meta">${tokensStr} · ${timeStr}</div>`;
     return `<div class="${bubbleClass}"><div class="message-content">${html}</div>${meta}</div>`;
   }).join('');

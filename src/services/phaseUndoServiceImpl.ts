@@ -1,9 +1,9 @@
+// [SCOPE] CHASSIS Phase Undo Service — implementation helpers.
+// Extracted from phaseUndoService.ts to keep source files under 200 lines.
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { PhaseUndoService, PhaseSnapshot, PhaseHistory, MAX_PHASE_HISTORY } from './phaseUndoService.js';
-
-// [SCOPE] CHASSIS Phase Undo Service — implementation helpers.
-// Extracted from phaseUndoService.ts to keep source files under 200 lines.
 
   export function undoPhaseImpl(service: PhaseUndoService, buildId: string, phaseNumber: number): boolean {
     const history = (service as any).getBuildHistory(buildId);

@@ -32,6 +32,8 @@ export function buildChatCssInput(): string {
     .input-pill:hover { background: var(--c-accent-lo); border-color: var(--c-accent); color: var(--c-text); }
     .input-pill--ai { color: var(--c-accent); border-color: rgba(77,158,255,0.3); background: var(--c-accent-lo); }
     .input-pill--ai:hover { background: var(--c-accent-md); }
+    .input-pill--run { color: #4ec959; border-color: rgba(78,201,89,0.35); }
+    .input-pill--run:hover { background: rgba(78,201,89,0.12); border-color: #4ec959; }
     .input-pill[data-cmd] { cursor: pointer; }
     #send-btn {
       width: 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;

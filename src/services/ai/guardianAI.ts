@@ -10,8 +10,11 @@ export interface GuardianReviewResult {
   passed: boolean;
   correctedText: string | null;  // null = no correction needed
   issues: string[];              // plain-English issues found
+  scopeAlerts: string[];         // out-of-scope changes the worker made — for user approval
   guardianAI: string;            // which AI acted as guardian
   workerAI: string;
+  inputTokens?: number;          // actual prompt tokens from API response
+  outputTokens?: number;         // actual completion tokens from API response
 }
 
 // [SCOPE] AI capability ranking — higher = more capable = better guardian candidate
@@ -44,21 +47,16 @@ export const AI_CAPABILITIES: Record<string, AICapability> = {
   groq:   { rank: 5, label: 'Groq', strengths: ['speed', 'simple completions', 'quick iterations'], bestFor: 'Fast simple completions, rapid iteration', contextLimit: 32_000 },
 };
 
-/**
- * Returns the guardian AI id (highest-ranked available that is NOT the worker).
- * [CHASSIS] Consistent with selectSupervisorAndWorker() in routingService —
- * both use AI_RANK. Guardian === Supervisor: same AI always in charge, no split brain.
- * (Cannot call selectSupervisorAndWorker directly here — would create circular import.)
- */
+// [FIX] Guardian picks cheapest first — scope review needs accuracy, not reasoning power.
+// [DEAD] Old: sorted by AI_RANK DESC (most capable) → used expensive Sonnet for every guardian pass.
+// Cost order: groq ($0.09/1M) → kimi ($0.15) → gemini ($0.30) → openai ($5) → xai ($5) → claude ($0.80–$3)
+const GUARDIAN_COST_ORDER = ['groq', 'kimi', 'gemini', 'openai', 'xai', 'claude'];
+
+/** Returns the cheapest available guardian AI that is not the worker. */
 export function selectGuardianAI(workerAI: string, keyMap: Record<string, () => string | null>): string | null {
-  // Prefer a different AI as Guardian (different model = better review)
-  const available = Object.keys(AI_RANK)
-    .filter(ai => ai !== workerAI && keyMap[ai]?.())
-    .sort((a, b) => (AI_RANK[b] ?? 0) - (AI_RANK[a] ?? 0));
-  if (available[0]) { return available[0]; }
-  // Solo mode: same AI reviews its own output with a skeptical reviewer persona
-  // Models catch errors better when prompted as a reviewer than as a generator
-  return keyMap[workerAI]?.() ? workerAI : null;
+  const cheap = GUARDIAN_COST_ORDER.filter(ai => ai !== workerAI && keyMap[ai]?.());
+  if (cheap[0]) { return cheap[0]; }
+  return keyMap[workerAI]?.() ? workerAI : null; // solo mode — same AI as skeptical reviewer
 }
 
 /** Returns true if Guardian AI review is enabled and possible */
@@ -122,15 +120,18 @@ DOMAIN GOTCHAS — things junior AIs consistently get wrong (use your judgment, 
 - speed hardcoded as a fixed number instead of Math.hypot(canvas.width, canvas.height) / 180 — ball moves too slow/fast on different screen sizes
 - CLI input shadowing: args parsed into named variables (distance, pay, fuelCost) but formula only uses some — e.g. netProfit = pay - fuelCost while distance was parsed and is never referenced — all parsed argv inputs MUST appear in the output computation
 
-INSTRUCTIONS:
-- If the code is correct and ready to use, reply with EXACTLY: GUARDIAN_PASS
-- If you find real problems, reply with EXACTLY this format:
+SCOPE RULE — THIS OVERRIDES EVERYTHING ELSE:
+If the worker changed, renamed, refactored, or "improved" ANYTHING not directly required to fulfill the task above — that is a scope violation. Reverting scope violations is MORE IMPORTANT than fixing other bugs. The user did not ask for improvements, only for the specific thing they requested.
 
+If code is correct and no scope violations: GUARDIAN_PASS
+
+If bugs or scope violations exist:
 GUARDIAN_ISSUES:
-[each issue on its own line — plain English, what is wrong and why it matters, max 2 sentences]
-
+[one bug per line — correctness problems in the requested fix only]
+GUARDIAN_SCOPE_ALERTS:
+[one line per scope violation — "Changed X in function Y — not part of the request"]
 GUARDIAN_CORRECTION:
-[the complete corrected code — not a summary, not a diff, the full working output]`;
+[complete corrected code — bugs fixed AND all scope violations reverted to original]`;
 }
 
 /** Run guardian review. Returns corrected text or null if passed. */
@@ -140,46 +141,54 @@ export async function runGuardianReview(
   workerAI: string,
   guardianAI: string,
   blueprintContext: string,
-  callProvider: (ai: string, prompt: string) => Promise<{ text: string; success: boolean }>
+  callProvider: (ai: string, prompt: string) => Promise<{ text: string; success: boolean; inputTokens?: number; outputTokens?: number }>
 ): Promise<GuardianReviewResult> {
   const isSoloMode = guardianAI === workerAI;
   const prompt = buildGuardianPrompt(originalTask, workerResponse, blueprintContext, workerAI, isSoloMode);
 
   let reviewText = '';
+  let inputTokens: number | undefined;
+  let outputTokens: number | undefined;
   try {
     const res = await callProvider(guardianAI, prompt);
     if (!res.success) {
-      // Guardian failed to respond — pass through unchanged, log silently
-      return { passed: true, correctedText: null, issues: [], guardianAI, workerAI };
+      return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI, workerAI };
     }
     reviewText = res.text.trim();
+    inputTokens = res.inputTokens;
+    outputTokens = res.outputTokens;
   } catch {
-    return { passed: true, correctedText: null, issues: [], guardianAI, workerAI };
+    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI, workerAI };
   }
 
-  // GUARDIAN_PASS — no issues
+  // GUARDIAN_PASS — no issues, no scope violations
   if (reviewText.startsWith('GUARDIAN_PASS')) {
-    return { passed: true, correctedText: null, issues: [], guardianAI, workerAI };
+    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI, workerAI, inputTokens, outputTokens };
   }
 
-  // Parse issues + correction
+  // Parse issues, scope alerts, and correction
   const issues: string[] = [];
+  const scopeAlerts: string[] = [];
   let correctedText: string | null = null;
 
-  const issueMatch = reviewText.match(/GUARDIAN_ISSUES:\n([\s\S]*?)(?=GUARDIAN_CORRECTION:|$)/);
-  if (issueMatch) {
-    issues.push(...issueMatch[1].trim().split('\n').map(l => l.replace(/^[-*\d.]+\s*/, '').trim()).filter(Boolean));
-  }
+  const issueMatch = reviewText.match(/GUARDIAN_ISSUES:\n([\s\S]*?)(?=GUARDIAN_SCOPE_ALERTS:|GUARDIAN_CORRECTION:|$)/);
+  if (issueMatch) { issues.push(...issueMatch[1].trim().split('\n').map(l => l.replace(/^[-*\d.]+\s*/, '').trim()).filter(Boolean)); }
+
+  const scopeMatch = reviewText.match(/GUARDIAN_SCOPE_ALERTS:\n([\s\S]*?)(?=GUARDIAN_CORRECTION:|$)/);
+  if (scopeMatch) { scopeAlerts.push(...scopeMatch[1].trim().split('\n').map(l => l.replace(/^[-*\d.]+\s*/, '').trim()).filter(Boolean)); }
 
   const correctionMatch = reviewText.match(/GUARDIAN_CORRECTION:\n([\s\S]*)/);
-  if (correctionMatch) {
-    correctedText = correctionMatch[1].trim();
+  if (correctionMatch) { correctedText = correctionMatch[1].trim(); }
+
+  // Scope alerts alone (no real bugs) — pass the fix through but surface alerts to user
+  if (scopeAlerts.length > 0 && issues.length === 0 && (!correctedText || correctedText === workerResponse)) {
+    return { passed: true, correctedText: null, issues: [], scopeAlerts, guardianAI, workerAI, inputTokens, outputTokens };
   }
 
-  // If correction is empty or identical to original, treat as pass
+  // No real correction — treat as pass
   if (!correctedText || correctedText === workerResponse) {
-    return { passed: true, correctedText: null, issues: [], guardianAI, workerAI };
+    return { passed: true, correctedText: null, issues: [], scopeAlerts, guardianAI, workerAI, inputTokens, outputTokens };
   }
 
-  return { passed: false, correctedText, issues, guardianAI, workerAI };
+  return { passed: false, correctedText, issues, scopeAlerts, guardianAI, workerAI, inputTokens, outputTokens };
 }
