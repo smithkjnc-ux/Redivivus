@@ -1,7 +1,75 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 20, 2026 — Session 32: Enhance Agent Mode Context and Features*
+*Last updated: May 20, 2026 — Session 38: Flappy Bird Audit — CHASSIS System Infrastructure Fixes*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 38: Flappy Bird Audit — CHASSIS System Infrastructure Fixes)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/agentService.ts` | Injected `CHASSIS_WORKER_RULES` into the ReAct system prompt. | Agent Mode (OBD2) was bypassing [SCOPE] and [WARN] annotation rules, causing it to write missing-annotation files in projects. | Low — brings Agent prompt to parity with standard Pipeline prompts. |
+| `src/services/analyzerScanner.ts` | Added `missingScopeAtLine1` check: verifies line 0 matches `// [SCOPE]`, `<!-- [SCOPE]`, or `# [SCOPE]` based on file type. Wired into `AnalysisResult`. | Scanner previously passed files with `[SCOPE]` appearing *anywhere*, failing to flag wrong-content files (like JSON in .js). | Low — pure scanning logic, no write side-effects. |
+| `src/services/analyzerReports.ts` | Added `missingScopeFiles` count to the Project Map markdown table and listed missing files in a new `❌ Files Missing [SCOPE] at Line 1` block. | Visualizing the new scanner metric in the generated map. | Low. |
+| `src/services/analyzerService.ts` | Added lightweight, background-safe `updateProjectMapOnly()` method. | Project map markdown was permanently stale unless user manually ran "Analyze". | Low — no AI calls or UI progress bars used in background update. |
+| `src/ui/chat/chatPanelBuildRunner.ts` | Wired `analyzerService.updateProjectMapOnly()` to run automatically after chunked builds complete. | Keeps `project_map.md` in sync with active development automatically. | Low — runs after file save loop completes. |
+| `src/services/blueprint/blueprintWriter.ts` | Extracted `syncBlueprintMd(chassis, config)` helper. | Single point to ensure `.chassis/blueprint.md` is synced whenever config is updated. | None — pure extraction. |
+| `src/ui/messageRouterCore.ts`, `src/ui/chat/chatPanelMsgSpecial.ts`, `src/ui/chat/chatPanelPlanInterviewHelpers.ts`, `src/commands/blueprint.ts` | Added `syncBlueprintMd()` calls after every `saveConfig(config)` operation containing blueprint updates. | `.chassis/blueprint.md` was staying as an empty stub even when the user provided a full 5W blueprint via interview or side-panels. | Low — keeps internal files in sync with state. |
+| `src/services/blueprint/blueprintRevisionService.ts` | Added `syncBlueprintMd()` after `applyRevision()`. | AI auto-revisions were only writing to root `blueprint.md`, missing the internal tracker. | Low. |
+| `src/services/ai/guardianAI.ts` | Added DOMAIN GOTCHA: `.js`/`.ts` files must contain actual code, not JSON/markdown/plain text. Wrong content for the file extension is a CRITICAL correctness bug. | Guardian passed `src/game.js` containing JSON docs because the JSON syntax was technically valid. | Low — improves Guardian catch rate. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 37: Badge doesn't update on mode toggle)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMessageRouterEarlyExits.ts` | After toggling `state.agentMode`, now posts `update-agent-badge` message to the webview with the new badge HTML and the `agentMode` bool. Uses `_panel.webview.postMessage` (private reference). | `panelRefresh()` only sends `update-conversation` once initialized — the header HTML is never rebuilt, so the badge stayed OBD1 even after switching to OBD2. | Low — badge patch is purely cosmetic, no state side-effects. |
+| `src/ui/chat/chatPanelScript.ts` | Added `update-agent-badge` message handler: updates `window._agentMode` and patches the badge element in-place using `badgeEl.outerHTML = msg.html`. | Webview side needs to handle the new message type. | None. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 36: Corrected deploy path)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `GEMINI.md` Rule 20 | Updated `$BAKED` path to `~/projects/chassis-build/VSCode-linux-x64/resources/app/extensions/chassis`. Added note that `~/.vscode/extensions/` is NOT the running IDE. Documented the desktop entry. | All prior sessions deployed to the wrong location — `~/.vscode/extensions/papajoe.chassis-0.3.6/` is ignored by the CHASSIS fork binary. All session 33–35 features were deployed to the correct path in this session. | None. |
+
+## [NEXT] Planned Phase: Transition from Extension to Full Fork Integration
+
+The user has requested transitioning CHASSIS from a VS Code extension model to a fully integrated fork. The chassis-build directory at `~/projects/chassis-build/` already has the VS Code fork source. The goal is to bake CHASSIS UI/UX directly into the editor chrome (titlebar, sidebar, activity bar) rather than relying on the extension activation model, eliminating the deploy friction entirely. This is a major phase — requires separate planning session.
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 35: OBD2 Agent documentary narrator)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/agentNarrator.ts` | **New file.** `extractAgentThought()` — strips the AI's reasoning text before each `<tool_call>` and returns it for display. `narrateTool()` — deterministic documentary-style description for each tool invocation (read_file, write_file, run_command, list_dir, search_code, ask_user, MCP). `describeCommand()` — translates common shell commands into plain English. Zero AI calls. | User saw terse single-line bubbles that were cut off. | None — purely additive, no logic paths changed. |
+| `src/services/ai/agentService.ts` | Imported `extractAgentThought` and `narrateTool`. Startup message upgraded to "OBD2 Agent spinning up...". Each iteration now: (1) extracts and posts the AI's own thought text as a 💬 bubble, (2) calls `narrateTool()` for a rich description before executing the tool. Error messages now include step number and plain-English context. | Same reason — users were seeing "Agent using built-in tool: read_file..." with no context. | Low — narrator calls are purely cosmetic; tool execution path unchanged. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 34: Live code preview alongside chat bubbles)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuild.ts` | Added `import * as vscode`. Added early editor-pane open (existing files only) in `ViewColumn.Beside` with `preview:true, preserveFocus:true` before AI generation starts — so the pane appears immediately for modification builds. | User saw the code pane only appear after the build finished (or not at all). | Low — try/catch prevents preview failure from stalling a build. |
+| `src/ui/chat/chatPanelChunkedLoop.ts` | After `fs.writeFileSync` for each file in the loop, opens that file in `ViewColumn.Beside, preview:true, preserveFocus:true`. Each successive file replaces the same preview tab (VS Code preview-mode behaviour). User sees each file appear as it's written. | Chunked builds had no live preview at all — editor only opened via final result card. | Low — try/catch, non-blocking. |
+| `src/services/ai/agentTools.ts` | After `write_file` tool writes to disk, opens the file in `ViewColumn.Beside, preview:true, preserveFocus:true`. Applies to OBD2 Agent Mode. | Agent-written files had no preview at all. | Low — try/catch, non-blocking. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 33: Agent Mode OBD1/OBD2 — full integration + hover info)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgSendEarlyExits.ts` | **New file.** Extracted URL-read, web-search, remember-intent, and read-#N handlers from `chatPanelMsgSendMessage.ts`. Exports `handleUrlRead`, `handleWebSearch`, `handleRememberIntent`, `handleReadResult`. | Rule 9 split — `chatPanelMsgSendMessage.ts` was at 283 lines. | None — pure extraction, no logic changes. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Reduced from 283 → 185 lines. Delegated 4 early-exit blocks to `chatPanelMsgSendEarlyExits.ts`. Added `set-status: working/ready` signals around agent execution loop. Tightened agent context building. | Rule 9 hard-stop + agent status bar was never set (spinner never showed during agent tasks). | Low — behavior unchanged; signals added around existing `executeAgentTask` call. |
+| `src/ui/chat/chatPanelHtml.ts` | Changed Agent Mode badge: label now **🤖 OBD2** (purple, active) / **🚇 OBD1** (blue, inactive). `data-action` changed from `toggle-agent-mode` to `show-agent-info` — click now opens info panel instead of blind toggle. Injected `window._agentMode` JS variable before the chat script so the cost modal can detect agent mode at render time. | User requested OBD1/OBD2 naming. Info panel UX is safer than blind toggle (no accidental mode switches). | None — badge still triggers toggle via the info panel's button. |
+| `src/ui/chat/chatPanelScriptGates.ts` | Added `showAgentInfoPanel()`: styled modal with OBD1 vs OBD2 cost comparison table, tool list (read_file, write_file, run_command, list_dir, search_code, ask_user), and Enable/Disable toggle button. Added OBD2 Agent Mode banner in `showCostEstimatePanel()` when `window._agentMode` is true — shows iterative cost model ($0.01–$0.12, 3–15 iterations). | User requested hover info explaining costs and differences between Pipeline (OBD1) and Agent (OBD2) modes. | Low — banner only renders when `window._agentMode === true`. |
+| `src/ui/chat/chatPanelScript.ts` | Replaced `toggle-agent-mode` click handler with `show-agent-info` → `showAgentInfoPanel()`. Compacted `autoGrow`, `showStartSessionPanel`, `showContentPanel` to stay under 200 lines. | Wires up badge click to new info panel. | None — toggle now happens via button inside the info panel. |
 
 ---
 

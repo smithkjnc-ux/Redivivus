@@ -82,8 +82,12 @@ CSS / SCSS:                    /* [TAG] description */
 ### Rule 20: Build & Deploy Protocol
 - After any code change, always run: npm run compile
 - When deploying to baked IDE, ALWAYS copy both out/ AND package.json:
+  BAKED=~/projects/chassis-build/VSCode-linux-x64/resources/app/extensions/chassis
   cp -r out/* $BAKED/out/
   cp package.json $BAKED/package.json
+- The CHASSIS IDE is a full VS Code fork launched from a desktop icon at:
+  ~/projects/chassis-build/VSCode-linux-x64/chassis  (via ~/.local/share/applications/chassis-ide.desktop)
+- DO NOT deploy to ~/.vscode/extensions/ — that path is NOT used by the running IDE
 - Never copy out/ without package.json — commands, settings, and activation events live in package.json
 - Version in package.json must match the current release (currently 0.3.6)
 - When adding new commands, settings, or activation events, they MUST be registered in package.json contributes section or they will silently fail
