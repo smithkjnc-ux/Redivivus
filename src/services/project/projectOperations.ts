@@ -79,7 +79,7 @@ export class ProjectOperations {
       try { fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); }
       catch { /* best-effort */ }
     }
-    await vscode.commands.executeCommand('vscode.openWorkspace', vscode.Uri.file(wsFile), false);
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), false);
     return true;
   }
 

@@ -48,6 +48,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     setBlueprintContext: (ctx: string) => { state.blueprintContext = ctx; },
     buildMode: state.buildMode, assistMode: state.assistMode, vault: (panel as any).vault,
     planInterview: state.planInterview,
+    agentMode: state.agentMode,
   };
 
   await handleChatMessage(msg, msgDeps);

@@ -92,5 +92,62 @@ export function buildChatCssMid(): string {
     }
     .onboarding-pill:hover { background: var(--c-accent-lo); border-color: var(--c-accent); color: var(--c-text); }
     .onboarding-hint { font-size: 11px; color: var(--c-text-faint); margin-top: 6px; }
+
+    /* ── Launcher: compact, no-scroll welcome screen ── */
+    .launcher-root { padding: 16px 20px 10px !important; gap: 10px !important; justify-content: flex-start !important; }
+    .launcher-hero { display: flex; align-items: center; gap: 12px; }
+    .launcher-logo { font-size: 32px; filter: drop-shadow(0 3px 10px rgba(77,158,255,0.35)); }
+    .launcher-hero-text { text-align: left; }
+    .launcher-actions { display: flex; gap: 8px; justify-content: center; width: 100%; max-width: 440px; }
+    .launcher-action-card {
+      flex: 1; padding: 10px 8px 8px; background: var(--c-surface); border: 1px solid var(--c-border);
+      border-radius: 10px; cursor: pointer; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      transition: all 0.18s ease; font-family: inherit;
+    }
+    .launcher-action-card:hover { border-color: var(--c-accent); background: var(--c-accent-lo); transform: translateY(-1px); box-shadow: 0 3px 12px rgba(77,158,255,0.15); }
+    .lac-icon { font-size: 18px; }
+    .lac-label { font-size: 12px; font-weight: 700; color: var(--c-text); line-height: 1.3; }
+    .lac-desc { font-size: 10px; color: var(--c-text-faint); line-height: 1.3; }
+
+    .launcher-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; width: 100%; max-width: 440px; }
+    .launcher-section { text-align: left; }
+    .launcher-section-label { font-size: 10px; font-weight: 700; color: var(--c-text-faint); letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 6px; padding-left: 2px; }
+    .launcher-templates { display: flex; flex-direction: column; gap: 4px; }
+    .launcher-tpl-pill {
+      display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+      background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px;
+      font-size: 11px; font-weight: 600; color: var(--c-text-dim); cursor: pointer;
+      transition: all 0.15s; font-family: inherit;
+    }
+    .launcher-tpl-pill:hover { border-color: var(--c-accent); background: var(--c-accent-lo); color: var(--c-text); }
+    .tpl-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+    .launcher-recent-list { display: flex; flex-direction: column; gap: 2px; }
+    .launcher-recent-item {
+      display: flex; align-items: center; gap: 6px; padding: 5px 8px;
+      background: var(--c-surface); border: 1px solid transparent; border-radius: 6px;
+      cursor: pointer; transition: all 0.15s;
+    }
+    .launcher-recent-item:hover { border-color: var(--c-accent); background: var(--c-accent-lo); }
+    .lri-icon { font-size: 12px; flex-shrink: 0; }
+    .lri-name { flex: 1; font-size: 12px; font-weight: 500; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lri-time { font-size: 10px; color: var(--c-text-faint); flex-shrink: 0; }
+    .launcher-empty-recent { padding: 6px; color: var(--c-text-faint); font-size: 11px; font-style: italic; }
+
+    .launcher-bottom-bar {
+      display: flex; align-items: center; justify-content: center; gap: 8px; flex-wrap: wrap;
+      width: 100%; max-width: 440px; padding-top: 8px; border-top: 1px solid var(--c-border);
+    }
+    .launcher-vault-status { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--c-accent); cursor: pointer; padding: 2px 6px; border-radius: 4px; transition: background 0.15s; }
+    .launcher-vault-status:hover { background: var(--c-accent-lo); }
+    .launcher-vault-empty { color: var(--c-text-faint); cursor: default; }
+    .launcher-vault-empty:hover { background: transparent; }
+    .lvs-icon { font-size: 12px; }
+    .launcher-settings-gear { background: none; border: 1px solid var(--c-border); color: var(--c-text-faint); font-size: 13px; cursor: pointer; padding: 2px 5px; border-radius: 5px; transition: all 0.15s; line-height: 1; }
+    .launcher-settings-gear:hover { border-color: var(--c-accent); color: var(--c-text); }
+    .launcher-auto-popover { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 8px; padding: 8px 12px; max-width: 300px; box-shadow: 0 4px 16px rgba(0,0,0,0.25); }
+    .launcher-autostart { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 11px; color: var(--c-text-dim); }
+    .launcher-autostart input { cursor: pointer; accent-color: var(--c-accent); }
   `;
 }

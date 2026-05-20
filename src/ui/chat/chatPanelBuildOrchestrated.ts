@@ -71,7 +71,7 @@ function parseFileMarkers(code: string, primaryOutput: string): Map<string, stri
 /** Formats plan steps as a readable breakdown for the chat conversation */
 function formatPlanBreakdown(steps: PlanStep[]): string {
   return steps.map(s =>
-    `  **Step ${s.stepNumber}** &#x2014; ${s.assignedLabel}: ${s.description}`
+    `  **Step ${s.stepNumber}** — ${s.assignedLabel}: ${s.description}`
   ).join('\n');
 }
 
@@ -105,7 +105,7 @@ export async function runOrchestratedPhaseBuild(
   // ── Step 1: Supervisor plans ──────────────────────────────────────────────
   deps.conversation.push({
     role: 'assistant',
-    content: `&#x1F3AF; **${supervisorLabel} (Supervisor)** is planning the ${phase.icon} ${phase.name} phase...`,
+    content: `🎯 **${supervisorLabel} (Supervisor)** is planning the ${phase.icon} ${phase.name} phase...`,
     timestamp: Date.now(),
   });
   deps.refresh();
@@ -115,7 +115,7 @@ export async function runOrchestratedPhaseBuild(
   deps.conversation.push({
     role: 'assistant',
     content: [
-      `**${phase.icon} ${phase.name} &#x2014; AI Build Plan**`,
+      `**${phase.icon} ${phase.name} — AI Build Plan**`,
       ``,
       formatPlanBreakdown(planSteps),
       ``,
@@ -132,7 +132,7 @@ export async function runOrchestratedPhaseBuild(
   for (const step of planSteps) {
     deps.conversation.push({
       role: 'assistant',
-      content: `&#x2699; **${step.assignedLabel}** &#x2014; ${step.description}`,
+      content: `⚙️ **${step.assignedLabel}** — ${step.description}`,
       timestamp: Date.now(),
     });
     deps.refresh();
@@ -145,7 +145,7 @@ export async function runOrchestratedPhaseBuild(
   // ── Step 3: Supervisor reviews assembled output ───────────────────────────
   deps.conversation.push({
     role: 'assistant',
-    content: `&#x1F6E1; **${supervisorLabel} (Supervisor)** reviewing assembled output...`,
+    content: `🛡️ **${supervisorLabel} (Supervisor)** reviewing assembled output...`,
     timestamp: Date.now(),
   });
   deps.refresh();
@@ -154,7 +154,7 @@ export async function runOrchestratedPhaseBuild(
   if (!review.passed && review.notes) {
     deps.conversation.push({
       role: 'assistant',
-      content: `&#x270F; Supervisor applied corrections: ${review.notes}`,
+      content: `✍️ Supervisor applied corrections: ${review.notes}`,
       timestamp: Date.now(),
     });
     deps.refresh();
@@ -173,7 +173,7 @@ export async function runOrchestratedPhaseBuild(
     } catch (err) {
       deps.conversation.push({
         role: 'assistant',
-        content: `&#x26A0; Failed to write \`${relPath}\`: ${err instanceof Error ? err.message : String(err)}`,
+        content: `⚠️ Failed to write \`${relPath}\`: ${err instanceof Error ? err.message : String(err)}`,
         timestamp: Date.now(),
       });
     }
@@ -182,7 +182,7 @@ export async function runOrchestratedPhaseBuild(
   deps.conversation.push({
     role: 'assistant',
     content: [
-      `&#x2705; **${phase.name} built by ${planSteps.length} AI${planSteps.length > 1 ? 's' : ''}**`,
+      `✅ **${phase.name} built by ${planSteps.length} AI${planSteps.length > 1 ? 's' : ''}**`,
       writtenFiles.map(f => `  - \`${f}\``).join('\n'),
       `_~${totalTokens} tokens across ${planSteps.length} step${planSteps.length > 1 ? 's' : ''}_`,
     ].join('\n'),

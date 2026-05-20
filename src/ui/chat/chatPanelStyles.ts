@@ -6,7 +6,8 @@
 import { buildChatCssBase } from './chatPanelStylesBase.js';
 import { buildChatCssMid } from './chatPanelStylesMid.js';
 import { buildChatCssInput } from './chatPanelStylesInput.js';
+import { buildChatCssDash } from './chatPanelStylesDash.js';
 
 export function buildChatCss(): string {
-  return buildChatCssBase() + buildChatCssMid() + buildChatCssInput();
+  return buildChatCssBase() + buildChatCssMid() + buildChatCssDash() + buildChatCssInput();
 }

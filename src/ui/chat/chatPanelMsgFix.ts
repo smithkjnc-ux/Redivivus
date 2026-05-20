@@ -24,9 +24,49 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     refresh(); return;
   }
 
-  const sourceFiles = collectSourceFiles(root, userText);
+  // [DIAG] Log source file discovery for debugging
+  const diagLog = (msg: string) => {
+    try { fs.appendFileSync('/tmp/chassis_debug.log', `[fix] ${msg}\n`); } catch {}
+  };
+  diagLog(`root=${root} exists=${fs.existsSync(root)}`);
+
+  let sourceFiles = collectSourceFiles(root, userText);
+  diagLog(`initial scan: ${sourceFiles.length} files`);
+
+  // [FIX] After auto-open, workspace root may be set but point to a wrapper or multi-root.
+  // Scan one level deep for a subfolder containing source files as fallback.
   if (sourceFiles.length === 0) {
-    conversation.push({ role: 'assistant', content: 'No source files found. Is the correct folder open?', timestamp: Date.now() });
+    try {
+      const entries = fs.readdirSync(root);
+      diagLog(`root entries: ${entries.join(', ')}`);
+      for (const entry of entries) {
+        if (entry.startsWith('.')) { continue; }
+        const sub = path.join(root, entry);
+        if (fs.statSync(sub).isDirectory()) {
+          const subFiles = collectSourceFiles(sub, userText);
+          diagLog(`subfolder ${entry}: ${subFiles.length} files`);
+          if (subFiles.length > 0) { sourceFiles = subFiles; break; }
+        }
+      }
+    } catch (e: any) {
+      diagLog(`fallback scan error: ${e.message}`);
+    }
+  }
+  if (sourceFiles.length === 0) {
+    const dirExists = fs.existsSync(root);
+    let entries: string[] = [];
+    try { entries = fs.readdirSync(root); } catch {}
+    const hasSrc = entries.includes('src');
+    const detail = !dirExists
+      ? `Workspace root does not exist: ${root}`
+      : entries.length === 0
+        ? `Workspace root is empty: ${root}`
+        : `Workspace root has no source files. Root: ${root}. Entries: ${entries.slice(0, 20).join(', ')}`;
+    conversation.push({
+      role: 'assistant',
+      content: `No source files found. ${detail}\n\nIf your project is inside a wrapper folder, make sure the correct subfolder is opened as the workspace.`,
+      timestamp: Date.now()
+    });
     refresh(); return;
   }
   const allowedRels = new Set(sourceFiles.map(f => f.rel));
@@ -91,7 +131,7 @@ ${filesBlock}
 
 RULES:
 1. Fix ALL bugs in the diagnosis -- do not skip any
-2. Return the COMPLETE corrected file for every file that changes -- every line, no truncation
+2. Use SURGICAL EDITS -- show only the exact code that changes, not the entire file
 3. Do NOT add unrequested features. Fix only what is diagnosed.
 4. ONLY modify files listed above (${fileNames}). Do NOT create new files or invent file paths.
 5. For every block of code you REMOVE or REPLACE, add a [DEAD] comment immediately above the replacement.
@@ -100,11 +140,17 @@ RULES:
    Example: // [DEAD] AudioContext.destination -- silently null on Linux Chrome, no error thrown${buildWorkerRules(activePatterns, 6)}
 
 ${deps.assistMode ? '' : CHASSIS_WORKER_RULES + '\n'}
-FORMAT (exact -- required):
-## Fix: relative/path/to/file
-\`\`\`
-[COMPLETE corrected file content -- no truncation]
-\`\`\``;
+FORMAT (exact -- required for EACH change):
+## Edit: relative/path/to/file
+<<<SEARCH
+[exact existing code to find -- copy verbatim from source, include enough context to be unique]
+===
+[replacement code]
+REPLACE>>>
+
+Multiple edits per file: repeat the <<<SEARCH...REPLACE>>> block.
+The SEARCH block must match the existing file EXACTLY (same indentation, same whitespace).
+Include 2-3 lines of unchanged context above and below the change to ensure uniqueness.`;
 
     const fixRes = await routing.prompt(fixPrompt, 90_000);
     if (!fixRes.success || !fixRes.text?.trim()) {
@@ -137,23 +183,50 @@ FORMAT (exact -- required):
     }
   } catch { guardianNote = 'Guardian: skipped (error)'; }
 
-  // Parse fix blocks -- only writes files that exist in allowedRels (no phantom files)
-  const { fixes, skipped } = parseFixResponse(finalResponse, root, allowedRels);
-  if (fixes.length === 0) {
-    const skipNote = skipped.length > 0 ? `\n[WARN] Worker invented ${skipped.length} file(s) not in project: ${skipped.join(', ')}` : '';
-    conversation[conversation.length - 1].content =
-      `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\nWorker could not produce correctable file blocks. Describe the problem differently and try again.${skipNote}`;
-    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
+  // [FIX] Try surgical edits first (SEARCH/REPLACE), fall back to full-file parsing
+  const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits } = await import('../../services/build/surgicalEditService.js');
+  const responseFormat = detectResponseFormat(finalResponse);
+
+  let written: string[] = []; let failed: string[] = []; let skipped: string[] = []; let fixSnapId: string | undefined;
+  let usedSurgical = false;
+
+  if (responseFormat === 'surgical') {
+    const edits = parseSurgicalEdits(finalResponse);
+    const editFiles = [...new Set(edits.map(e => e.filePath))];
+    // Validate all edited files exist in project
+    const validEdits = edits.filter(e => allowedRels.has(e.filePath));
+    skipped = edits.filter(e => !allowedRels.has(e.filePath)).map(e => e.filePath);
+
+    if (validEdits.length > 0) {
+      fixSnapId = takeSnapshot(root, editFiles.filter(f => allowedRels.has(f)), userText);
+      const results = applySurgicalEdits(validEdits, root);
+      for (const r of results) {
+        if (r.success) { written.push(r.filePath); }
+        else { failed.push(`${r.filePath}: ${r.error || 'edit failed'}`); }
+      }
+      usedSurgical = true;
+    }
   }
 
-  const fixSnapId = takeSnapshot(root, fixes.map(f => f.rel), userText);
-  const written: string[] = []; const failed: string[] = [];
-  for (const fix of fixes) {
-    try {
-      fs.mkdirSync(path.dirname(fix.abs), { recursive: true });
-      fs.writeFileSync(fix.abs, fix.content, 'utf-8');
-      written.push(fix.rel);
-    } catch (e) { failed.push(`${fix.rel}: ${e instanceof Error ? e.message : String(e)}`); }
+  // Fallback: if no surgical edits found or all failed, try legacy full-file parsing
+  if (!usedSurgical || (written.length === 0 && failed.length > 0)) {
+    const { fixes: legacyFixes, skipped: legacySkipped } = parseFixResponse(finalResponse, root, allowedRels);
+    if (legacyFixes.length > 0) {
+      written = []; failed = []; skipped = legacySkipped;
+      fixSnapId = takeSnapshot(root, legacyFixes.map(f => f.rel), userText);
+      for (const fix of legacyFixes) {
+        try {
+          fs.mkdirSync(path.dirname(fix.abs), { recursive: true });
+          fs.writeFileSync(fix.abs, fix.content, 'utf-8');
+          written.push(fix.rel);
+        } catch (e) { failed.push(`${fix.rel}: ${e instanceof Error ? e.message : String(e)}`); }
+      }
+    } else if (written.length === 0) {
+      const skipNote = skipped.length > 0 ? `\n[WARN] Worker invented ${skipped.length} file(s) not in project: ${skipped.join(', ')}` : '';
+      conversation[conversation.length - 1].content =
+        `**Supervisor (${supervisorLabel}):**\n${diagnosis}\n\n---\nWorker could not produce correctable file blocks. Describe the problem differently and try again.${skipNote}`;
+      refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
+    }
   }
 
   const fileList = written.map(f => `- \`${f}\``).join('\n');
@@ -161,7 +234,7 @@ FORMAT (exact -- required):
   const failLine = failed.length > 0 ? `\n[WARN] Could not write: ${failed.join(', ')}` : '';
 
   // [WARN] Post-write pattern validation -- catch fixes that ignored guidance
-  const writtenFixes = fixes.filter(f => written.includes(f.rel));
+  const writtenFixes = written.map(rel => ({ rel, content: fs.existsSync(path.join(root, rel)) ? fs.readFileSync(path.join(root, rel), 'utf-8') : '' }));
   const patternViolations = validateOutputFiles(writtenFixes);
   const validationLine = patternViolations.length > 0
     ? '\n[VALIDATION FAIL] Fix still contains known failure pattern(s): ' +

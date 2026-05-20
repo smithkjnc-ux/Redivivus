@@ -75,6 +75,23 @@ export function buildChatScript(): string {
         vscode.postMessage({ type: 'switch-mode', mode: nextMode });
         return;
       }
+      const agentTarget = e.target.closest('[data-action="toggle-agent-mode"]');
+      if (agentTarget) {
+        vscode.postMessage({ type: 'toggle-agent-mode' });
+        const isAgent = agentTarget.textContent.includes('Agent Mode');
+        if (isAgent) {
+           agentTarget.textContent = '🚇 Pipeline';
+           agentTarget.style.background = '#1f2937';
+           agentTarget.style.color = '#9ca3af';
+           agentTarget.style.borderColor = '#374151';
+        } else {
+           agentTarget.textContent = '🤖 Agent Mode';
+           agentTarget.style.background = '#4c1d95';
+           agentTarget.style.color = '#c4b5fd';
+           agentTarget.style.borderColor = '#8b5cf6';
+        }
+        return;
+      }
       // Generic data-cmd handler: header buttons, sidebar pills, onboarding pills
       // [FIX] All button/pill elements use data-cmd — previous ID-based handlers (map-btn, blueprint-btn)
       // referenced elements that no longer exist. All header buttons were silently dead.
@@ -102,6 +119,8 @@ export function buildChatScript(): string {
           try { vscode.postMessage({ type: 'retrofit-project' }); } catch(err) {}
           return;
         }
+        if (action === 'scaffold-quickstart') { var tpl = launcherBtn.getAttribute('data-template'); if (tpl) { try { vscode.postMessage({ type: 'scaffold-quickstart', template: tpl }); } catch(err) {} } return; }
+        if (action === 'toggle-auto-open-popover') { var pop = document.getElementById('launcher-auto-popover'); if (pop) { pop.style.display = pop.style.display === 'none' ? 'block' : 'none'; } return; }
       }
     });
     clearBtn.addEventListener('click', () => vscode.postMessage({ type: 'clear-chat' }));

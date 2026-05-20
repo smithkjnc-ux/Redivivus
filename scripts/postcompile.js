@@ -52,10 +52,13 @@ if (fs.existsSync(srcDir)) {
 
 // Write build timestamp for visual verification
 const buildTimestamp = new Date().toISOString();
-const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
-// [WARN] File system operation: `fs.writeFileSync` can fail due to permissions or disk space issues.
 const pkgVersion = (() => { try { return JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf-8')).version; } catch { return '0.0.0'; } })();
-fs.writeFileSync(buildInfoPath, JSON.stringify({ timestamp: buildTimestamp, version: pkgVersion }, null, 2));
+const buildInfo = { timestamp: buildTimestamp, version: pkgVersion };
+// [WARN] Write to both .chassis/ (project tooling) and out/data/ (deployed with extension, readable at runtime)
+const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
+fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2));
+const outDataDir = path.join(workspaceRoot, 'out', 'data');
+if (fs.existsSync(outDataDir)) { fs.writeFileSync(path.join(outDataDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2)); }
 
 // Auto-commit logic
 try {

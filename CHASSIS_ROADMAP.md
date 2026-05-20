@@ -1,7 +1,618 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 19, 2026 — Session 20e: 7 holistic improvements — streaming, rollback, AI routing, fix undo, continuity, scaffolds*
+*Last updated: May 20, 2026 — Session 32: Enhance Agent Mode Context and Features*
+
+---
+
+## NEXT PHASE — Phase 2: Hybrid Backend / SaaS Architecture
+> **Status: PLANNED — not yet started. User will begin when domain is purchased.**
+> **Goal: Move CHASSIS pipeline logic to a Cloudflare-hosted backend while keeping the BYOK model. Extension becomes a thin client. Users cannot extract the brains.**
+
+### Why This Phase Exists
+
+CHASSIS is currently a VS Code extension — all pipeline logic (Supervisor/Worker/Guardian, AI routing, vault, build history) ships in the VSIX and is fully extractable by any user. Moving the logic server-side protects intellectual property, enables a future managed-key tier, and lets CHASSIS evolve independently of extension releases.
+
+### Architecture Overview
+
+```
+[VS Code Extension — thin client]
+        |
+        |  HTTPS + SSE  (user AI keys in headers, never stored)
+        v
+[Cloudflare Worker — api.chassisai.com]
+   - Supervisor / Worker / Guardian pipeline
+   - AI routing & complexity classification
+   - Vault search & enrichment
+   - Build history API
+   - Dead-ends & Lessons API
+        |
+        |  API calls with user-provided keys
+        v
+[AI Providers — Gemini / Claude / OpenAI / Groq / xAI / Kimi]
+```
+
+### What Moves to the Backend (Cloudflare Workers)
+
+| Currently In Extension | Moves To Server | Notes |
+|------------------------|-----------------|-------|
+| `src/services/ai/guardianService.ts` | Cloudflare Worker | Full Guardian pipeline |
+| `src/services/ai/routingClassifier.ts` | Cloudflare Worker | AI intent routing |
+| `src/services/ai/routingComplexity.ts` | Cloudflare Worker | Complexity classifier |
+| `src/services/build/compileAutoFix.ts` | Cloudflare Worker | Compile fix loop |
+| `src/services/build/testAutoFix.ts` | Cloudflare Worker | Test fix loop |
+| `src/ui/chat/chatPanelBuild.ts` — AI calls only | Cloudflare Worker | File writes stay local |
+| `src/ui/chat/chatPanelChunked.ts` — AI calls only | Cloudflare Worker | Planning + code gen |
+| `src/ui/chat/chatPanelMsgFix.ts` — AI calls only | Cloudflare Worker | Fix pipeline |
+| Vault AI enrichment | Cloudflare KV + Worker | Search stays local |
+
+### What Stays Local (Extension)
+
+| Stays In Extension | Reason |
+|--------------------|--------|
+| All file I/O (`fs.writeFileSync`, `fs.readFileSync`) | Cloudflare Workers have no filesystem access |
+| WebView panels (chat, build history, architecture map) | VS Code API only |
+| Snapshot / undo system (`SnapshotService`) | Requires local disk |
+| Git operations (`gitContext.ts`) | Requires git binary on user machine |
+| Compile runner (`compileRunner.ts`, `testRunner.ts`) | Requires local compiler/runtime |
+| Extension commands & keybindings | VS Code API only |
+| Blueprint, session, work log management | User's local `.chassis/` files |
+
+### BYOK Model — Retained as-is
+
+Users still bring their own AI API keys. The change is WHERE the keys are used:
+
+**Current flow:** Extension reads key from VS Code settings → calls AI provider directly
+**Phase 2 flow:** Extension reads key from VS Code settings → sends key in HTTPS header → Cloudflare Worker makes the AI call → streams response back
+
+Keys are **never logged or stored** on the server. Each request is stateless from a key perspective. Cloudflare Worker reads the key from the request header, uses it for that request only, and discards it.
+
+```
+Extension                       Cloudflare Worker
+--------                        ----------------
+Read key from VS Code settings
+Build request body:
+  { task, files, blueprintCtx }
+Add header:
+  X-Gemini-Key: user_key
+  X-Claude-Key: user_key (if set)
+POST /api/build  ─────────────> Receive request
+                                Extract keys from headers
+                                Run Supervisor → Worker → Guardian
+                                Call AI provider with user's key
+                                Stream SSE back
+Receive SSE chunks <────────────
+Write files locally
+```
+
+### Cloudflare Stack
+
+| Component | Purpose | Cloudflare Product |
+|-----------|---------|-------------------|
+| API compute | Supervisor/Worker/Guardian pipeline | **Workers** (no cold start, global edge) |
+| User vault sync (optional) | Cross-device vault access | **KV** (global, low-latency reads) |
+| Build history sync (optional) | Cross-device history | **D1** (SQLite, free tier: 5M rows) |
+| SSE streaming | Real-time token delivery | **Workers Streaming Response** |
+| Auth | CHASSIS license keys | **Workers** + **KV** (key → user record) |
+| Domain | `api.chassisai.com` | **Cloudflare DNS** (or user's own domain) |
+
+**Cost estimate at launch (100 users, 50 builds/day each):**
+- Workers: 5M requests/day free tier — covers up to ~500 users before billing starts
+- KV reads: 10M/day free — vault lookups easily covered
+- D1: 5M rows free — build history per user
+- Bandwidth: Workers → AI providers is egress Cloudflare doesn't charge
+
+### Auth System
+
+Phase 2 uses a simple license key model (not OAuth):
+
+1. User visits `chassisai.com` (your domain)
+2. Creates an account, gets a **CHASSIS License Key** (UUID-style, e.g. `chss_live_abc123...`)
+3. Enters the key in CHASSIS extension settings (`chassis.licenseKey`)
+4. Extension sends key in every request: `Authorization: Bearer chss_live_abc123`
+5. Worker validates key against KV store, rejects unknown/expired keys
+6. No sessions, no cookies, no OAuth — fully stateless
+
+**KV schema:**
+```
+key:   "license:chss_live_abc123"
+value: { userId, email, plan, createdAt, requestCount, dailyLimit }
+```
+
+### Streaming — SSE Cloudflare Worker → Extension
+
+Cloudflare Workers support native SSE via `ReadableStream`. The extension already has SSE handling (`streamingProviders.ts`) — it just needs the URL changed to point at the Worker instead of the AI provider directly.
+
+**Worker SSE response:**
+```
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+
+data: {"type":"chunk","text":"export "}
+data: {"type":"chunk","text":"function "}
+data: {"type":"chunk","text":"main() {"}
+data: {"type":"done","tokensUsed":1240,"costUSD":0.0006}
+```
+
+**Extension side — change one import:**
+```typescript
+// Before (Phase 1 — direct)
+import { streamProvider } from '../services/ai/streamingProviders.js';
+
+// After (Phase 2 — via backend)
+import { streamBackend } from '../services/ai/backendClient.js';
+```
+
+### Phase 2 Implementation Steps
+
+#### Step 1 — Backend Setup (do first, before any extension changes)
+- [ ] Purchase domain (e.g. `chassisai.com`)
+- [ ] Set up Cloudflare account, add domain
+- [ ] Create Cloudflare Worker project: `npm create cloudflare@latest chassis-api`
+- [ ] Deploy "hello world" worker at `api.chassisai.com/health`
+- [ ] Set up KV namespace: `CHASSIS_LICENSES`
+- [ ] Set up D1 database: `chassis_builds`
+- [ ] Create `wrangler.toml` with bindings
+
+**Worker file structure:**
+```
+chassis-api/
+  src/
+    index.ts          — request router
+    pipeline/
+      supervisor.ts   — Supervisor AI call
+      worker.ts       — Worker AI call
+      guardian.ts     — Guardian validation
+      router.ts       — AI routing logic
+    auth/
+      validateKey.ts  — KV license lookup
+    stream/
+      sseResponse.ts  — SSE response builder
+    types.ts
+  wrangler.toml
+  package.json
+```
+
+#### Step 2 — Auth Layer
+- [ ] Create KV schema + seed with test license key
+- [ ] Implement `validateKey(key, env)` — KV lookup, rate-limit check
+- [ ] Add `Authorization` header check to all Worker routes
+- [ ] Build simple license key generator script (run locally to provision users)
+- [ ] Add `chassis.licenseKey` setting to `package.json` contributes > configuration
+- [ ] Extension: read license key from settings, attach to every API request
+
+#### Step 3 — Migrate AI Routing Pipeline
+- [ ] Port `routingClassifier.ts` logic to Worker `pipeline/router.ts`
+- [ ] Port `routingComplexity.ts` → Worker (50-token classify call, same guards)
+- [ ] Port `guardianService.ts` → Worker `pipeline/guardian.ts`
+- [ ] Port `guardianAI.ts` / `guardianELI5.ts` / `guardianHealth.ts` → Worker
+- [ ] Create `POST /api/build` route — accepts task + files + blueprint context, runs full Supervisor→Worker→Guardian pipeline, streams SSE back
+- [ ] Test end-to-end: `curl -N -H "Authorization: Bearer test_key" -H "X-Gemini-Key: ..." https://api.chassisai.com/api/build`
+
+#### Step 4 — Extension Client Refactor
+- [ ] Create `src/services/ai/backendClient.ts` — thin wrapper around `fetch` to `api.chassisai.com`
+  - `buildRequest(ctx, task, files)` — POST /api/build, returns SSE stream
+  - `fixRequest(ctx, error, files)` — POST /api/fix, returns SSE stream
+  - Attaches license key + all user AI keys as headers
+- [ ] In `chatPanelBuild.ts`, replace `executeWorkerBuild` calls with `backendClient.buildRequest`
+- [ ] In `chatPanelChunked.ts`, replace chunked AI calls with streaming backend calls
+- [ ] In `chatPanelMsgFix.ts`, replace `aiFixCompileError` calls with `backendClient.fixRequest`
+- [ ] Keep all file I/O, snapshot, git, and compile runner calls exactly as-is (still local)
+- [ ] Feature-flag the switch: `chassis.useBackend` setting (boolean, default false during rollout)
+
+#### Step 5 — Vault Sync (Optional — Phase 2b)
+- [ ] Create `POST /api/vault/search` — takes query, searches user's vault in KV
+- [ ] Create `POST /api/vault/enrich` — AI-enriches vault items, writes to KV
+- [ ] Extension: if `useBackend` enabled, vault search hits Worker first, falls back to local
+- [ ] Local vault file (`~/.chassis-vault/`) remains the source of truth; KV is a sync mirror
+
+#### Step 6 — Build History Sync (Optional — Phase 2b)
+- [ ] Create D1 table: `builds (id, userId, task, files, supervisor, worker, tokensUsed, costUSD, timestamp)`
+- [ ] `POST /api/builds/record` — Worker writes to D1 after each build
+- [ ] `GET /api/builds?limit=20` — returns recent builds for the Build History panel
+- [ ] Extension: if `useBackend` enabled, history panel queries Worker; else uses local `build_history.json`
+
+#### Step 7 — Testing & Rollout
+- [ ] Run full self-test suite with backend enabled: `scripts/self-test-v2.sh`
+- [ ] Test BYOK flow: each AI provider key, verify keys never appear in Worker logs
+- [ ] Load test: 10 concurrent builds, verify SSE streams don't interleave
+- [ ] Beta: ship `chassis.useBackend = false` by default; opt-in for testers
+- [ ] Once stable: flip default to `true`, keep local-only as fallback
+
+### Performance Impact Analysis
+
+| Metric | Phase 1 (current) | Phase 2 (backend) | Delta |
+|--------|--------------------|-------------------|-------|
+| First token latency | ~800ms (direct to AI) | ~950ms (+Cloudflare hop) | +150ms — negligible |
+| SSE streaming | Already real SSE | SSE via Worker passthrough | Identical |
+| Build round-trip | 15-45s (AI-bound) | 15-45s (AI-bound) | No change |
+| Offline support | Full (BYOK direct) | Requires internet to Worker | Breaking — see below |
+| Extension VSIX size | ~932KB (with logic) | ~400KB (logic removed) | Smaller install |
+| Update cycle | Extension release required | Worker deploys in seconds | Better for users |
+
+**Offline impact:** Phase 2 requires internet to reach the Worker. If the user is offline, builds fail. Mitigation: keep a local fallback mode (`chassis.useBackend = false`) that uses the current direct AI call path. Users who work offline can stay on local mode.
+
+### Business Model (Future)
+
+| Tier | Price | What's Different |
+|------|-------|-----------------|
+| **Free / BYOK** | $0 | Use your own AI keys, Worker pipeline included |
+| **Pro / Managed Keys** | $X/mo | CHASSIS provides AI keys, no setup required |
+| **Team** | $Y/mo | Shared vault, build history across team members |
+
+Phase 2 enables the Pro tier — the Worker already has the user's keys in headers, so swapping to CHASSIS-managed keys is one config flag per request.
+
+### Files To Create (Phase 2)
+
+| New File | Purpose |
+|----------|---------|
+| `chassis-api/src/index.ts` | Worker router |
+| `chassis-api/src/pipeline/supervisor.ts` | Server-side Supervisor |
+| `chassis-api/src/pipeline/worker.ts` | Server-side Worker |
+| `chassis-api/src/pipeline/guardian.ts` | Server-side Guardian |
+| `chassis-api/src/pipeline/router.ts` | Server-side AI routing |
+| `chassis-api/src/auth/validateKey.ts` | License key validation |
+| `chassis-api/src/stream/sseResponse.ts` | SSE builder |
+| `chassis-api/wrangler.toml` | Cloudflare config |
+| `src/services/ai/backendClient.ts` | Extension thin client |
+
+### Files To Modify (Phase 2)
+
+| File | Change |
+|------|--------|
+| `package.json` | Add `chassis.licenseKey`, `chassis.useBackend` settings |
+| `src/ui/chat/chatPanelBuild.ts` | Replace AI calls with `backendClient.buildRequest` |
+| `src/ui/chat/chatPanelChunked.ts` | Replace AI calls with `backendClient.buildRequest` |
+| `src/ui/chat/chatPanelMsgFix.ts` | Replace AI calls with `backendClient.fixRequest` |
+| `src/commands/apiSetup.ts` | Add license key setup step |
+
+### [NEXT] Start Here When Domain Is Purchased
+
+1. `npm create cloudflare@latest chassis-api` — scaffold the Worker project
+2. Deploy the health check endpoint: `GET /health` returns `{ status: 'ok', version: '2.0.0' }`
+3. Set up KV namespace and seed one test license key
+4. Implement `validateKey` auth middleware
+5. Port the Guardian pipeline first (smallest, most self-contained)
+6. Add `POST /api/validate` — takes code string, returns Guardian score (easy to test in isolation)
+7. Build from there
+
+## Recent Fixes — May 20, 2026 (Session 31: Fix Build Intent Overreach on Packaging Requests)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelClassifier.ts` | Excluded vague packaging requests (e.g., "make this a stand alone game") from the `build` intent, mapping them explicitly to `question`. | The word "make" in "make flappy bird into a stand alone game" was triggering the `build` intent. This bypassed the conversational Q&A routing we added in Session 30, causing CHASSIS to erroneously build a duplicate file named `alone.html` instead of having a clarifying conversation about Electron. | None. |
+
+## Recent Fixes — May 20, 2026 (Session 30: Fix Surgical Edit Fallback and Vague Intent Routing)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuild.ts` | Added a safety guard to throw an error if a surgical edit fails to apply, instead of falling back to a full-file write. Also split 5 lines to maintain `< 200` Rule 9 compliance. | When surgical edits failed (e.g. missing file headers or text mismatches), CHASSIS was blindly falling back and writing the literal `<<<SEARCH...REPLACE>>>` tags into the user's file as a full file replacement, breaking their code. | Low. It now throws a graceful error in chat instead of corrupting the file. |
+| `src/services/build/surgicalEditService.ts` | Updated `parseSurgicalEdits` to handle AI responses that omit the `## Edit: filename` header. | The Worker AI was not explicitly instructed to output the `## Edit:` header for single-file surgical edits, causing the parser to fail to find the blocks and triggering the catastrophic fallback bug. | None. |
+| `src/ui/chat/chatPanelClassifier.ts` | Updated the `run` and `question` intents to route vague, non-technical overarching requests (like "make it a real app") to the conversational Q&A pipeline. | CHASSIS needs to understand plain English and clarify intent instead of blindly executing. This allows the AI to ask clarifying questions (e.g. "Do you want an Electron desktop app?") before building. | None. |
+
+## Recent Fixes — May 20, 2026 (Session 29: Fix Q&A auto-save and feature request classification)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelAutoSave.ts` | Updated the Supervisor prompt to check if the user asked to "modify" or "update" code, not just "create a NEW file". | If a user asked a question that yielded a full-file replacement, the AI previously ignored it for auto-save because the user didn't ask to create a "new" file. Now it correctly auto-saves code modifications resulting from Q&A. | None. |
+| `src/ui/chat/chatPanelClassifier.ts` | Updated the `build` intent system prompt to explicitly include feature requests phrased as questions (e.g. "how do I add X"). | The classifier was routing feature requests to the `question` (Q&A) pipeline instead of the `build` pipeline, skipping the robust orchestrated file-builder. | None. |
+
+## Recent Fixes — May 20, 2026 (Session 28: Fix Guardian AI conversational interception hallucination (Part 2))
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgSendAI.ts` | Added `isConvert` condition to the `if (routing.isGuardianActive())` check. | Guardian was still intercepting Q&A answers if the AI happened to include a code snippet in its explanation. This ensures Guardian only runs on actual codebase conversion tasks, never on conversational Q&A. | None. |
+| `src/ui/chat/chatPanelMsgMapContext.ts` | Removed the Guardian check block entirely. | Map context returns conversational analysis. Guardian should never run on analytical responses, even if they contain code snippets, as it will hallucinate file replacements. | None. |
+
+## Recent Fixes — May 20, 2026 (Session 27: Fix Guardian AI conversational interception hallucination)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgSendAI.ts` | Re-added the `hasCodeBlock` condition to the `if (routing.isGuardianActive())` check. | Prevents Guardian from trying to run a strict code-review prompt on a text-only conversational answer, which caused it to hallucinate code block rewrites. | None. |
+| `src/ui/chat/chatPanelMsgMapContext.ts` | Added the `hasCodeBlock` condition to the `if (routing.isGuardianActive())` check. | Prevents Guardian from trying to run a strict code-review prompt on a text-only analytical answer (e.g., when explaining a file in the Architecture Map). | None. |
+
+## Recent Fixes — May 20, 2026 (Session 26: Fix Open Workspace Silent Failure)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/project/projectOperations.ts` | Replaced `vscode.commands.executeCommand('vscode.openWorkspace', ...)` with `vscode.openFolder`. | The `vscode.openWorkspace` command does not exist in VS Code API, which caused the command to fail silently. `vscode.openFolder` handles both folders and workspaces. | None. |
+| `src/ui/messageRouterWizard.ts` | Replaced `vscode.commands.executeCommand('vscode.openWorkspace', ...)` with `vscode.openFolder`. | Fixes silent failure when opening newly scaffolded projects. | None. |
+| `src/ui/chat/chatPanelMsgProjectOps.ts` | Replaced `vscode.commands.executeCommand('vscode.openWorkspace', ...)` with `vscode.openFolder`. | Fixes silent failure when opening existing projects from the file dialog. | None. |
+| `src/ui/chat/chatPanelShow.ts` | Replaced `vscode.commands.executeCommand('vscode.openWorkspace', ...)` with `vscode.openFolder`. | Fixes silent failure when auto-opening last project on startup. | None. |
+
+## Recent Fixes — May 20, 2026 (Session 25: Clear Chat trashcan redirects to main dashboard / launcher screen)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelEmptyState.ts` | [NEW] Extracted `buildEmptyStateHtml` from `chatPanelHtml.ts` into this new modular file. | Fulfills the 200-line split hard stop (Rule 9) while separating empty state rendering. | None. |
+| `src/ui/chat/chatPanelHtml.ts` | Imported `buildEmptyStateHtml` from `./chatPanelEmptyState.js` and replaced inline IIFE. | Keeps chat panel HTML builder extremely slim and modular. | None. |
+| `src/ui/chat/chatPanelPublicAPI.ts` | In `panelRefresh`, if `messagesHtml` is empty (cleared chat), dynamically load `buildEmptyStateHtml` and post it to the webview. | Ensures clearing the chat redirects the central area back to the main dashboard / launcher screen instead of leaving it completely blank. | None. |
+
+## Recent Fixes — May 20, 2026 (Session 24: Fix raw HTML entity rendering and add Clarification Cancel button)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMessageRouterEarlyExits.ts` | Replaced the raw HTML entity `&#x1F680;` with the real unicode `🚀` emoji. | Prevents the HTML renderer from escaping `&` and showing raw text in the chat bubble. | None. |
+| `src/ui/chat/chatPanelBuild.ts` | Replaced `&#x1F4DD;` with the `📝` emoji. | Standardizes and clarifies chat message bubbles with clean emojis. | None. |
+| `src/ui/chat/chatPanelMsgIntentActions.ts` | Replaced `&#x23F3;` with the `⌛` emoji. | Standardizes and clarifies chat message bubbles with clean emojis. | None. |
+| `src/ui/chat/chatPanelBuildPhase.ts` | Replaced `&#x1F528;` with `🛠️` and `&#x1F50D;` with `🔍` emojis. | Standardizes and clarifies chat message bubbles with clean emojis. | None. |
+| `src/ui/chat/chatPanelEditBuild.ts` | Replaced `&#x274C;`, `&#x1F4BE;`, and `&#x2705;` with `❌`, `💾`, and `✅` emojis. | Standardizes and clarifies chat message bubbles with clean emojis. | None. |
+| `src/ui/chat/chatPanelBuildOrchestrated.ts` | Replaced `&#x1F3AF;`, `&#x2699;`, `&#x1F6E1;`, `&#x270F;`, `&#x26A0;`, `&#x2705;` with clean unicode emojis. | Standardizes and clarifies chat message bubbles with clean emojis. | None. |
+| `src/ui/chat/chatPanelRenderer.ts` | Added a Cancel button with secondary styles next to the Submit & Build button on the clarify card. | Gives the user a visual way to abort a build clarification prompt. | None. |
+| `src/ui/chat/chatPanelScriptActionsB.ts` | Added listener for `.clarify-cancel-btn` click event to post a message with `answers: { _cancelled: 'true' }`. | Connects the cancel button to the extension runtime. | None. |
+| `src/ui/chat/chatPanelChunked.ts` | Implemented `answers._cancelled === 'true'` check to output `❌ Build canceled.` and exit the build process cleanly. Also compacted multiple lines to remain strictly under the 200 line split limit. | Fulfills the user request to cancel builds from the guided interview while fully complying with Rule 9. | None. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 23: Collapse all custom sidebar sections by default)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/sidebar/chassisSidebar.ts` | Modified all section headers to have the `collapsed` class and all section bodies to have the `hidden` class by default. Unified the REVIEW section chevron to the standard down-facing indicator `▼`. | Keeps the sidebar extremely clean, structured, and uncluttered on load so the user can selectively expand whatever they need. | None. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 22: Restore User Profile to custom sidebar and auto-open chat)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/sidebar/chassisSidebar.ts` | Replaced the commented-out `[NEXT]` placeholder for the Profile section with an active collapsible `-- PROFILE` section, rendering `User Profile` (triggers `chassis.openProfile`) and `Web Search` (triggers `chassis.webSearch`) buttons. | Displays the user profile and web search tools directly in the custom sidebar as intended by the design. | None. |
+| `src/extensionInlineCommandsB.ts` | Modified the `chassis.openProfile` command handler to call `ChatPanel.show(...)` if the panel is not currently open, waiting briefly for initialization before sending the profile content. | Avoids showing an unhelpful warning dialog when the chat panel is closed and instead opens it automatically for a premium UX. | None. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 21: Resolve circular dependency causing Profile Runtime "command not found" error)
+
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/commands/profileRuntime.ts` | Converted static top-level `ChatPanel` import into a dynamic inline import inside the `chassis.profileRuntime` command handler. | Breaks circular dependency chain (`extensionCommands` -> `profileRuntime` -> `ChatPanel` -> `extensionInlineCommands` -> `extensionInlineCommandsB` -> `profileRuntime`) that caused command registration to fail at runtime. | None. |
+| `src/commands/startRuntimeAnalysis.ts` | Converted static top-level `ChatPanel` import into a dynamic inline import inside the `chassis.startRuntimeAnalysis` command handler. | Breaks circular dependency chain and prevents potential load-time crashes during initialization. | None. |
+| `src/commands/startRuntimeAnalysisHelpers.ts` | Converted static top-level `ChatPanel` import into a dynamic import within `postToChat()`. | Breaks circular dependency chain while maintaining synchronous signature for callers. | None. |
+| `src/extensionInlineCommandsB.ts` | Removed duplicate registration of `chassis.showBuildHistory` command. | The command is already registered in `src/commands/savePoint.ts`. Double-registration threw an unhandled error during startup that crashed the entire extension activation, rendering all sidebar commands non-functional. | None. |
+
+*Last updated: May 20, 2026 — resolve circular dependency in profile commands*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20Z: Fix Profile Runtime — wrong location + undeclared command)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/sidebar/chassisSidebar.ts` | Added `&#x26A1; Profile Runtime` button to the REVIEW section (after Scan Project). | Profile belongs in the sidebar REVIEW section, not the chat header. | None. |
+| `src/ui/chat/chatPanelHtml.ts` | Removed the `Profile` button from the chat header. | Wrong location — it was added there by mistake during session 20Y. | None. |
+| `package.json` | Added `chassis.profileRuntime` to `contributes.commands`. | Command was never declared, causing "command not found" toast on click. VS Code requires all commands to be declared before use. | None. |
+
+*Last updated: May 20, 2026 — fix Profile Runtime location and missing package.json declaration*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20Y: Restore missing Profile button)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelHtml.ts` | Restored `&#x26A1; Profile` header button (`data-cmd="chassis.profileRuntime"`). | Button was silently dropped during today's header rewrites — it appeared in the code-search result from the previous session but was no longer present in the current file. | None — restores existing command. |
+
+*Last updated: May 20, 2026 — restore Profile Runtime button*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20X: API setup disable switch, team roles, sorting, highlights, and styles split)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `package.json` | Added `chassis.disabledProviders` configuration setting array. | Stores user-disabled provider IDs persistently. | None. |
+| `src/services/ai/routingKeys.ts` | Intercepted key getters to return `null` if the provider ID is disabled. | Seamlessly propagates the disable action across the entire extension routing system. | None. |
+| `src/commands/apiSetup.ts` | Handled `toggle-provider` message to toggle disabled status and reload HTML. | Keeps the setting and the UI perfectly in sync in real time. | None. |
+| `src/commands/apiSetupHtml.ts` | Redesigned card layouts to support enabling/disabling, active team roles, and models/cost metadata. Implemented active team sorting (Supervisor > Guardian > Worker > Configured > Disabled > Not set) and card highlights. Extracted CSS to `src/commands/apiSetupStyles.ts` to remain under 200 lines (Rule 9). | Delivers a highly aesthetic, premium, and functional experience for managing AI teams. Groups and highlights active AI members at the top of the interface. | None. |
+| `[NEW] src/commands/apiSetupStyles.ts` | Created standalone styles file containing all CSS layout and pulsing/glowing animations. | Adheres to Rule 9 file split limits. | None. |
+
+*Last updated: May 20, 2026 — API setup sorting, highlights, and split*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20W: Improve build clarification UI option wrapping)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelRenderer.ts` | Wrapped each radio option label inside a block-level `div` with inline-flex alignment and flex-shrink protection. | Prevents the radio circles and option text from overlapping or running together horizontally in the build clarification card. | None. |
+
+*Last updated: May 20, 2026 — improve build clarification UI options*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20V: Improve Save All Files button UX)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelScriptActions.ts` | Updated the `'save-all-btn'` click handler to set `saveAllBtn.style.display = 'none'` and show a gorgeous green success message in its place. | Hides the Save All button after execution to prevent double clicks and make saving completion unambiguous. | None. |
+
+*Last updated: May 20, 2026 — improve Save All Files button UX*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20U: Add chat fast-path routing to codebase vault scan)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelClassifier.ts` | Added `'chassis.scanVaultCodebase'` command type to `AvailableCommand` union type. | Declares the scan codebase command is valid for intent classification. | None. |
+| `src/ui/chat/chatPanelClassifierOverrides.ts` | Added fast-path keyword and regex check for scanning codebase/project to vault, returning the command intent `chassis.scanVaultCodebase`. | Enables users to type "scan my codebase for reusable blocks and save them to my vault" in the CHASSIS Chat panel and directly launch the folder scanning flow. | None. |
+
+*Last updated: May 20, 2026 — add chat fast-path routing to codebase vault scan*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20T: Fix worker AI multi-file output extraction + tsconfig)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelChunkedLoop.ts` | Added robust multi-file output extraction: when worker AI outputs both files in one response separated by markdown fences, splits by fence and extracts only the section matching the target filename. Fixed TS7006 type annotation. Compacted header to 199 lines (Rule 9). | Worker AI ignores "output ONLY one file" instruction and dumps both files in each response. The naive fence-strip only removed first/last fences, leaving inner fences as TS syntax errors. | Low — only improves output parsing. |
+| `~/projects/surgical-test-greet/tsconfig.json` | Added `"DOM"` to `lib` array alongside `"ES2020"`. | The project tsconfig lacked DOM lib, so `console` was undefined — causing TS2584 errors on any `console.log` the AI generated. | None. |
+
+*Last updated: May 20, 2026 — fix worker AI multi-file output extraction*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20S: Fix vault snippet injection corrupting surgical edits)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelChunkedLoop.ts` | 1) Vault snippets now only injected for NEW files (`!exists`), not existing files being surgically modified. 2) Added `surgicalRules` variable with explicit instructions: output complete updated file, preserve existing code, do NOT add vault code or unrelated functions, do NOT wrap in markdown fences. 3) Strengthened the general "no fences" instruction. | The worker AI was given vault snippets (playSound, downloadAudio, etc.) for EVERY file including surgical edits. It copied all vault code into `test-surgical.ts`, producing 100+ lines of unrelated audio functions alongside the greet/farewell functions. This caused massive TS1005/TS1128 compile errors. | Low — only affects chunked build worker prompt. |
+
+*Last updated: May 20, 2026 — fix vault snippet injection corrupting surgical edits*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20R: Fix JSON parse failure in clarify token renderer)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelRenderer.ts` | Added HTML entity unescaping (`&quot;` → `"`, etc.) before `JSON.parse` in the `__CLARIFY__` token handler. Added `[WARN]` tag documenting the escapeHtml ordering issue. | `escapeHtml()` runs on line 27 before any token regex replacements, so the JSON inside `__CLARIFY__` has its quotes converted to `&quot;`, causing `JSON.parse` to fail silently and return an empty string — rendering the entire bubble blank. | None — mirrors the same unescape pattern used by the code block renderer. |
+
+*Last updated: May 20, 2026 — fix JSON parse failure in clarify token renderer*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20Q: Fix build clarification UI rendering in chat panel)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelRenderer.ts` | Added `__CLARIFY__` token parser and renderer to parse the AI generated questions array and render them as an interactive radio-button form inside the message bubble. Checked that the file size is strictly under 200 lines (Rule 9). | The chat panel webview lacked a renderer for the `__CLARIFY__` token, leaving the raw JSON string exposed in the chat interface and stalling the build. | None — cleanly handles the token rendering. |
+| `src/ui/chat/chatPanelScriptActionsB.ts` | Added a `.clarify-submit-btn` click listener that gathers checked radio option values, maps them to their respective question IDs, sets the button to a disabled "Building..." state, and posts the `clarify-submit` event back to the extension router. | Needed client-side interaction support to collect and submit user answers back to the extension to unlock the pending build loop. | None — standard DOM event listener. |
+
+*Last updated: May 20, 2026 — fix build clarification UI rendering in chat panel*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20P: Fix multi-file chunked build bypass in orchestrator)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelOrchestrator.ts` | Imported `runChunkedBuild` and `isChunkedBuildRequest` from `chatPanelBuild.js`. Updated `handleNanoBuild` and `handleStandardBuild` to check if a task is a chunked build request via `isChunkedBuildRequest`, and if so, route it to `runChunkedBuild(task, ctx)` instead of hardcoding `runSingleFileBuild(ctx)`. Compacted `handleDeepBuild` message strings to keep the file strictly under 200 lines (Rule 9). | The modification fast-path and standard-complexity project-initialized builds completely bypassed chunked build and directly executed `runSingleFileBuild`. This completely broke all multi-file requests on existing projects by forcing single-file behavior (resulting in wiping out files or single-file dumps). | None — properly integrates the chunked build router logic. |
+
+*Last updated: May 20, 2026 — fix multi-file chunked build bypass in orchestrator*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20O: Fix chunked build surgical edits of existing files)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelChunked.ts` | Imported `getWorkspaceContextService` and fetched workspace files. Injected `wsBlock` (list of relative paths of all files in the active workspace) directly into the planner's prompt `planPrompt`. Compacted dead-ends and rules variable declarations to keep the file strictly under 200 lines (Rule 9). | The planner AI (Claude) had no context on what files actually existed in the user's workspace, so it assumed existing target files (like `src/test-surgical.ts`) didn't exist or shouldn't be planned. Supplying the workspace file list lets it successfully plan updates to existing files. | None — strictly adds context. |
+| `src/ui/chat/chatPanelChunkedLoop.ts` | Added logic to check if a planned file already exists in the workspace. If it does, reads the current file content, injects it into `filePrompt` as `existingBlock`, and adds a strict rule telling the worker AI to modify the file content surgically rather than overwriting it from scratch. | When a file was planned for modification, the loop wrote it from scratch because it never loaded the existing file contents from disk, leading to overwriting of other functions and imports. | None — mirrors the successful single-file target loading logic. |
+
+*Last updated: May 20, 2026 — fix chunked build surgical edits of existing files*
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 20N: Fix multi-file chunked build planner supervisor)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelChunked.ts` | Rewrote the supervisor's planning prompt in `runChunkedBuild` to explicitly command it to identify and list both brand new files to create AND existing files that need to be edited or updated. Removed the unused `plannerLabel` variable and condensed recent context declarations to keep the file strictly under 200 lines (Rule 9). | The planning prompt was too generic ("Break this into individual source files..."), so the supervisor AI (Claude) thought existing files didn't need to be in the returned JSON plan. Consequently, it only planned the new file `src/farewell.ts` and left the caller `src/test-surgical.ts` completely out of the plan. Adding explicit instructions guarantees both creations and updates are planned. | None — prompt content optimization only. Rule 9 line count constraints successfully met (file is exactly 198 lines). |
+
+*Last updated: May 20, 2026 — fix multi-file planning prompt for existing file edits*
+
+---
+
+## Recent Fixes — May 19, 2026 (Session 20M: Fix single/multi-file chunked build routing)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuildHelpers.ts` | Added a structural fast-path in `isChunkedBuildRequest` to count unique file mentions (`\b[\w./-]+\.(ts\|tsx\|js\|...)\b`) in the task. If two or more unique files are mentioned, it immediately returns `true` (chunked build). Also sharpened the AI prompt to explicitly define creates + modifications/imports as a multi-file task, and parsed the answer robustly with `.includes()`. | When the user asked to create `src/farewell.ts` AND update `src/test-surgical.ts`, the model routing classified the build as "single-file" because the generic AI classifier in `isChunkedBuildRequest` didn't catch the multi-file requirement (likely returned prose or answered "single" because it wasn't a database/fullstack app). As a result, the single-file pipeline ran, wrote both functions to `src/farewell.ts`, and ignored `src/test-surgical.ts`. | None — regex is precise and handles any normal file references. Fallback prompt remains to catch non-explicit multi-file statements. |
+
+*Last updated: May 19, 2026 — fix single/multi-file chunked build routing on multiple file mentions*
+
+---
+
+## Recent Fixes — May 19, 2026 (Session 20L: Fix scaffold/build misclassification)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelClassifier.ts` | Sharpened `build` vs `scaffold` intent definitions. `build` now explicitly includes "even if user says 'new project' — specific files/functions/features always means build." `scaffold` now says "ONLY when NO specific files, functions, or features are named." Added 3 disambiguating examples including the exact failing message: "create a new test project called surgical-test-greet with a specific TypeScript file" → `build`. | "create a new test project... with a single TypeScript file src/test-surgical.ts containing a greet function" was classified as `scaffold` because it said "new project". `handleScaffoldIntent` → `detectScaffoldIntent` found no matching template (React/Flask/Go/Express) → asked "which one?" instead of building. The distinction: scaffold = blank boilerplate template, build = specific named content. | Low — purely prompt text change. AI classifier now has explicit rule and a matching example. |
+
+*Last updated: May 19, 2026 — fix build vs scaffold misclassification for specific-content project requests*
+
+---
+
+## Recent Fixes — May 19, 2026 (Session 20k: Build stamp in chat header)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `scripts/postcompile.js` | Now writes `build-info.json` to both `.chassis/` (existing) and `out/data/` (new). `out/data/` is deployed with the extension so the stamp is readable at runtime. | `.chassis/build-info.json` is in the project folder — the extension can't reliably find it at runtime because the project root varies. `out/data/` is always at a fixed path relative to `extensionContext.extensionPath`. | None — write is additive; `out/data/` write only runs if the dir exists. |
+| `src/ui/chat/chatPanelHeader.ts` | Reads `out/data/build-info.json` via `extensionContext.extensionPath` at header build time. Formats as `vX.Y.Z · May 19 HH:MM`. Silently skips on any error. Added `import * as fs from 'fs'`. | Need runtime access to build timestamp to display in UI. | None — all errors silently caught; `buildStamp` is optional on the interface. |
+| `src/ui/chat/chatPanelHtml.ts` | Added `buildStamp?: string` to `ChatHeaderInfo`. Renders as a monospace 10px dimmed stamp between the status dot and header-right buttons when `buildStamp` is present. | User needs to verify at a glance that a deploy took effect — build timestamp proves the running code matches the last compile. | None — purely additive; renders nothing when `buildStamp` is undefined. |
+
+*Last updated: May 19, 2026 — build stamp in chat header for deploy verification*
+
+---
+
+## Recent Fixes — May 19, 2026 (Session 20i: No-workspace auto-create for scaffold/service)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgIntentActions.ts` | `handleScaffoldIntent` and `handleServiceIntent` now call `autoCreateProject` when no workspace folder is open, instead of blocking with "Open a project folder first". After creation, auto-opens the folder via `vscode.openFolder`. | CHASSIS must work with nothing open — users expect to type a request and get a result, not be told to open a folder manually. | Low — `autoCreateProject` is the same path `runBuildAfterGates` uses. |
+
+---
+
+## Recent Fixes — May 19, 2026 (Session 20j: Fix "No project is open" false-positive on build requests)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelClassifierOverrides.ts` | Removed `test` and `start` from the structural run-intent fast-path regex. Both words are ambiguous: `test` matched `test project` in create requests ("create a new test project..."), routing to `handleRunIntent` which returned "No project is open". `start` matched "start a new project" (scaffold intent). Added `[DEAD]` comment documenting the removal. AI classifier now handles these per Rule 18. | User sent "create a new test project..." and got "No project is open — open a project folder first." Root cause: the hardcoded regex `\b(run|launch|preview|start|execute|test)\s+(...)?` matched `test project`, bypassed the AI classifier, and called `handleRunIntent` which lacks any auto-create logic. | None — `run`, `launch`, `preview`, `execute` remain in the fast-path and are unambiguous. `test it` / "let me test it" still resolves via the `let me (see|test|try) it` clause. |
+| Deploy — `chassis-build/VSCode-linux-x64/resources/app/extensions/chassis/out/` | Deployed fix to the actual running baked IDE. Previous deploy only targeted `~/.vscode/extensions/papajoe.chassis-0.3.6/` — that is NOT the editor the user runs. The baked IDE at `chassis-build/VSCode-linux-x64/` is the real target per Rule 20. [DEAD] Never deploy only to `~/.vscode/extensions/` — always deploy to `chassis-build/VSCode-linux-x64/resources/app/extensions/chassis/`. | Fix was compiled and deployed to the wrong location — baked IDE kept running old code with the broken regex. | None — file copy only. |
+
+*Last updated: May 19, 2026 — deploy fix to correct baked IDE path, add [DEAD] note on deploy target*
+
+---
+
+## Recent Fixes — May 19, 2026 (Session 20h: Feature gap closure — 9 features)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/build/surgicalEditService.ts` | New — SEARCH/REPLACE block parser + applier with whitespace-normalized fallback. | Full-file rewrites caused accidental deletion. | Low |
+| `src/ui/chat/chatPanelMsgFix.ts` | Worker prompt: SEARCH/REPLACE format. Response handler: surgical first, full-file fallback. | Fix pipeline was overwriting files. | Medium |
+| `src/ui/chat/chatPanelBuildWorker.ts` | Mod mode instructs AI to use SEARCH/REPLACE blocks. | Build pipeline same issue. | Medium |
+| `src/ui/chat/chatPanelBuild.ts` | Surgical edit detection after Guardian review with fallback. | Build pipeline for mods. | Low |
+| `src/ui/chat/chatPanelEditBuild.ts` | TODO-fix uses surgical format, graceful fallback. | Edit pipeline. | Low |
+| `src/services/webSearchService.ts` | New — DuckDuckGo search + URL reader + intent detection. No API key. | No web access existed. | Low |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Web search/URL/remember interception before classifier. "read #N" for results. | Wires web search + user memory into chat. | Low |
+| `src/services/languageServerBridge.ts` | New — go-to-definition, hover, references, rename, document symbols via VS Code LSP API. | No LSP integration existed. | Low |
+| `src/services/inlineDiffPreview.ts` | New — diff editor with accept/reject for proposed changes. Temp file management. | No review UI before writing. | Low |
+| `src/services/terminalCommandService.ts` | New — propose/approve/reject/execute terminal commands. Destructive command detection. | AI could not safely run terminal commands. | Low |
+| `src/services/imageUnderstandingService.ts` | New — structured image analysis (OCR, error detect, mockup comparison) via vision AI. | Only raw base64 forwarding existed. | Low |
+| `src/services/userMemoryService.ts` | New — global ~/.chassis/user_memory.json. Passive learning (0 tokens), explicit "remember", ~30-token prompt injection. | No cross-project memory existed. | Low |
+| `src/ui/sidebar/sidebarProvider.ts` | Activated PROFILE section with User Profile + Web Search entries. | Profile was greyed out. | Low |
+| `src/extensionInlineCommandsB.ts` | Registered chassis.openProfile + chassis.webSearch commands. | Sidebar entries need handlers. | Low |
+| `src/ui/chat/chatPanelAI.ts` | User memory injection into AI prompts via buildPromptInjection(). | AI needs to know user preferences. | Low |
+| `src/services/jupyterService.ts` | New — read/edit/insert .ipynb cells. Notebook-to-text for AI context. | No Jupyter support. | Low |
+| `src/services/deployService.ts` | New — Netlify/Vercel/Surge deploy. Project detection, build step, CLI integration. | No deployment capability. | Low |
+| `src/services/mcpService.ts` | New — MCP JSON-RPC client. Connect, discover tools/resources, call tools, read resources. | No external tool protocol. | Low |
+| `package.json` | Added chassis.openProfile + chassis.webSearch command definitions. | Required for sidebar activation. | None |
+
+---
+
+## Recent Fixes — May 19, 2026 (Session 20g: Project dashboard redesign)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelDashboard.ts` | Complete rewrite of `buildProjectDashboard`: compact hero (icon + name + stats inline), 2-column grid (blueprint left, activity right), truncated activity with relative timestamps (3 rows max), compact inline progress bar, better action pills with tooltips, added Close Project button, removed floating "Skip questions" pill. | Dashboard was verbose and required scrolling. New layout is compact, informative, and no-scroll. | Medium — full HTML rewrite but data sources unchanged. |
+| `src/ui/chat/chatPanelStylesDash.ts` | New file — CSS for dashboard classes: `.dash-root`, `.dash-hero`, `.dash-grid`, `.dash-bp-card`, `.dash-act-row`, `.dash-progress`, `.dash-actions`, `.dash-action-close`. | Dashboard needed dedicated styles; Mid CSS file was near 200-line limit. | None — new file, no existing styles affected. |
+| `src/ui/chat/chatPanelStyles.ts` | Added import + call for `buildChatCssDash()`. | Wire new dashboard CSS into the assembler. | None. |
+
+## Recent Fixes — May 19, 2026 (Session 20f: Launcher screen redesign — 6 improvements)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelHtml.ts` | Replaced launcher screen with polished redesign: 3 action cards with descriptions (Start New Project / Quick Build / Open Project), Quick Start Template pills (React, Flask, Go API, Express), vault status line, onboarding link, recent projects with relative timestamps, settings gear popover for auto-open checkbox. | Launcher undersold CHASSIS capabilities — new users saw a generic project picker, not an AI build system. Now surfaces scaffolding, vault, and capabilities discoverability. | Medium — launcher HTML changed significantly; all existing `data-action` and `data-recent-path` attributes preserved for backward compat. |
+| `src/ui/chat/chatPanelStylesMid.ts` | Added ~70 lines of CSS for new launcher components: `.launcher-action-card`, `.launcher-tpl-pill`, `.launcher-vault-status`, `.launcher-onboard-link`, `.launcher-settings-gear`, `.launcher-auto-popover`, improved `.launcher-recent-item` with timestamp column. | Professional styling for the redesigned launcher. | None — new classes only, no existing styles modified. |
+| `src/ui/chat/chatPanelScript.ts` | Added click handlers for `scaffold-quickstart` (sends template type to extension) and `toggle-auto-open-popover` (toggles visibility of settings popover). | Wire new launcher buttons to extension-side handlers. | None — new action names, no existing handlers modified. |
+| `src/ui/chat/chatPanelHeader.ts` | Added `vaultItemCount` to header data (computed via VaultService). Changed `recentProjects` to include `timestamp` field from globalState. | Launcher needs vault count for status line and timestamps for relative time display. | Low — VaultService instantiation wrapped in try/catch, defaults to 0. |
+| `src/ui/chat/chatPanelMessageRouterEarlyExits.ts` | Added `scaffold-quickstart` message handler: sets direct build mode, pushes scaffold request to conversation, delegates to `_handleBuildRequest`. | Quick Start Template pills need an extension-side handler to trigger scaffolding without requiring the user to type. | Low — reuses existing scaffold detection in the build pipeline. |
+| `src/ui/chat/chatPanelHtml.ts` | Replaced `⚡ Capabilities` header button with context-sensitive `? Help` button. On launcher: triggers `chassis.showCapabilities`. With project open: triggers `chassis.showChatGettingStarted` (focused help). Removed redundant "What can CHASSIS do?" link from launcher bottom bar. | Capabilities button was redundant with the bottom bar link. Help button is more useful and context-aware. | None — uses existing commands. |
+| `src/ui/chat/chatPanelStylesBase.ts` | Removed `.capabilities-btn` CSS (marked [DEAD]). | Cleanup — button no longer exists. | None. |
+| `src/ui/chat/chatPanelStylesMid.ts` | Removed unused `.launcher-onboard-link` and `.launcher-bottom-sep` CSS. | Cleanup — elements removed from HTML. | None. |
 
 ## Recent Fixes — May 19, 2026 (Session 20e: 7 holistic improvements)
 

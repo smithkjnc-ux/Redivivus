@@ -62,7 +62,7 @@ export function doShowChatPanel(
         recent.unshift(item);
         ctx.globalState.update('chassis.recentProjects', recent.slice(0, 10));
       }
-      vscode.commands.executeCommand('vscode.openWorkspace', vscode.Uri.file(wsFile), false);
+      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), false);
     }
   }
   if (ctx && !vscode.workspace.workspaceFolders?.length && startupBehavior === 'launcher') {

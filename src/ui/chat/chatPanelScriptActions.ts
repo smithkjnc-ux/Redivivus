@@ -71,6 +71,7 @@ export function buildActionsScript(): string {
       }
       // [FIX 3] SAVE ALL FILES BUTTON HANDLER
       if (target.id === 'save-all-btn' || target.closest('#save-all-btn')) {
+        const saveAllBtn = (target.id === 'save-all-btn') ? target : target.closest('#save-all-btn');
         const btns = document.querySelectorAll('.create-file-btn:not([style*="display: none"])');
         btns.forEach(b => b.click());
         setTimeout(() => {
@@ -78,7 +79,12 @@ export function buildActionsScript(): string {
           saveBtns.forEach(sb => sb.click());
           const count = btns.length;
           const stat = document.getElementById('save-all-stat');
-          if (stat) stat.textContent = '\\u2705 Saved ' + count + ' of ' + count + ' files';
+          if (stat) {
+            stat.innerHTML = '<span style="color:#2ba245;font-weight:600;font-size:12px;display:flex;align-items:center;gap:4px;">&#9989; Saved ' + count + ' of ' + count + ' files</span>';
+          }
+          if (saveAllBtn) {
+            saveAllBtn.style.display = 'none';
+          }
         }, 50);
         return;
       }

@@ -61,7 +61,7 @@ export async function handleWizardMessage(
             try { fs.writeFileSync(_wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { /* best-effort */ }
           }
           const _wsUri = vscode.Uri.file(_wsFile);
-          await vscode.commands.executeCommand('vscode.openWorkspace', _wsUri, false);
+          await vscode.commands.executeCommand('vscode.openFolder', _wsUri, false);
         }
       } catch (err) {
         vscode.window.showErrorMessage('Failed to create project: ' + (err as Error).message);

@@ -38,9 +38,17 @@ export function getSidebarHtml(): string {
 </head>
 <body>
 
-  <!-- [NEXT] Profile section — re-add when user preferences are implemented -->
+  <!-- [DONE] Profile section activated -->
+  <div class="section">
+    <div class="section-header collapsed" data-section="profile">
+      <span>&#x2014; PROFILE</span><span class="chevron">&#9660;</span>
+    </div>
+    <div class="section-body hidden" id="body-profile">
+      <button class="item" data-cmd="chassis.openProfile">&#128100; User Profile</button>
+      <button class="item" data-cmd="chassis.webSearch">&#128269; Web Search</button>
+    </div>
+  </div>
 
-  <!-- SETUP -->
   <div class="section">
     <div class="section-header collapsed" data-section="setup">
       <span>&#x2014; SETUP</span><span class="chevron">&#9660;</span>
@@ -55,10 +63,10 @@ export function getSidebarHtml(): string {
 
   <!-- SESSION -->
   <div class="section">
-    <div class="section-header" data-section="session">
+    <div class="section-header collapsed" data-section="session">
       <span>&#x2014; SESSION</span><span class="chevron">&#9660;</span>
     </div>
-    <div class="section-body" id="body-session">
+    <div class="section-body hidden" id="body-session">
       <button class="item" data-cmd="chassis.startSession">&#9654; Start Session</button>
       <button class="item" data-cmd="chassis.endSession">&#9899; End Session</button>
       <button class="item" data-cmd="chassis.switchAI">&#10024; Switch AI</button>
@@ -68,10 +76,10 @@ export function getSidebarHtml(): string {
 
   <!-- PROJECT -->
   <div class="section">
-    <div class="section-header" data-section="project">
+    <div class="section-header collapsed" data-section="project">
       <span>&#x2014; PROJECT</span><span class="chevron">&#9660;</span>
     </div>
-    <div class="section-body" id="body-project">
+    <div class="section-body hidden" id="body-project">
       <button class="item" data-cmd="chassis.wizard">&#128196; New Project</button>
       <button class="item" data-cmd="chassis.openProject">&#128193; Open Project</button>
       <button class="item" data-cmd="chassis.blueprint">&#128218; Blueprint</button>
@@ -81,10 +89,10 @@ export function getSidebarHtml(): string {
 
   <!-- BUILD & VAULT -->
   <div class="section">
-    <div class="section-header" data-section="build">
+    <div class="section-header collapsed" data-section="build">
       <span>&#x2014; BUILD &amp; VAULT</span><span class="chevron">&#9660;</span>
     </div>
-    <div class="section-body" id="body-build">
+    <div class="section-body hidden" id="body-build">
       <button class="item primary" data-cmd="chassis.openChat">&#128172; Open Chat <span class="badge">primary</span></button>
       <button class="item" data-cmd="chassis.openVault">&#128190; Open Vault</button>
       <button class="item" data-cmd="chassis.buildFromVault">&#128230; Build from Vault</button>
@@ -100,6 +108,7 @@ export function getSidebarHtml(): string {
     </div>
     <div class="section-body hidden" id="body-review">
       <button class="item" data-cmd="chassis.analyze">&#128269; Scan Project</button>
+      <button class="item" data-cmd="chassis.profileRuntime">&#x26A1; Profile Runtime</button>
       <button class="item" data-cmd="chassis.checkFileHealth">&#128196; Check File</button>
       <button class="item" data-cmd="chassis.cleanUpFile">&#10024; Clean File</button>
     </div>

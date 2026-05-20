@@ -60,7 +60,14 @@ export class SidebarProvider implements vscode.TreeDataProvider<SidebarNode> {
     const COMING_SOON = 'Coming Soon -- not yet implemented';
 
     return [
-      // [NEXT] Profile section — re-add when user preferences are implemented
+      // [DONE] Profile section activated -- user memory + web search
+      {
+        id: 'sec-profile', label: '-- PROFILE', type: 'section',
+        children: [
+          { id: 'prof-view',   label: 'User Profile',  type: 'action', icon: 'account',        command: 'chassis.openProfile' },
+          { id: 'prof-search', label: 'Web Search',    type: 'action', icon: 'search',         command: 'chassis.webSearch' },
+        ],
+      },
       {
         id: 'sec-setup', label: '-- SETUP', type: 'section',
         children: [
@@ -101,9 +108,10 @@ export class SidebarProvider implements vscode.TreeDataProvider<SidebarNode> {
       {
         id: 'sec-review', label: '-- REVIEW', type: 'section',
         children: [
-          { id: 'rev-scan',  label: 'Scan Project', type: 'action', icon: 'search',    command: 'chassis.analyze' },
-          { id: 'rev-check', label: 'Check File',   type: 'action', icon: 'file-text', command: 'chassis.checkFileHealth' },
-          { id: 'rev-clean', label: 'Clean File',   type: 'action', icon: 'wand',      command: 'chassis.cleanUpFile' },
+          { id: 'rev-scan',    label: 'Scan Project',    type: 'action', icon: 'search',    command: 'chassis.analyze' },
+          { id: 'rev-profile', label: 'Profile Runtime', type: 'action', icon: 'zap',       command: 'chassis.profileRuntime' },
+          { id: 'rev-check',   label: 'Check File',      type: 'action', icon: 'file-text', command: 'chassis.checkFileHealth' },
+          { id: 'rev-clean',   label: 'Clean File',      type: 'action', icon: 'wand',      command: 'chassis.cleanUpFile' },
         ],
       },
       {

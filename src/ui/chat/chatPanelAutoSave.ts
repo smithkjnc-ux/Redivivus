@@ -34,7 +34,7 @@ interface AutoSaveTarget {
 export async function shouldAutoSave(aiResponse: string, userMessage: string, routing: RoutingService): Promise<boolean> {
   // [RULE 18] AI classifier decides whether the user asked to build/generate a file
   try {
-    const prompt = `User message: "${userMessage.slice(0, 200)}"\nDid the user ask to build, create, or generate a new file or program? Reply with one word: yes or no`;
+    const prompt = `User message: "${userMessage.slice(0, 200)}"\nDid the user ask to build, create, generate, modify, or update code/files? Reply with one word: yes or no`;
     const res = await routing.prompt(prompt, 12_000);
     if (res.success && res.text && !res.text.trim().toLowerCase().startsWith('yes')) { return false; }
   } catch {

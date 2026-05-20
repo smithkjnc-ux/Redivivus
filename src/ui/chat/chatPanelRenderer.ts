@@ -73,6 +73,38 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `</div>`;
     });
 
+    // [CHASSIS] Multi-file build clarification token — renders interactive questions form
+    // [WARN] escapeHtml() runs first (line 27), so JSON quotes become &quot; — must unescape before parse
+    html = html.replace(/__CLARIFY__(.*?)__END_CLARIFY__/g, (_m, rawJson) => {
+      const unescaped = rawJson.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#039;/g, "'");
+      let questions: Array<{ id: string; question: string; options: Array<{ label: string }> }> = [];
+      try { questions = JSON.parse(unescaped); } catch { return ''; }
+      const questionsInputs = questions.map((q, idx) => {
+        const optionsHtml = q.options.map((opt, optIdx) =>
+          `<div style="display:block;margin-bottom:6px;">`
+          + `<label style="display:inline-flex;align-items:center;font-size:12px;cursor:pointer;color:var(--vscode-foreground);">`
+          + `<input type="radio" name="clarify-${q.id}" class="clarify-radio" data-qid="${escapeHtml(q.id)}" value="${escapeHtml(opt.label)}" `
+          + `${optIdx === 0 ? 'checked' : ''} style="margin-right:8px;accent-color:var(--vscode-button-background);flex-shrink:0;">`
+          + `<span>${escapeHtml(opt.label)}</span>`
+          + `</label>`
+          + `</div>`
+        ).join('');
+        return `<div class="clarify-question-block" style="margin-bottom:18px;">`
+          + `<div style="font-size:12px;font-weight:600;color:var(--vscode-foreground);margin-bottom:8px;">${idx + 1}. ${escapeHtml(q.question)}</div>`
+          + optionsHtml
+          + `</div>`;
+      }).join('');
+      return `<div class="clarify-card" style="background:var(--vscode-editor-inactiveSelectionBackground);border:1px solid var(--vscode-input-border);border-radius:8px;padding:16px 20px;margin-bottom:14px;box-shadow:0 4px 12px rgba(0,0,0,0.15);">`
+        + `<div style="font-size:14px;font-weight:700;color:var(--vscode-foreground);margin-bottom:4px;">📋 Build Clarification</div>`
+        + `<div style="font-size:11px;color:var(--vscode-descriptionForeground);margin-bottom:14px;">Select the best options for your project so I can build it exactly as you want:</div>`
+        + questionsInputs
+        + `<div style="display:flex;gap:8px;margin-top:12px;">`
+        + `<button class="clarify-submit-btn" style="padding:7px 16px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">Submit & Build</button>`
+        + `<button class="clarify-cancel-btn" style="padding:7px 16px;background:var(--vscode-button-secondaryBackground, #3a3d41);color:var(--vscode-button-secondaryForeground, #ffffff);border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">Cancel</button>`
+        + `</div>`
+        + `</div>`;
+    });
+
     // [CHASSIS] Vault dedup actions token — renders Merge button
     html = html.replace(/__VAULT_DEDUP_ACTIONS__END_VAULT_DEDUP__/g, () => {
       return `<div class="vault-dedup-actions">`

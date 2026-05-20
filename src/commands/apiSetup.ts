@@ -62,8 +62,27 @@ class ApiSetupPanel {
         if (msg.groqKey !== undefined)   { await config.update('groqApiKey',   msg.groqKey   || undefined, true); }
         if (msg.xaiKey !== undefined)    { await config.update('xaiApiKey',    msg.xaiKey    || undefined, true); }
         if (msg.kimiKey !== undefined)   { await config.update('kimiApiKey',   msg.kimiKey   || undefined, true); }
+        
+        // Refresh HTML after saving so thatConfigured/Not Set labels update in real-time
+        this._panel.webview.html = getApiSetupHtml();
+        
         this._panel.webview.postMessage({ type: 'saved', timestamp: new Date().toLocaleTimeString() });
         vscode.window.showInformationMessage('CHASSIS API keys applied successfully!');
+      } else if (msg.type === 'toggle-provider') {
+        const config = vscode.workspace.getConfiguration('chassis');
+        const disabled = config.get<string[]>('disabledProviders') || [];
+        const index = disabled.indexOf(msg.providerId);
+        const newDisabled = [...disabled];
+        if (index > -1) {
+          newDisabled.splice(index, 1);
+        } else {
+          newDisabled.push(msg.providerId);
+        }
+        await config.update('disabledProviders', newDisabled, true);
+        
+        // Refresh HTML to update disabled labels and team roles dynamically
+        this._panel.webview.html = getApiSetupHtml();
+        vscode.window.showInformationMessage(`CHASSIS: ${msg.providerId.toUpperCase()} has been ${index > -1 ? 'enabled' : 'disabled'}!`);
       } else if (msg.type === 'open-vscode-settings') {
         await vscode.commands.executeCommand('workbench.action.openSettings', 'chassis');
       }

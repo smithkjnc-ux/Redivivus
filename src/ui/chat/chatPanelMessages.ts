@@ -34,6 +34,7 @@ export interface MessageHandlerDeps {
   buildMode?: 'plan' | 'direct'; assistMode?: boolean; vault?: import('../../services/vault/vaultService.js').VaultService;
   planInterview?: import('./chatPanelPlanInterview.js').PlanInterviewState;
   setBlueprintContext?: (ctx: string) => void;
+  agentMode?: boolean;
 }
 
 

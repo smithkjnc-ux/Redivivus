@@ -1,0 +1,131 @@
+// [SCOPE] Built-in Tools for the Agentic Architecture.
+// These tools are exposed to the Agent LLM so it can read/write files and run commands autonomously.
+
+import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
+import { exec } from 'child_process';
+import { promisify } from 'util';
+
+const execAsync = promisify(exec);
+
+export interface AgentContext {
+  root: string;
+  task: string;
+  log: (msg: string) => void;
+  modifiedFiles: Set<string>;
+  snapshotId?: string;
+}
+
+export interface AgentTool {
+  name: string;
+  description: string;
+  parameters: string; // JSON schema or description of args
+  execute: (args: any, context: AgentContext) => Promise<string>;
+}
+
+export const BUILT_IN_TOOLS: AgentTool[] = [
+  {
+    name: 'read_file',
+    description: 'Reads the contents of a file in the workspace.',
+    parameters: '{ "filePath": "string (relative path)" }',
+    execute: async (args: any, ctx: AgentContext) => {
+      const absPath = path.join(ctx.root, args.filePath);
+      if (!fs.existsSync(absPath)) { return `Error: File ${args.filePath} does not exist.`; }
+      try {
+        const content = fs.readFileSync(absPath, 'utf8');
+        return content;
+      } catch (e: any) {
+        return `Error reading file: ${e.message}`;
+      }
+    }
+  },
+  {
+    name: 'write_file',
+    description: 'Writes or overwrites a file in the workspace with new content. Use this to create new files or completely replace existing ones.',
+    parameters: '{ "filePath": "string (relative path)", "content": "string (file content)" }',
+    execute: async (args: any, ctx: AgentContext) => {
+      const absPath = path.join(ctx.root, args.filePath);
+      try {
+        if (!ctx.snapshotId) {
+          const { createSnapshot } = await import('../../ui/chat/chatPanelBuildWriter.js');
+          ctx.snapshotId = createSnapshot(ctx.root, `Agent task: ${ctx.task.substring(0, 50)}`, args.filePath);
+        }
+        const dir = path.dirname(absPath);
+        if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+        fs.writeFileSync(absPath, args.content, 'utf8');
+        ctx.modifiedFiles.add(args.filePath);
+        ctx.log(`✅ Wrote \`${args.filePath}\``);
+        return `Successfully wrote to ${args.filePath}.`;
+      } catch (e: any) {
+        return `Error writing file: ${e.message}`;
+      }
+    }
+  },
+  {
+    name: 'run_command',
+    description: 'Executes a shell command in the project directory and returns the output (e.g. npm install, gcc).',
+    parameters: '{ "command": "string (shell command)" }',
+    execute: async (args: any, ctx: AgentContext) => {
+      ctx.log(`🖥️ Running: \`${args.command}\``);
+      try {
+        const { stdout, stderr } = await execAsync(args.command, { cwd: ctx.root });
+        let result = '';
+        if (stdout) result += `STDOUT:\n${stdout}\n`;
+        if (stderr) result += `STDERR:\n${stderr}\n`;
+        if (!result) result = 'Command completed successfully with no output.';
+        return result;
+      } catch (e: any) {
+        return `Command failed:\nSTDOUT:\n${e.stdout}\nSTDERR:\n${e.stderr}\nERROR:\n${e.message}`;
+      }
+    }
+  },
+  {
+    name: 'ask_user',
+    description: 'Pauses the agent loop and asks the user for clarification or permission.',
+    parameters: '{ "question": "string" }',
+    execute: async (args: any, ctx: AgentContext) => {
+      // This is a special tool. In the real agent loop, this might just yield the question back to chat.
+      // For now, we return a system message indicating the loop should pause.
+      return `_PAUSE_ASK_USER_${args.question}`;
+    }
+  },
+  {
+    name: 'list_dir',
+    description: 'Lists all files and subdirectories in a directory.',
+    parameters: '{ "dirPath": "string (relative path, e.g. \'.\' for root)" }',
+    execute: async (args: any, ctx: AgentContext) => {
+      const absPath = path.join(ctx.root, args.dirPath || '.');
+      if (!fs.existsSync(absPath)) { return `Error: Directory ${args.dirPath} does not exist.`; }
+      try {
+        const files = fs.readdirSync(absPath, { withFileTypes: true });
+        const list = files.map(f => `${f.isDirectory() ? '[DIR]' : '[FILE]'} ${f.name}`).join('\n');
+        return list || 'Directory is empty.';
+      } catch (e: any) {
+        return `Error listing directory: ${e.message}`;
+      }
+    }
+  },
+  {
+    name: 'search_code',
+    description: 'Searches the entire workspace for a specific keyword or regex pattern.',
+    parameters: '{ "query": "string (keyword or regex)" }',
+    execute: async (args: any, ctx: AgentContext) => {
+      ctx.log(`🔍 Searching codebase for: \`${args.query}\``);
+      try {
+        const { stdout } = await execAsync(`grep -rnI "${args.query.replace(/"/g, '\\"')}" . | head -n 50`, { cwd: ctx.root });
+        if (!stdout) { return 'No results found.'; }
+        return stdout;
+      } catch (e: any) {
+        if (e.code === 1) return 'No results found.';
+        return `Error searching codebase: ${e.message}`;
+      }
+    }
+  }
+];
+
+export function getToolInstructions(): string {
+  return BUILT_IN_TOOLS.map(t => 
+    `- **${t.name}**: ${t.description}\n  Args: ${t.parameters}`
+  ).join('\n\n');
+}

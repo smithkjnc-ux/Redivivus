@@ -262,6 +262,10 @@
         "title": "CHASSIS: Show Build History"
       },
       {
+        "command": "chassis.profileRuntime",
+        "title": "CHASSIS: Profile Runtime"
+      },
+      {
         "command": "chassis.runProject",
         "title": "CHASSIS: Run Project"
       },
@@ -306,6 +310,14 @@
         "command": "chassis.showPipelineTrace",
         "title": "CHASSIS: Show Pipeline Trace",
         "category": "CHASSIS"
+      },
+      {
+        "command": "chassis.openProfile",
+        "title": "CHASSIS: Open User Profile"
+      },
+      {
+        "command": "chassis.webSearch",
+        "title": "CHASSIS: Web Search"
       }
     ],
     "viewsWelcome": [
@@ -545,6 +557,14 @@
             "Automatically reopen the most recent CHASSIS project (falls back to launcher if none exists)"
           ],
           "description": "What CHASSIS should do when launched without a specific folder open"
+        },
+        "chassis.disabledProviders": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "List of AI provider IDs that are manually disabled by the user."
         }
       }
     }

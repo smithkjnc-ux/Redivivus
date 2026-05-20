@@ -131,6 +131,12 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     return true;
   }
 
+  if (msg.type === 'toggle-agent-mode') {
+    state.agentMode = !state.agentMode;
+    panel.refresh();
+    return true;
+  }
+
   if (msg.type === 'assistant-message') {
     state.conversation.push({ role: 'assistant', content: msg.text, timestamp: Date.now() });
     panel.refresh();
@@ -153,6 +159,18 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
   if (msg.type === 'retrofit-project') {
     vscode.commands.executeCommand('chassis.retrofitBlueprint');
+    return true;
+  }
+
+  // [CHASSIS] Quick Start Template — scaffold from launcher pill
+  if (msg.type === 'scaffold-quickstart') {
+    const tplNames: Record<string, string> = { react: 'React', flask: 'Python Flask', go: 'Go API', express: 'Node Express' };
+    const label = tplNames[msg.template] || msg.template;
+    state.buildMode = 'direct';
+    state.conversation.push({ role: 'user', content: `Scaffold a new ${label} project`, timestamp: Date.now() });
+    state.conversation.push({ role: 'assistant', content: `🚀 Scaffolding ${label} project...`, timestamp: Date.now() });
+    panel.refresh();
+    await (panel as any)._handleBuildRequest(`scaffold a new ${label} project`, true, false);
     return true;
   }
 

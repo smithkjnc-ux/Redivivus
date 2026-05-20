@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+
 
 export interface TraceEntry {
   type: string;
@@ -26,7 +26,9 @@ export interface Connection {
 }
 
 export function postToChat(text: string): void {
-  ChatPanel.currentPanel?.handleMessage({ type: 'assistant-message', text });
+  import('../ui/chat/chatPanel.js').then(({ ChatPanel }) => {
+    ChatPanel.currentPanel?.handleMessage({ type: 'assistant-message', text });
+  });
 }
 
 export function deleteSafe(filePath: string): void {

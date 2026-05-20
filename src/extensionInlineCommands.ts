@@ -64,7 +64,7 @@ export function registerInlineCommands(
   // ── Setup hub — aggregates all global setup, shows on first install ──
   try { registerSetupHubCommand(context, githubBackupService); } catch (e) { console.error('[CHASSIS] Setup hub registration failed', e); }
   // Hook auto-backup to build finish — fires after every successful build if enabled
-  ChatPanel.onBuildFinished = async (_task: string, _files: string[]) => {
+  ChatPanel.onBuildFinished = async (_task: string, _files: string[], buildRoot?: string) => {
     const cfg = githubBackupService.getConfig();
     if (cfg.enabled && cfg.autoBackupOnBuild) {
       await githubBackupService.backup();
@@ -74,7 +74,8 @@ export function registerInlineCommands(
     //        triggers a VS Code window reload which kills the chat panel message channel — the webview
     //        shows cached content but is disconnected, so the user cannot type or interact with it.
     //        When no folders exist, skip the auto-add and let the user open the folder manually.
-    const builtRoot = ChatPanel.currentPanel ? (ChatPanel.currentPanel.getChassisRoot?.() || '') : '';
+    // [FIX] Use buildRoot passed from the build pipeline — getChassisRoot() returns stale activation root
+    const builtRoot = buildRoot || (ChatPanel.currentPanel ? (ChatPanel.currentPanel.getChassisRoot?.() || '') : '');
     const existingFolders = vscode.workspace.workspaceFolders ?? [];
     const alreadyInWs = existingFolders.some(f => f.uri.fsPath === builtRoot);
     if (builtRoot && !alreadyInWs && existingFolders.length > 0) {
@@ -87,15 +88,9 @@ export function registerInlineCommands(
         { uri: vscode.Uri.file(builtRoot) }
       );
     } else if (builtRoot && !alreadyInWs && existingFolders.length === 0) {
-      // [FIX] First folder: show a notification instead of auto-adding (auto-add would reload window)
-      vscode.window.showInformationMessage(
-        `Project built at: ${builtRoot}`,
-        'Open as Workspace'
-      ).then(choice => {
-        if (choice === 'Open as Workspace') {
-          vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(builtRoot));
-        }
-      });
+      // [DEAD] Was: showInformationMessage with "Open as Workspace" button -- users missed it every time
+      // Auto-open the project folder immediately so user can start working
+      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(builtRoot));
     }
   };
 

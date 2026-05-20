@@ -14,6 +14,10 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
       /\bvault\b.*(open|show|view|browse)/i.test(t)) {
     return { type: 'command', command: 'chassis.openVault' };
   }
+  if (/\b(scan|search)\b.*\b(codebase|project|workspace|folder|files?)\b.*\bvault\b/i.test(t) ||
+      /\b(scan|search)\b.*\breusable\b.*\bvault\b/i.test(t)) {
+    return { type: 'command', command: 'chassis.scanVaultCodebase' };
+  }
   if (/\b(open|show|view)\b.*(the\s+)?blueprint\b/i.test(t)) {
     return { type: 'command', command: 'chassis.openBlueprint' };
   }
@@ -52,8 +56,12 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
   }
 
   // Run / preview — "run the app", "launch the sound player", "open in browser", "let me see it"
-  // [RULE 18] Structural fast path: explicit run/launch/preview/test verb + subject or explicit browser mention.
-  if (/\b(run|launch|preview|start|execute|test)\s+(the\s+|my\s+|it\s+)?(app|program|project|player|game|site|page|script|server|it)\b/i.test(t) ||
+  // [RULE 18] Structural fast path: explicit run/launch/preview verb + subject or explicit browser mention.
+  // [DEAD] 'test' and 'start' removed — both are ambiguous:
+  //   'test' matches 'test project' in CREATE requests (e.g. "create a new test project")
+  //   'start' matches 'start a new project' (scaffold) and 'start a session' (command)
+  //   AI classifier handles these correctly — Rule 18 says let AI handle language understanding.
+  if (/\b(run|launch|preview|execute)\s+(the\s+|my\s+|it\s+)?(app|program|project|player|game|site|page|script|server|it)\b/i.test(t) ||
       /\bopen\s+(it\s+)?in\s+(a\s+|the\s+)?browser\b/i.test(t) ||
       /\blet\s+me\s+(see|test|try)\s+it\b/i.test(t)) {
     return { type: 'run' };

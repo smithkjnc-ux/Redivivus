@@ -5,9 +5,116 @@
 
 ---
 
-*Last updated: May 16, 2026 (Session 14: Architect Review per-action fix buttons with in-chat confirmation)*
+*Last updated: May 20, 2026 (Session 32: Enhance Agent Mode Context and Features)*
 
 ---
+
+## May 20, 2026 — Session 32 (Agent Mode UX: Enhance Agent Mode Context and Features)
+
+- **Feature: Agent Mode Result Cards** — `src/ui/chat/chatPanelMsgSendMessage.ts` & `src/services/ai/agentService.ts`: Surfaced the standard CHASSIS Result Card UI in Agent Mode by injecting a `BuildLedger` to track total tokens across ReAct loop iterations and wiring it into `buildResultCard`.
+- **Fix: Missing Build History** — `src/services/ai/agentTools.ts` & `src/ui/chat/chatPanelMsgSendMessage.ts`: Added `SnapshotManager` triggers to the `write_file` agent tool so the first modification creates a save point, and wired the resulting snapshot to `BuildHistoryService` so Agent Mode builds appear in the History panel.
+- **Fix: Path Hallucination and Aggressive Instructions** — `src/services/ai/agentService.ts` & `src/ui/chat/chatPanelMsgSendMessage.ts`: Added aggressive "ZERO MANUAL INSTRUCTIONS" and "NO HALLUCINATIONS" constraints to the system prompt to force the agent to use `run_command` instead of writing fallback text tutorials. Additionally, injected a `vscode.workspace.findFiles` tree into `projectContext` so the Agent knows the exact file structure and stops guessing incorrect paths (e.g., `src/renderer.js` instead of `rendering.js`).
+
+---
+
+## May 20, 2026 — Session 31 (UX Intent Routing: Fix Build Intent Overreach on Packaging Requests)
+
+- **Fix: "Make" keyword triggering erroneous builds** — `src/ui/chat/chatPanelClassifier.ts`: In Session 30, I updated the `run` and `question` intents to handle vague packaging requests like "turn this into an app". However, the user typed: *"I want to make flappy bird into a stand alone game..."*. Because the `build` intent rule was instructed to trigger whenever the user asks to "make" something, the classifier overrode the Session 30 rule and routed this request straight into the `build` pipeline. 
+  - **The Result:** The Supervisor AI tried to parse a filename from the prompt, incorrectly extracted the word "alone" from "stand alone", inferred an HTML extension, and literally built a new duplicate file called `alone.html` containing the game code.
+  - **The Resolution:** Added an explicit override rule to the `build` intent system prompt, barring it from handling vague packaging requests (e.g. "make an executable") and explicitly routing them to `question`. Also added several hardcoded examples to ensure the classifier learns the pattern.
+
+---
+
+## May 20, 2026 — Session 30 (Surgical Edits & UX: Fix Surgical Edit Fallback and Vague Intent Routing)
+
+- **Fix: Surgical Edit Fallback Data Corruption** — `src/ui/chat/chatPanelBuild.ts` & `src/services/build/surgicalEditService.ts`: When the Worker AI generated `<<<SEARCH...REPLACE>>>` blocks without a `## Edit: filename` header, the parser failed to find any edits. Consequently, `usedSurgical` evaluated to false. The catastrophic bug was that CHASSIS then fell back to a full-file write, but the code payload it wrote was the literal, unparsed `<<<SEARCH...REPLACE>>>` tags, completely destroying the user's file.
+  - **Resolution 1:** Updated `parseSurgicalEdits` to assign headerless blocks to the default target file.
+  - **Resolution 2:** Added a strict safety guard in `chatPanelBuild.ts`. If surgical edits are detected but fail to apply, it now throws a graceful error (`Surgical edit failed`) instead of writing the raw tags.
+- **Fix: Vague Intent Classification** — `src/ui/chat/chatPanelClassifier.ts`: Vague, non-technical overarching requests (like "make it a real app" or "I want to run it when I click it") were being incorrectly routed to the `run` pipeline (which just opens the browser). I updated the system prompt to explicitly route these ambiguous non-code requests to the `question` intent. This allows the AI to fall back to conversational Q&A, clarify the user's goal (e.g., "Do you want an Electron desktop app?"), and explain the process before building.
+- **Rule 9 Enforcement:** Trimmed 5 lines from `src/ui/chat/chatPanelBuild.ts` to ensure it remains under the 200-line limit (currently 199 lines).
+
+---
+
+## May 20, 2026 — Session 29 (Auto-Save & Intent Routing: Fix Q&A auto-save and feature request classification)
+
+- **Fix: Feature requests phrased as questions routed to Q&A instead of Build** — `src/ui/chat/chatPanelClassifier.ts`: The intent classifier was heavily biased toward treating any input phrased as a question (e.g., "is there a way to make the bird more realistic?") as the `question` intent. I updated the system prompt to explicitly define feature requests and code modifications as `build` requests, ensuring they are routed to the robust orchestrated file-builder pipeline where changes are automatically applied.
+- **Fix: Q&A Code Snippets did not auto-save** — `src/ui/chat/chatPanelAutoSave.ts`: When a message did legitimately route to Q&A, and the AI responded with a full file replacement block, the `shouldAutoSave` guard was blocking the save. The guard asked the Supervisor AI, "Did the user ask to build, create, or generate a **new** file or program?" Since the user was asking to *modify* an existing file, the Supervisor correctly answered "No", disabling auto-save. I updated the prompt to check if the user asked to "build, create, generate, **modify, or update** code/files," ensuring valid code blocks generated during Q&A can now trigger the auto-save pipeline.
+
+---
+
+## May 20, 2026 — Session 28 (Guardian Hallucination Part 2: Fix Guardian AI conversational interception hallucination)
+
+- **Fix: Guardian AI still intercepted Q&A if the AI explanation included a code block** — `src/ui/chat/chatPanelMsgSendAI.ts` & `src/ui/chat/chatPanelMsgMapContext.ts`: My previous fix added `hasCodeBlock` to the Guardian check, but conversational answers often include code snippets to explain concepts (e.g., "Yes, you can do this by adding: `code snippet`"). This caused Guardian to trigger anyway and replace the entire conversational answer with a sterile codebase review patch. I completely removed Guardian from Map Context (which is always analytical) and mandated that Guardian only runs in standard chat if `isConvert` is true (i.e. the user explicitly asked to rewrite a file, not a Q&A question).
+
+---
+
+## May 20, 2026 — Session 27 (Guardian Hallucination: Fix Guardian AI conversational interception hallucination)
+
+- **Fix: Guardian AI hallucinated code block rewrites when evaluating non-code conversational answers** — `src/ui/chat/chatPanelMsgSendAI.ts` & `src/ui/chat/chatPanelMsgMapContext.ts`: Re-introduced the `hasCodeBlock` guard into the `if (routing.isGuardianActive())` condition. The Guardian AI is strictly prompted to perform a code-review (i.e. "CODE TO REVIEW:"). When the hasCodeBlock guard was previously removed for Q&A, Guardian intercepted text-only conversational answers, evaluated them as code, and routinely hallucinated code patches to replace the conversation. Guardian now correctly skips text-only responses and only reviews responses containing fenced code blocks.
+
+---
+
+## May 20, 2026 — Session 26 (Open Workspace Fix: Fix Open Workspace Silent Failure)
+
+- **Fix: "vscode.openWorkspace" command does not exist** — `src/services/project/projectOperations.ts`, `src/ui/messageRouterWizard.ts`, `src/ui/chat/chatPanelMsgProjectOps.ts`, `src/ui/chat/chatPanelShow.ts`: Replaced multiple usages of `vscode.commands.executeCommand('vscode.openWorkspace', ...)` with `vscode.commands.executeCommand('vscode.openFolder', ...)`. There is no such command as `vscode.openWorkspace` in the VS Code API, which caused opening scaffolded projects, existing projects from dialog, and auto-opening on startup to silently fail. The built-in `vscode.openFolder` correctly handles both directory URIs and `.code-workspace` file URIs.
+
+---
+
+## May 20, 2026 — Session 25 (Clear Chat Redirect: Clear Chat trashcan redirects to main dashboard / launcher screen)
+
+- **Architecture: Extracted empty state HTML building to respect Rule 9** — `src/ui/chat/chatPanelEmptyState.ts` [NEW]: Created a dedicated empty state module, keeping `chatPanelHtml.ts` extremely slim and strictly under the 200 lines limit.
+- **UX: Integrated Empty State in chat panel HTML builder** — `src/ui/chat/chatPanelHtml.ts`: Replaced the massive inline `emptyState` IIFE with a clean, delegated call to `buildEmptyStateHtml(header, progress)`.
+- **UX: Clear Chat redirects central area to main dashboard / launcher screen** — `src/ui/chat/chatPanelPublicAPI.ts`: Modified `panelRefresh()` so that when `messagesHtml` is empty (indicating a cleared chat history), it dynamically loads and injects the dashboard or launcher screen HTML rather than leaving the chat webview's central body completely blank.
+
+---
+
+## May 20, 2026 — Session 24 (UI Polish & Build Cancel: Fix raw HTML entities & add Clarification Cancel button)
+
+- **UX: Replaced all HTML entities with clean unicode emojis in chat** — Replaced raw codes like `&#x1F680;`, `&#x23F3;`, `&#x1F528;`, `&#x1F50D;`, `&#x274C;`, `&#x1F4BE;`, `&#x2705;`, `&#x1F3AF;`, `&#x2699;`, `&#x1F6E1;` with their real emoji counterparts (`🚀`, `⌛`, `🛠️`, `🔍`, `❌`, `💾`, `✅`, `🎯`, `⚙️`, `🛡️`). This avoids HTML escaping issues and ensures gorgeous, unescaped emoji rendering in all chat bubbles.
+- **UX: Added Cancel button to Build Clarification Card** — `src/ui/chat/chatPanelRenderer.ts` & `src/ui/chat/chatPanelScriptActionsB.ts`: Rendered a cancel button next to "Submit & Build" and wired its click handler to post a message containing `answers: { _cancelled: 'true' }`.
+- **Feature: Handled Clarification cancellation** — `src/ui/chat/chatPanelChunked.ts`: Handled the cancellation message by aborting the build pipeline gracefully, updating the assistant's message bubble to `❌ Build canceled.`, and setting status back to ready. Also compacted the file's code to stay strictly under the 200 line limit.
+
+---
+
+## May 20, 2026 — Session 23 (Sidebar Collapse: Collapse all custom sidebar sections by default)
+
+- **UX: Collapse all custom sidebar sections by default** — `src/ui/sidebar/chassisSidebar.ts`: Modified all 7 section headers to include the `collapsed` class and all 7 section bodies to include the `hidden` class by default. Unified the REVIEW section chevron to the standard down-facing indicator `▼` (`&#9660;`) to behave consistently with other sections during rotation. This results in an incredibly clean, neat, and highly customizable UI experience where the user only expands the sections they want to work with.
+
+---
+
+## May 20, 2026 — Session 22 (Profile View: Restore User Profile to custom sidebar and auto-open chat)
+
+
+- **Feature: Restored User Profile section to the custom sidebar** — `src/ui/sidebar/chassisSidebar.ts`: Replaced the commented-out `[NEXT]` placeholder for the Profile section with an active collapsible `-- PROFILE` section, rendering `User Profile` (triggers `chassis.openProfile`) and `Web Search` (triggers `chassis.webSearch`) buttons directly in the custom sidebar.
+- **UX: Auto-open chat panel on Profile request** — `src/extensionInlineCommandsB.ts`: Modified the `chassis.openProfile` command handler so that if the chat panel is not open, it automatically calls `ChatPanel.show(...)` and waits briefly for the panel to initialize before rendering the user memory profile. This gives a highly responsive, premium UX.
+
+---
+
+## May 20, 2026 — Session 21 (Profile Runtime: Resolve circular dependency causing "command not found" error)
+
+
+- **Fix: profileRuntime command fails to find at runtime with "command not found" toast** — Converted static top-level imports of `ChatPanel` into dynamic inline imports inside `src/commands/profileRuntime.ts`, `src/commands/startRuntimeAnalysis.ts`, and `src/commands/startRuntimeAnalysisHelpers.ts`. This breaks the circular dependency chain (`extensionCommands` -> `profileRuntime` -> `ChatPanel` -> `extensionInlineCommands` -> `extensionInlineCommandsB` -> `profileRuntime`) that caused command registration to fail or be skipped at load time, while maintaining signature compatibility.
+
+- **Fix: Extension activation crashed entirely on startup** — Found that `chassis.showBuildHistory` was being registered in both `src/commands/savePoint.ts` and `src/extensionInlineCommandsB.ts`. Because it was registered twice, the VS Code extension host threw an unhandled duplicate command error on startup which completely halted extension activation, rendering the sidebar non-functional. Removed the duplicate registration from `src/extensionInlineCommandsB.ts` to restore clean activation.
+
+---
+
+## May 20, 2026 — Session 20X (API Setup: Disable switches, active team sorting, glowing highlights, and split styles)
+
+- **Feature: Persistent ability to disable any configured AI provider** — `package.json`: Added `chassis.disabledProviders` setting schema to store array of user-disabled provider IDs. `src/services/ai/routingKeys.ts`: Intercepted all provider API key getters (`getGeminiKey()`, `getClaudeKey()`, etc.) to return `null` if the provider's ID is in the disabled list. This propagates the disabled state flawlessly across all supervisors, worker planners, and guardians.
+
+- **Feature: Interactive enable/disable actions in the UI** — `src/commands/apiSetup.ts`: Implemented `toggle-provider` message handler which receives the ID, toggles its state in settings, and reloads the HTML instantly to keep the UI perfectly updated.
+
+- **Feature: Dynamic team role badges, metadata, active sorting, and card highlights** — `src/commands/apiSetupHtml.ts`: Upgraded card rendering to instantiate `RoutingService` and dynamically display current roles (`🎯 Supervisor`, `⚙️ Worker`, `🛡️ Guardian`). Implemented custom rank sorting prioritizing active roles at the very top of the list (`Supervisor > Guardian > Worker > Configured > Disabled > Not configured`). Added a beautiful active visual highlight (active focus border left, inset shadow glow) and a pulsing green CSS active dot indicator.
+
+- **Architecture: Split CSS stylesheet to standalone styles file to respect Rule 9** — `src/commands/apiSetupStyles.ts`: Created new styling module starting with a valid `[SCOPE]` tag containing all CSS and keyframes declarations, successfully keeping `apiSetupHtml.ts` under the 200 lines limit!
+
+---
+
+## May 20, 2026 — Session 20W (Build Clarification: Vertically Stacked Option Labels)
+
+- **Fix: Build clarification radio choices were running together horizontally** — `src/ui/chat/chatPanelRenderer.ts`: Wrapped each `<label>` inside a block-level `<div>` with `display:block;margin-bottom:6px;` to force options onto their own distinct vertical lines, regardless of any global label inline-flex overrides. Set `display:inline-flex` and `flex-shrink:0` on the label/input to align the radio dot and option text perfectly.
+
 
 ## May 16, 2026 — Session 14l (Architect Review: Per-Action Fix Buttons)
 

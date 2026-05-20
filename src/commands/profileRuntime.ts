@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 import { runRuntimeProfiler, buildProfileSummary } from '../services/runtimeProfiler.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+
 import { ChassisService } from '../services/chassisService.js';
 import { RoutingService } from '../services/ai/routingService.js';
 import { UsageTracker } from '../services/usageTracker.js';
@@ -24,6 +24,7 @@ export function registerProfileRuntimeCommand(
         return;
       }
 
+      const { ChatPanel } = await import('../ui/chat/chatPanel.js');
       ChatPanel.show(chassis, routing, usageTracker, vault);
       await new Promise(r => setTimeout(r, 300));
 

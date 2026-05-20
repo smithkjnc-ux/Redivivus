@@ -48,10 +48,13 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
       editPrompt =
         `Edit this file \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
         `TASK: ${task}${bpSection}\n` +
-        `RULES:\n- Return ONLY the complete updated file (no fences, no explanation)\n` +
+        `Use SURGICAL EDITS. Output ONLY the changed parts:\n` +
+        `<<<SEARCH\n[exact existing code to find]\n===\n[replacement code]\nREPLACE>>>\n\n` +
+        `RULES:\n- Use <<<SEARCH...REPLACE>>> for each change. Do NOT return the full file.\n` +
         `- Change [TODO] to [DONE] once implemented\n` +
         `- Preserve all other annotations exactly\n` +
-        `- Write real, working code — no placeholders`;
+        `- Write real, working code — no placeholders\n` +
+        `- If you must return a full file (e.g. file is tiny), that is also acceptable.`;
     }
   } else {
     editPrompt =
@@ -77,7 +80,24 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     if (/^[A-Z][a-z]/.test(result) && !result.includes('<') && !result.includes('{') && !result.includes('//') && result.length < 800) {
       throw new Error('AI returned an explanation instead of code. Try again.');
     }
-    newContent = useExcerpt ? spliceExcerpt(lines, excerptStart, excerptEnd, result) : result;
+    // [FIX] Try surgical edits first if AI returned SEARCH/REPLACE blocks
+    const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits } = await import('../../services/build/surgicalEditService.js');
+    if (!useExcerpt && detectResponseFormat(res.text) === 'surgical') {
+      const edits = parseSurgicalEdits(res.text).map(e => ({ ...e, filePath: filePath }));
+      if (edits.length > 0) {
+        const results = applySurgicalEdits(edits, root);
+        if (results.every(r => r.success)) {
+          newContent = fs.readFileSync(absPath, 'utf-8');
+        } else {
+          // Surgical failed — fall back to full-file
+          newContent = result;
+        }
+      } else {
+        newContent = useExcerpt ? spliceExcerpt(lines, excerptStart, excerptEnd, result) : result;
+      }
+    } else {
+      newContent = useExcerpt ? spliceExcerpt(lines, excerptStart, excerptEnd, result) : result;
+    }
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     ctx.logError(task, editPrompt, errMsg, promptLen);
@@ -95,7 +115,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : String(err);
     ctx.logError(task, editPrompt, `Write failed: ${errMsg}`, promptLen);
-    appendMsg(ctx, `&#x274C; Could not write \`${filePath}\`\n\n**Reason:** ${errMsg}`);
+    appendMsg(ctx, `❌ Could not write \`${filePath}\`\n\n**Reason:** ${errMsg}`);
     if (ctx.onBuildFailed) { ctx.onBuildFailed(task, errMsg); }
     return;
   }
@@ -112,9 +132,9 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   let vaultMsg = '';
   if (vault) {
     const saved = await saveNewBlocksToVault(absPath, vault);
-    if (saved > 0) { vaultMsg = `\n&#x1F4BE; Saved **${saved}** new code block${saved !== 1 ? 's' : ''} to vault`; }
+    if (saved > 0) { vaultMsg = `\n💾 Saved **${saved}** new code block${saved !== 1 ? 's' : ''} to vault`; }
   }
 
-  updateLastMsg(ctx, `&#x2705; Fixed \`${filePath}\` ${diffSummary}${vaultMsg}\n\n_Diff view opened — close it to dismiss._`);
+  updateLastMsg(ctx, `✅ Fixed \`${filePath}\` ${diffSummary}${vaultMsg}\n\n_Diff view opened — close it to dismiss._`);
   if (ctx.onBuildFinished) { ctx.onBuildFinished(task, [filePath]); }
 }

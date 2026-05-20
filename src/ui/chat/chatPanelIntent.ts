@@ -71,8 +71,9 @@ export { classifyIntent, isBuildRequest, IntentType, IntentResult, AvailableComm
 
 /** Handles a build request — shows choice dialog for complex requests, runs pipeline for simple ones. */
 export async function handleBuildRequest(task: string, deps: BuildRequestDeps, skipComplex: boolean = false, isFixRequest: boolean = false): Promise<void> {
-  require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[handleBuildRequest entry] task=${task.slice(0,60)} skipComplex=${skipComplex}\n`);
   deps.postToWebview({ type: 'set-status', status: 'working' });
+  // [FIX] No workspace open → skip all gates (scope, vault, cost). Auto-create handles project setup.
+  if (!vscode.workspace.workspaceFolders?.length) { skipComplex = true; }
   if (!skipComplex) tracer.start(task);
 
   // ── Scope clarification — ask 2 questions in chat before doing anything for vague requests ──
@@ -152,11 +153,8 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
         const ctx = { task, root: vaultRoot!, blueprintContext: vaultBlueprintContext, vault: deps.vault, chassis: deps.chassis, routing: deps.routing, conversation: deps.conversation, refresh: deps.refresh, logError: deps.logError, postToWebview: deps.postToWebview };
         await runVaultAssemblyBuild(ctx, relevantItems);
         if (autoCreated && vaultRoot) {
-          const projectName = require('path').basename(vaultRoot);
-          const openChoice = await vscode.window.showInformationMessage(
-            `Project "${projectName}" built. Open it in the Explorer?`, 'Open Folder'
-          );
-          if (openChoice === 'Open Folder') { vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(vaultRoot)); }
+          // [DEAD] Was: showInformationMessage -- users expect auto-open
+          await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(vaultRoot));
         }
         deps.postToWebview({ type: 'set-status', status: 'ready' });
         return;

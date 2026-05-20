@@ -2,6 +2,8 @@
 // Imported by ApiSetupPanel._getHtml() in apiSetup.ts.
 
 import * as vscode from 'vscode';
+import { RoutingService } from '../services/ai/routingService.js';
+import { API_SETUP_CSS } from './apiSetupStyles.js';
 
 export function getApiSetupHtml(): string {
   const config = vscode.workspace.getConfiguration('chassis');
@@ -12,51 +14,96 @@ export function getApiSetupHtml(): string {
   const xaiKey     = config.get<string>('xaiApiKey') || '';
   const kimiKey    = config.get<string>('kimiApiKey') || '';
 
+  const disabledProviders = config.get<string[]>('disabledProviders') || [];
+  const routing = new RoutingService();
+  const roster = routing.buildRoster();
+
   const mask = (k: string) => k ? '•'.repeat(Math.min(k.length, 20)) : '';
-  const st = (k: string) => k ? 'status-ok">&#x2705; Configured' : 'status-missing">&#x274C; Not set';
 
   const providers = [
-    { id: 'gemini', icon: '&#x1F916;', name: 'Gemini (Google)',        badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Fast, free tier available. Recommended for most users -- great starting point.',           link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey },
-    { id: 'claude', icon: '&#x1F9E0;', name: 'Claude (Anthropic)',      badge: 'Paid',                badgeColor: '#b85c00', desc: 'Best for complex reasoning, long documents, and nuanced code review.',                    link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey },
-    { id: 'openai', icon: '&#x26A1;',  name: 'OpenAI (GPT-4o)',         badge: 'Paid',                badgeColor: '#b85c00', desc: 'GPT-4o -- strong all-rounder for code, chat, and analysis.',                             link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey },
-    { id: 'groq',   icon: '&#x1F525;', name: 'Groq (Llama / Mixtral)',  badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Extremely fast inference. Free tier available. Great for quick tasks.',                   link: 'https://console.groq.com/keys',                   linkLabel: 'Get free key', val: groqKey },
-    { id: 'xai',    icon: '&#x1F680;', name: 'xAI Grok',                badge: 'Paid',                badgeColor: '#b85c00', desc: 'Grok model -- strong reasoning, real-time data awareness.',                              link: 'https://console.x.ai/',                           linkLabel: 'Get API key', val: xaiKey },
-    { id: 'kimi',   icon: '&#x1F52E;', name: 'Kimi (Moonshot AI)',       badge: 'Paid',                badgeColor: '#b85c00', desc: 'Moonshot AI -- very large context window, good for big codebases.',                      link: 'https://platform.moonshot.cn/',                   linkLabel: 'Get API key', val: kimiKey },
+    { id: 'gemini', icon: '🤖', name: 'Gemini (Google)',        badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Fast, free tier available. Recommended for most users -- great starting point.',           link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey, model: 'gemini-2.5-flash', tier: '🚀 Ultra-Fast (Free / Low Cost)' },
+    { id: 'claude', icon: '🧠', name: 'Claude (Anthropic)',      badge: 'Paid',                badgeColor: '#b85c00', desc: 'Best for complex reasoning, long documents, and nuanced code review.',                    link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey, model: 'claude-3-5-sonnet', tier: '🧠 Deep Reasoning (Premium Paid)' },
+    { id: 'openai', icon: '⚡', name: 'OpenAI (GPT-4o)',         badge: 'Paid',                badgeColor: '#b85c00', desc: 'GPT-4o -- strong all-rounder for code, chat, and analysis.',                             link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey, model: 'gpt-4o-mini', tier: '⚖️ Strong Generalist (Low Cost)' },
+    { id: 'groq',   icon: '🔥', name: 'Groq (Llama / Mixtral)',  badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Extremely fast inference. Free tier available. Great for quick tasks.',                   link: 'https://console.groq.com/keys',                   linkLabel: 'Get free key', val: groqKey, model: 'llama-3.3-70b-versatile', tier: '⚡ Sub-second (Free Tier)' },
+    { id: 'xai',    icon: '🚀', name: 'xAI Grok',                badge: 'Paid',                badgeColor: '#b85c00', desc: 'Grok model -- strong reasoning, real-time data awareness.',                              link: 'https://console.x.ai/',                           linkLabel: 'Get API key', val: xaiKey, model: 'grok-2-1212', tier: '💬 Smart & Dynamic (Paid)' },
+    { id: 'kimi',   icon: '🔮', name: 'Kimi (Moonshot AI)',       badge: 'Paid',                badgeColor: '#b85c00', desc: 'Moonshot AI -- very large context window, good for big codebases.',                      link: 'https://platform.moonshot.cn/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)' },
   ];
 
-  const providerCards = providers.map(p => `
-  <div class="provider">
-    <div class="provider-header">
-      <span class="provider-name">${p.icon} ${p.name} <span style="font-size:10px;font-weight:600;padding:1px 7px;border-radius:10px;background:${p.badgeColor}30;color:${p.badgeColor};vertical-align:middle;">${p.badge}</span></span>
-      <span class="provider-status ${st(p.val)}</span>
-    </div>
-    <div class="provider-desc">${p.desc} <a href="${p.link}" style="color:#4a9eff;font-size:11px;">${p.linkLabel}</a></div>
-    <input type="password" id="${p.id}-key" placeholder="Enter ${p.name} API key" value="${mask(p.val)}" data-original="${p.val ? 'set' : ''}">
-  </div>`).join('');
+  const getRank = (pId: string, val: string) => {
+    const isKeySet = val && val.length > 0;
+    const isDisabled = disabledProviders.includes(pId);
+    if (!isKeySet) return 6;
+    if (isDisabled) return 5;
+    if (roster.supervisor === pId) return 1;
+    if (roster.guardian === pId && roster.guardian !== roster.supervisor) return 2;
+    if (roster.workers.includes(pId)) return 3;
+    return 4;
+  };
+
+  providers.sort((a, b) => getRank(a.id, a.val) - getRank(b.id, b.val));
+
+  const providerCards = providers.map(p => {
+    const isKeySet = p.val && p.val.length > 0;
+    const isDisabled = disabledProviders.includes(p.id);
+    const isActive = isKeySet && !isDisabled && (roster.supervisor === p.id || roster.workers.includes(p.id) || roster.guardian === p.id);
+
+    let statusClass = 'status-missing';
+    let statusText = '&#x274C; Not set';
+    let toggleBtnHtml = '';
+    let rolesHtml = '';
+
+    if (isKeySet) {
+      if (isDisabled) {
+        statusClass = 'status-disabled';
+        statusText = '&#x26A0;&#xFE0F; Disabled';
+        toggleBtnHtml = `<button type="button" class="btn-toggle btn-enable" onclick="toggleProvider('${p.id}')">🔓 Enable AI</button>`;
+      } else {
+        statusClass = 'status-ok';
+        statusText = '&#x2705; Configured';
+        toggleBtnHtml = `<button type="button" class="btn-toggle btn-disable" onclick="toggleProvider('${p.id}')">🔒 Disable AI</button>`;
+
+        // Compute current team roles
+        const roles: string[] = [];
+        if (roster.supervisor === p.id) {
+          roles.push('<span class="badge badge-supervisor">🎯 Supervisor</span>');
+        }
+        if (roster.workers.includes(p.id)) {
+          roles.push('<span class="badge badge-worker">⚙️ Worker</span>');
+        }
+        if (roster.guardian === p.id && roster.guardian !== roster.supervisor) {
+          roles.push('<span class="badge badge-guardian">🛡️ Guardian</span>');
+        }
+        if (roles.length > 0) {
+          rolesHtml = `<div class="provider-roles">${roles.join('')}</div>`;
+        }
+      }
+    }
+
+    const dotHtml = isActive ? `<span class="active-dot" title="Active Team Member"></span>` : '';
+
+    return `
+    <div class="provider ${isDisabled ? 'provider-disabled' : ''} ${isActive ? 'provider-active' : ''}">
+      <div class="provider-header">
+        <span class="provider-name">${p.icon} ${p.name} <span class="provider-type-badge" style="background:${p.badgeColor}30;color:${p.badgeColor};">${p.badge}</span></span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          ${dotHtml}
+          <span class="provider-status ${statusClass}">${statusText}</span>
+          ${toggleBtnHtml}
+        </div>
+      </div>
+      <div class="provider-desc">${p.desc} <a href="${p.link}" style="color:#4a9eff;font-size:11px;">${p.linkLabel}</a></div>
+      <input type="password" id="${p.id}-key" placeholder="Enter ${p.name} API key" value="${mask(p.val)}" data-original="${p.val ? 'set' : ''}" ${isDisabled ? 'disabled' : ''}>
+      ${rolesHtml}
+      <div class="provider-meta">
+        <span>🤖 Active Model: <code>${p.model}</code></span>
+        <span>${p.tier}</span>
+      </div>
+    </div>`;
+  }).join('');
 
   return `<!DOCTYPE html><html><head>
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; max-width: 640px; margin: 0 auto; }
-    h1 { font-size: 24px; margin-bottom: 4px; }
-    .subtitle { color: var(--vscode-descriptionForeground); margin-bottom: 8px; font-size:13px; }
-    .free-tip { background: rgba(26,122,58,0.12); border:1px solid #1a7a3a50; border-radius:8px; padding:10px 14px; margin-bottom:18px; font-size:12px; color:var(--vscode-foreground); }
-    .free-tip strong { color:#4ec959; }
-    .provider { background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); border-radius: 8px; padding: 14px 16px; margin-bottom: 10px; }
-    .provider-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap:wrap; gap:6px; }
-    .provider-name { font-weight: 600; font-size: 13px; }
-    .provider-status { font-size: 12px; padding: 2px 8px; border-radius: 12px; white-space:nowrap; }
-    .status-ok { background: rgba(78,201,89,0.2); color: #4ec959; }
-    .status-missing { background: rgba(255,83,79,0.2); color: #ff534f; }
-    .provider-desc { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 10px; line-height:1.5; }
-    input { width: 100%; box-sizing:border-box; padding: 7px 10px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-input-border); border-radius: 4px; color: var(--vscode-input-foreground); font-family: monospace; font-size: 12px; }
-    input:focus { outline: none; border-color: var(--vscode-focusBorder); }
-    .actions { margin-top: 20px; display: flex; gap: 12px; justify-content: center; }
-    button { padding: 9px 22px; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: 600; }
-    button:hover { opacity:0.85; }
-    button.secondary { background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); }
-    .apply-feedback { margin-top:14px; padding:10px 14px; background:rgba(78,201,89,0.1); border-left:3px solid #4ec959; border-radius:0 4px 4px 0; display:none; font-size:13px; }
-    .apply-feedback.show { display:block; }
-    .tip { margin-top:20px; padding:10px 14px; background:var(--vscode-input-background); border-radius:6px; font-size:11px; color:var(--vscode-descriptionForeground); }
+    ${API_SETUP_CSS}
   </style></head><body>
   <h1>&#x1F510; CHASSIS API Setup</h1>
   <div class="subtitle">Configure your AI provider API keys -- you only need ONE to get started.</div>
@@ -75,17 +122,25 @@ export function getApiSetupHtml(): string {
   </div>
   <script>
     const vscode = acquireVsCodeApi();
+    
+    function toggleProvider(id) {
+      vscode.postMessage({ type: 'toggle-provider', providerId: id });
+    }
+
     document.getElementById('apply-btn').addEventListener('click', () => {
       const ids = ['gemini','claude','openai','groq','xai','kimi'];
       const payload = { type: 'save-keys' };
       ids.forEach(id => {
         const el = document.getElementById(id + '-key');
+        if (!el) return;
         const v = el.value;
         payload[id + 'Key'] = (v.includes('•') && el.dataset.original === 'set') ? undefined : v;
       });
       vscode.postMessage(payload);
     });
+
     document.getElementById('vscode-settings-btn').addEventListener('click', () => { vscode.postMessage({ type: 'open-vscode-settings' }); });
+    
     window.addEventListener('message', e => {
       if (e.data.type === 'saved') {
         const fb = document.getElementById('apply-feedback');
@@ -94,6 +149,6 @@ export function getApiSetupHtml(): string {
         setTimeout(() => fb.classList.remove('show'), 5000);
       }
     });
-  <\/script>
+  </script>
 </body></html>`;
 }

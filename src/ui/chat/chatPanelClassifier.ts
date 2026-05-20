@@ -23,6 +23,7 @@ export type AvailableCommand =
   | 'chassis.startSession'
   | 'chassis.endSession'
   | 'chassis.generateRules'
+  | 'chassis.scanVaultCodebase'
   | 'chassis.openSettings';
 
 export interface IntentResult {
@@ -45,13 +46,13 @@ export async function classifyIntent(
   const systemPrompt = `You are the CHASSIS intent classifier. Given a user message and project context, classify it as ONE of these intents and return ONLY valid JSON, nothing else.
 
 Intents:
-- build: user wants to CREATE something NEW from scratch (new file, new app, new feature, new script, add a new capability)
+- build: user wants to CREATE something NEW from scratch, OR they want to MODIFY, ADD, or CHANGE a feature in their project. ALSO build when: user asks "how do I add X", "can you make X do Y", or "is there a way to make X more Y". Any feature request or code modification request (even if phrased as a question) is a build. IMPORTANT: Do NOT use 'build' for vague requests about packaging (e.g. "make this a stand alone game", "turn this into an app", "make an executable") — route those to 'question' instead so the AI can clarify.
 - fix: user is reporting a BUG, PROBLEM, or MALFUNCTION in EXISTING code — something that used to or should work is broken, wrong, or missing behavior
 - convert: user wants to TRANSFORM or PORT existing code (convert, rewrite, refactor, port, turn X into Y, change language/format)
-- run: user wants to RUN, PREVIEW, LAUNCH, TEST, or SEE the existing project/app/file in action
-- scaffold: user wants to SET UP a NEW PROJECT from a template (new React app, new Flask API, new Go service, new Express server, set up a project)
+- run: user wants to RUN, PREVIEW, LAUNCH, TEST, or SEE the existing project/app/file in action. IMPORTANT: Do NOT use 'run' if the user makes a vague request like "make this a real app" or "I want to click an icon" — send those to 'question' instead.
+- scaffold: user wants a BLANK PROJECT TEMPLATE with NO specific content specified — just the boilerplate for a framework (React app, Flask API, Go service, Express server). ONLY scaffold when NO specific files, functions, or features are named.
 - service: user wants to SET UP or INTEGRATE an EXTERNAL SERVICE (Firebase, Supabase, Stripe, OpenAI API, add auth, add database, add payments)
-- question: user asking about their project, code, or any software development topic
+- question: user asking a PURELY THEORETICAL or FACTUAL question about coding concepts. ALSO use 'question' if the user makes a vague, non-technical overarching request like "turn this into a real app" or "I want to run it when I click it" so the AI can ask clarifying questions. DO NOT use this if the user is asking to modify specific code (e.g. "how do I add gravity" should be build, NOT question).
 - command: user wants to trigger a CHASSIS action
 - offtopic: no connection to software development, coding, architecture, databases, APIs, or technical topics
 
@@ -83,11 +84,16 @@ Examples (follow these exactly):
 "how does async/await work" → {"intent": "question"}
 "what does this file do" → {"intent": "question"}
 "what is 2 + 2" → {"intent": "question"}
-"how do I center a div in CSS" → {"intent": "question"}
 "explain what a REST API is" → {"intent": "question"}
 "build me a login page" → {"intent": "build"}
 "add a dark mode toggle" → {"intent": "build"}
 "add a settings page" → {"intent": "build"}
+"how do I add gravity to the bird" → {"intent": "build"}
+"is there anyway to make the bird more realistic" → {"intent": "build"}
+"can you make the player jump higher" → {"intent": "build"}
+"make this a stand alone game" → {"intent": "question"}
+"I want to run it when I click an icon" → {"intent": "question"}
+"turn this into a real desktop app" → {"intent": "question"}
 "can you fix the audio" → {"intent": "fix"}
 "fix this bug" → {"intent": "fix"}
 "the button doesn't work" → {"intent": "fix"}
@@ -116,6 +122,9 @@ Examples (follow these exactly):
 "create a new Go service" → {"intent": "scaffold"}
 "init a Node Express project" → {"intent": "scaffold"}
 "start a new React project" → {"intent": "scaffold"}
+"create a new project called my-app with a TypeScript file src/greet.ts containing a greet function" → {"intent": "build"}
+"create a new test project called surgical-test-greet with a single TypeScript file src/test-surgical.ts containing a greet function that returns Hello + name" → {"intent": "build"}
+"write a Python script that reads a CSV and prints each row" → {"intent": "build"}
 "set up Firebase auth" → {"intent": "service"}
 "add Stripe payments" → {"intent": "service"}
 "integrate Supabase database" → {"intent": "service"}

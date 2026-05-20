@@ -59,7 +59,7 @@ export function panelSetLastModel(panel: ChatPanel, model: string): void {
 export async function panelRefresh(panel: ChatPanel): Promise<void> {
   const state = (panel as any).state;
   const usageTracker = (panel as any).usageTracker;
-  const headerInfo = buildHeaderInfo((panel as any).chassis, (panel as any).routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
+  const headerInfo = buildHeaderInfo((panel as any).chassis, (panel as any).routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode, state.agentMode);
   const _panel = (panel as any)._panel;
   const _initialized = (panel as any)._initialized;
   if (!_initialized) {
@@ -77,7 +77,20 @@ export async function panelRefresh(panel: ChatPanel): Promise<void> {
   }
   const { renderMessages } = await import('./chatPanelRenderer.js');
   const messagesHtml = renderMessages(state.conversation);
-  _panel.webview.postMessage({ type: 'update-conversation', html: messagesHtml });
+  let htmlToInject = messagesHtml;
+  if (!htmlToInject) {
+    let progress: SetupProgress | undefined;
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (headerInfo.isInitialized && root) {
+      try { progress = await new SetupProgressService((panel as any).chassis, root).getProgress(); } catch { }
+    }
+    if (root && headerInfo.workspaceHasChassis && !headerInfo.workspaceIsAssistMode) {
+      try { const config = (panel as any).chassis.isInitialized() ? (panel as any).chassis.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch { }
+    }
+    const { buildEmptyStateHtml } = await import('./chatPanelEmptyState.js');
+    htmlToInject = buildEmptyStateHtml(headerInfo, progress);
+  }
+  _panel.webview.postMessage({ type: 'update-conversation', html: htmlToInject });
 }
 
 export function panelBuildFromVaultPrefill(panel: ChatPanel): { task?: string; targetFile?: string } {

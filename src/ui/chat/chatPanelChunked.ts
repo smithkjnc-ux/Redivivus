@@ -21,16 +21,15 @@ import { autoCommitIfEnabled } from '../../services/gitAutoCommitService.js';
 import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel.js';
 import { runCompileAutoFix } from '../../services/build/compileAutoFix.js';
 import { runTestAutoFix } from '../../services/build/testAutoFix.js';
+import { getWorkspaceContextService } from '../../services/workspace/workspaceContext.js';
 
 export function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
-  ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined });
-  ctx.refresh();
+  ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined }); ctx.refresh();
 }
 
 export function updateLastMsg(ctx: BuildContext, content: string): void {
   const last = ctx.conversation[ctx.conversation.length - 1];
-  if (last && last.role === 'assistant') { last.content = content; }
-  else { ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() }); }
+  if (last && last.role === 'assistant') { last.content = content; } else { ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now() }); }
   ctx.refresh();
 }
 
@@ -62,11 +61,15 @@ export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<
       const last = conversation[conversation.length - 1];
       if (last && last.role === 'assistant') { last.content = encodeClarifyToken(questions); }
       ctx.refresh();
-      // [WARN] 2-minute timeout prevents indefinite freeze if clarify UI fails to render
       const answers = await Promise.race<Record<string, string>>([
         new Promise<Record<string, string>>((resolve) => { ctx.onClarifySubmit = resolve; }),
         new Promise<Record<string, string>>(resolve => setTimeout(() => resolve({}), 120_000)),
       ]);
+      if (answers._cancelled === 'true') {
+        const last2 = conversation[conversation.length - 1];
+        if (last2 && last2.role === 'assistant') { last2.content = '❌ Build canceled.'; }
+        ctx.refresh(); ctx.postToWebview?.({ type: 'set-status', status: 'ready' }); return;
+      }
       answersBlock = formatAnswersForPrompt(answers);
       const summary = Object.entries(answers).map(([q, a]) => `  • ${q}: **${a}**`).join('\n');
       const last2 = conversation[conversation.length - 1];
@@ -86,24 +89,25 @@ export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<
   updateLastMsg(ctx, vaultMsg);
 
   // Planning
-  const plannerLabel = workerLabel ? `${supervisorLabel} (Supervisor)` : supervisorLabel;
   appendMsg(ctx, `📋 Planning your build...`);
 
-  // [FIX] Inject vault context into planner so supervisor knows what already exists
+  // [FIX] Inject workspace files & vault context into planner so supervisor knows what exists
+  const wsCtx = await getWorkspaceContextService().getContext();
+  const wsBlock = wsCtx?.files?.length ? `EXISTING WORKSPACE FILES:\n${wsCtx.files.map(f => `- ${f.relativePath}`).join('\n')}\n` : '';
   const vaultCtxBlock = relevant.length > 0 ? formatVaultContext(relevant) + '\n' : '';
-  const deadEnds = readProjectDeadEnds(root);
-  const projectRules = readProjectRules(root);
-  const recentBuildsBlock = getRecentBuildsContext(root);
-  const deadEndsBlock = deadEnds ? `PREVIOUSLY FAILED APPROACHES (do not repeat):\n${deadEnds}\n` : '';
-  const rulesBlock = projectRules ? `PROJECT RULES (must not violate):\n${projectRules}\n` : '';
-  const recentBlock = recentBuildsBlock ? `${recentBuildsBlock}\n` : '';
+  const deadEndsBlock = readProjectDeadEnds(root) ? `PREVIOUSLY FAILED APPROACHES:\n${readProjectDeadEnds(root)}\n` : '';
+  const rulesBlock = readProjectRules(root) ? `PROJECT RULES:\n${readProjectRules(root)}\n` : '';
+  const recentBlock = getRecentBuildsContext(root) ? `${getRecentBuildsContext(root)}\n` : '';
   const planPrompt = `I need to build: "${task}"
-${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${vaultCtxBlock}${recentBlock}${deadEndsBlock}${rulesBlock}${answersBlock ? `${answersBlock}\n` : ''}Break this into individual source files, each under 200 lines.
+${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${wsBlock}${vaultCtxBlock}${recentBlock}${deadEndsBlock}${rulesBlock}${answersBlock ? `${answersBlock}\n` : ''}Identify every single source file that needs to be CREATED or MODIFIED to accomplish this task.
+You MUST list both:
+1. Brand new files that need to be created.
+2. Existing files that need to be edited, modified, or updated to import/call the new files.
+
 Return ONLY a JSON array — no markdown, no explanation, no code:
 [
-  {"file": "src/models.py", "purpose": "Data models for expenses"},
-  {"file": "src/storage.py", "purpose": "Save and load data from JSON file"},
-  {"file": "src/main.py", "purpose": "CLI entry point"}
+  {"file": "src/new-file.py", "purpose": "Create new module"},
+  {"file": "src/existing.py", "purpose": "Modify to import and use src/new-file.py"}
 ]`;
 
   const promptLen = Math.ceil(planPrompt.length / 4);
@@ -187,11 +191,7 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
     new BuildHistoryService(root).record(makeBuildHistoryEntry({ snapshotId: snapshotId || Date.now().toString(), task, files: builtFiles, tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: supervisor || 'gemini', worker: worker || null, resultCardToken: resultCard }));
   } catch { /* never block */ }
 
-  await runCompileAutoFix(ctx, builtFiles).catch(() => {});
-  await runTestAutoFix(ctx, builtFiles).catch(() => {});
-
-  // Generate docs in background
+  await runCompileAutoFix(ctx, builtFiles).catch(() => {}); await runTestAutoFix(ctx, builtFiles).catch(() => {});
   generateDocs(root, task, blueprintContext, filePlan, routing)
-    .then(docPath => { if (docPath.endsWith('.md')) { conversation.push({ role: 'assistant', content: `📖 Documentation written to \`${docPath}\``, timestamp: Date.now() }); ctx.refresh(); } })
-    .catch(() => { /* best-effort */ });
+    .then(docPath => { if (docPath.endsWith('.md')) { conversation.push({ role: 'assistant', content: `📖 Documentation written to \`${docPath}\``, timestamp: Date.now() }); ctx.refresh(); } }).catch(() => {});
 }

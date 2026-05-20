@@ -95,9 +95,126 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     const _exRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (_exRoot) { const { explainProjectFiles } = await import('./chatPanelFileExplainer.js'); conversation.push({ role: 'assistant', content: await explainProjectFiles(_exRoot), timestamp: Date.now() }); refresh(); return; }
   }
+  // [FIX] Web search + URL reading -- intercept before classifier
+  const { extractUrl, detectSearchIntent, readUrl, searchWeb } = await import('../../services/webSearchService.js');
+  const pastedUrl = extractUrl(userText);
+  if (pastedUrl && /\b(read|use|look at|check|fetch|get|from|reference)\b/i.test(lowerText)) {
+    conversation.push({ role: 'assistant', content: `Reading \`${pastedUrl}\`...`, timestamp: Date.now() });
+    refresh();
+    const page = await readUrl(pastedUrl);
+    if (page) {
+      const summary = page.text.slice(0, 4000);
+      const truncNote = page.truncated ? '\n_(Page was large -- showing first portion)_' : '';
+      conversation[conversation.length - 1].content = `**${page.title || pastedUrl}**\n\n${summary}${truncNote}`;
+    } else {
+      conversation[conversation.length - 1].content = `Could not read that URL. It may be blocked, require login, or be non-text content.`;
+    }
+    refresh(); return;
+  }
+  const searchQuery = detectSearchIntent(userText);
+  if (searchQuery && !pastedUrl) {
+    conversation.push({ role: 'assistant', content: `Searching the web for "${searchQuery}"...`, timestamp: Date.now() });
+    refresh();
+    const results = await searchWeb(searchQuery);
+    if (results.length > 0) {
+      const formatted = results.map((r, i) => `${i + 1}. **[${r.title}](${r.url})**\n   ${r.snippet}`).join('\n\n');
+      conversation[conversation.length - 1].content = `**Web results for "${searchQuery}":**\n\n${formatted}\n\n_Say "read #1" to fetch the full page, or ask me to use these results in a build._`;
+    } else {
+      conversation[conversation.length - 1].content = `No results found for "${searchQuery}". Try rephrasing or check your internet connection.`;
+    }
+    refresh(); return;
+  }
+  // [FIX] "remember that..." — store explicit preference in user memory (0 AI tokens)
+  const { detectRememberIntent, rememberExplicit } = await import('../../services/userMemoryService.js');
+  const rememberText = detectRememberIntent(userText);
+  if (rememberText) {
+    rememberExplicit(rememberText);
+    conversation.push({ role: 'assistant', content: `Got it -- I'll remember: **"${rememberText}"**\n\n_This preference will be used in all future builds across all projects._`, timestamp: Date.now() });
+    refresh(); return;
+  }
+
+  // [FIX] "read #N" — fetch a specific search result from the previous results
+  const readResultMatch = lowerText.match(/^read\s+#?(\d+)/);
+  if (readResultMatch) {
+    const prevMsg = [...conversation].reverse().find(m => m.role === 'assistant' && m.content.includes('**Web results for'));
+    if (prevMsg) {
+      const urlMatches = [...prevMsg.content.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g)];
+      const idx = parseInt(readResultMatch[1]) - 1;
+      if (urlMatches[idx]) {
+        const targetUrl = urlMatches[idx][2];
+        conversation.push({ role: 'assistant', content: `Reading \`${targetUrl}\`...`, timestamp: Date.now() });
+        refresh();
+        const page = await readUrl(targetUrl);
+        if (page) {
+          const truncNote = page.truncated ? '\n_(Page was large -- showing first portion)_' : '';
+          conversation[conversation.length - 1].content = `**${page.title || targetUrl}**\n\n${page.text.slice(0, 4000)}${truncNote}`;
+        } else {
+          conversation[conversation.length - 1].content = `Could not read that page.`;
+        }
+        refresh(); return;
+      }
+    }
+  }
+
   // [FIX] Just Build (direct) mode skips classifier ONLY for pure build tasks — fix/bug/broken words fall through to classifier
   // [DEAD] Was: skip classifier entirely — routed "this needs fixed" to build pipeline, wiped the project
-  if (deps.buildMode === 'direct' && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
+  if (deps.buildMode === 'direct' && !deps.agentMode && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
+
+  // [CHASSIS] Phase 2: Agent Mode routing
+  if (deps.agentMode) {
+    const { executeAgentTask } = await import('../../services/ai/agentService.js');
+    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    const agentCtx: any = {
+      root: rootPath,
+      task: userText,
+      log: (msg: string) => {
+        conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() });
+        refresh();
+      },
+      modifiedFiles: new Set<string>(),
+      snapshotId: undefined
+    };
+    const config = deps.chassis.isInitialized() ? deps.chassis.loadConfig() : null;
+    let projectContext = config?.blueprint ? `Blueprint: ${JSON.stringify(config.blueprint)}` : 'No blueprint available.';
+    try {
+      const files = await vscode.workspace.findFiles('**/*.*', '**/node_modules/**,**/.git/**,**/dist/**,**/out/**');
+      const fileList = files.map(f => vscode.workspace.asRelativePath(f)).slice(0, 100).join('\n- ');
+      projectContext += `\n\nPROJECT FILES IN WORKSPACE:\n- ${fileList}\n\n(Use these exact paths when reading/writing files.)`;
+    } catch (e) {}
+    const result = await executeAgentTask(userText, projectContext, deps.routing, agentCtx, agentCtx.log);
+    
+    if (!result.success && result.error) {
+      conversation.push({ role: 'assistant', content: `**Agent failed:** ${result.error}`, timestamp: Date.now() });
+    } else if (result.finalAnswer) {
+      let finalContent = result.finalAnswer;
+      if (agentCtx.modifiedFiles.size > 0 && result.ledger) {
+        const { buildResultCard } = await import('./chatPanelStory.js');
+        const { BuildHistoryService, makeBuildHistoryEntry } = await import('../../services/build/buildHistoryService.js');
+        const ledgerSummary = result.ledger.hasData() ? result.ledger.getSummary() : undefined;
+        const totalTokens = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.tokens, 0) : 0;
+        const totalCost = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.costUSD, 0) : 0;
+        const files: string[] = Array.from(agentCtx.modifiedFiles as Set<string>);
+        const card = buildResultCard(files, 0, totalTokens, totalCost, 0, agentCtx.snapshotId, 0, true, ledgerSummary);
+        finalContent += `\n\n${card}`;
+        
+        const sw = deps.routing.selectSupervisorAndWorker();
+        new BuildHistoryService(rootPath).record(makeBuildHistoryEntry({
+          snapshotId: agentCtx.snapshotId || Date.now().toString(),
+          task: userText,
+          files,
+          tokensUsed: totalTokens,
+          costUSD: totalCost,
+          source: 'ai',
+          supervisor: sw.supervisor,
+          worker: null,
+          resultCardToken: card
+        }));
+      }
+      conversation.push({ role: 'assistant', content: finalContent, timestamp: Date.now() });
+    }
+    refresh();
+    return;
+  }
 
   // [RULE 18] AI intent classification — never use regex to simulate language understanding.
   // [WARN] If classifyIntent throws (e.g. no API key), fall back to keyword check.
@@ -134,8 +251,10 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
 
   if (intent.type === 'build') {
     // [RULE] If no mode chosen yet: initialized projects auto-route to direct build (user is modifying, not starting fresh).
-    // Only show mode popover for brand-new uninitialized projects.
+    // Only show mode popover for brand-new uninitialized projects WITH a folder open.
     if (!deps.buildMode) {
+      // [FIX] No workspace open → just build, don't show mode popover. Auto-create handles the rest.
+      if (!vscode.workspace.workspaceFolders?.length) { await deps.handleBuildRequest(userText); return; }
       if (deps.chassis?.isInitialized?.()) { await deps.handleBuildRequest(userText); return; }
       panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
       return;

@@ -35,11 +35,25 @@ export function resolveVaultHit(hitId: string, result: string | boolean): void {
 
 // [RULE 18] AI classifier decides multi-file vs single-file — regex cannot reliably detect this from phrasing.
 export async function isChunkedBuildRequest(task: string, routing: RoutingService): Promise<boolean> {
+  // [RULE 18] Structural fast path: if the user mentions two or more distinct, unique files, it must be chunked/multi-file.
+  const fileMatches = task.match(/\b[\w./-]+\.(ts|tsx|js|jsx|py|html|css|scss|json|go|rs)\b/gi) || [];
+  const uniqueFiles = new Set(fileMatches.map(f => f.toLowerCase()));
+  if (uniqueFiles.size > 1) { return true; }
+
   if (/\b(full[- ]?stack|multi[- ]?file|multiple\s+files|several\s+files)\b/i.test(task)) { return true; }
   try {
-    const prompt = `Does this build request require multiple separate files (e.g. HTML + CSS + JS, or frontend + backend + database), or can it be one self-contained file?\nTask: "${task.slice(0, 200)}"\nReply with one word: single or multi`;
+    const prompt = `Classify if this task requires writing or modifying MULTIPLE separate files, or just a SINGLE file.
+Note: If the user wants to create a new file AND modify/import it in an existing file, that requires MULTIPLE files (multi).
+
+Task: "${task}"
+
+Reply with exactly one word: "single" or "multi"`;
     const res = await routing.prompt(prompt, 12_000);
-    if (res.success && res.text) { return res.text.trim().toLowerCase().startsWith('multi'); }
+    if (res.success && res.text) {
+      const reply = res.text.trim().toLowerCase();
+      if (reply.includes('multi')) { return true; }
+      if (reply.includes('single')) { return false; }
+    }
   } catch { /* fall through to safe default */ }
   return false;
 }

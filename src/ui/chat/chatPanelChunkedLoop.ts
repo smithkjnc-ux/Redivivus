@@ -1,6 +1,4 @@
-// [SCOPE] CHASSIS Chat Panel Chunked Build — per-file build loop
-// Extracted from chatPanelChunked.ts per [NEXT] marker
-
+// [SCOPE] CHASSIS Chat Panel Chunked Build — per-file build loop (extracted from chatPanelChunked.ts)
 import * as path from 'path';
 import * as fs from 'fs';
 import { BuildContext } from './chatPanelBuild.js';
@@ -57,11 +55,22 @@ export async function runFileBuildLoop(lctx: FileBuildLoopContext): Promise<File
     phaseUndo.snapshotBeforePhase(buildId, phaseName, [entry.filename], `Build ${entry.filename}: ${entry.purpose}`);
     appendMsg(ctx, `⚙️ Writing part ${fileNum} of ${total}: \`${entry.filename}\`...`);
 
+    const absPath = path.join(ctx.root, entry.filename);
+    const exists = fs.existsSync(absPath);
+    const existingContent = exists ? fs.readFileSync(absPath, 'utf8') : '';
+    const existingBlock = exists
+      ? `\nEXISTING FILE CONTENT OF ${entry.filename} (Modify this content surgically. Preserve all other existing functions, structures, annotations, and imports unless explicitly asked otherwise):\n\`\`\`\n${existingContent}\n\`\`\`\n`
+      : '';
+
     const allFiles = filePlan.map(f => `  - ${f.filename}: ${f.purpose}`).join('\n');
-    const vaultSnippets = relevant.slice(0, 4).map(v => `// [FROM VAULT: ${v.name}]\n${v.code}`).join('\n\n');
-    const vaultBlock = relevant.length > 0
+    // [WARN] Vault snippets only for NEW files — injecting them into surgical edits caused AI to dump unrelated code
+    const vaultSnippets = (!exists && relevant.length > 0) ? relevant.slice(0, 4).map(v => `// [FROM VAULT: ${v.name}]\n${v.code}`).join('\n\n') : '';
+    const vaultBlock = vaultSnippets
       ? `VAULT CODE (strict rules):\n- COPY any vault item that fits into your output as-is, marked // [FROM VAULT: name].\n- Do NOT rewrite or create a parallel version of vault code.\n- Only write NEW code for what vault doesn't cover.\n${vaultSnippets}\n`
       : '';
+    const surgicalRules = exists
+      ? `- You are MODIFYING an existing file. Output the COMPLETE updated file content.\n- Preserve ALL existing functions, imports, annotations, and comments.\n- Only add/change what the PURPOSE requires. Do NOT add vault code or unrelated functions.\n- Do NOT wrap your output in markdown fences.`
+      : '- Add a [SCOPE] comment at the top';
     const filePrompt = `You are CHASSIS. Build one file as part of a larger project.
 
 PROJECT TASK: "${task}"
@@ -70,13 +79,14 @@ ${allFiles}
 
 FILE TO BUILD NOW: ${entry.filename}
 PURPOSE: ${entry.purpose}
+${existingBlock}
 ${vaultBlock}RULES:
 - Implement ONLY ${entry.filename} — do not output any other file
 - Keep it under 200 lines
-- Add a [SCOPE] comment at the top
+${surgicalRules}
 - On the FIRST line, add a \`// NARRATOR:\` comment describing in plain English what this file does
 - Write working, production-ready code with correct imports
-- Return ONLY the code -- no markdown fences, no explanation
+- Return ONLY the complete file source code — no markdown fences, no explanation, no extra files
 
 ${CHASSIS_WORKER_RULES}`;
 
@@ -100,7 +110,14 @@ ${CHASSIS_WORKER_RULES}`;
         ctx.usageTracker?.recordUsage(fallbackTokens, fallbackCost, supervisor, res.inputTokens, res.outputTokens);
       }
       if (!res.success) { throw new Error(res.error || 'AI generation failed'); }
-      code = res.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
+      // [WARN] Worker AI often outputs BOTH files — strip fences, extract only target file's block
+      let rawCode = res.text.trim().replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+      if (rawCode.includes('```')) {
+        const bn = path.basename(entry.filename);
+        const sec = rawCode.split(/```[a-zA-Z]*\n?/).find((s: string) => s.includes(bn) || s.includes(entry.filename));
+        rawCode = sec ? sec.replace(/```\s*$/m, '').trim() : rawCode.replace(/```[a-zA-Z]*\n?/g, '').replace(/```/g, '').trim();
+      }
+      code = rawCode;
       if (!code) { throw new Error('AI returned an empty response'); }
       fileTokens = Math.ceil(res.text.length / 4);
       fileCost = (fileTokens / 1_000_000) * 0.30;

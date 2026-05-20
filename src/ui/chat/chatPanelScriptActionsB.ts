@@ -32,6 +32,36 @@ export function buildActionsScriptB(): string {
         if (projectPath) { vscode.postMessage({type:'open-recent-project', folderPath: projectPath}); }
         return;
       }
+      // Clarify submit button
+      const clarifySubmitBtn = target.closest ? target.closest('.clarify-submit-btn') : (target.classList&&target.classList.contains('clarify-submit-btn')?target:null);
+      if (clarifySubmitBtn) {
+        const card = clarifySubmitBtn.closest('.clarify-card');
+        const answers = {};
+        if (card) {
+          const radios = card.querySelectorAll('.clarify-radio:checked');
+          radios.forEach(function(rad) {
+            const qid = rad.getAttribute('data-qid');
+            if (qid && rad.value) { answers[qid] = rad.value; }
+          });
+        }
+        clarifySubmitBtn.textContent = 'Building...';
+        clarifySubmitBtn.setAttribute('disabled','true');
+        const cBtn = card ? card.querySelector('.clarify-cancel-btn') : null;
+        if (cBtn) cBtn.setAttribute('disabled','true');
+        try { vscode.postMessage({ type: 'clarify-submit', answers: answers }); } catch(e) {}
+        return;
+      }
+      // Clarify cancel button
+      const clarifyCancelBtn = target.closest ? target.closest('.clarify-cancel-btn') : (target.classList&&target.classList.contains('clarify-cancel-btn')?target:null);
+      if (clarifyCancelBtn) {
+        const card = clarifyCancelBtn.closest('.clarify-card');
+        clarifyCancelBtn.textContent = 'Canceling...';
+        clarifyCancelBtn.setAttribute('disabled','true');
+        const sBtn = card ? card.querySelector('.clarify-submit-btn') : null;
+        if (sBtn) sBtn.setAttribute('disabled','true');
+        try { vscode.postMessage({ type: 'clarify-submit', answers: { _cancelled: 'true' } }); } catch(e) {}
+        return;
+      }
     });
   `;
 }

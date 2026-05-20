@@ -57,7 +57,10 @@ export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] 
   // [CHASSIS] Inject annotation-driven project context — the AI sees [SCOPE] from ALL files
   // in ~200 tokens instead of loading 50,000 tokens of raw code. This is the CHASSIS advantage.
   const projectContext = buildProjectAnnotationContext(workspaceRoot);
-  return `${prompt}\n${projectContext}${activeFileContext}${conversationContext}\nUser:`;
+  // [FIX] Inject user memory profile (~30 tokens, 0 AI cost to learn)
+  let userProfileCtx = '';
+  try { const { buildPromptInjection } = require('../../services/userMemoryService.js'); userProfileCtx = buildPromptInjection(); } catch {}
+  return `${prompt}\n${userProfileCtx ? userProfileCtx + '\n' : ''}${projectContext}${activeFileContext}${conversationContext}\nUser:`;
 }
 
 // [SCOPE] Focused code generation prompt — bypasses CHASSIS identity noise entirely

@@ -33,7 +33,7 @@ export async function handleRunIntent(intent: any, deps: MessageHandlerDeps, con
     const terminal = vscode.window.createTerminal(`CHASSIS: Install (${depsLabel})`);
     terminal.show();
     terminal.sendText(installCmd);
-    conversation.push({ role: 'assistant', content: `&#x23F3; Running \`${installCmd}\` in terminal...`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `⌛ Running \`${installCmd}\` in terminal...`, timestamp: Date.now() });
     refresh(); return;
   }
 
@@ -49,10 +49,18 @@ export async function handleRunIntent(intent: any, deps: MessageHandlerDeps, con
 }
 
 export async function handleScaffoldIntent(userText: string, deps: MessageHandlerDeps, conversation: Conv, refresh: () => void): Promise<void> {
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let autoOpened = false;
   if (!root) {
-    conversation.push({ role: 'assistant', content: 'Open a project folder first so I know where to scaffold the files.', timestamp: Date.now() });
-    refresh(); return;
+    try {
+      const { autoCreateProject } = await import('./chatPanelBuildAutoCreate.js');
+      const created = await autoCreateProject(userText, deps as any);
+      root = created.dir;
+      autoOpened = true;
+    } catch (e: any) {
+      conversation.push({ role: 'assistant', content: `Could not create project folder: ${e.message}`, timestamp: Date.now() });
+      refresh(); return;
+    }
   }
   const { detectScaffoldIntent, runScaffold } = await import('./chatPanelScaffold.js');
   const scaffoldInfo = detectScaffoldIntent(userText);
@@ -64,18 +72,27 @@ export async function handleScaffoldIntent(userText: string, deps: MessageHandle
   refresh();
   try {
     const { files, guidance } = await runScaffold(null as any, scaffoldInfo.type, root);
-    conversation.push({ role: 'assistant', content: `✅ Scaffold complete! Created:\n\n${files.map(f => `- \`${f}\``).join('\n')}\n\n**Next steps:** ${guidance}`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `✅ Scaffold complete! Created:\n\n${files.map((f: string) => `- \`${f}\``).join('\n')}\n\n**Next steps:** ${guidance}`, timestamp: Date.now() });
+    if (autoOpened && root) { await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root)); }
   } catch (e: any) {
-    conversation.push({ role: 'assistant', content: `❌ Scaffold failed: ${e.message}`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `Scaffold failed: ${e.message}`, timestamp: Date.now() });
   }
   refresh();
 }
 
 export async function handleServiceIntent(userText: string, deps: MessageHandlerDeps, conversation: Conv, refresh: () => void): Promise<void> {
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let autoOpened = false;
   if (!root) {
-    conversation.push({ role: 'assistant', content: 'Open a project folder first so I know where to set up the service files.', timestamp: Date.now() });
-    refresh(); return;
+    try {
+      const { autoCreateProject } = await import('./chatPanelBuildAutoCreate.js');
+      const created = await autoCreateProject(userText, deps as any);
+      root = created.dir;
+      autoOpened = true;
+    } catch (e: any) {
+      conversation.push({ role: 'assistant', content: `Could not create project folder: ${e.message}`, timestamp: Date.now() });
+      refresh(); return;
+    }
   }
   const { detectServiceIntent, runServiceSetup, formatServiceSetupResult } = await import('./chatPanelServiceTemplates.js');
   const serviceInfo = detectServiceIntent(userText);
@@ -88,8 +105,9 @@ export async function handleServiceIntent(userText: string, deps: MessageHandler
   try {
     const { files, notes } = await runServiceSetup(serviceInfo.type, root);
     conversation.push({ role: 'assistant', content: formatServiceSetupResult(serviceInfo.type, files, notes), timestamp: Date.now() });
+    if (autoOpened && root) { await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root)); }
   } catch (e: any) {
-    conversation.push({ role: 'assistant', content: `❌ Service setup failed: ${e.message}`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `Service setup failed: ${e.message}`, timestamp: Date.now() });
   }
   refresh();
 }

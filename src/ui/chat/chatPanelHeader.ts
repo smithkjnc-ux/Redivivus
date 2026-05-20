@@ -7,6 +7,7 @@ import { RoutingService } from '../../services/ai/routingService.js';
 import { UsageTracker } from '../../services/usageTracker.js';
 import { ChatHeaderInfo } from './chatPanelHtml.js';
 import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
+import * as fs from 'fs';
 
 export function buildHeaderInfo(
   chassis: ChassisService,
@@ -16,6 +17,7 @@ export function buildHeaderInfo(
   extensionContext?: vscode.ExtensionContext,
   buildMode?: 'plan' | 'direct',
   assistMode?: boolean,
+  agentMode?: boolean,
 ): ChatHeaderInfo {
   const available = routing.getAvailableAI();
   const config = chassis.isInitialized() ? chassis.loadConfig() : null;
@@ -37,7 +39,7 @@ export function buildHeaderInfo(
   const workspaceIsAssistMode = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.chassis-assist')) : false;
 
   // Get recent projects from globalState
-  const recentProjects: Array<{ path: string; name: string }> = [];
+  const recentProjects: Array<{ path: string; name: string; timestamp?: number }> = [];
   if (extensionContext) {
     const recent = extensionContext.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('chassis.recentProjects', []);
     // Filter out deleted projects and sort by most recent
@@ -45,7 +47,7 @@ export function buildHeaderInfo(
       .filter((p: any) => fs.existsSync(p.path))
       .sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0))
       .slice(0, 5);
-    recentProjects.push(...valid.map((p: any) => ({ path: p.path, name: p.name })));
+    recentProjects.push(...valid.map((p: any) => ({ path: p.path, name: p.name, timestamp: p.timestamp || undefined })));
   }
   
   // Determine blueprint status: 'complete' | 'incomplete' | 'missing'
@@ -84,6 +86,18 @@ export function buildHeaderInfo(
     } catch {}
   }
 
+  // Build stamp — read from out/data/build-info.json so every compile+deploy shows a new timestamp
+  let buildStamp: string | undefined;
+  try {
+    const extPath = extensionContext?.extensionPath;
+    if (extPath) {
+      const info = JSON.parse(fs.readFileSync(path.join(extPath, 'out', 'data', 'build-info.json'), 'utf-8'));
+      const d = new Date(info.timestamp);
+      const hhmm = d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+      buildStamp = `v${info.version} \u00b7 ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} ${hhmm}`;
+    }
+  } catch {}
+
   return {
     projectName, aiName, aiLabel: displayModel,
     isFallback: hasKey && available.ai !== selectedAI,
@@ -102,6 +116,9 @@ export function buildHeaderInfo(
     rosterDisplay,
     buildMode,
     projectTokens,
+    buildStamp,
+    agentMode,
+    vaultItemCount: (() => { try { const { VaultService } = require('../../services/vault/vaultService.js'); const v = new VaultService(); return v.listItems().length; } catch { return 0; } })(),
   };
 }
 

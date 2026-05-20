@@ -55,8 +55,7 @@ export function buildChatCssBase(): string {
     .header-btn:hover, .clear-btn:hover, .map-btn:hover {
       background: var(--c-border); color: var(--c-text); border-color: var(--c-border-hi);
     }
-    .header-btn.capabilities-btn { border-color: var(--c-accent); color: var(--c-accent); background: var(--c-accent-lo); }
-    .header-btn.capabilities-btn:hover { background: var(--c-accent-md); color: #fff; }
+    /* [DEAD] .capabilities-btn removed — replaced by context-sensitive Help button */
     .save-point-btn, .blueprint-btn {
       background: var(--c-accent-lo); border: 1px solid var(--c-accent); color: var(--c-accent);
       padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600;

@@ -47,12 +47,22 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const searchResult = findRelevantByTask(task, vaultItems);
   updateLastMsg(ctx, `🔍 Found ${searchResult.items.length} useful match${searchResult.items.length !== 1 ? 'es' : ''} in your code library`);
 
-  const isMod = await Inf.isModificationRequest(task.toLowerCase(), routing);
+  // [FIX] Extract explicit file path if user names one (e.g. "called src/test.ts", "named foo/bar.py")
+  const explicitPathMatch = task.match(/(?:called|named|file|path)\s+[`"']?([\w./-]+\.\w{1,5})[`"']?/i)
+    || task.match(/\b(src\/[\w./-]+\.\w{1,5})\b/);
+
+  const isMod = explicitPathMatch ? false : await Inf.isModificationRequest(task.toLowerCase(), routing);
   const existingTarget = isMod ? await Inf.findExistingTarget(root, task) : null;
   const ext = Inf.inferExtension(task.toLowerCase(), blueprintContext);
-  const fileBase = await Inf.deriveFileBase(task, routing);
+  const fileBase = explicitPathMatch ? '' : await Inf.deriveFileBase(task, routing);
   const isCrossLang = !!existingTarget && path.extname(existingTarget) !== ext;
-  const relPath = (existingTarget && !isCrossLang) ? path.relative(root, existingTarget) : (ext === '.html' ? 'index.html' : `src/${fileBase}${ext}`);
+
+  let relPath: string;
+  if (explicitPathMatch) {
+    relPath = explicitPathMatch[1];
+  } else {
+    relPath = (existingTarget && !isCrossLang) ? path.relative(root, existingTarget) : (ext === '.html' ? 'index.html' : `src/${fileBase}${ext}`);
+  }
   const absPath = path.join(root, relPath);
 
   appendMsg(ctx, `📋 Planning \`${relPath}\`...`);
@@ -105,22 +115,49 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   updateLastMsg(ctx, `✅ Review complete — writing \`${relPath}\`...`);
 
   const snapshotId = Writer.createSnapshot(root, task, relPath);
-  const { narration, cleanCode } = extractNarrator(code);
   const _oldContent = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
-  Writer.writeBuiltFile(absPath, cleanCode, { root, task });
-  const _diff = existingTarget && !isCrossLang ? diffSummary(_oldContent, cleanCode) : '';
 
+  // [FIX] Surgical edit support: if modifying and AI returned SEARCH/REPLACE blocks, apply them
+  const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits } = await import('../../services/build/surgicalEditService.js');
+  const rawResponse = res.text;
+  let usedSurgical = false;
+  let cleanCode = code;
+  let narration = '';
+
+  if (existingTarget && !isCrossLang && detectResponseFormat(rawResponse) === 'surgical') {
+    const edits = parseSurgicalEdits(rawResponse);
+    if (edits.length > 0) {
+      // Rewrite paths to match target
+      const normalizedEdits = edits.map(e => ({ ...e, filePath: relPath }));
+      const results = applySurgicalEdits(normalizedEdits, root);
+      if (results.every(r => r.success)) {
+        usedSurgical = true;
+        cleanCode = fs.readFileSync(absPath, 'utf-8');
+      } else {
+        // [FIX] If surgical edit failed to apply (e.g., mismatch in existing code), DO NOT write the raw SEARCH/REPLACE blocks to the file.
+        const failedResult = results.find(r => !r.success);
+        throw new Error(`Surgical edit failed: ${failedResult?.error || 'Could not apply changes to existing file'}. Please ask the AI to rewrite the full file instead.`);
+      }
+    } else {
+      // [FIX] If we detected surgical format but parsed 0 edits, throw an error to prevent writing raw tags.
+      throw new Error(`Surgical edit failed: Could not parse SEARCH/REPLACE blocks from AI response.`);
+    }
+  }
+
+  if (!usedSurgical) {
+    ({ narration, cleanCode } = extractNarrator(code));
+    Writer.writeBuiltFile(absPath, cleanCode, { root, task });
+  }
+  const _diff = existingTarget && !isCrossLang ? diffSummary(_oldContent, cleanCode) : '';
   // [FIX] Check imports in the newly written file and report missing dependencies
   const importCheck = checkImports(root, absPath, cleanCode);
   const importWarning = formatMissingImports(importCheck, relPath);
-
   // Auto-scaffold package.json + tsconfig.json for TypeScript Node.js projects
   const scaffoldedFiles: string[] = [];
   if (ext === '.ts' && !Inf.isWebPageTask(task.toLowerCase())) {
     Writer.scaffoldNodeProject(root, path.basename(absPath, ext), scaffoldedFiles);
   }
   tracer.fileOp([relPath, ...scaffoldedFiles]);
-
   const ledgerSummary = ledger.hasData() ? ledger.getSummary() : undefined;
   const totalTokens = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.tokens, 0) : 0;
   const totalCost = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.costUSD, 0) : 0;
@@ -137,14 +174,12 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
 
   const elapsed = (Date.now() - buildStart) / 1000;
   const resultCard = buildResultCard([relPath, ...scaffoldedFiles], searchResult.items.length, totalTokens, totalCost, elapsed, snapshotId, 0, !!existingTarget, ledgerSummary) + (_diff ? `\n_Changes: ${_diff}_` : '');
-
   // [FIX] Record to build history so single-file builds appear in the Build History panel
   new BuildHistoryService(root).record(makeBuildHistoryEntry({ snapshotId: snapshotId || Date.now().toString(), task, files: [relPath, ...scaffoldedFiles], tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: supervisorAI, worker: workerAI !== supervisorAI ? workerAI : null, resultCardToken: resultCard }));
-
   const previewToken = relPath.endsWith('.html') ? `\n__PREVIEW_BROWSER__${absPath}|||END_PREVIEW_BROWSER__` : '';
   const nextSteps = buildPostBuildGuidance(root, [relPath, ...scaffoldedFiles]);
   // [FIX] Include import validation warning in build result message
-  appendMsg(ctx, `${narration ? '&#x1F4DD; ' + narration + '\n\n' : ''}${resultCard}${importWarning}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${previewToken}${nextSteps}${(require('./chatPanelBuildPipeline.js') as any).appendCompileAction(relPath)}`);
+  appendMsg(ctx, `${narration ? '📝 ' + narration + '\n\n' : ''}${resultCard}${importWarning}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${previewToken}${nextSteps}${(require('./chatPanelBuildPipeline.js') as any).appendCompileAction(relPath)}`);
 
   tracer.vault('save', `${relPath} -> vault`);
   tracer.end([relPath, ...scaffoldedFiles], totalTokens, totalCost);

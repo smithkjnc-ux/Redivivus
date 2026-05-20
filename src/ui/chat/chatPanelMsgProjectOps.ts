@@ -135,7 +135,7 @@ export async function handleOpenExistingProject(msg: any, conversation: ChatMess
     try { fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { }
   }
   require('fs').appendFileSync(require('os').homedir() + '/chassis_debug.log', `[open-existing-project] opening wsFile=${wsFile}\n`);
-  vscode.commands.executeCommand('vscode.openWorkspace', vscode.Uri.file(wsFile), false);
+  vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), false);
 }
 
 export async function handleOpenRecentProject(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
@@ -150,7 +150,7 @@ export async function handleOpenRecentProject(msg: any, conversation: ChatMessag
     return;
   }
   const folderPath = msg.folderPath;
-  const folderName = path.basename(folderPath);
+  fs.appendFileSync(require('os').homedir() + '/chassis_debug.log', `[open-recent] folderPath=${folderPath} exists=${fs.existsSync(folderPath)}\n`);
   const ctx = ChatPanel.extensionContext;
   if (ctx) {
     const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('chassis.recentProjects', []);
@@ -158,11 +158,8 @@ export async function handleOpenRecentProject(msg: any, conversation: ChatMessag
     if (existing >= 0) { const item = recent.splice(existing, 1)[0]; item.timestamp = Date.now(); recent.unshift(item); }
     ctx.globalState.update('chassis.recentProjects', recent.slice(0, 10));
   }
-  const wsFile = path.join(folderPath, `${folderName}.code-workspace`);
-  if (!fs.existsSync(wsFile)) {
-    try { fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { }
-  }
-  vscode.commands.executeCommand('vscode.openWorkspace', vscode.Uri.file(wsFile), false);
+  // [FIX] Use vscode.openFolder — vscode.openWorkspace requires .code-workspace files and silently fails
+  vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), false);
 }
 
 export async function handleToggleSetting(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {

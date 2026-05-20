@@ -33,14 +33,9 @@ export async function handleMapContext(msg: any, deps: MessageHandlerDeps): Prom
     const estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
     await deps.usageTracker?.recordUsage(estimatedTokens, estimatedCost, routing.getAvailableAI().ai);
     let mapText = aiResponse.text || '';
-    // [FIX] Skip Guardian for Architect Review — Guardian lacks project context and rejects real reviews,
-    // replacing them with a generic "Architecture Review Framework" template. Same pattern as buildAIPrefix skip.
-    if (routing.isGuardianActive() && !isArchitectReview) {
-      const review = await routing.guardianReview(displayMsg, mapText, routing.getAvailableAI().ai, '').catch(() => null);
-      if (review && !review.passed && review.correctedText) {
-        mapText = review.correctedText + '\n\n---\n*Guardian reviewed this response.*';
-      }
-    }
+    // [FIX] Guardian is strictly a codebase/mutating code-reviewer. It should NEVER run on 
+    // conversational, analytical, or Q&A responses, even if they happen to contain a code block.
+    // If it does, it will hallucinate file replacements. Skip Guardian entirely for Map Context.
     // Parse and strip ACTIONS_JSON before rendering — AI appends this block when prompt requests it
     let reviewActions: ArchitectAction[] = [];
     if (isArchitectReview) {

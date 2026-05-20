@@ -82,7 +82,15 @@ export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifyin
     : '- [SCOPE] comment at top.\n- // NARRATOR: comment on first line describing the file.\n- Use EVERY input variable in the actual computation — if you parse or declare it, it MUST appear in the formula or logic, not just in a comment or unused variable.\n- CLI tools: every command-line argument that is parsed MUST affect the output. If args include distance, pay, and fuelCost, all three must participate in the calculation.';
 
   const modRules = isModifying 
-    ? '- SURGICAL EDIT. Output COMPLETE file including all existing code plus your changes.\n- DO NOT OMIT ANYTHING.'
+    ? `- SURGICAL EDIT MODE. Output ONLY the changes using this exact format:
+<<<SEARCH
+[exact existing code to find -- copy verbatim, include 2-3 lines of context for uniqueness]
+===
+[replacement code]
+REPLACE>>>
+- Multiple edits: repeat the <<<SEARCH...REPLACE>>> block for each change.
+- The SEARCH block must match the existing file EXACTLY (same indentation, whitespace).
+- Do NOT output the entire file. Only show the parts that change.`
     : '- Creating NEW file.';
 
   const vaultBlock = vaultSummary

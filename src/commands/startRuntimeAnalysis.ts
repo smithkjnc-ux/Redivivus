@@ -11,7 +11,7 @@ import * as cp from 'child_process';
 import { loadRuntimeProfile } from '../services/runtimeProfiler.js';
 import { buildPythonTraceScript } from '../runtime/pythonInstrumentor.js';
 import { buildJsHookScript } from '../runtime/jsInstrumentor.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+
 import { ChassisService } from '../services/chassisService.js';
 import { RoutingService } from '../services/ai/routingService.js';
 import { UsageTracker } from '../services/usageTracker.js';
@@ -110,6 +110,7 @@ export function registerStartRuntimeAnalysisCommand(
     vscode.commands.registerCommand('chassis.startRuntimeAnalysis', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) { vscode.window.showErrorMessage('CHASSIS: No workspace folder open.'); return; }
+      const { ChatPanel } = await import('../ui/chat/chatPanel.js');
       ChatPanel.show(chassis, routing, usageTracker, vault);
       await new Promise(r => setTimeout(r, 300));
       try {

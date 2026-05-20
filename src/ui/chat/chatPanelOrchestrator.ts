@@ -9,7 +9,7 @@ import { assessComplexity, ComplexityResult, getTierDescription } from '../../se
 import { BuildOrchestrator, BuildBlueprint, BuildPlan, BuildPhase } from '../../services/build/buildOrchestrator.js';
 import { generateVagueWarning } from '../../services/blueprint/expandedInterview.js';
 import { createBuildContext } from './chatPanelPhasedBuild.js';
-import { runSingleFileBuild, BuildContext } from './chatPanelBuild.js';
+import { runSingleFileBuild, runChunkedBuild, isChunkedBuildRequest, BuildContext } from './chatPanelBuild.js';
 import { VaultSearchResult } from '../../services/vault/buildFromVaultSearch.js';
 import { inspectPhase, PhaseInspection } from '../../services/phaseInspector.js';
 import { formatInspectionReport } from '../../services/phaseInspectorReport.js';
@@ -108,10 +108,13 @@ async function handleNanoBuild(
   }
 
   // [CHASSIS] Cost estimate modal already confirmed upstream — build directly
-  // buildStartMessage is pushed inside runSingleFileBuild AFTER vault-hit resolution
   const ctx = createBuildContext(task, deps);
   ctx.buildStartMessage = `⚡ **Nano Build** — Building now...`;
-  await runSingleFileBuild(ctx);
+  if (await isChunkedBuildRequest(task, ctx.routing)) {
+    await runChunkedBuild(task, ctx);
+  } else {
+    await runSingleFileBuild(ctx);
+  }
 
   return true;
 }
@@ -146,7 +149,11 @@ async function handleStandardBuild(
   } else {
     // [CHASSIS] Has blueprint + cost estimate already confirmed — build directly, no second dialog
     const ctx = createBuildContext(task, deps);
-    await runSingleFileBuild(ctx);
+    if (await isChunkedBuildRequest(task, ctx.routing)) {
+      await runChunkedBuild(task, ctx);
+    } else {
+      await runSingleFileBuild(ctx);
+    }
   }
 
   return true;
@@ -165,17 +172,7 @@ async function handleDeepBuild(
   const phaseCount = complexity.recommendedPhases;
   deps.conversation.push({
     role: 'assistant',
-    content: [
-      `🔴 **Complex Build Detected**`,
-      ``,
-      `This request requires a **phased build approach** (~${phaseCount} phases).`,
-      ``,
-      `Like building a car: foundation → data → core → interface → features → polish → delivery.`,
-      ``,
-      `**Next:** Expanded interview to capture requirements, then we'll build phase by phase.`,
-      ``,
-      `__ACTION_CARD__chassis.startExpandedInterview|||📝 Start Expanded Interview|||END__`,
-    ].join('\n'),
+    content: `🔴 **Complex Build Detected**\n\nThis request requires a **phased build approach** (~${phaseCount} phases).\n\nLike building a car: foundation → data → core → interface → features → polish → delivery.\n\n**Next:** Expanded interview to capture requirements, then we'll build phase by phase.\n\n__ACTION_CARD__chassis.startExpandedInterview|||📝 Start Expanded Interview|||END__`,
     timestamp: Date.now(),
   });
   deps.refresh();

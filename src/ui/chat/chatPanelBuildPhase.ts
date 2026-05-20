@@ -39,7 +39,7 @@ export async function buildPhase(
   if (!root) { return { passed: false, inspection: null as any }; }
 
   const phaseTask = buildPhaseTask(phase, plan);
-  deps.conversation.push({ role: 'assistant', content: `&#x1F528; ${phase.icon} **Building ${phase.name}...**`, timestamp: Date.now() });
+  deps.conversation.push({ role: 'assistant', content: `🛠️ ${phase.icon} **Building ${phase.name}...**`, timestamp: Date.now() });
   deps.refresh();
 
   try {
@@ -55,7 +55,7 @@ export async function buildPhase(
     throw err;
   }
 
-  deps.conversation.push({ role: 'assistant', content: `&#x1F50D; **Inspecting ${phase.name}...** (like testing an engine before installation)`, timestamp: Date.now() });
+  deps.conversation.push({ role: 'assistant', content: `🔍 **Inspecting ${phase.name}...** (like testing an engine before installation)`, timestamp: Date.now() });
   deps.refresh();
 
   const builtFiles: string[] = [];
