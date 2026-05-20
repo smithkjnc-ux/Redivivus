@@ -4,8 +4,10 @@
 import { BUILT_IN_TOOLS, getToolInstructions, AgentContext } from './agentTools.js';
 import { RoutingService } from './routingService.js';
 import { AIResponse } from './routingTypes.js';
+import { CHASSIS_WORKER_RULES } from './chassisWorkerRules.js';
 import { getAllTools, callTool } from '../mcpService.js';
 import { BuildLedger } from '../build/buildLedgerService.js';
+import { extractAgentThought, narrateTool } from './agentNarrator.js';
 
 export interface AgentExecutionResult {
   success: boolean;
@@ -63,13 +65,15 @@ TASK: ${task}
 PROJECT CONTEXT:
 ${context}
 
+${CHASSIS_WORKER_RULES}
+
 Begin. Think step-by-step.`;
 
   const ledger = new BuildLedger();
   const MAX_ITERATIONS = 15;
   let iterations = 0;
 
-  onUpdate('🧠 Agent is thinking...');
+  onUpdate('🧠 **OBD2 Agent** spinning up — analysing your task and preparing a plan...');
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -89,6 +93,10 @@ Begin. Think step-by-step.`;
     const aiText = res.text.trim();
     history += `\n\nAssistant:\n${aiText}`;
 
+    // [CHASSIS] Surface AI's own reasoning as narrator bubble — zero extra tokens
+    const thought = extractAgentThought(aiText);
+    if (thought) { onUpdate(`\uD83D\uDCAD _Step ${iterations}:_ ${thought}`); }
+
     // Parse tool call
     const toolMatch = aiText.match(/<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/);
     if (!toolMatch) {
@@ -102,26 +110,26 @@ Begin. Think step-by-step.`;
     } catch (e) {
       const errorMsg = 'Error parsing tool call JSON. Ensure it is valid JSON.';
       history += `\n\nSystem:\n<tool_result>\n${errorMsg}\n</tool_result>`;
-      onUpdate(`⚠️ Agent formatting error, retrying...`);
+      onUpdate(`\u26A0\uFE0F _Step ${iterations}:_ Had a formatting hiccup \u2014 adjusting and trying again...`);
       continue;
     }
 
     let result: string = '';
     const builtInTool = BUILT_IN_TOOLS.find(t => t.name === toolData.name);
-    
+
     if (builtInTool) {
-      onUpdate(`🛠️ Agent using built-in tool: **${builtInTool.name}**...`);
+      onUpdate(narrateTool(builtInTool.name, toolData.args || {}, iterations, MAX_ITERATIONS));
       result = await builtInTool.execute(toolData.args || {}, agentCtx);
     } else {
       const mcpTool = mcpTools.find(t => t.name === toolData.name);
       if (mcpTool) {
-        onUpdate(`🔌 Agent using MCP tool: **${mcpTool.name}**...`);
+        onUpdate(`\uD83D\uDD0C _Step ${iterations}:_ **Calling external tool** \`${mcpTool.name}\` from the ${mcpTool.serverName} MCP server...`);
         const mcpResult = await callTool(mcpTool.serverName, mcpTool.name, toolData.args || {});
         result = mcpResult.success ? mcpResult.content || 'MCP Tool execution successful.' : `MCP Tool Error: ${mcpResult.error}`;
       } else {
         const errorMsg = `Tool ${toolData.name} not found.`;
         history += `\n\nSystem:\n<tool_result>\n${errorMsg}\n</tool_result>`;
-        onUpdate(`⚠️ Agent tried to use unknown tool: ${toolData.name}`);
+        onUpdate(`\u26A0\uFE0F _Step ${iterations}:_ Tried an unknown tool (\`${toolData.name}\`) \u2014 correcting course...`);
         continue;
       }
     }

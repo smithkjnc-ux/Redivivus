@@ -180,6 +180,8 @@ ${CHASSIS_WORKER_RULES}`;
       if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
       fs.writeFileSync(absPath, code, 'utf8');
       builtFiles.push(entry.filename);
+      // [CHASSIS] Live preview: open each built file beside chat immediately (preview mode reuses same tab slot).
+      try { const vscode = await import('vscode'); const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath)); await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch { /* non-blocking */ }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);
       ctx.logError(task, filePrompt, `Write failed for ${entry.filename}: ${errMsg}`, filePromptLen);
@@ -194,6 +196,5 @@ ${CHASSIS_WORKER_RULES}`;
     updateStory(storyLines);
     appendMsg(ctx, `✅ Built ${fileNum} of ${total}: \`${entry.filename}\`\n__BUILD_RESULT__${entry.filename}|||${path.join(ctx.root, entry.filename)}|||END__`, fileTokens, fileCost);
   }
-
   return { success: true, builtFiles, totalTokens, totalCost, storyLines };
 }

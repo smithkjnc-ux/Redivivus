@@ -73,9 +73,9 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
     if (header.assistMode || header.workspaceIsAssistMode) { badges.push(`<span class="badge mode" style="background:#1e3a5f;color:#60a5fa;border-color:#2563eb;" title="Assist Mode: CHASSIS runs silently. No code annotations or roadmap. Click to upgrade." data-action="retrofit-project">&#x26A1; Assist Mode</span>`); }
     else if (header.workspaceHasChassis) { badges.push(`<span class="badge mode" style="background:#14291a;color:#4ade80;border-color:#16a34a;" title="Full CHASSIS Mode: code annotations, roadmap, and blueprint active">&#x1F9E9; CHASSIS</span>`); }
     
-    // [CHASSIS] Phase 2: Agent Mode toggle
-    if (header.agentMode) { badges.push(`<span class="badge mode" style="background:#4c1d95;color:#c4b5fd;border-color:#8b5cf6;" title="Agent Mode Active: Autonomous tool-use loop. Click to disable." data-action="toggle-agent-mode">🤖 Agent Mode</span>`); }
-    else { badges.push(`<span class="badge mode" style="background:#1f2937;color:#9ca3af;border-color:#374151;" title="Pipeline Mode Active: Rigid intent classification. Click to enable Agent Mode." data-action="toggle-agent-mode">🚇 Pipeline</span>`); }
+    // [CHASSIS] Phase 2: Agent Mode — OBD1 = Pipeline, OBD2 = Agent. Click opens info+cost panel with toggle.
+    if (header.agentMode) { badges.push(`<span class="badge mode" style="background:#4c1d95;color:#c4b5fd;border-color:#8b5cf6;cursor:pointer;" title="OBD2 Agent Mode: ON \u2014 autonomous ReAct loop, reads files &amp; runs commands. Click for cost info &amp; controls." data-action="show-agent-info">\uD83E\uDD16 OBD2</span>`); }
+    else { badges.push(`<span class="badge mode" style="background:#1d3461;color:#60a5fa;border-color:#2563eb;cursor:pointer;" title="OBD1 Pipeline Mode: ON \u2014 structured intent classification, Supervisor + Worker + Guardian. Click to learn about OBD2 Agent Mode." data-action="show-agent-info">\uD83D\uDE87 OBD1</span>`); }
   }
   const headerHtml = header ? `<div class="header-badges">${badges.join('')}</div>` : '';
 
@@ -123,6 +123,6 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       </div>
     </div>
   </div>
-  <script nonce="${nonce}">${buildChatScript()}<\/script>
+  <script nonce="${nonce}">window._agentMode=${header?.agentMode ? 'true' : 'false'};${buildChatScript()}<\/script>
 </body></html>`;
 }

@@ -4,8 +4,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
 import { WizardPanelState } from './messageRouterTypes.js';
+import { syncBlueprintMd } from '../services/blueprint/blueprintWriter.js';
 
 export async function handleCoreMessage(
   msg: any,
@@ -115,9 +117,9 @@ export async function handleCoreMessage(
           lockedAt: msg.data.lock ? new Date().toISOString() : undefined,
           version: '1.0',
         };
+        };
         chassis.saveConfig(cfg);
-        const md = '# Blueprint\n\n## WHO\n' + cfg.blueprint.who + '\n\n## WHAT\n' + cfg.blueprint.what + '\n\n## WHERE\n' + cfg.blueprint.where + '\n\n## WHEN\n' + cfg.blueprint.when + '\n\n## WHY\n' + cfg.blueprint.why + '\n';
-        fs.writeFileSync(chassis.blueprintPath, md);
+        syncBlueprintMd(chassis, cfg);
         chassis.generateRules(cfg.projectName, cfg.blueprint);
       }
       refresh();

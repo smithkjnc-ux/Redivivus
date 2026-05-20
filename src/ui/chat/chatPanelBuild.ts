@@ -3,6 +3,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import * as vscode from 'vscode';
 import { findRelevantByTask } from '../../services/vault/buildFromVaultSearch.js';
 import { extractNarrator, buildResultCard } from './chatPanelStory.js';
 import { buildPostBuildGuidance } from './chatPanelPostBuild.js';
@@ -83,6 +84,8 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   // Real streaming: chunks arrive from the AI and update the message in real time
   let streamAccum = '';
   appendMsg(ctx, `⚙️ Writing \`${relPath}\`...\n\`\`\`\n\`\`\``);
+  // [CHASSIS] Open editor pane early (existing files only) so user sees side panel appear before AI generates.
+  if (fs.existsSync(absPath)) { try { const _doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath)); await vscode.window.showTextDocument(_doc, { preview: true, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch {} }
   const onChunk = (chunk: string) => {
     streamAccum += chunk;
     updateLastMsg(ctx, `⚙️ Writing \`${relPath}\`...\n\`\`\`\n${streamAccum}\n\`\`\``);
@@ -193,6 +196,5 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   await runCompileAutoFix(ctx, [relPath, ...scaffoldedFiles]).catch(() => {});
   await runTestAutoFix(ctx, [relPath, ...scaffoldedFiles]).catch(() => {});
 }
-
 export { runChunkedBuild } from './chatPanelChunked.js';
 export { runVaultAssemblyBuild } from './chatPanelBuildVault.js';

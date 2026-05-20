@@ -128,7 +128,18 @@ export async function runBuildAfterGates(
     deps.setActiveBuildCtx(undefined);
     deps.postToWebview({ type: 'set-status', status: 'ready' });
   }
-  if (root) { import('../../services/blueprint/blueprintRevisionService.js').then(m => m.tryBlueprintRevision(root!, deps.chassis, deps.routing)).catch(() => {}); }
+  if (root) { 
+    import('../../services/blueprint/blueprintRevisionService.js').then(m => m.tryBlueprintRevision(root!, deps.chassis, deps.routing)).catch(() => {}); 
+    
+    // [CHASSIS] Auto-update the project map in the background after complex chunked builds
+    // Only runs for chunked builds to keep fast direct edits snappy
+    if (await isChunkedBuildRequest(task, ctx.routing)) {
+      import('../../services/analyzerService.js').then(m => {
+        const analyzer = new m.AnalyzerService(deps.chassis);
+        analyzer.updateProjectMapOnly(root!);
+      }).catch(e => console.error('Failed to auto-update project map', e));
+    }
+  }
   // [DEAD] Was: auto-open here — moved to extensionInlineCommands.ts onBuildFinished callback
   // which now receives buildRoot directly and handles both first-folder and add-to-workspace cases.
 }

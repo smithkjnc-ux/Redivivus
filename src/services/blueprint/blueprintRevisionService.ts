@@ -4,6 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
+import { syncBlueprintMd } from './blueprintWriter.js';
 
 const BUILDS_PER_REVISION = 3;
 
@@ -189,4 +190,5 @@ export async function tryBlueprintRevision(root: string, chassis: any, routing: 
 
   applyRevision(blueprintPath, config, rev.what, projectName, rev.reason);
   chassis.saveConfig?.(config);
+  syncBlueprintMd(chassis, config);
 }

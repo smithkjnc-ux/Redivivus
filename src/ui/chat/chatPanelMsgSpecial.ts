@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import { ChatMessage } from './chatPanelHtml.js';
 import { MessageHandlerDeps } from './chatPanelMessages.js';
 import { applyGapAnswers } from '../../services/blueprint/blueprintGapDetector.js';
+import { syncBlueprintMd } from '../../services/blueprint/blueprintWriter.js';
 
 // [CHASSIS] Guided Blueprint Mode — pending build tasks waiting for gap answers (sessionId -> original task)
 export const _pendingGuidedBuilds = new Map<string, string>();
@@ -20,6 +21,7 @@ export async function handleBlueprintGapAnswer(msg: any, deps: MessageHandlerDep
   if (config) {
     config.blueprint = applyGapAnswers(config.blueprint || {}, answers) as typeof config.blueprint;
     deps.chassis.saveConfig(config);
+    syncBlueprintMd(deps.chassis, config);
   }
 
   const fields = Object.keys(answers).filter(k => answers[k]?.trim()).map(k => k.toUpperCase()).join(', ');

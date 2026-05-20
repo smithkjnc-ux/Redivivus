@@ -43,3 +43,10 @@ ${bp.why || '❓ Not answered'}
   // [WARN] Direct file system write, potential for path/permission errors.
   fs.writeFileSync(blueprintPath, content);
 }
+
+// [SCOPE] Syncs the internal .chassis/blueprint.md with the current config blueprint
+// Call this everywhere saveConfig is called with updated blueprint data
+export function syncBlueprintMd(chassis: any, config: any): void {
+  if (!config || !config.blueprint || !chassis.blueprintPath) return;
+  writeBlueprintMd(config.blueprint, chassis.blueprintPath, config.projectName || 'Unknown');
+}

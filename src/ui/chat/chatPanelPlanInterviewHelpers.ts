@@ -3,6 +3,7 @@
 
 /** Generates follow-up questions when 5W answers are too vague.
  * [RULE 18] Uses AI to check if game type / project specifics are already clear — no regex guessing. */
+import { syncBlueprintMd } from '../../services/blueprint/blueprintWriter.js';
 export async function generateFollowups(answers: Record<string, string>, routing?: any): Promise<string[]> {
   const followups: string[] = [];
   const what = answers.what?.toLowerCase() || '';
@@ -126,6 +127,7 @@ export function saveBlueprint(deps: any, answers: Record<string, string>): void 
         why:  answers.why   || config.blueprint?.why   || '',
       };
       deps.chassis.saveConfig(config);
+      syncBlueprintMd(deps.chassis, config);
     }
   } catch { /* never crash the interview */ }
 }

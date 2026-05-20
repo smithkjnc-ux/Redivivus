@@ -2,6 +2,7 @@
 import * as vscode from 'vscode';
 import { ChassisService } from '../services/chassisService.js';
 import { BlueprintService } from '../services/blueprint/blueprintService.js';
+import { syncBlueprintMd } from '../services/blueprint/blueprintWriter.js';
 
 export function registerBlueprintCommands(
   context: vscode.ExtensionContext,
@@ -73,6 +74,7 @@ export function registerBlueprintCommands(
       if (choice === lockOption) {
         config.blueprint.locked = true;
         chassis.saveConfig(config);
+        syncBlueprintMd(chassis, config);
         vscode.window.showInformationMessage('Blueprint successfully locked.');
         try { refreshAll(); } catch { /* never block the lock on a refresh error */ }
       }

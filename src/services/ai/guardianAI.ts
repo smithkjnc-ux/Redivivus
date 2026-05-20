@@ -119,6 +119,7 @@ DOMAIN GOTCHAS — things junior AIs consistently get wrong (use your judgment, 
 - resizeCanvas() called before x/y are initialized, then clamps x/y producing NaN — causes black screen; guard the clamp: only clamp if x and y are already numbers (typeof x === 'number')
 - speed hardcoded as a fixed number instead of Math.hypot(canvas.width, canvas.height) / 180 — ball moves too slow/fast on different screen sizes
 - CLI input shadowing: args parsed into named variables (distance, pay, fuelCost) but formula only uses some — e.g. netProfit = pay - fuelCost while distance was parsed and is never referenced — all parsed argv inputs MUST appear in the output computation
+- File type mismatch: if the file is .js or .ts, the content must be valid JavaScript/TypeScript code. If it is JSON, markdown, or plain text disguised as code, that is a CRITICAL correctness bug.
 
 SCOPE RULE — THIS OVERRIDES EVERYTHING ELSE:
 If the worker changed, renamed, refactored, or "improved" ANYTHING not directly required to fulfill the task above — that is a scope violation. Reverting scope violations is MORE IMPORTANT than fixing other bugs. The user did not ask for improvements, only for the specific thing they requested.

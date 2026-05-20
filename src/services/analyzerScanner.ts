@@ -80,7 +80,17 @@ export function scanDirectory(
         const commentLines = lines.filter(l => /^\s*(\/\/|\/\*|\*|#\s|<!--|"""|''')/.test(l)).length;
         const hasScope = /\[(SCOPE|TODO|WARN|NEXT|DEAD|DONE)\]/.test(content);
         const hasComments = hasScope || (lines.length > 0 && commentLines / lines.length >= 0.03);
-        files.push({ relativePath, extension: ext || path.basename(entry.name), lines: lines.length, size: stat.size, todos, hasComments });
+        // [CHASSIS] Check if [SCOPE] is correctly at line 1 with right syntax for the file type
+        const line0 = lines[0]?.trim() || '';
+        let missingScopeAtLine1 = false;
+        if (['.js', '.ts', '.jsx', '.tsx'].includes(ext)) {
+          missingScopeAtLine1 = !line0.startsWith('// [SCOPE]');
+        } else if (ext === '.html') {
+          missingScopeAtLine1 = !line0.startsWith('<!-- [SCOPE]');
+        } else if (['.py', '.sh', '.bash'].includes(ext)) {
+          missingScopeAtLine1 = !line0.startsWith('# [SCOPE]');
+        }
+        files.push({ relativePath, extension: ext || path.basename(entry.name), lines: lines.length, size: stat.size, todos, hasComments, missingScopeAtLine1 });
       } catch { /* skip unreadable */ }
     }
   }
@@ -94,6 +104,8 @@ export function buildAnalysis(files: FileInfo[]): AnalysisResult {
   const uncommentedFiles: FileInfo[] = [];
   let totalLines = 0;
 
+  const missingScopeFiles: FileInfo[] = [];
+
   for (const f of files) {
     filesByType[f.extension] = (filesByType[f.extension] || 0) + 1;
     totalLines += f.lines;
@@ -101,6 +113,10 @@ export function buildAnalysis(files: FileInfo[]): AnalysisResult {
     for (const t of f.todos) { todoItems.push({ file: f.relativePath, line: t }); }
     if (!f.hasComments && ['.ts', '.tsx', '.js', '.jsx', '.py'].includes(f.extension)) {
       uncommentedFiles.push(f);
+    }
+    // [CHASSIS] Flag any code file missing proper [SCOPE] at line 1
+    if (f.missingScopeAtLine1 && ['.ts', '.tsx', '.js', '.jsx', '.py', '.html', '.sh', '.bash'].includes(f.extension)) {
+      missingScopeFiles.push(f);
     }
   }
   largeFiles.sort((a, b) => b.lines - a.lines);
@@ -113,11 +129,13 @@ export function buildAnalysis(files: FileInfo[]): AnalysisResult {
   const filteredTodos = todoItems.filter(t => !resolvedTodo.has(t.file));
   const filteredUncommented = uncommentedFiles.filter(f => !resolvedUncommented.has(f.relativePath));
 
+  const filteredMissingScope = missingScopeFiles.filter(f => !resolvedUncommented.has(f.relativePath));
+
   const dirs = new Set<string>();
   for (const f of files) {
     const dir = path.dirname(f.relativePath);
     if (dir !== '.') { dirs.add(dir); }
   }
 
-  return { totalFiles: files.length, totalLines, filesByType, largeFiles: filteredLarge, todoItems: filteredTodos, uncommentedFiles: filteredUncommented, structure: Array.from(dirs).sort() };
+  return { totalFiles: files.length, totalLines, filesByType, largeFiles: filteredLarge, todoItems: filteredTodos, uncommentedFiles: filteredUncommented, missingScopeFiles: filteredMissingScope, structure: Array.from(dirs).sort() };
 }

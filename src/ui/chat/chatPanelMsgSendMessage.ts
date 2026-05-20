@@ -1,6 +1,7 @@
 // [SCOPE] Chat message handler: send-message — the main user chat path
 // Extracted from chatPanelMessages.ts. Called by handleChatMessage router.
 // [RULE 18] Intent classification uses AI (deps.classifyIntent), never regex pattern matching.
+// [DONE] Rule 9 split: URL/search/memory intercepts extracted to chatPanelMsgSendEarlyExits.ts
 
 import * as vscode from 'vscode';
 import { ChatMessage } from './chatPanelHtml.js';
@@ -14,6 +15,7 @@ import { handleAIChat } from './chatPanelMsgSendAI.js';
 import { handleFixRequest } from './chatPanelMsgFix.js';
 import { runTemplateWizard } from '../../services/project/templateWizard.js';
 import { handleRunIntent, handleScaffoldIntent, handleServiceIntent } from './chatPanelMsgIntentActions.js';
+import { handleUrlRead, handleWebSearch, handleRememberIntent, handleReadResult } from './chatPanelMsgSendEarlyExits.js';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { chassis, routing, usageTracker, conversation, panel, refresh } = deps;
@@ -40,149 +42,57 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     }
     refresh(); return;
   }
-
   // Run / open program — check BEFORE AI classifier to avoid vault/build path
   if (/^(run|open|launch|show|preview|view)\s+(it|the\s+(program|app|site|page|game|file|project|result|output)|my\s+(program|app|site|game))/i.test(lowerText) || lowerText.trim() === 'run it') {
     const _runRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (_runRoot) {
-      const { detectPostBuildInfo } = await import('./chatPanelPostBuild.js');
-      const _info = detectPostBuildInfo(_runRoot, []);
-      if (_info.entryFile) {
-        const _p = require('path') as typeof import('path');
-        await vscode.env.openExternal(vscode.Uri.file(_p.join(_runRoot, _info.entryFile)));
-        conversation.push({ role: 'assistant', content: `Opening \`${_info.entryFile}\` in your browser.`, timestamp: Date.now() });
-        refresh(); return;
-      }
-    }
+    if (_runRoot) { const { detectPostBuildInfo } = await import('./chatPanelPostBuild.js'); const _info = detectPostBuildInfo(_runRoot, []); if (_info.entryFile) { const _p = require('path') as typeof import('path'); await vscode.env.openExternal(vscode.Uri.file(_p.join(_runRoot, _info.entryFile))); conversation.push({ role: 'assistant', content: `Opening \`${_info.entryFile}\` in your browser.`, timestamp: Date.now() }); refresh(); return; } }
   }
-
   // Scan project
-  if (/scan.*for\s+(problems?|issues?|errors?|bugs?|warnings?)|analyze\s+(the\s+)?project|check\s+(my\s+|the\s+)?project|find.*problems|project.*health|run\s+scan|scan\s+project/i.test(lowerText)) {
-    conversation.push({ role: 'assistant', content: 'Running project scan now -- opening the Recommendations panel...', timestamp: Date.now() });
-    refresh(); await vscode.commands.executeCommand('chassis.analyze'); return;
-  }
-
+  if (/scan.*for\s+(problems?|issues?|errors?|bugs?|warnings?)|analyze\s+(the\s+)?project|check\s+(my\s+|the\s+)?project|find.*problems|project.*health|run\s+scan|scan\s+project/i.test(lowerText)) { conversation.push({ role: 'assistant', content: 'Running project scan now -- opening the Recommendations panel...', timestamp: Date.now() }); refresh(); await vscode.commands.executeCommand('chassis.analyze'); return; }
   // Current project info
-  if (/what\s+(am\s+i\s+working|project\s+is\s+this)/i.test(lowerText)) {
-    const info = await projectOps.getCurrentProjectInfo();
-    conversation.push({ role: 'assistant', content: `**Current project:** ${info || 'No project info available'}`, timestamp: Date.now() });
-    refresh(); return;
-  }
+  if (/what\s+(am\s+i\s+working|project\s+is\s+this)/i.test(lowerText)) { const info = await projectOps.getCurrentProjectInfo(); conversation.push({ role: 'assistant', content: `**Current project:** ${info || 'No project info available'}`, timestamp: Date.now() }); refresh(); return; }
 
   // Setup progress
   if (/how'?s\s+my\s+setup|setup\s+progress|what'?s\s+left|what\s+to\s+do\s+next/i.test(lowerText)) {
     const _spRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (_spRoot && chassis) {
-      const { SetupProgressService } = await import('../../services/project/setupProgressService.js');
-      const { showSetupProgressPanel } = await import('../../services/project/setupProgressPanel.js');
-      const svc = new SetupProgressService(chassis, _spRoot); const prog = await svc.getProgress();
-      showSetupProgressPanel(prog, () => svc.getProgress());
-      conversation.push({ role: 'assistant', content: `Setup progress panel opened. You're **${prog.percentage}% complete** (${prog.completedCount} of ${prog.totalCount} steps done).`, timestamp: Date.now() });
-      refresh(); return;
-    }
+    if (_spRoot && chassis) { const { SetupProgressService } = await import('../../services/project/setupProgressService.js'); const { showSetupProgressPanel } = await import('../../services/project/setupProgressPanel.js'); const svc = new SetupProgressService(chassis, _spRoot); const prog = await svc.getProgress(); showSetupProgressPanel(prog, () => svc.getProgress()); conversation.push({ role: 'assistant', content: `Setup progress panel opened. You're **${prog.percentage}% complete** (${prog.completedCount} of ${prog.totalCount} steps done).`, timestamp: Date.now() }); refresh(); return; }
   }
-
   // List projects
   if (/list.*project|show.*project|available.*project|my.*project/i.test(lowerText)) {
-    const projects = _scanChassisProjects();
-    const reply = projects.length ? `Found **${projects.length} CHASSIS project${projects.length === 1 ? '' : 's'}** -- opening the picker now.` : 'No CHASSIS projects found.';
-    conversation.push({ role: 'assistant', content: reply, timestamp: Date.now() }); refresh();
-    if (projects.length) { panel.webview.postMessage({ type: 'show-projects-modal', projects }); }
-    return;
+    const projects = _scanChassisProjects(); const reply = projects.length ? `Found **${projects.length} CHASSIS project${projects.length === 1 ? '' : 's'}** -- opening the picker now.` : 'No CHASSIS projects found.';
+    conversation.push({ role: 'assistant', content: reply, timestamp: Date.now() }); refresh(); if (projects.length) { panel.webview.postMessage({ type: 'show-projects-modal', projects }); } return;
   }
-  // Explain project files — non-tech file explanation, before AI classifier
-  if (/explain.*files?|what.*files?|what.*folder|why.*extra.*code|what.*all.*this/i.test(lowerText)) {
-    const _exRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (_exRoot) { const { explainProjectFiles } = await import('./chatPanelFileExplainer.js'); conversation.push({ role: 'assistant', content: await explainProjectFiles(_exRoot), timestamp: Date.now() }); refresh(); return; }
-  }
-  // [FIX] Web search + URL reading -- intercept before classifier
-  const { extractUrl, detectSearchIntent, readUrl, searchWeb } = await import('../../services/webSearchService.js');
-  const pastedUrl = extractUrl(userText);
-  if (pastedUrl && /\b(read|use|look at|check|fetch|get|from|reference)\b/i.test(lowerText)) {
-    conversation.push({ role: 'assistant', content: `Reading \`${pastedUrl}\`...`, timestamp: Date.now() });
-    refresh();
-    const page = await readUrl(pastedUrl);
-    if (page) {
-      const summary = page.text.slice(0, 4000);
-      const truncNote = page.truncated ? '\n_(Page was large -- showing first portion)_' : '';
-      conversation[conversation.length - 1].content = `**${page.title || pastedUrl}**\n\n${summary}${truncNote}`;
-    } else {
-      conversation[conversation.length - 1].content = `Could not read that URL. It may be blocked, require login, or be non-text content.`;
-    }
-    refresh(); return;
-  }
-  const searchQuery = detectSearchIntent(userText);
-  if (searchQuery && !pastedUrl) {
-    conversation.push({ role: 'assistant', content: `Searching the web for "${searchQuery}"...`, timestamp: Date.now() });
-    refresh();
-    const results = await searchWeb(searchQuery);
-    if (results.length > 0) {
-      const formatted = results.map((r, i) => `${i + 1}. **[${r.title}](${r.url})**\n   ${r.snippet}`).join('\n\n');
-      conversation[conversation.length - 1].content = `**Web results for "${searchQuery}":**\n\n${formatted}\n\n_Say "read #1" to fetch the full page, or ask me to use these results in a build._`;
-    } else {
-      conversation[conversation.length - 1].content = `No results found for "${searchQuery}". Try rephrasing or check your internet connection.`;
-    }
-    refresh(); return;
-  }
-  // [FIX] "remember that..." — store explicit preference in user memory (0 AI tokens)
-  const { detectRememberIntent, rememberExplicit } = await import('../../services/userMemoryService.js');
-  const rememberText = detectRememberIntent(userText);
-  if (rememberText) {
-    rememberExplicit(rememberText);
-    conversation.push({ role: 'assistant', content: `Got it -- I'll remember: **"${rememberText}"**\n\n_This preference will be used in all future builds across all projects._`, timestamp: Date.now() });
-    refresh(); return;
-  }
-
-  // [FIX] "read #N" — fetch a specific search result from the previous results
-  const readResultMatch = lowerText.match(/^read\s+#?(\d+)/);
-  if (readResultMatch) {
-    const prevMsg = [...conversation].reverse().find(m => m.role === 'assistant' && m.content.includes('**Web results for'));
-    if (prevMsg) {
-      const urlMatches = [...prevMsg.content.matchAll(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g)];
-      const idx = parseInt(readResultMatch[1]) - 1;
-      if (urlMatches[idx]) {
-        const targetUrl = urlMatches[idx][2];
-        conversation.push({ role: 'assistant', content: `Reading \`${targetUrl}\`...`, timestamp: Date.now() });
-        refresh();
-        const page = await readUrl(targetUrl);
-        if (page) {
-          const truncNote = page.truncated ? '\n_(Page was large -- showing first portion)_' : '';
-          conversation[conversation.length - 1].content = `**${page.title || targetUrl}**\n\n${page.text.slice(0, 4000)}${truncNote}`;
-        } else {
-          conversation[conversation.length - 1].content = `Could not read that page.`;
-        }
-        refresh(); return;
-      }
-    }
-  }
+  // Explain project files
+  if (/explain.*files?|what.*files?|what.*folder|why.*extra.*code|what.*all.*this/i.test(lowerText)) { const _exRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (_exRoot) { const { explainProjectFiles } = await import('./chatPanelFileExplainer.js'); conversation.push({ role: 'assistant', content: await explainProjectFiles(_exRoot), timestamp: Date.now() }); refresh(); return; } }
+  // [FIX] Web search / URL / remember / read-#N — delegated to chatPanelMsgSendEarlyExits.ts (Rule 9 split)
+  if (await handleUrlRead(userText, lowerText, conversation, refresh)) { return; }
+  if (await handleWebSearch(userText, lowerText, conversation, refresh)) { return; }
+  if (await handleRememberIntent(userText, conversation, refresh)) { return; }
+  if (await handleReadResult(lowerText, conversation, refresh)) { return; }
 
   // [FIX] Just Build (direct) mode skips classifier ONLY for pure build tasks — fix/bug/broken words fall through to classifier
   // [DEAD] Was: skip classifier entirely — routed "this needs fixed" to build pipeline, wiped the project
   if (deps.buildMode === 'direct' && !deps.agentMode && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
 
-  // [CHASSIS] Phase 2: Agent Mode routing
+  // [CHASSIS] Phase 2: Agent Mode routing — autonomous ReAct loop
   if (deps.agentMode) {
     const { executeAgentTask } = await import('../../services/ai/agentService.js');
     const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     const agentCtx: any = {
-      root: rootPath,
-      task: userText,
-      log: (msg: string) => {
-        conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() });
-        refresh();
-      },
-      modifiedFiles: new Set<string>(),
-      snapshotId: undefined
+      root: rootPath, task: userText,
+      log: (msg: string) => { conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() }); refresh(); },
+      modifiedFiles: new Set<string>(), snapshotId: undefined,
     };
     const config = deps.chassis.isInitialized() ? deps.chassis.loadConfig() : null;
     let projectContext = config?.blueprint ? `Blueprint: ${JSON.stringify(config.blueprint)}` : 'No blueprint available.';
     try {
       const files = await vscode.workspace.findFiles('**/*.*', '**/node_modules/**,**/.git/**,**/dist/**,**/out/**');
-      const fileList = files.map(f => vscode.workspace.asRelativePath(f)).slice(0, 100).join('\n- ');
-      projectContext += `\n\nPROJECT FILES IN WORKSPACE:\n- ${fileList}\n\n(Use these exact paths when reading/writing files.)`;
-    } catch (e) {}
+      projectContext += `\n\nPROJECT FILES:\n- ${files.map(f => vscode.workspace.asRelativePath(f)).slice(0, 100).join('\n- ')}\n\n(Use these exact paths.)`;
+    } catch (_e) {}
+    // [CHASSIS] Signal status bar — agent loop can take many iterations
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
     const result = await executeAgentTask(userText, projectContext, deps.routing, agentCtx, agentCtx.log);
-    
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
     if (!result.success && result.error) {
       conversation.push({ role: 'assistant', content: `**Agent failed:** ${result.error}`, timestamp: Date.now() });
     } else if (result.finalAnswer) {
@@ -190,30 +100,22 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
       if (agentCtx.modifiedFiles.size > 0 && result.ledger) {
         const { buildResultCard } = await import('./chatPanelStory.js');
         const { BuildHistoryService, makeBuildHistoryEntry } = await import('../../services/build/buildHistoryService.js');
-        const ledgerSummary = result.ledger.hasData() ? result.ledger.getSummary() : undefined;
-        const totalTokens = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.tokens, 0) : 0;
-        const totalCost = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.costUSD, 0) : 0;
-        const files: string[] = Array.from(agentCtx.modifiedFiles as Set<string>);
-        const card = buildResultCard(files, 0, totalTokens, totalCost, 0, agentCtx.snapshotId, 0, true, ledgerSummary);
+        const ls = result.ledger.hasData() ? result.ledger.getSummary() : undefined;
+        const totalTokens = ls ? ls.reduce((s: number, l: any) => s + l.tokens, 0) : 0;
+        const totalCost = ls ? ls.reduce((s: number, l: any) => s + l.costUSD, 0) : 0;
+        const builtFiles: string[] = Array.from(agentCtx.modifiedFiles as Set<string>);
+        const card = buildResultCard(builtFiles, 0, totalTokens, totalCost, 0, agentCtx.snapshotId, 0, true, ls);
         finalContent += `\n\n${card}`;
-        
         const sw = deps.routing.selectSupervisorAndWorker();
         new BuildHistoryService(rootPath).record(makeBuildHistoryEntry({
-          snapshotId: agentCtx.snapshotId || Date.now().toString(),
-          task: userText,
-          files,
-          tokensUsed: totalTokens,
-          costUSD: totalCost,
-          source: 'ai',
-          supervisor: sw.supervisor,
-          worker: null,
-          resultCardToken: card
+          snapshotId: agentCtx.snapshotId || Date.now().toString(), task: userText, files: builtFiles,
+          tokensUsed: totalTokens, costUSD: totalCost, source: 'ai',
+          supervisor: sw.supervisor, worker: null, resultCardToken: card,
         }));
       }
       conversation.push({ role: 'assistant', content: finalContent, timestamp: Date.now() });
     }
-    refresh();
-    return;
+    refresh(); return;
   }
 
   // [RULE 18] AI intent classification — never use regex to simulate language understanding.

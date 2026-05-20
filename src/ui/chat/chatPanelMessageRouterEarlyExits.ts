@@ -133,6 +133,13 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
   if (msg.type === 'toggle-agent-mode') {
     state.agentMode = !state.agentMode;
+    // [CHASSIS] Patch badge in place — panelRefresh only sends update-conversation after init,
+    // so the header HTML never rebuilds. Directly update the badge via postMessage instead.
+    const isObd2 = state.agentMode;
+    const badgeHtml = isObd2
+      ? `<span class="badge mode" style="background:#4c1d95;color:#c4b5fd;border-color:#8b5cf6;cursor:pointer;" title="OBD2 Agent Mode: ON — autonomous ReAct loop. Click for info." data-action="show-agent-info">\uD83E\uDD16 OBD2</span>`
+      : `<span class="badge mode" style="background:#1d3461;color:#60a5fa;border-color:#2563eb;cursor:pointer;" title="OBD1 Pipeline Mode — structured pipeline. Click for info." data-action="show-agent-info">\uD83D\uDE87 OBD1</span>`;
+    _panel.webview.postMessage({ type: 'update-agent-badge', html: badgeHtml, agentMode: isObd2 });
     panel.refresh();
     return true;
   }

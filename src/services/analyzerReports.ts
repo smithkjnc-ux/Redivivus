@@ -13,7 +13,8 @@ export function generateProjectMap(result: AnalysisResult, root: string): string
   md += `| Total Lines | ${result.totalLines.toLocaleString()} |\n`;
   md += `| Large Files (>200 lines) | ${result.largeFiles.length} |\n`;
   md += `| TODO/FIXME items | ${result.todoItems.length} |\n`;
-  md += `| Files without comments | ${result.uncommentedFiles.length} |\n\n`;
+  md += `| Files without comments | ${result.uncommentedFiles.length} |\n`;
+  md += `| Files missing [SCOPE] at line 1 | ${result.missingScopeFiles?.length || 0} |\n\n`;
 
   md += `## File Types\n\n`;
   const sorted = Object.entries(result.filesByType).sort((a, b) => b[1] - a[1]);
@@ -44,6 +45,12 @@ export function generateProjectMap(result: AnalysisResult, root: string): string
     md += `## 🔇 Files Without Comments\n\n`;
     md += `Consider adding \`// [SCOPE]\` tags to define boundaries:\n\n`;
     for (const f of result.uncommentedFiles) { md += `- **${f.relativePath}** (${f.lines} lines)\n`; }
+    md += `\n`;
+  }
+  if (result.missingScopeFiles && result.missingScopeFiles.length > 0) {
+    md += `## ❌ Files Missing [SCOPE] at Line 1\n\n`;
+    md += `These code files lack the mandatory CHASSIS scope tag at their very first line:\n\n`;
+    for (const f of result.missingScopeFiles) { md += `- **${f.relativePath}**\n`; }
     md += `\n`;
   }
   return md;

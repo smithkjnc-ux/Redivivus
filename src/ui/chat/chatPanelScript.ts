@@ -19,17 +19,11 @@ export function buildChatScript(): string {
     const clearBtn = document.getElementById('clear-btn');
     const sendBtn = document.getElementById('send-btn');
     input.focus();
-
-    function autoGrow() {
-      input.style.height = 'auto';
-      input.style.height = Math.min(input.scrollHeight, 160) + 'px';
-    }
+    function autoGrow() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px'; }
     input.addEventListener('input', autoGrow);
-
     // [CHASSIS] Build mode: 'plan' | 'direct' | undefined. Set by user via toggle or popover.
     window._buildMode = window._buildMode || undefined;
     var _pendingSendText = null;
-
     function doSend() {
       const text = input.value;
       if (!text.trim() && !window._pendingImage) { return; }
@@ -75,21 +69,9 @@ export function buildChatScript(): string {
         vscode.postMessage({ type: 'switch-mode', mode: nextMode });
         return;
       }
-      const agentTarget = e.target.closest('[data-action="toggle-agent-mode"]');
+      const agentTarget = e.target.closest('[data-action="show-agent-info"]');
       if (agentTarget) {
-        vscode.postMessage({ type: 'toggle-agent-mode' });
-        const isAgent = agentTarget.textContent.includes('Agent Mode');
-        if (isAgent) {
-           agentTarget.textContent = '🚇 Pipeline';
-           agentTarget.style.background = '#1f2937';
-           agentTarget.style.color = '#9ca3af';
-           agentTarget.style.borderColor = '#374151';
-        } else {
-           agentTarget.textContent = '🤖 Agent Mode';
-           agentTarget.style.background = '#4c1d95';
-           agentTarget.style.color = '#c4b5fd';
-           agentTarget.style.borderColor = '#8b5cf6';
-        }
+        showAgentInfoPanel();
         return;
       }
       // Generic data-cmd handler: header buttons, sidebar pills, onboarding pills
@@ -135,7 +117,6 @@ export function buildChatScript(): string {
       const gsClose = document.getElementById('gs-close');
       if (gsClose) gsClose.addEventListener('click', () => document.getElementById('getting-started')?.remove());
     }
-
     function showStartSessionPanel() {
       const existing = document.getElementById('ss-modal-overlay'); if(existing)existing.remove();
       const overlay=document.createElement('div'); overlay.id='ss-modal-overlay'; overlay.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
@@ -147,7 +128,6 @@ export function buildChatScript(): string {
       const st=document.createElement('button'); st.textContent='Start'; st.onclick=()=>{ vscode.postMessage({type:'start-session',goal:gi.value}); overlay.remove(); };
       btns.appendChild(st); card.appendChild(btns); overlay.appendChild(card); document.body.appendChild(overlay);
     }
-
     function showContentPanel(title, content) {
       const existing=document.getElementById('dynamic-panel'); if(existing)existing.remove();
       const header=document.querySelector('.header'); if(!header)return;
@@ -202,6 +182,11 @@ export function buildChatScript(): string {
       if (msg.type === 'show-cost-estimate') showCostEstimatePanel(msg.buildId, msg.estimate);
       if (msg.type === 'show-scope-modal') showScopeModal(msg.task);
       if (msg.type === 'show-vault-hit') showVaultHitPanel(msg.resolverId, msg.task, msg.matchCount, msg.isSemantic);
+      if (msg.type === 'update-agent-badge') {
+        window._agentMode = !!msg.agentMode;
+        const badgeEl = document.querySelector('.badge.mode[data-action="show-agent-info"]');
+        if (badgeEl && msg.html) { badgeEl.outerHTML = msg.html; }
+      }
     });
 
     ${buildProjectsScript()}

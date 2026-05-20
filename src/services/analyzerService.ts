@@ -83,9 +83,45 @@ export class AnalyzerService {
     });
   }
 
-  // [DONE] scanDirectory, buildAnalysis → analyzerScanner.ts
   // [DONE] generateProjectMap, generateRecommendations, analyzeCurrentFile → analyzerReports.ts
   // [DONE] showRecommendationsPanel → analyzerPanel.ts
+
+  /**
+   * Fast, background-safe project scan that only updates project_map.md and config.json.
+   * No UI progress bars, no AI calls, no Recommendations panel.
+   */
+  updateProjectMapOnly(root: string): void {
+    const extraSkipDirs = new Set<string>();
+    try {
+      const pkgPath = path.join(root, 'package.json');
+      if (fs.existsSync(pkgPath)) {
+        const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
+        if (pkg?.engines?.vscode) { extraSkipDirs.add('out'); }
+      }
+    } catch { /* non-fatal */ }
+
+    const files: import('./analyzerTypes.js').FileInfo[] = [];
+    scanDirectory(root, root, files, extraSkipDirs);
+    const result = buildAnalysis(files);
+    
+    // Update map file
+    const mapPath = path.join(this.chassis.chassisDir, 'project_map.md');
+    fs.writeFileSync(mapPath, generateProjectMap(result, root));
+
+    // Update config snapshot
+    try {
+      const cfg = this.chassis.loadConfig();
+      if (cfg) {
+        cfg.lastScan = new Date().toISOString();
+        cfg.scanResults = {
+          largeFiles: result.largeFiles.map(f => ({ relativePath: f.relativePath, lines: f.lines })),
+          todos: result.todoItems.map(t => ({ file: t.file, line: t.line })),
+          uncommented: result.uncommentedFiles.map(f => ({ relativePath: f.relativePath, lines: f.lines })),
+        };
+        this.chassis.saveConfig(cfg);
+      }
+    } catch { /* non-fatal */ }
+  }
 
   showRecommendationsPanel(result: AnalysisResult): void {
     _showRecommendationsPanel(result);
