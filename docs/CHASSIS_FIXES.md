@@ -5,7 +5,22 @@
 
 ---
 
-*Last updated: May 24, 2026 (Session 11AW: Rule 9 Splits)*
+*Last updated: May 24, 2026 (Session 11AX: Activation Fix + Complexity Reduction)*
+
+---
+
+## May 24, 2026 — Session 11AX (Extension Activation Fix + Complexity Reduction)
+
+**Activation bug:** `registerTerminalErrorService` accessed `(vscode.window as any).onDidWriteTerminalData` — a proposed VS Code API. In VS Code 1.110+, accessing a proposed API property throws even with `as any` cast, because the throw comes from a property getter on the extension host proxy object, not from calling the result. The existing `?.()` optional chaining only prevents errors from calling `undefined`; it cannot catch a getter throw. The throw propagated up through `registerInlineCommandsC`, causing all command registrations after line 75 (`chassis.injectTerminalError`, `chassis.openVisualEditor`) to silently not register.
+
+**Fix:** wrapped the property access in try/catch. Terminal output buffering degrades to `null` returns from `getLastTerminalError()` when the API is unavailable — all callers already handled this.
+
+**Complexity reduction:** extracted two large nested blocks that inflated cyclomatic complexity scores:
+
+| File | Before | After | Why |
+|------|--------|-------|-----|
+| `chatPanelMsgSendMessage.ts` | 200 lines, ~80 complexity | 166 lines, ~47 complexity | 7 regex keyword intercepts extracted to `chatPanelMsgSendKeywords.ts` |
+| `chatPanelMsgSendAI.ts` | 168 lines, ~61 complexity | 152 lines, ~45 complexity | Chunked-generate branch extracted to `chatPanelMsgSendAIConvert.ts` |
 
 ---
 

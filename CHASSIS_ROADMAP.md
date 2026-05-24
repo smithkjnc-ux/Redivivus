@@ -1,7 +1,21 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated:* May 24, 2026 (Session 11AW)
+*Last updated:* May 24, 2026 (Session 11AX)
+
+---
+
+## Extension Activation Fix + Complexity Reduction — May 24, 2026 (Session 11AX)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/workspace/terminalErrorService.ts` | Wrapped `onDidWriteTerminalData` property access in try/catch inside `registerTerminalErrorService`. Added explanatory comment about the proposed API behavior. | `onDidWriteTerminalData` is a proposed VS Code API — VS Code 1.110+ throws when you access a proposed API property on `vscode.window` if the extension hasn't declared it in `enabledApiProposals`. The existing `?.()` optional chaining only prevents errors from calling `undefined`; it can't catch a throw from the property getter itself. Without the guard, the throw inside `registerInlineCommandsC` caused all subsequent command registrations (`chassis.injectTerminalError`, `chassis.openVisualEditor`, etc.) to silently not register. Terminal buffering degrades gracefully to returning `null` from `getLastTerminalError()`. | Low — all callers already handle `null` from `getLastTerminalError`. |
+| `src/extensionInlineCommands.ts` | Removed unused import of `registerTerminalErrorService, getLastTerminalError`. | Dead import — registration is done in `extensionInlineCommandsC.ts`. | Low — import-only removal. |
+| `src/extensionCommands.ts` | Same unused import removed. | Same. | Low. |
+| `src/core/routing/chatPanelMsgSendKeywords.ts` | NEW. Extracted 7 keyword shortcut intercepts from `handleSendMessage`: template listing, run/open program, scan project, current project info, setup progress, list projects, explain files. | `handleSendMessage` had cyclomatic complexity ~80 with 33 lines of regex inline before the AI classifier. | Low — identical logic, just moved. Re-exported as a single `handleKeywordShortcuts(userText, lowerText, deps)` call. |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Replaced 33-line keyword block with `if (await handleKeywordShortcuts(...)) { return; }`. Removed `ProjectOperations` and `_scanChassisProjects` imports (now in keywords file). Removed `projectOps` instantiation. 200→166 lines, complexity ~80→~47. | Complexity reduction. | Low. |
+| `src/core/routing/chatPanelMsgSendAIConvert.ts` | NEW. Extracted chunked-generation path from `handleAIChat`: `runChunkedConvert(userText, wsRoot, routing, usageTracker, conversation, refresh)` — returns `null` when source is small enough for a single call, otherwise runs `chunkedGenerate` and returns the formatted result. | `handleAIChat` had a nested if/if/else for the chunked vs. single-call convert path inside the isConvert branch, adding ~16 lines of nested logic. | Low — return type `ChunkedConvertResult | null` makes the null/fall-through contract explicit. |
+| `src/core/routing/chatPanelMsgSendAI.ts` | Replaced chunked generate block with `runChunkedConvert(...)` call. Removed `findSourceFiles`, `splitSourceIntoSections`, `chunkedGenerate` imports and `CHUNKED_THRESHOLD` constant (all moved to new file). 168→152 lines, complexity ~61→~45. | Complexity reduction. | Low. |
 
 ---
 
