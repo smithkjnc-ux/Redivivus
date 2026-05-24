@@ -44,6 +44,11 @@ export async function handleKeywordShortcuts(
     refresh(); await vscode.commands.executeCommand('chassis.analyze'); return true;
   }
 
+  if (/retrofit.*blueprint|blueprint.*from.*code|blueprint.*from.*scan|figure\s+out\s+what.*project|what\s+does.*project\s+do|generate.*blueprint\s+from|scan.*generate.*blueprint|infer.*blueprint|auto.*blueprint/i.test(lowerText)) {
+    conversation.push({ role: 'assistant', content: 'Scanning your project to infer a blueprint — takes about 30 seconds...', timestamp: Date.now() });
+    refresh(); await vscode.commands.executeCommand('chassis.retrofitBlueprint'); return true;
+  }
+
   if (/what\s+(am\s+i\s+working|project\s+is\s+this)/i.test(lowerText)) {
     const info = await new ProjectOperations().getCurrentProjectInfo();
     conversation.push({ role: 'assistant', content: `**Current project:** ${info || 'No project info available'}`, timestamp: Date.now() });
