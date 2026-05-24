@@ -7,21 +7,18 @@ import * as vscode from 'vscode';
 import { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 
-import { detectBlueprintGaps, buildGapPromptMessage } from '../../services/blueprint/blueprintGapDetector';
-import { _pendingGuidedBuilds } from './chatPanelMsgSpecial';
 import { handleAIChat } from './chatPanelMsgSendAI';
 import { handleKeywordShortcuts } from './chatPanelMsgSendKeywords';
 import { handleFixRequest } from './chatPanelMsgFix';
-import { runTemplateWizard } from '../../services/project/templateWizard';
 import { handleRunIntent, handleScaffoldIntent, handleServiceIntent } from './chatPanelMsgIntentActions';
 import { handleUrlRead, handleWebSearch, handleRememberIntent, handleReadResult } from './chatPanelMsgSendEarlyExits';
 import { runAgentMode } from './chatPanelMsgSendAgent';
 import { ChatPanel } from '../../ui/panels/chat/chatPanel';
-import { generateClarifyQuestions, encodeClarifyToken, formatAnswersForPrompt } from '../../ui/panels/chat/chatPanelClarify';
-import { setPendingClarifyResolve } from '../../ui/panels/chat/chatPanelClarifyBridge';
+import { runChatClarifyStep } from './chatPanelMsgSendClarify';
+import { handleBuildIntent } from './chatPanelMsgSendBuildIntent';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
-  const { chassis, routing, usageTracker, conversation, panel, refresh } = deps;
+  const { conversation, refresh } = deps;
   const userText = msg.text?.trim();
   if (!userText) { return; }
 
@@ -51,29 +48,9 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (deps.buildMode === 'direct' && !deps.chassis?.isInitialized?.() && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing|done for now|done for today|end session|stop session|finish session|start session)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
 
   // [CHASSIS] Design triage — ask clarifying questions BEFORE routing so all modes get user preferences
-  let routedText = userText;
-  const clarifyQuestions = await generateClarifyQuestions(userText, '', deps.routing);
-  if (clarifyQuestions.length > 0) {
-    conversation.push({ role: 'assistant', content: encodeClarifyToken(clarifyQuestions), timestamp: Date.now() });
-    refresh();
-    const answers = await new Promise<Record<string, string>>((resolve) => {
-      setPendingClarifyResolve(resolve);
-      setTimeout(() => resolve({}), 120_000);
-    });
-    if ((answers as any)._cancelled === 'true') {
-      conversation[conversation.length - 1].content = '❌ Build canceled.';
-      refresh(); return;
-    }
-    const answersBlock = formatAnswersForPrompt(answers);
-    if (answersBlock) {
-      const summary = Object.entries(answers).map(([q, a]) => `  \u2022 ${q}: **${a}**`).join('\n');
-      conversation[conversation.length - 1].content = `✅ Got it — building with your choices:\n${summary}`;
-      refresh();
-      routedText = `${userText}\n\n${answersBlock}`;
-    } else {
-      conversation.pop(); refresh();
-    }
-  }
+  const clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
+  if (clarify.cancelled) { return; }
+  const routedText = clarify.routedText;
 
   // [CHASSIS] Early Exit: Hardcoded Command Overrides (bypasses Adaptive/Agent Mode)
   const { checkHardcodedOverrides } = await import('../ai/chatPanelClassifierOverrides.js');
@@ -94,12 +71,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     await runAgentMode(routedText, deps, conversation, refresh);
     return;
   }
-  // Simple path: fall through to classifier below
 
   // [RULE 18] AI intent classification — never use regex to simulate language understanding.
   // [WARN] If classifyIntent throws (e.g. no API key), fall back to keyword check.
   const _BUILD_FALLBACK = /^\s*(add|change|update|remove|delete|rename|replace|fix|edit|make|give|put|set|increase|decrease|toggle|enable|disable|switch|move|style|color)\b/i;
-  let intent = deps.classifyIntent ? (await deps.classifyIntent(userText).catch(() => _BUILD_FALLBACK.test(lowerText) ? { type: 'build' as const } : { type: 'question' as const })) : { type: 'question' as const };
+  const intent = deps.classifyIntent ? (await deps.classifyIntent(userText).catch(() => _BUILD_FALLBACK.test(lowerText) ? { type: 'build' as const } : { type: 'question' as const })) : { type: 'question' as const };
 
   if (intent.type === 'offtopic') {
     conversation.push({ role: 'assistant', content: "I'm a coding assistant -- I can help you build, fix, explain, or review code. What are you building today?", timestamp: Date.now() });
@@ -113,54 +89,13 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     refresh(); return;
   }
 
-  // Conversions (port/rewrite/transform existing code) stay on the AI chat path — dead end log prohibits routing them through the build pipeline.
-  if (intent.type === 'convert') {
-    await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true });
-    return;
-  }
-
+  if (intent.type === 'convert') { await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return; }
   if (intent.type === 'run') { await handleRunIntent(intent, deps, conversation, refresh); return; }
-
-  if (intent.type === 'fix') {
-    await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
-    return;
-  }
-
+  if (intent.type === 'fix') { await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType); return; }
   if (intent.type === 'scaffold') { await handleScaffoldIntent(userText, deps, conversation, refresh); return; }
   if (intent.type === 'service') { await handleServiceIntent(userText, deps, conversation, refresh); return; }
-
-  if (intent.type === 'build') {
-    // [RULE] Initialized projects use the edit pipeline (reads all files, makes surgical changes).
-    // Only show mode popover for brand-new uninitialized projects WITH a folder open.
-    if (!deps.buildMode) {
-      // [FIX] No workspace open → just build, don't show mode popover. Auto-create handles the rest.
-      if (!vscode.workspace.workspaceFolders?.length) { await deps.handleBuildRequest(routedText); return; }
-      // [FIX] Initialized project + "build" intent = user is modifying existing code → use edit pipeline (has file context)
-      if (deps.chassis?.isInitialized?.()) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
-      panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
-      return;
-    }
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (root) {
-      const config = deps.chassis?.isInitialized?.() ? deps.chassis?.loadConfig?.() : null;
-      const gapResult = detectBlueprintGaps(config?.blueprint);
-      if (gapResult.hasGaps) {
-        _pendingGuidedBuilds.set(gapResult.sessionId, userText);
-        conversation.push({ role: 'assistant', content: buildGapPromptMessage(gapResult, userText), timestamp: Date.now() });
-        refresh(); return;
-      }
-    }
-    // Template wizard — new projects only; initialized projects skip it (user is modifying, not starting fresh)
-    if (deps.buildMode === 'plan' && !deps.chassis?.isInitialized?.()) {
-      const wiz = await runTemplateWizard(userText, (m) => panel.webview.postMessage(m), deps.routing);
-      if (wiz.handled && wiz.customizationPrompt) { await deps.handleBuildRequest(wiz.customizationPrompt); return; }
-    }
-    // [FIX] Initialized project → edit pipeline (reads existing files). New project → build pipeline (creates from scratch).
-    await (deps.chassis?.isInitialized?.() ? handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType) : deps.handleBuildRequest(routedText));
-    return;
-  }
+  if (intent.type === 'build') { await handleBuildIntent(routedText, userText, msg, deps, conversation, refresh); return; }
 
   // Default: question / unknown → AI chat
   await handleAIChat(msg, userText, deps, conversation, refresh);
 }
-
