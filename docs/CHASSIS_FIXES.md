@@ -5,7 +5,120 @@
 
 ---
 
-*Last updated: May 20, 2026 (Session 32: Enhance Agent Mode Context and Features)*
+*Last updated: May 24, 2026 (Session 11AW: Rule 9 Splits)*
+
+---
+
+## May 24, 2026 — Session 11AW (Rule 9: All Oversized Files Split to ≤200 Lines)
+
+12 TypeScript source files exceeded the 200-line Rule 9 limit. Each was split by extracting a cohesive unit (a large function, a set of related functions, or an interface block) into a new file, then re-exporting from the original so all callers remain unchanged.
+
+| New File | Extracted From | What Moved |
+|----------|---------------|-----------|
+| `src/services/logging/chassisLoggerOps.ts` | `chassisLogger.ts` (277→193 lines) | `logBuildOperation`, `logFixOperation`, `logAnalysisOperation`, `logChatOperation`, `listChassisLogs`, `readLogFile` |
+| `src/services/ai/guardianAIPrompt.ts` | `guardianAI.ts` (218→122 lines) | `buildGuardianPrompt` — 96-line review prompt string builder |
+| `src/core/routing/chatPanelMsgFixRoadmap.ts` | `chatPanelMsgFixUtils.ts` (221→196 lines) | `writeProjectRoadmapEntry` |
+| `src/core/project/chatPanelMsgRunCommand.ts` | `chatPanelMsgProjectOps.ts` (273→154 lines) | `handleRunCommand` — `chassis.runProject`, `chassis.listProjects`, `chassis.openVisualEditor` inline handlers |
+| `src/services/mcpServiceTypes.ts` | `mcpService.ts` (205→178 lines) | `McpServerConfig`, `McpTool`, `McpResource`, `McpCallResult` interfaces |
+| `src/services/ai/routingServiceAnalyze.ts` | `routingService.ts` (226→195 lines) | `analyzeFileImpl` — standalone version of `RoutingService.analyzeFile`; class method now delegates |
+| `src/services/userMemoryServiceProfile.ts` | `userMemoryService.ts` (225→182 lines) | `buildPromptInjection`, `getMemoryForDisplay`, `updateMemoryField`, `removeExplicit` |
+| `src/services/sessionServiceFinalize.ts` | `sessionService.ts` (213→175 lines) | `finalizeSession`, `parseEndSessionData` |
+| `src/commands/apiSetupHtmlCards.ts` | `apiSetupHtml.ts` (216→150 lines) | `buildProviderCards` — HTML renderer for all 6 provider cards |
+| `src/core/build/chatPanelBuildResult.ts` | `chatPanelBuild.ts` (233→186 lines) | `buildSingleFileResult`, `SingleFileBuildResultParams`, `diffSummary` |
+| `src/ui/panels/chat/chatPanelScriptListener.ts` | `chatPanelScript.ts` (212→170 lines) | `buildListenerScript` — the entire `window.addEventListener('message', ...)` block |
+| _(import removal)_ | `buildOrchestrator.ts` (201→199 lines) | Removed unused `fs` and `path` imports |
+
+Also: gated vault injection in `chatPanelMsgFix.ts` behind `isVaultEnabled()` — fix pipeline now respects the Setup Hub vault toggle alongside the build pipelines.
+
+**Bug fixed during compile:** `mcpService.ts` used `McpCallResult` in two function return types but only re-exported it (not imported it) after the split — TypeScript error `Cannot find name 'McpCallResult'`. Fixed by adding `McpCallResult` to the type import alongside the other three interfaces.
+
+---
+
+## May 22, 2026 — Session 11AK (Reload Triggers Unexpected Rebuild)
+
+**Root cause:** `extensionInlineCommands.ts` `onBuildFinished` callback saved both `pendingRescueConversation` and `pendingResumeTask` to `globalState` after every build where the project root was not already in the workspace. This was designed for the `vscode.openFolder` flow removed in 11AJ — the reload it was protecting against no longer occurs. The state sat in `globalState` indefinitely. On any VS Code reload (extension update, manual window reload, etc.), `extensionResumeState.ts` found `pendingResumeTask`, called `resumeBuildTask(task, projectRoot)`, which calls `_handleBuildRequest` — a full rebuild from scratch.
+
+**Fix:**
+- Removed both `globalState` saves from `extensionInlineCommands.ts` `onBuildFinished`. No data to trigger a spurious rebuild.
+- Moved the conversation save to `chatPanelMessageRouterEarlyExits.ts` `open-workspace-btn` handler — saves `pendingRescueConversation` from the live panel state RIGHT BEFORE calling `vscode.openFolder`. This is the only intentional reload path remaining (user explicitly clicking the button).
+- Added a `pendingRescueConversation`-only restore path in `extensionResumeState.ts` (fires when `pendingRescueConversation` is present WITHOUT `pendingResumeTask`). Restores conversation and returns without calling `resumeBuildTask`. The existing `pendingResumeTask` path (init flow) is unchanged.
+
+---
+
+## May 22, 2026 — Session 11AJ (Explorer Auto-Open + Spinner Persist After Multi-File Build)
+
+**Bug 1 — Spinner not clearing after multi-file build (root cause: `vscode.openFolder` in finalize):**
+
+Session 11AG added `set-status: 'ready'` on the orchestrator early-return path. That IS compiled and deployed. But `chatPanelChunkedFinalize.ts` had a second bug: it called `vscode.openFolder(root, false)` at line 45 AFTER pushing the result card. `vscode.openFolder` schedules a full VS Code extension-host reload. Depending on timing, the `set-status: 'ready'` message from `chatPanelBuildRunner.ts` either arrived to an already-dead webview or was lost in the reload. Net result: spinner never cleared even though the 11AG fix was in place.
+
+**Bug 2 — Explorer not auto-opening (root causes: wrong root + no non-destructive add path):**
+
+Two issues compounded:
+1. `buildResultCard` computed the `__OPEN_WORKSPACE__` token using `ChatPanel.currentPanel.getChassisRoot()` → `chassis.getWorkspaceRoot()` → `ChassisPaths.workspaceRoot` (set at extension activation). This is the extension's activation root, not the directory where the new project was actually written. When both paths matched the existing workspace folder, `alreadyInWs` was `true` and no button was generated.
+2. In the "≥1 existing folder" case, there was no non-destructive auto-add path at all. `extensionInlineCommands.ts` only saved `pendingRescueConversation` / `pendingResumeTask` to globalState (designed for the reload-then-restore flow), but never called `updateWorkspaceFolders`.
+
+**Bonus fix — save-point logic silently dropped:**
+
+`registerSessionCommands` (line 81 of `extensionCommands.ts`) sets `ChatPanel.onBuildFinished` to a save-point + session-record callback. `registerInlineCommands` (line 131) runs after and assigns a new lambda, silently dropping the session.ts callback. Fixed by capturing `_prevOnBuildFinished` in `extensionInlineCommands.ts` and chaining it at the end of the new callback.
+
+**Fixes applied:**
+- `chatPanelChunkedFinalize.ts`: Removed `vscode.openFolder`. Replaced with `updateWorkspaceFolders` for the ≥1-folder case (no reload). Passed `root` as `projectRoot` arg to `buildResultCard`.
+- `chatPanelStory.ts`: Added `projectRoot?: string` to `buildResultCard`. Uses it for the `__OPEN_WORKSPACE__` token when provided, falls back to `getChassisRoot()` for callers that don't pass it.
+- `extensionInlineCommands.ts`: Capture + chain `_prevOnBuildFinished` so both the backup/rescue logic AND the save-point/session-record logic run on every build finish.
+
+---
+
+## May 22, 2026 — Session 11AI (Done for Now / Ghost Session Bug)
+
+**Root cause traced:** Two independent bugs in `chatPanelMsgSendMessage.ts` combined to produce the symptom:
+
+1. **Ghost session creation** — `startSessionSilent` fired unconditionally at line 36 before any intent classification. Typing "done for now" in the chat box created a session with goal "done for now" before the code had any chance to recognize it as a session command.
+
+2. **Direct-mode bypass ignores session commands** — At line 85, `buildMode === 'direct'` short-circuits the entire classifier (including the hardcoded overrides at line 113). "done for now" doesn't match the fix-keyword exclusion regex, so it bypassed the override that maps it to `chassis.endSession` and went directly to `handleBuildRequest("done for now")` — restarting the build pipeline.
+
+**Investigation note:** The `endSession` message handler in `messageRouterSession.ts` (where the semaphore was added in 11AE) is in the `ChassisWebviewProvider` / `attachMessageRouter` path. That view type (`chassisPanel`) is NOT registered in `package.json` — only `chassisSidebar` is. The active sidebar uses `ChassisSidebarProvider` which dispatches `chassis.endSession` as a VS Code command directly, bypassing the webview message path entirely. The semaphore fix was in dead code.
+
+**Fix — `src/core/routing/chatPanelMsgSendMessage.ts`:**
+- `startSessionSilent` block: wrapped in `if (!/\bdone\s+for\s+(now|today)\b|\bend\s+(the\s+)?session\b|\bstart\s+(a\s+)?session\b/i.test(userText))` guard. Session management phrases skip session creation entirely.
+- Direct-mode bypass regex: extended to also exclude the same session phrases. "done for now" now falls through to the hardcoded overrides check at line 113, which correctly routes it to `chassis.endSession`.
+- File stays at 198 lines (Rule 9 compliant).
+
+---
+
+## May 22, 2026 — Session 11AH (Double Clarification Panel / Round 2 Re-Asks)
+
+- **Root cause: round-1 answers silently discarded** — `chatPanelMsgSendMessage.ts`: Round 1 collected answers into `routedText = userText + "\n\n" + answersBlock`. But lines 171, 172, and 191 called `handleBuildRequest(userText)` — NOT `routedText`. The answers were never passed to the build pipeline. Changed all three to `handleBuildRequest(routedText)`.
+- **Root cause: round 2 blind to round 1** — `chatPanelClarify.ts`: Added `previousAnswersBlock?: string` parameter to `generateClarifyQuestions`. Injected into the triage prompt ("does ambiguity remain NOT already covered by previous answers?") and the question prompt ("do NOT ask about these topics — if all covered, return []"). Without injection, the AI re-asked the same design topics reworded.
+- **Extraction bridge** — `chatPanelChunked.ts`: Before calling `generateClarifyQuestions`, regex-extracts `USER DESIGN PREFERENCES[\s\S]*$` from `task` (where it was embedded by the `routedText` fix) and passes it as `previousAnswersBlock`. The triage step sees the prior answers and returns `[]` when nothing genuinely new remains, short-circuiting round 2 entirely.
+
+---
+
+## May 22, 2026 — Session 11AG (Status Spinner Hang After Multi-File Build)
+
+- **Fix: Spinner never clears after multi-file build** — `src/core/build/chatPanelBuildRunner.ts`: Added `deps.postToWebview({ type: 'set-status', status: 'ready' })` on the early-return path at `if (handled) { return; }` (lines 92–97). Root cause: `set-status: 'ready'` lives in the `finally` block of the direct build `try` (entered only when the orchestrator returns `false`). Multi-file builds go through `handleNanoBuild` or `handleStandardBuild` in `chatPanelOrchestrator.ts` — both run `runChunkedBuild` then return `true`. The `if (handled) { return; }` early-exits `runBuildAfterGates` before the `try-finally` is ever entered. The phrase ticker (`load testing frame...`, `torquing bolts...`, etc.) ran indefinitely. The `ready` post now fires on every code path — direct build (via finally), orchestrator-handled build (via the new explicit post), and error path (via finally catch).
+
+---
+
+## May 22, 2026 — Session 11AF (Blueprint Contract Enforcement)
+
+- **Feature: Blueprint Contract** — `src/services/blueprint/blueprintContract.ts` (new file, 103 lines): Pure-logic module with no AI calls. Defines `BlueprintContract` (paradigm, htmlIds, globals, interfaces, cssClasses) and exports `emptyContract()`, `extractContractFromCode(filename, code)`, `mergeContract(base, addition)`, `buildContractBlock(contract)` (formats for prompt injection), and `detectContractViolations(code, filename, contract)` (returns violations for paradigm mismatches — e.g. `import` in a global-vars project breaks file:// loading).
+- **Rule 9 Split: chatPanelChunkedBuildFile.ts** — `src/core/build/chatPanelChunkedBuildFile.ts` (new file, 113 lines): Extracted the AI generation + retry loop + 429 supervisor fallback + supervisor review block from `chatPanelChunkedLoop.ts`. Exports `generateFileCode(params)` which returns `{ code, fileTokens, fileCost }`. Uses `onMsg` callback instead of direct `appendMsg` import to avoid circular dependency (chunkedBuildFile → chunkedChunked → chunkedLoop → chunkedBuildFile).
+- **Contract injection in build loop** — `src/core/build/chatPanelChunkedLoop.ts` (now 163 lines, down from 232): After file 1 is written its paradigm, HTML IDs, and globals are extracted via `extractContractFromCode()` and stored on `ctx.contract`. Every subsequent file's prompt includes a `CONTRACT (already established)` block listing these values. After generation, `detectContractViolations()` checks if the output honors the paradigm — a global-vars game file that uses `import` triggers one regeneration pass with an explicit fix instruction. After each successful write `mergeContract()` accumulates new IDs/globals into the running contract.
+- **BuildContext extended** — `src/core/build/chatPanelBuildHelpers.ts`: Added `contract?: BlueprintContract` field. `src/core/build/chatPanelBuildRunner.ts`: Added `contract: emptyContract()` to context initialization so the contract is ready from the first file.
+
+---
+
+## May 22, 2026 — Session 11AD (Post-Compile Auto-Deploy)
+
+- **Infra: Auto-deploy on every compile** — `scripts/postcompile.js`: Added `rsync -a --delete` step that mirrors `out/` to `~/projects/chassis-build/.../chassis/out/` immediately after every `npm run compile`. Uses `--delete` so stale files (e.g. `out/ui/chat/` zombie outputs from the old directory structure) are pruned from the baked extension automatically. Non-fatal: logs `ℹ Baked extension not found — skipping deploy` if the path doesn't exist. This is the structural fix that prevents any future source fix from compiling correctly but silently failing to reach the running build.
+
+---
+
+## May 22, 2026 — Session 11AC (Zombie Bug Elimination: MODULE_NOT_FOUND + Auto-Open)
+
+- **Fix: MODULE_NOT_FOUND zombie bug** — `src/core/build/chatPanelBuildRunner.ts` line 116: Changed `require('./chatPanel.js')` to `require('../../ui/panels/chat/chatPanel.js')`. The file lives at `src/core/build/` so `./chatPanel.js` was resolving to `out/core/build/chatPanel.js` which doesn't exist. This runtime exception was caught by `runBuildAfterGates`'s try-catch and displayed as "Build failed: Cannot find module './chatPanel.js'" after every successful build. Verified compiled output at `out/core/build/chatPanelBuildRunner.js:144` has the correct path and deployed to baked extension.
+- **Fix: Folder not auto-opening (Bug 2 root cause)** — No source change needed in `chatPanelChunkedFinalize.ts`. The `vscode.commands.executeCommand('vscode.openFolder', ...)` call on line 45 was already correct with static `vscode` import (confirmed in compiled output). It was unreachable because Bug 1's MODULE_NOT_FOUND exception propagated from `ctx.onBuildFinished()` (line 43) and aborted `runChunkedBuildFinalize` before line 45. Fixing Bug 1 unblocks the auto-open call.
+- **Fix: Stale test path** — `scripts/test-webview-sanity.js`: Updated `require('../out/ui/chatPanelHtml.js')` to `require('../out/ui/panels/chat/chatPanelHtml.js')`. Added `Module._load` vscode stub so the test can run in bare Node.js environment (transitive imports via `chatPanelMsgArchitect.js` require the VS Code API). All 12 sanity tests now pass.
 
 ---
 
