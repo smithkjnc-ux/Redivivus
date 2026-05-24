@@ -1,7 +1,16 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated:* May 24, 2026 (Session 11AZ)
+*Last updated:* May 24, 2026 (Session 11BB)
+
+---
+
+## Complexity Hotspot Reduction — May 24, 2026 (Session 11BB)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/build/chatPanelBuildSteps.ts` | New file (159 lines). Exports 5 step functions extracted from `runSingleFileBuild`: `inferBuildTarget` — resolves target path, existingTarget, isCrossLang, ext from task + routing; `resolveWorkerPrompt` — builds worker prompt with conditional existing-file reads; `runCodeReviewPipeline` — Guardian review + static validation + import validation; `applyCodeToFile` — surgical edit detection + full-file write + narration extraction; `runPostBuildActions` — vault capture, roadmap entry, autocommit, workspace explorer open, compile auto-fix, test auto-fix. | `runSingleFileBuild` had ESLint complexity of 58 — entire build pipeline in one function made it hard to test, trace, or extend individual steps. | Low — pure extraction; no logic changed. TypeScript: 0 errors. |
+| `src/core/build/chatPanelBuild.ts` | Reduced from 191 → 97 lines. `runSingleFileBuild` complexity: 58 → 23. Replaced 5 inline blocks with calls to the extracted step functions. Removed now-redundant imports (`extractNarrator`, `autoCommitIfEnabled`, `refreshSetupProgressIfOpen`, `runCompileAutoFix`, `runTestAutoFix`, `writeProjectRoadmapEntry`, `logFileChange`). | See above. | Low. |
 
 ---
 
