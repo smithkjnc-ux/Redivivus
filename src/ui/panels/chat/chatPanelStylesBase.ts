@@ -55,6 +55,48 @@ export function buildChatCssBase(): string {
     .header-btn:hover, .clear-btn:hover, .map-btn:hover {
       background: var(--c-border); color: var(--c-text); border-color: var(--c-border-hi);
     }
+    .header-btn--preview { border-color: var(--c-purple); color: var(--c-purple); }
+    .header-btn--preview:hover { background: rgba(167,139,250,0.12); color: var(--c-purple); border-color: var(--c-purple); }
+    /* ── Live Preview overlay ── */
+    .preview-toolbar {
+      display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+      border-bottom: 1px solid var(--c-border); background: var(--c-surface); flex-shrink: 0;
+    }
+    .preview-back {
+      background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text-dim);
+      padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit;
+      transition: all 0.15s;
+    }
+    .preview-back:hover { background: var(--c-border); color: var(--c-text); }
+    .preview-device-group { display: flex; gap: 2px; margin: 0 4px; }
+    .preview-device-btn {
+      background: none; border: 1px solid transparent; color: var(--c-text-dim);
+      padding: 2px 8px; border-radius: 4px; cursor: pointer; font-size: 14px; transition: all 0.15s;
+    }
+    .preview-device-btn:hover { border-color: var(--c-border); color: var(--c-text); }
+    .preview-device-btn.active { border-color: var(--c-accent); color: var(--c-accent); }
+    .preview-status { font-size: 11px; color: var(--c-text-dim); margin-left: auto; white-space: nowrap; }
+    .preview-popout {
+      background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text-dim);
+      padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .preview-popout:hover { background: var(--c-border); color: var(--c-text); }
+    .preview-frame-wrap {
+      flex: 1; position: relative; overflow: hidden; display: flex;
+      justify-content: center; background: #fff;
+    }
+    .preview-loading {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      color: var(--c-text-dim); z-index: 2; background: var(--c-bg);
+    }
+    .preview-spinner {
+      width: 28px; height: 28px; border: 3px solid var(--c-border);
+      border-top-color: var(--c-purple); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     /* [DEAD] .capabilities-btn removed — replaced by context-sensitive Help button */
     .save-point-btn, .blueprint-btn {
       background: var(--c-accent-lo); border: 1px solid var(--c-accent); color: var(--c-accent);

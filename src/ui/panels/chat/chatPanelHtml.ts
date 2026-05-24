@@ -72,7 +72,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
   const emptyState = buildEmptyStateHtml(header, progress);
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-src http://localhost:* http://127.0.0.1:*; img-src http://localhost:* http://127.0.0.1:* data:;" />
   <style nonce="${nonce}">${buildChatCss()}</style></head><body>
   <div class="header">
     <div class="header-left">
@@ -85,6 +85,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       <button class="header-btn" data-cmd="chassis.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">📋 ${header.projectName}</button>
       <button class="header-btn" data-cmd="chassis.showMap" title="Map">🗺️ Map</button>
       <button class="header-btn" data-cmd="chassis.showBuildHistory" title="Build History">&#x1F4CB; History</button>
+      <button class="header-btn header-btn--preview" onclick="window.__chassisPreviewShow && window.__chassisPreviewShow()" title="Live preview of your project">&#x25B6; Preview</button>
       ` : ''}
       ${header && header.projectTokens ? `<button class="header-btn" data-cmd="chassis.viewUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="chassis.viewUsage" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
       <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
@@ -112,6 +113,26 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
           <button id="send-btn" title="Send (Enter)">↑</button>
         </div>
       </div>
+    </div>
+  </div>
+  <div id="preview-view" style="display:none;position:fixed;inset:0;z-index:500;flex-direction:column;background:var(--c-bg);">
+    <div class="preview-toolbar">
+      <button class="preview-back" onclick="window.__chassisPreviewHide && window.__chassisPreviewHide()">&#x2190; Chat</button>
+      <div class="preview-device-group">
+        <button class="preview-device-btn" data-w="390" title="Mobile (390px)">&#x1F4F1;</button>
+        <button class="preview-device-btn" data-w="768" title="Tablet (768px)">&#x1F4BB;</button>
+        <button class="preview-device-btn active" data-w="0" title="Desktop (full width)">&#x1F5A5;</button>
+      </div>
+      <button class="preview-back" id="preview-refresh" onclick="window.__chassisPreviewRefresh && window.__chassisPreviewRefresh()" title="Refresh preview">&#x21BA;</button>
+      <span id="preview-status" class="preview-status">Starting server...</span>
+      <button class="preview-popout" onclick="window.__chassisPreviewPopOut && window.__chassisPreviewPopOut()" title="Open in VS Code side panel — great for large monitors">&#x229E; Pop Out</button>
+    </div>
+    <div id="preview-frame-wrap" class="preview-frame-wrap">
+      <div id="preview-loading" class="preview-loading">
+        <div class="preview-spinner"></div>
+        <span>Starting dev server&hellip;</span>
+      </div>
+      <iframe id="preview-frame" src="about:blank" sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals" style="border:none;width:100%;height:100%;flex-shrink:0;transition:width 0.2s;"></iframe>
     </div>
   </div>
   <script nonce="${nonce}">${buildChatScript()}<\/script>

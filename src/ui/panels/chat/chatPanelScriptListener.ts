@@ -38,6 +38,8 @@ export function buildListenerScript(): string {
       if (msg.type === 'show-cost-estimate') showCostEstimatePanel(msg.buildId, msg.estimate);
       if (msg.type === 'show-scope-modal') showScopeModal(msg.task);
       if (msg.type === 'show-vault-hit') showVaultHitPanel(msg.resolverId, msg.task, msg.matchCount, msg.isSemantic);
+      if (msg.type === 'preview-ready' && window.__chassisPreviewSetReady) { window.__chassisPreviewSetReady(msg.port); }
+      if (msg.type === 'preview-error' && window.__chassisPreviewSetError) { window.__chassisPreviewSetError(msg.message || 'Could not start server.'); }
       if (msg.type === 'update-agent-badge') {
         window._agentMode = !!msg.agentMode;
         const badgeEl = document.querySelector('.badge.mode[data-action="show-agent-info"]');

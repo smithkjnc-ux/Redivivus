@@ -11,6 +11,7 @@ import { buildGatesScript } from './chatPanelScriptGates';
 import { buildExpandedInterviewScript } from './chatPanelScriptExpandedInterview';
 import { buildImageScript } from './chatPanelScriptImage';
 import { buildListenerScript } from './chatPanelScriptListener';
+import { buildPreviewScript } from './chatPanelPreviewScript';
 
 export function buildChatScript(): string {
   return `
@@ -157,6 +158,7 @@ export function buildChatScript(): string {
     function stopPhraseTicker() { if(_phraseInterval){ clearInterval(_phraseInterval); _phraseInterval=null; } }
 
     ${buildListenerScript()}
+    ${buildPreviewScript()}
 
     ${buildProjectsScript()}
     ${buildTemplatesScript()}

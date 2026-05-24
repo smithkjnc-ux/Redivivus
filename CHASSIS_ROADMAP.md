@@ -2698,7 +2698,15 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 - [x] **Built-in Git** — auto-commit after AI change, session end, build from vault (Sessions 14 + 11AT)
 - [x] **Retrofit Blueprint-from-Scan** — infer 5 W's from existing project structure (Session 11AZ)
 - [x] **AI Delegation Button** — one-click delegate for `[WARN]`/`[TODO]`/`[DEAD]` tags (Session 11AY)
-- [ ] **Vault Translation Engine** — convert vault items across languages (JS → Python etc.)
+- [x] **Vault Translation Engine** — convert vault items across languages (JS → Python etc.) (Session 11AX)
+- [ ] **Live Preview** — `▶ Preview` tab in chat panel; built-in static server for HTML, terminal dev server for npm projects; device toggle (📱 💻 🖥); `⊹ Pop Out` for side-by-side on large screens (IN PROGRESS)
+
+### 🔵 Competitive Gap — Next Sprint
+- [ ] **Deploy to Vercel** — detect workspace, run `vercel --prod`, post URL to chat; closes "I built it, now what?" gap
+- [ ] **Single-key starter mode** — "Quick Start: paste one Claude key" path in Setup Hub; all other AI keys optional/discoverable later
+- [ ] **Supabase scaffold** — keyword trigger "add auth" / "add a database" → generate schema, install client, write env vars, add supabase client file
+- [ ] **Screenshot-to-build** — dropped image or clipboard screenshot → "build this UI" — VS Code webview accepts dropped images
+- [ ] **Template library expansion** — grow from 10 → 50+ starters; Next.js + Tailwind + Supabase auth, Stripe payments, React dashboard w/ real data, etc.
 
 ---
 

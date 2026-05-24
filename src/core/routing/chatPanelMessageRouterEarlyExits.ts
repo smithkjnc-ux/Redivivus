@@ -195,5 +195,33 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     return true;
   }
 
+  if (msg.type === 'start-preview') {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) {
+      _panel.webview.postMessage({ type: 'preview-error', message: 'No project folder open.' });
+      return true;
+    }
+    const { detectDevServer, startPreviewServer, waitForPort } = await import('../../ui/panels/chat/chatPanelPreview.js');
+    const info = detectDevServer(root);
+    if (!info) {
+      _panel.webview.postMessage({ type: 'preview-error', message: 'Nothing to preview — build a project first, then click Preview.' });
+      return true;
+    }
+    const { port } = await startPreviewServer(root, info);
+    const timeout = info.type === 'static' ? 2_000 : 30_000;
+    const ready = await waitForPort(port, timeout);
+    if (ready) {
+      _panel.webview.postMessage({ type: 'preview-ready', port });
+    } else {
+      _panel.webview.postMessage({ type: 'preview-error', message: `Server didn't start on port ${port}. Check the CHASSIS Preview terminal for errors.` });
+    }
+    return true;
+  }
+
+  if (msg.type === 'popout-preview') {
+    vscode.commands.executeCommand('simpleBrowser.show', `http://localhost:${msg.port}`);
+    return true;
+  }
+
   return false;
 }
