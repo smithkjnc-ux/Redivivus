@@ -2,15 +2,17 @@
 // Complexity routing and guardian logic extracted to routingComplexity.ts and routingGuardian.ts.
 
 import * as vscode from 'vscode';
-import { VaultContextService } from '../vault/vaultContextService.js';
-import { AIResponse } from './routingTypes.js';
+import type { VaultContextService } from '../vault/vaultContextService.js';
+import type { AIResponse } from './routingTypes.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from './routingKeys.js';
-import { callGemini } from './routingGemini.js';
-import { callProvider } from './routingProviders.js';
+import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import { AI_RANK } from './guardianAI.js';
 import { routeByComplexityImpl } from './routingComplexity.js';
 import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
-import { createPlan, executeStep, reviewOutput, OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
+import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
+import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
+import { chassisLog } from '../logging/chassisLogger.js';
+import { analyzeFileImpl } from './routingServiceAnalyze.js';
 
 interface SwPair { supervisor: string; worker: string | null; }
 let _swCache: { pair: SwPair; settingsKey: string } | null = null;
@@ -45,7 +47,7 @@ export class RoutingService {
       .filter(([ai]) => keyMap[ai]?.())
       .sort(([, a], [, b]) => b - a)
       .map(([ai]) => ai);
-    if (ranked.length === 0) return { supervisor: 'gemini', workers: [], guardian: null };
+    if (ranked.length === 0) {return { supervisor: 'gemini', workers: [], guardian: null };}
     return { supervisor: ranked[0], workers: ranked.slice(1), guardian: ranked.length >= 1 ? ranked[0] : null };
   }
 
@@ -89,26 +91,19 @@ export class RoutingService {
     ];
     const preferred = checks.find(c => c.id === defaultAI);
     if (preferred && preferred.key()) { return { ai: preferred.id, source: 'chassis-settings', label: preferred.label }; }
-    for (const c of checks) { if (c.key()) return { ai: c.id, source: 'chassis-settings', label: c.label + ' (fallback)' }; }
+    for (const c of checks) { if (c.key()) {return { ai: c.id, source: 'chassis-settings', label: c.label + ' (fallback)' };} }
     return { ai: 'none', source: 'none', label: 'No AI' };
   }
 
   async analyzeFile(filePath: string, content: string, instruction: string, cancelToken?: import('vscode').CancellationToken): Promise<AIResponse> {
     const { supervisor } = this.selectSupervisorAndWorker();
-    if (supervisor === 'gemini') {
-      const key = getGeminiKey();
-      if (!key) { return { text: '', model: 'none', success: false, error: 'No Gemini API key. Set it in CHASSIS settings or via GEMINI_API_KEY env var.' }; }
-      return callGemini(key, filePath, content, instruction, this.vaultContext, cancelToken);
-    }
-    const fetch = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, 30_000);
-    const prompt = `${instruction}\n\nFile: ${filePath}\n\`\`\`\n${content.slice(0, 6000)}\n\`\`\``;
-    return callProvider(supervisor, prompt, fetch);
+    return analyzeFileImpl(supervisor, this.vaultContext, this.fetchWithTimeout.bind(this), filePath, content, instruction, cancelToken);
   }
 
   // [CHASSIS] Failover callback — set by caller to show "Gemini timed out, retrying with Kimi..." in chat
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
 
-  async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string): Promise<AIResponse & { usingFallback?: string }> {
+  async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string): Promise<AIResponse & { usingFallback?: string }> {
     const keyMap = this.getKeyMap();
     // Build ranked list of available AIs
     const ranked = Object.entries(AI_RANK)
@@ -117,15 +112,20 @@ export class RoutingService {
       .map(([ai]) => ai);
 
     if (ranked.length === 0) {
+      chassisLog({ operation: 'system', message: 'No AI keys configured', success: false });
       return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in CHASSIS Settings (Files & AI tab).' };
     }
+    
+    const startTime = Date.now();
+    const promptPreview = text.substring(0, 200);
+    chassisLog({ operation: 'chat', message: 'AI prompt sent', data: { ai: ranked[0], promptLength: text.length, hasImage: !!imageBase64 } });
 
     // [WARN] Try each AI in rank order — failover on timeout/network errors only
     let lastError = '';
     for (let i = 0; i < ranked.length; i++) {
       const ai = ranked[i];
       const fetchFn = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
-      const result = await callProvider(ai, text, fetchFn, undefined, imageBase64, imageType);
+      const result = await callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage);
 
       if (result.success) {
         return { ...result, usingFallback: i > 0 ? ai : undefined };

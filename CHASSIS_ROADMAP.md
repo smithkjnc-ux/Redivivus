@@ -1,7 +1,501 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated: May 20, 2026 — Session 38: Flappy Bird Audit — CHASSIS System Infrastructure Fixes*
+*Last updated:* May 24, 2026 (Session 11AW)
+
+---
+
+## Rule 9 Splits (All 12 Files ≤200 Lines) — May 24, 2026 (Session 11AW)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/logging/chassisLoggerOps.ts` | NEW. Extracted `logBuildOperation`, `logFixOperation`, `logAnalysisOperation`, `logChatOperation`, `listChassisLogs`, `readLogFile` from `chassisLogger.ts`. | `chassisLogger.ts` was 277 lines. | Low — re-exported from original file; callers unchanged. |
+| `src/services/logging/chassisLogger.ts` | Removed 6 functions, added re-export from `chassisLoggerOps.ts`. 277→~193 lines. | Rule 9. | Low |
+| `src/services/ai/guardianAIPrompt.ts` | NEW. Extracted `buildGuardianPrompt` (96-line review prompt) from `guardianAI.ts`. | `guardianAI.ts` was 218 lines. | Low — single call site updated to import. |
+| `src/services/ai/guardianAI.ts` | Removed `buildGuardianPrompt` body, added import. 218→~122 lines. | Rule 9. | Low |
+| `src/core/routing/chatPanelMsgFixRoadmap.ts` | NEW. Extracted `writeProjectRoadmapEntry` from `chatPanelMsgFixUtils.ts`. | `chatPanelMsgFixUtils.ts` was 221 lines. | Low — re-exported from original file. |
+| `src/core/routing/chatPanelMsgFixUtils.ts` | Replaced 26-line function with re-export. 221→~196 lines. | Rule 9. | Low |
+| `src/core/project/chatPanelMsgRunCommand.ts` | NEW. Extracted `handleRunCommand` from `chatPanelMsgProjectOps.ts`. | `chatPanelMsgProjectOps.ts` was 273 lines. | Low — re-exported; callers unchanged. |
+| `src/core/project/chatPanelMsgProjectOps.ts` | Removed `handleRunCommand` body, added re-export. 273→~154 lines. | Rule 9. | Low |
+| `src/services/mcpServiceTypes.ts` | NEW. Extracted `McpServerConfig`, `McpTool`, `McpResource`, `McpCallResult` interfaces from `mcpService.ts`. | `mcpService.ts` was 205 lines. | Low — re-exported; callers unchanged. |
+| `src/services/mcpService.ts` | Removed 4 interfaces, added import+re-export from types file. 205→~178 lines. | Rule 9. | Low |
+| `src/services/ai/routingServiceAnalyze.ts` | NEW. Extracted `analyzeFileImpl` standalone function from `RoutingService.analyzeFile`. | `routingService.ts` was 226 lines. | Low — delegate pattern; method signature unchanged. |
+| `src/services/ai/routingService.ts` | `analyzeFile` now delegates to `analyzeFileImpl`. 226→~195 lines. | Rule 9. | Low |
+| `src/services/userMemoryServiceProfile.ts` | NEW. Extracted `buildPromptInjection`, `getMemoryForDisplay`, `updateMemoryField`, `removeExplicit` from `userMemoryService.ts`. | `userMemoryService.ts` was 225 lines. | Low — re-exported; callers unchanged. |
+| `src/services/userMemoryService.ts` | Replaced 4 function definitions with re-export. 225→~182 lines. | Rule 9. | Low |
+| `src/services/sessionServiceFinalize.ts` | NEW. Extracted `finalizeSession` and `parseEndSessionData` from `sessionService.ts`. | `sessionService.ts` was 213 lines. | Low — class delegates to standalone function. |
+| `src/services/sessionService.ts` | Removed `finalizeSession` body, added delegate + import. 213→~175 lines. | Rule 9. | Low |
+| `src/commands/apiSetupHtmlCards.ts` | NEW. Extracted `buildProviderCards` (64-line HTML renderer) from `apiSetupHtml.ts`. | `apiSetupHtml.ts` was 216 lines. | Low — single call site updated. |
+| `src/commands/apiSetupHtml.ts` | Replaced card map with `buildProviderCards(...)` call. 216→~150 lines. | Rule 9. | Low |
+| `src/core/build/chatPanelBuildResult.ts` | NEW. Extracted `buildSingleFileResult` + `SingleFileBuildResultParams` + `diffSummary` from `chatPanelBuild.ts`. | `chatPanelBuild.ts` was 233 lines. | Low — single call site updated. |
+| `src/core/build/chatPanelBuild.ts` | Replaced 45-line result block with `buildSingleFileResult(...)` call. 233→~186 lines. | Rule 9. | Low |
+| `src/ui/panels/chat/chatPanelScriptListener.ts` | NEW. Extracted `buildListenerScript` (the `window.addEventListener('message', ...)` block) from `chatPanelScript.ts`. | `chatPanelScript.ts` was 212 lines. | Low — injected via template literal `${buildListenerScript()}`. |
+| `src/ui/panels/chat/chatPanelScript.ts` | Replaced 43-line listener block with `${buildListenerScript()}`. 212→~170 lines. | Rule 9. | Low |
+| `src/services/build/buildOrchestrator.ts` | Removed unused `fs` and `path` imports. 201→199 lines. | Rule 9. | Low |
+
+---
+
+## Vault Toggle Setting + Chat History Persistence — May 23, 2026 (Session 11AV)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/commands/setupHubHtml.ts` | Added Vault Context section with status badge and checkbox toggle (`id="vault-toggle"`, `onchange="send('toggle-vault',{enabled:this.checked})"`) between Guardian and the divider. Added `vaultEnabled = true` param to `getHubHtml()`. | User request: vault context injection should be on by default but explicitly toggleable in Setup Hub — same pattern as Guardian toggle. | Low — additive only; doesn't change any existing section. |
+| `src/commands/setupHub.ts` | `refreshPanel()` now accepts `context` as first param and reads `chassis.vaultEnabled` from globalState to pass to `getHubHtml`. Added `toggle-vault` message handler (`context.globalState.update + refreshPanel`). | Needed to read and write vault toggle state from the panel and reflect it live on re-render. | Low |
+| `src/services/vault/vaultContextService.ts` | Added `isVaultEnabled()` export — reads `chassis.vaultEnabled` from `ChatPanel.extensionContext.globalState` (defaults `true`). | Single source of truth for "is vault injection enabled" used by all 3 pipeline files. Requires() chatPanel at runtime to avoid circular import. | Low — try/catch; returns `true` on any error. |
+| `src/core/build/chatPanelBuild.ts` | Gated vault search and message copy behind `isVaultEnabled()`. Shows "Building..." instead of "Checking code library..." when vault is off. | Single-file build pipeline now respects the Setup Hub toggle. | Low |
+| `src/core/build/chatPanelChunked.ts` | Gated vault search, vault result message, and vault context block behind `isVaultEnabled()`. | Multi-file build pipeline now respects the Setup Hub toggle. | Low |
+| `src/core/routing/chatPanelMsgFix.ts` | Changed `deps.vault ?` to `(deps.vault && isVaultEnabled()) ?` for vault context injection. Added `isVaultEnabled` to import. | Fix pipeline now respects the Setup Hub toggle. All 3 AI pipelines share the same gate. | Low — additive condition; file stays at exactly 200 lines. |
+| `src/ui/panels/chat/chatPanelPublicAPI.ts` | NEW (recreated from compiled JS — source was deleted). Adds `saveConversation()`, `restoreConversation()`, `clearPersistedConversation()` using `globalState` keyed by workspace root (`chassis.chatHistory.${root}`). Keeps last 100 messages. | Chat history was resetting every time the panel was reopened. GlobalState persists across VS Code restarts and panel closes. Per-project key means switching projects shows the right history. | Low — silent try/catch on all operations; never blocks panel open. |
+| `src/ui/panels/chat/chatPanel.ts` | Constructor calls `restoreConversation(this)` before `loadLastSessionContext`. Workspace change handler clears and restores history for the new root. | Wires persistence into panel lifecycle. | Low |
+| `src/core/routing/chatPanelMessages.ts` | `clear-chat` handler also calls `clearPersistedConversation()`. | Ensures explicit clear wipes globalState so history doesn't come back on next open. | Low |
+
+---
+
+## Vault System — "Make it 100%" Fixes — May 24, 2026 (Session 11AU)
+
+Four gaps that caused vault items to be retrieved poorly or ignored during builds ("mish-mash" problem).
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/vault/buildFromVaultSearch.ts` | Added `description` and `useCase` fields to the `itemText` string used in `findRelevantByTask` scoring. | AI-generated descriptions and use-case strings are the highest-signal retrieval text — but the search was only looking at name, tags, source path, and raw code preview. Items with rich AI metadata were invisible to task-based search. | Low — additive to existing scoring; only improves recall. |
+| `src/core/build/chatPanelChunkedLoop.ts` | Replaced raw code snippet dump (`map(v => '// [FROM VAULT: name]\n' + v.code)`) with `formatVaultContext(relevant.slice(0, 4))`. Added `formatVaultContext` import. | The old format gave workers raw code with no description or useCase context. The `formatVaultContext` block shows name, description, "Use when:" hint, source path, and 1500 chars — the same richer format the single-file build already used. Workers can now make informed decisions about which vault items to use and how. | Low — same 4-item limit; same no-injection-on-modify guard. |
+| `src/core/routing/chatPanelMsgFix.ts` | Added vault search + injection before Phase 1 supervisor. `findRelevantByTask` searches the vault for items relevant to the fix task; top 4 results are formatted and prepended to `buildContext`. Added `findRelevantByTask` and `formatVaultContext` imports. | The fix pipeline (Supervisor → Worker → Guardian) never looked at the vault. Relevant patterns from previous builds were invisible during bug fixes — the Worker wrote patches from scratch even when a vault item contained the correct pattern. File stays at exactly 200 lines. | Low — vault search is fast (in-memory); formatted block only injected when hits found (≥1 match). |
+| `src/commands/vault.ts` | Manual save (`chassis.saveToVault`) now runs `evaluateQuality()` on each item before saving — enriches with `description`, `useCase`, `qualityScore`, and AI-generated `tags`. Applied to both scan-to-save and single-file-save paths. Added `evaluateQuality` import. | Manually saved items had no AI metadata: no description, no useCase, no quality score. They were nearly unfindable by the task-based search and generated no useful "Use when" hints for workers. Auto-captured items (post-build) already ran this gate — manual save now does the same. | Low — quality gate failure is caught and ignored; item saves anyway with whatever metadata is available. |
+
+---
+
+## AI Capability Parity: Diagnostics, Terminal Context, Unified Diff — May 23, 2026 (Session 11AS+)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/routing/chatPanelMsgFixContext.ts` | NEW. `collectFixContext()` replaces bare `getRecentBuildContext` call. Adds (1) `vscode.languages.getDiagnostics()` — live TypeScript/ESLint errors the Language Server already knows — and (2) `getLastTerminalError()` — runtime crashes the compiler cannot see. | Supervisor was diagnosing from source text alone. Other editors (Cursor, Windsurf) pass live IDE error state to their AI. Now the Supervisor sees the same signals a human developer sees before touching code. | Low — both calls wrapped in try/catch; no-op if not available. |
+| `src/services/build/surgicalEditService.ts` | Added `parseUnifiedDiff()` — converts standard git unified diff hunks into `SurgicalEdit` pairs (ignoring `@@` line numbers since AI models get them wrong; anchors on context+changed text instead). Updated `detectResponseFormat()` to return `'unified'` for `--- a/` responses. | AI models natively know unified diff format; some produce it even without being asked. Without a parser, those responses fell through to full-file parse and failed. SEARCH/REPLACE requires exact text match; unified diff provides a standard format that's less fragile when whitespace drifts. | Low — only activates when `--- a/` header detected; SEARCH/REPLACE and full-file paths unchanged. |
+| `src/core/routing/chatPanelMsgFixApply.ts` | Added `'unified'` branch between surgical and full-file fallback. Calls `parseUnifiedDiff`, filters to `allowedRels`, reuses `applySurgicalEdits` machinery (same search-and-replace engine). | Closes the gap between detected format and applied format. | Low — mirrors existing surgical branch pattern. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | Updated Worker output format prompt: added `UNIFIED DIFF` as accepted format (18-line-for-18-line replacement, file stays at 200). Shortened verbose SURGICAL/FULL FILE descriptions to make room. | Workers should know all three output formats CHASSIS accepts so they can choose the safest one for each change. | Low — wording change only; all three formats were already accepted by the parser. |
+| `src/core/routing/chatPanelMsgFix.ts` | Replaced `getRecentBuildContext` import/call with `collectFixContext` from new context module. | Wire the enriched context into the fix pipeline. | Low — same `buildContext` string parameter, just richer content. |
+
+---
+
+## Dynamic Context Expansion (Supervisor requests missing files) — May 23, 2026 (Session 11AS)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/routing/chatPanelMsgFixPhases.ts` | Added `CONTEXT EXPANSION` instruction to Supervisor prompt. If response contains `NEEDS_FILES:` block, reads those files from disk and re-runs Phase 1 with expanded context (one retry, `isRetry` guard). Strips `NEEDS_FILES:` from final diagnosis. Returns `expandedFilesBlock` alongside `diagnosis`. | Supervisor was capped at ~12 pre-selected files. On large projects it could see an import but not the imported file — leading to guessed diagnoses or incorrect fixes. Now the Supervisor can request what it actually needs; Worker automatically receives the expanded file set. | Low — one extra API call only when Supervisor requests files (most fixes won't need it). Path traversal (`..`, leading `/`) filtered before any read. Max 8 additional files. |
+| `src/core/routing/chatPanelMsgFix.ts` | Changed `filesBlock` and `fileNames` from `const` to `let`. After Phase 1, if `expandedFilesBlock !== filesBlock`, updates `filesBlock`, adds new paths to `allowedRels`, and rebuilds `fileNames`. | Worker and `applyFixContent` both use `filesBlock` and `allowedRels` — they need to see the expanded file set or they'll refuse to write files the Supervisor requested. | Low — additive; only updates these variables when expansion actually occurred. |
+
+---
+
+## Fix: Strip `===` Separator Artifacts Before Writing Files — May 23, 2026 (Session 11AR+++)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/routing/chatPanelMsgFixApply.ts` | Added `stripSeparatorArtifacts()` that removes standalone `===` lines. Applied to both surgical `replaceBlock` content and legacy full-file content before writing to disk. | Some AIs (Gemini, Groq) emit `===` as visual section separators inside code output. These are never valid syntax in HTML/CSS/JS/TS — writing them to disk injects a JavaScript SyntaxError that prevents the entire script from running. Observed: flappy-bird game rendered blank canvas after speed-control fix; JS threw SyntaxError from 9 `===` lines scattered through the script. | Low — `===` is never valid in any code file CHASSIS targets. ReStructuredText uses `===` as heading underlines but CHASSIS doesn't generate .rst files. |
+
+---
+
+## Dead-End Auto-Logging for Failed Fixes — May 23, 2026 (Session 11AR++)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/routing/chatPanelMsgFix.ts` | Added `appendProjectDeadEnd` call in the `written=0 && failed=0` branch. | When the Worker produced no parseable file edits, the approach was silently forgotten — the next session's Supervisor could repeat the same no-output attempt. Now logged to `.chassis/dead_ends.md` with the task description and plain-summary diagnosis so future Supervisors see "this approach was tried and produced nothing." | Low — best-effort write; no change to fix success path. |
+| `src/services/build/compileAutoFix.ts` | Added `appendProjectDeadEnd` call after all `MAX_RETRIES` exhausted. Added import for `appendProjectDeadEnd`. | Persistent compile errors after 3 AI fix attempts were also silently lost. Now logged with the error signature so the Supervisor knows this file/pattern resisted auto-repair and can suggest a different strategy. | Low — fires only on complete failure path; files already rolled back by this point. |
+
+---
+
+## Guardian Redesign: Review-Only + Compiler as Truth — May 23, 2026 (Session 11AR+)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/guardianAI.ts` | Removed `GUARDIAN_CORRECTION:` from prompt and correction parsing from `runGuardianReview`. Guardian now returns pass/fail + issues only — never corrected code. | Guardian used the cheapest AI (groq/kimi) to rewrite code from more capable models. When it failed to follow format, it returned prose that overwrote the Worker's good code — causing silent "0 files written" failures. Research confirms: AI-reviewing-AI only works with real execution evidence, not code re-reading. | Low — Guardian still catches scope violations and logic bugs; now passes those as retry feedback to the Worker instead of overwriting code. |
+| `src/core/routing/chatPanelMsgFixEscalation.ts` | Removed `correctedText` branch entirely. Guardian is strictly pass/fail — rejections accumulate as Worker retry feedback. | Dead code after Guardian redesign. | Low — simplifies escalation flow. |
+| `src/core/routing/chatPanelMsgFix.ts` | Added `runCompileAutoFix` call after fix is applied. Real compiler (tsc/npm build/etc.) verifies correctness instead of Guardian AI. | Compiler errors are ground truth — they cannot return prose. This closes the "fix writes invalid TypeScript" gap that Guardian was supposed to catch but couldn't reliably. | Low — `runCompileAutoFix` is a no-op for projects with no detected compile command; already battle-tested in the build pipeline. |
+
+---
+
+## Bug Fixes: Vault Count Path, Conversation Rescue Race, CompileAutoFix Corruption, Run→Chat Error Loop — May 23, 2026 (Session 11AR)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/panels/chat/chatPanelHeader.ts` | Fixed `require('../../services/...')` → `require('../../../services/...')` in vault count IIFE. | Wrong relative depth — 2 levels up from `out/ui/panels/chat/` landed at nonexistent `out/ui/services/`; vault count always 0. | Low — path-only fix. |
+| `src/extensionResumeState.ts` | Reduced rescue delay from 1200ms → 100ms; added `innerDelayMs` param to `openPanel`. | Conversation rescue (pendingRescueConversation) was racing against a 500ms auto-open timer — empty panel appeared first, overwriting restored history. 100ms fires before 500ms timer. | Low — rescue still waits for panel to mount (250ms inner delay). |
+| `src/services/build/compileAutoFix.ts` | (1) Added code syntax + explanation pattern validation to `aiFixCompileError` to reject AI prose returned instead of code. (2) Expanded pre-fix snapshot to include `parseErrorFiles` result (not just `builtFiles`). | AI occasionally returned an explanation string that passed the old `length >= 10` check, overwriting source files with garbage. Source files referenced in compile errors were not snapshotted — rollback left them corrupted. | Low — validation is conservative; only rejects text with no code syntax AND a known explanation opener. |
+| `src/core/build/chatPanelPostBuild.ts` | Rewrote `buildPostBuildGuidance` to reference the ▶ Run button by name with plain-language instructions per project type. | Post-build guidance was developer-oriented ("open a terminal and run:") — non-technical users had no idea what to do next. | Low — display only. |
+| `src/core/project/chatPanelMsgProjectOps.ts` | Added `getLastTerminalError()` + `inject-terminal-error` monitor after terminal `sendText` in `chassis.runProject` inline handler. | `handleRunCommand` handles `chassis.runProject` inline (bypasses VS Code command that already had error monitor). Terminal errors were never fed back to the chat panel — user had to manually copy-paste. | Low — fires once after 4s/10s delay; no-ops if no error detected. |
+
+---
+
+## UX: Vault Count + Auto-Open + Clarify Routing — May 23, 2026 (Session 11AQ)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/panels/chat/chatPanelHeader.ts` | Changed `new VaultService()` to `new VaultService(extensionContext)` in the vault count IIFE. | VaultService constructor requires ExtensionContext. Without it, construction threw every time — vault count always showed 0 / "Vault empty" on the home screen even with 40+ items. | Low — one-argument fix, extensionContext is always available in this call path. |
+| `src/core/build/chatPanelChunkedFinalize.ts` | Auto-open logic extended to handle 0-folder case: save conversation to `pendingRescueConversation` then call `vscode.openFolder`. Removed `__OPEN_WORKSPACE__` button (no longer needed). | First-project builds showed "NO FOLDER OPENED" in Explorer with a manual button. User expectation: Explorer opens automatically on every build. | Low for ≥1 folders (no reload). Medium for 0 folders (triggers VS Code window reload, conversation is rescued via extensionResumeState). |
+| `src/core/build/chatPanelBuild.ts` | Same auto-open logic added to `runSingleFileBuild` post-build. Removed `root` from `buildResultCard` call (no button). | Single-file builds (HTML games, scripts) went through `runSingleFileBuild` which had zero workspace folder logic — Explorer never opened. | Same as above. |
+| `src/core/build/chatPanelBuildRunner.ts` | Moved clarify step here from `chatPanelChunked.ts` — runs before single/multi routing decision. | Single-file builds bypassed clarify entirely — user saw no questions before build started. Fix ensures both paths get user preferences. | Low — guarded by `!isFixRequest && !skipComplex && buildMode !== 'direct'`. |
+| `src/core/build/chatPanelChunked.ts` | Removed internal clarify block. Uses `ctx.clarifyAnswers` instead. | Prevent double-clarify if chunked build was called again after answers already collected. | Low. |
+
+---
+
+## UX: Folder-First Build + Explorer Auto-Open — May 23, 2026 (Session 11AP)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/build/chatPanelChunked.ts` | After plan is confirmed and before the build loop starts: (1) `fs.mkdirSync(root, { recursive: true })` creates the project folder immediately. (2) `updateWorkspaceFolders` adds it to the workspace. (3) `workbench.view.explorer` + `workbench.files.action.focusFilesExplorer` commands open and focus Explorer. Also removed 8 dead imports that had been moved to `chatPanelChunkedFinalize.ts` (Rule 9 compliance — back to 196 lines). | Users saw a blank Explorer sidebar for the entire build duration. The folder and files only appeared after the result card rendered. The fix makes the empty project folder appear in Explorer as soon as planning finishes — files then materialize one by one as the build loop runs, matching the Cursor/Windsurf UX. | Low — `mkdirSync` with `recursive: true` is safe on existing dirs. `updateWorkspaceFolders` is the same API used in finalize; calling it earlier has no side effects. Explorer commands are fire-and-forget. |
+| `src/core/build/chatPanelChunkedFinalize.ts` | Added `workbench.view.explorer` + `workbench.files.action.focusFilesExplorer` after `updateWorkspaceFolders` in the post-build folder-add path. | Ensures Explorer is revealed even in the edge case where the folder already existed before the build (e.g. user re-running a build into an existing directory that wasn't in the workspace yet). | Low — additive; both commands are non-blocking fire-and-forget. |
+
+---
+
+## AI Quality Overhaul — May 23, 2026 (Session 11AO: Build Prompt + Review Quality)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/build/chatPanelChunkedLoop.ts` | (1) Removed `- Keep it under 200 lines` from user file prompts. (2) Changed "You are CHASSIS" to "You are an expert software engineer." (3) Removed `CHASSIS_WORKER_RULES` injection from user builds. (4) Added `QUALITY STANDARDS` block: modern syntax (ES2020+, CSS custom props), polished UI, error handling, descriptive names, responsive/accessible markup. (5) Changed "Write working code" to "never truncate or stub out functionality." | The 200-line limit was the single largest quality bottleneck — it forced the AI to skip features, cut game mechanics, and stub out implementations. `CHASSIS_WORKER_RULES` is for CHASSIS's own TypeScript source (annotation rules, internal constraints) and should never touch user projects — it was enforcing `[SCOPE]`/`[WARN]`/`[DEAD]` annotations, "No emoji", and "NO FLAT FILES" on users' code. The identity prompt "You are CHASSIS" activates no useful quality behavior; "expert software engineer" does. | Medium — removes explicit line limit and CHASSIS annotation rules from builds. Tested that existing single-file game rule, surgical edit rules, and contract enforcement remain unchanged. |
+| `src/services/ai/supervisorReview.ts` | Changed scope check from "first 60 lines" to first 8000 characters (full code). Changed "You are a code reviewer" to "You are a senior code reviewer" and added "completely" — checking for completeness not just correctness. | A scope review that only sees the first 60 lines of a 400-line game file is reviewing header comments, not game logic. The AI would approve "YES" for a stub that had the right imports but no actual implementation. | Low — more context sent per review call (slightly more tokens). Fail-open behavior unchanged. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | Supervisor: (1) Added "Do NOT write 'Solution:', 'Verification Completed:', grep results..." prohibition. (2) Changed "Do NOT suggest rebuilding, refactoring, or restructuring" to allow restructuring when the current approach is fundamentally broken. (3) Worker: Added `## Fix: path` full-file format as alternative to SEARCH/REPLACE for large rewrites. (4) Worker user message: removed "do NOT create new files" framing. | Supervisor was hallucinating fake verification output. "Never restructure" was too absolute — prevented fixing the animal sounds player where the correct fix required replacing `<audio>` element approach with Web Audio API synthesis. SEARCH/REPLACE silently failed for large structural changes; `## Fix:` full-file format routes through existing `parseFixResponse` fallback which correctly writes the file. | Medium — Supervisor restructuring permission is broader. Constrained to "fundamentally broken" cases only. |
+
+---
+
+## Recent Fixes — May 23, 2026 (Session 11AT: Built-in GitHub Integration)
+
+**Live test result:** Full flow confirmed working — Setup Hub connected GitHub account, repo `smithkjnc-ux/flappy-bird-game` created as **Private** on GitHub, initial commit pushed successfully. Step-by-step PAT guide ("only check repo") resolved user confusion about GitHub token scopes. Sidebar SETUP section now shows Setup Hub as primary entry point.
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/githubBackupService.ts` | Full rewrite — token moved to VS Code `SecretStorage` (was `globalState`), removed `autoBackupOnBuild`/`autoBackupInterval`/`startTimer`/`stopTimer`, added `validateToken()` (GitHub API check before storing), split into `storeToken()`/`getToken()`/`getConfig()`/`saveConfig()`, `commitFiles()` now accepts specific file list (never `git add -A` silently) | User requirement: GitHub is opt-in, user-initiated only. Token in globalState was a security problem. Auto-timers violated the "user chooses when to commit" rule. | Low — full rewrite, no callers broken. Old config keys in globalState will just be ignored. |
+| `src/commands/setupHubHtml.ts` | GitHub modal: removed "Auto-backup frequency" dropdown, changed description from "auto-backup after every build" to "CHASSIS never commits without your action", added "Validating..." button state, result fed back via `postMessage({ type: 'github-saved' \| 'github-error' })`, external PAT link now uses `openExternal` handler instead of `href` | Remove all auto-backup language and UX. Token link must open in real browser, not webview. | Low |
+| `src/commands/setupHub.ts` | `isConnected()` now async (secrets-backed), validates token against GitHub API before storing, auto-fills username from API response (not user-typed), removed all `startTimer()` calls, refresh panel via `refreshPanel()` helper after save | Validation catches bad tokens before they're stored. Username confirmed from GitHub instead of trusted from input. | Low |
+| `src/commands/githubBackup.ts` | Removed interval QuickPick and `autoBackupOnBuild`, added token validation step to `chassis.configureGitHubBackup`, added `chassis.setupGitHubRepo` command, added `chassis.githubCommitFiles` command (called by result card button — accepts files[], message, webview ref, posts result back to webview) | Clean command surface for manual-only git operations. `chassis.githubCommitFiles` is the bridge between the fix result card button and the service. | Low |
+| `src/extensionInlineCommands.ts` | Removed `githubBackupService.startTimer()` call and auto-backup hook on `onBuildFinished` | No auto-commits ever. Build finish no longer triggers any git operation. | None |
+| `src/core/routing/chatPanelMsgFixOutput.ts` | Emits `__GITHUB_COMMIT__[base64]|||END_GITHUB_COMMIT__` token at end of fix result content. Payload is base64-encoded JSON `{ files: string[], message: string }`. Token only added when `written.length > 0`. | Carries file list and plain-language commit message from fix result to the renderer and click handler without threading service references through deps. | Low |
+| `src/ui/panels/chat/chatPanelRenderer.ts` | Added `__GITHUB_COMMIT__` token renderer — replaces with green `💾 Commit + Push to GitHub` button (`class="github-commit-btn"`, `data-payload` holds base64 JSON) | Token → button in the fix result card UI. | Low |
+| `src/ui/panels/chat/chatPanelScriptActions.ts` | Added `.github-commit-btn` click handler (shows "Committing...", disables button, posts `{ type: 'github-commit', payload }`) and `window.addEventListener('message')` for `github-commit-result` (updates button to "Committed!" or re-enables on failure) | Webview-side of the commit flow. | Low |
+| `src/core/routing/chatPanelMessages.ts` | Added `github-commit` message handler — decodes base64 payload, calls `chassis.githubCommitFiles` command with files, message, and `panel.webview` reference | Routes commit action through the VS Code command registry so the service instance is accessible without threading it through `MessageHandlerDeps`. | Low |
+| `scripts/test-github-commit.mjs` | New test file — 8 tests covering token generation, rendering, payload round-trip, and the full flappy-bird fix simulation | No VS Code dependency — tests pure functions only. Run with `node scripts/test-github-commit.mjs`. | None |
+
+---
+
+## Recent Fixes — May 23, 2026 (Session 11AN: Visual Editor Fixes + AI Edit Routing)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/extensionInlineCommandsC.ts` | Changed top-level `import { openVisualContractPanel }` to lazy `require()` inside the command handler. | Top-level import threw on module load → ALL 4 commands in the file silently failed to register (including `chassis.openVisualEditor`). Lazy require isolates the failure to the one command. | Low — lazy require is safe; module is loaded on demand. |
+| `scripts/postcompile.js` | Added auto-discovery of all `~/.vscode/extensions/papajoe.chassis-*` dirs and syncs compiled output to each. | Previously only synced to the baked extension path. The installed extension at `~/.vscode/extensions/papajoe.chassis-0.3.6/` (installed May 20) was taking priority and didn't get updates. | Low — additive discovery loop. |
+| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | `open-visual-editor` message now calls `openVisualContractPanel` directly via `require()` instead of `executeCommand('chassis.openVisualEditor')`. | Extension activation was failing due to `terminalDataWriteEvent` proposed API in `registerTerminalErrorService` — `vscode.commands.registerCommand` never ran, so `chassis.openVisualEditor` command didn't exist in the registry. Direct call bypasses the registry entirely. | Low — direct module call; same function that the command would have called. |
+| `src/core/project/chatPanelMsgProjectOps.ts` | Added inline handler for `chassis.openVisualEditor` in `handleRunCommand` that calls `openVisualContractPanel` directly. Includes fallback scan for `.html`/`.css` when build history is empty. | Same `executeCommand` reliability issue as above. Both call sites (dashboard pill and chat message) now bypass the registry. | Low — additive `else if` branch. |
+| `src/ui/panels/visualContract/visualContractPanel.ts` | Extracts contract BEFORE creating HTML, passes it as inline JSON. Removed webview-ready handshake. Added debug logging (temporary). | Visual Editor opened blank because the contract was sent via `postMessage` after webview load — if the message arrived before the listener was ready, it was silently dropped. Inline JSON in the HTML avoids any timing issue. | Low — simpler, more reliable than async message handshake. |
+| `src/ui/panels/visualContract/visualContractPanelHtml.ts` | (1) Contract embedded inline: `let contract = ${contractJson}`. (2) Moved `if (contract) { render(); }` to bottom of script after all `const` declarations (TDZ fix). (3) Fixed template literal backslash stripping: `\\(`, `\\d`, `\\s` in regex. (4) Removed ALL inline event handlers (`onclick`, `oninput`, `onchange`) — replaced with event delegation in nonce-allowed `<script>` block. | TDZ bug: calling `render()` before `const TABS` was declared threw ReferenceError. Backslash stripping produced invalid regex `/rgba?((d+),.../` that crashed the script. CSP blocks all inline handlers in VS Code webviews regardless of what CSP the extension sets — only the nonce-granted `<script>` block can register listeners. All three caused blank output on different code paths. | Low — behavioral parity maintained; event delegation is functionally identical to inline handlers. |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | (1) Added `!deps.chassis?.isInitialized?.()` to direct-mode bypass so initialized projects always fall through to classifier. (2) Routed `build` intent on initialized projects to `handleFixRequest` instead of `handleBuildRequest`. | When user said "add X" or "change Y" on an initialized project, direct mode bypassed the classifier entirely and routed to the build pipeline — which creates code from scratch without reading existing files, effectively overwriting or rebuilding the project. For initialized projects, the edit pipeline (which reads all source files) is always correct. | Medium — changes routing for all "build" intent on initialized projects. Fix pipeline reads files and makes surgical edits; confirmed it handles feature-addition requests via Supervisor prompt update below. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | (1) Supervisor prompt: changed "diagnose bugs only" to handle both bugs AND feature/change requests. Added explicit prohibition: "Do NOT write 'Solution:', 'Verification Completed:', grep results, or any language implying the fix was already applied." (2) Worker prompt: changed "fix ONLY the specific bugs" to "implement ONLY what the Supervisor identified". Added `## Fix: path` full-file format as alternative to SEARCH/REPLACE for large-scale rewrites (e.g. switching from `<audio>` elements to Web Audio API). (3) Worker user message: removed "do NOT create new files" framing. | Three bugs: (a) Supervisor hallucinated "Solution: Replaced..." and "Verification Completed: grep output 1" making users think the fix was applied when it wasn't. (b) Worker SEARCH/REPLACE fails silently when the change is structural (SEARCH pattern doesn't match), but the only fallback `parseFixResponse` looks for `## Fix:` format which the Worker never output — fix went nowhere. (c) Fix pipeline was "bugs only" framing, breaking for "add X" feature requests. | Medium — Worker now has two output formats; `detectResponseFormat` in `surgicalEditService.ts` correctly routes: SEARCH/REPLACE → surgical path, `## Fix:` → fullfile path → `parseFixResponse` fallback. |
+
+**Known remaining issue:** `registerTerminalErrorService` uses `(vscode.window as any).onDidWriteTerminalData` which is a proposed API — extension activation fails. This breaks `chassis.openVisualEditor` via the command registry (all calls already bypassed to direct function calls). Fix: either remove `onDidWriteTerminalData` usage or add `terminalDataWriteEvent` to `package.json#enabledApiProposals`.
+
+---
+
+## Feature Added — May 22, 2026 (Session 11AM: Visual Contract Editor)
+
+| File | What It Does |
+|------|-------------|
+| `src/services/visualContract/visualContractTypes.ts` | Data model: `VisualProperty`, `VisualSection`, `VisualContract`. Each property stores a `findRegex`+`findGroup` pair for in-file replacement — no AST required. |
+| `src/services/visualContract/propertyExtractor.ts` | Scans built HTML/CSS files and emits a `VisualContract`. CSS colors extracted via regex + selector-context walk; CSS numbers (font-size, padding, border-radius, gap) extracted with unit preservation; HTML text extracted from title, h1–h4, buttons, and inline `<style>` blocks. Sections inferred from structural HTML tags (section, header, footer, nav, main, article) for Pro mode. |
+| `src/services/visualContract/visualContractPatcher.ts` | `applyPropertyPatch` and `applyBatchPatches`. Reads the file, applies stored regex replacement for the changed value, writes atomically. Batch mode reads each file once to avoid offset drift from sequential replacements. |
+| `src/ui/panels/visualContract/visualContractPanelHtml.ts` | Self-contained webview HTML. Tab bar (Colors / Text / Layout / Effects / Structure). Plain/Pro toggle in the header. Controls rendered client-side from the contract JSON: color pickers (`<input type="color">`), text inputs, range+number sliders. Structure tab (Pro) shows sections list and "Add Section" free-text input. |
+| `src/ui/panels/visualContract/visualContractPanel.ts` | VS Code `WebviewPanel` host. Singleton — second call reveals existing panel and re-extracts. Handles `apply-all` (batch patch + ack), `property-changed` (immediate single patch), `add-section` (dispatches fix-request to chat pipeline to build the new section with matching style). |
+| `src/ui/panels/chat/chatPanelStory.ts` | `buildResultCard` now emits `__EDIT_VISUALLY__${root}|||END_EDIT_VISUALLY__` token when any built file is `.html` or `.css`. |
+| `src/ui/panels/chat/chatPanelRenderer.ts` | Renders `__EDIT_VISUALLY__` token as an "✏️ Edit Visually" button (blue gradient, matches CHASSIS aesthetic). |
+| `src/ui/panels/chat/chatPanelScriptActionsB.ts` | Click handler for `.edit-visually-btn` — decodes base64 root, posts `open-visual-editor` message. |
+| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | Handles `open-visual-editor` message → `chassis.openVisualEditor` command. |
+| `src/extensionInlineCommandsC.ts` | Registers `chassis.openVisualEditor` command. Loads last-build file list from `BuildHistoryService`; falls back to scanning for `.html`/`.css` in the project root (2-level deep). |
+
+**Plain vs Pro mode:**
+- **Plain** — Colors, Text, Layout, Effects tabs. Only properties with `proOnly: false`. No Structure tab. Suitable for quick visual tweaks.
+- **Pro** — All tabs including Structure. All properties including `proOnly: true` (gap, max-width, letter-spacing). Structure tab lists inferred HTML sections and provides free-text "Add Section" input which dispatches a fix-request to the build pipeline.
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AL: Remove Automatic Git Init Prompt)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/savePointService.ts` | Replaced the modal git-init dialog in `create()` with an early silent return when no git repo exists. | `SavePointService.create()` was showing a blocking modal ("Initialize one to use Save Points?") on every build where the project wasn't already a git repo. Called from `ChatPanel.onBuildFinished` → `session.ts` after every build. A build finishing should never be a git prompt. | None — callers already check `result.success` and only show a notification on success. Silent skip is safe. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AK: Reload Triggers Unexpected Rebuild)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/extensionInlineCommands.ts` | Removed `pendingRescueConversation` and `pendingResumeTask` saves from `onBuildFinished`. | Since `vscode.openFolder` was removed in 11AJ, there is no longer an immediate reload after build — these saves persisted in `globalState` indefinitely. Any VS Code reload (extension update, manual reload) triggered `extensionResumeState.ts` which found `pendingResumeTask` and called `resumeBuildTask` → `_handleBuildRequest` → full rebuild. | Low — the saves are now deferred to the button click handler where the reload is actually intentional. |
+| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | In the `open-workspace-btn` handler, save `pendingRescueConversation` from the live panel state RIGHT BEFORE calling `vscode.openFolder`. | The only reload that should trigger conversation restoration is the one the user explicitly requested by clicking the button. Saving at click time means the conversation is current and not stale from build-finish. | Low — additive; `ChatPanel.extensionContext` is a static property set at activation. |
+| `src/extensionResumeState.ts` | Added a new `pendingRescueConversation`-only path (before the `pendingBuildTask` check). Restores the conversation and returns WITHOUT calling `resumeBuildTask`. | The old path restored conversation AND rebuilt. After the `__OPEN_WORKSPACE__` click, the build is already done — only the conversation needs restoring. | Low — only fires when `pendingRescueConversation` is present AND `pendingResumeTask` is absent. The existing `pendingResumeTask` path (init flow) is unchanged. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AJ: Explorer Auto-Open + Spinner Persist After Multi-File Build)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/build/chatPanelChunkedFinalize.ts` | Removed `vscode.openFolder` call. Replaced with `vscode.workspace.updateWorkspaceFolders` for the "≥1 existing folder" case. Also passed `root` as `projectRoot` to `buildResultCard`. | `vscode.openFolder` triggers a full VS Code window/extension-host reload on every multi-file build — destroying the webview before `set-status: 'ready'` could arrive (spinner never cleared). The reload also wiped the chat panel unless `pendingRescueConversation` was saved in time (race condition). `updateWorkspaceFolders` adds the project to the Explorer sidebar without any reload. | Low — `updateWorkspaceFolders` is the documented VS Code API for non-destructive workspace folder addition. No reload path remains. |
+| `src/ui/panels/chat/chatPanelStory.ts` | Added optional `projectRoot?: string` to `buildResultCard`. Used as the root for the `__OPEN_WORKSPACE__` token when provided, falling back to `getChassisRoot()`. | `getChassisRoot()` returns the extension's activation-time workspace root (stale), not the directory where the new project was actually written. When both matched, `alreadyInWs` was `true` and no Open Workspace button was shown at all. | Low — backward-compatible optional param. Existing callers that omit it fall back to the old `getChassisRoot()` path. |
+| `src/extensionInlineCommands.ts` | Captured `_prevOnBuildFinished` before assigning `ChatPanel.onBuildFinished`. Chained `await _prevOnBuildFinished(...)` at the end of the new callback. | `registerSessionCommands` (line 81 of `extensionCommands.ts`) sets `ChatPanel.onBuildFinished` first with save-point + session-record logic. `registerInlineCommands` (line 131) runs after and silently overwrites it, losing the save-point logic. The chain call preserves both. | Low — additive chain, not a replacement. Both callbacks now run in order: GitHub backup → rescue state save → save point → session record. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AI: Done for Now / Ghost Session Bug)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/routing/chatPanelMsgSendMessage.ts` | (1) Wrapped `startSessionSilent` in a regex guard that skips it for session-management phrases ("done for now", "end session", "start session"). (2) Extended the `buildMode === 'direct'` bypass exclusion regex to also exclude those same session phrases. | Two separate bugs combined: when the user typed "done for now" in the chat box, (a) `startSessionSilent` fired unconditionally at line 36 — creating a ghost session with goal "done for now" — and (b) in `buildMode === 'direct'`, the direct-mode bypass at line 85 bypassed the hardcoded override check entirely and routed "done for now" straight to `handleBuildRequest`, restarting the build pipeline. The hardcoded override that correctly maps "done for now" → `chassis.endSession` is at line 113, which neither code path reached. | Low — the regex guard is structural (exact phrase matching), not natural language understanding, consistent with Rule 18. The exclusion regex is additive to an existing exclusion list. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AH: Double Clarification Panel / Round 2 Re-Asks)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/panels/chat/chatPanelClarify.ts` | Added `previousAnswersBlock?: string` parameter to `generateClarifyQuestions`. Injected into both the triage prompt ("not already covered by previous answers?") and the question-generation prompt ("do NOT ask about any of these topics again — if all design decisions are covered, return []"). | Without this, round 2 got the bare task with no context about what round 1 already captured — the AI re-asked the same topics reworded. | Low — backward-compatible parameter, no change to existing call sites that omit it. |
+| `src/core/build/chatPanelChunked.ts` | Before calling `generateClarifyQuestions`, regex-extracts any `USER DESIGN PREFERENCES` block from the task string and passes it as `previousAnswersBlock`. | The round-1 answers are embedded in the task string (via the `chatPanelMsgSendMessage.ts` fix). Extracting and forwarding them to the triage step causes the AI to declare "no more ambiguity" and return `[]`, skipping round 2 entirely when everything is already answered. | Low — extraction returns undefined if no prior answers exist, leaving the normal path unchanged. |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Changed three `handleBuildRequest(userText)` calls to `handleBuildRequest(routedText)` (lines 171, 172, 191). `routedText` equals `userText` when no clarification happened; when it did, it equals `userText + "\n\nUSER DESIGN PREFERENCES: ..."`. | This was the structural root cause: round-1 answers were collected into `routedText` but then silently dropped when `handleBuildRequest(userText)` was called. The build pipeline received the bare task with no answers, triggering a fresh round of clarification. | Low — `routedText === userText` when no clarification ran, so no behavior change for those builds. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AG: Status Spinner Hang After Multi-File Build)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/build/chatPanelBuildRunner.ts` | Added `deps.postToWebview({ type: 'set-status', status: 'ready' })` before the `return` when `handleComplexityRoutedBuild` returns `true`. | `set-status: 'ready'` lives in the `finally` block of the main `try` (lines 126–142). That `finally` only fires when the orchestrator returns `false` (falls through to the direct build path). Every multi-file build goes through `handleNanoBuild` or `handleStandardBuild`, both of which run `runChunkedBuild` and return `true` — causing an early `return` that bypasses the `finally` entirely. The spinner phrase ticker (`load testing frame...`) never stopped. | Low — one added `postToWebview` call in a code path that was previously unterminated. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AF: Blueprint Contract Enforcement)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/blueprint/blueprintContract.ts` | New file. Defines `BlueprintContract` (paradigm, htmlIds, globals, interfaces, cssClasses) and exports `emptyContract()`, `extractContractFromCode()`, `mergeContract()`, `buildContractBlock()`, `detectContractViolations()`. | Single source of truth for cross-file API surface. Extracts IDs, globals, paradigm from each built file so every subsequent file prompt knows what already exists. | Low — pure logic, no AI calls, no filesystem writes. |
+| `src/core/build/chatPanelChunkedBuildFile.ts` | New file (Rule 9 split). Extracted AI call + retry + 429 fallback + supervisor review from `chatPanelChunkedLoop.ts`. Exports `generateFileCode(params): Promise<{code, fileTokens, fileCost}>`. | `chatPanelChunkedLoop.ts` was 232 lines — over the 200-line Rule 9 hard stop. Required split before any further editing. | Low — exact behavioral extract, no logic changes. |
+| `src/core/build/chatPanelChunkedLoop.ts` | Replaced inline AI generation block with `generateFileCode()` call. Added contract block injection into every `filePrompt` (after file 1 is written). Added `detectContractViolations()` check after generation — paradigm mismatch triggers one regeneration with explicit fix instruction. Added `mergeContract()` accumulation after every file write. File is now 163 lines. | Without contract enforcement, file 2 of a global-vars browser game could use ES module `import`, breaking the game at `file://` load. The contract locks the paradigm and HTML IDs after file 1 and forces all subsequent files to conform. | Low — contract injection is additive (more prompt context). Violation check adds one extra AI call only when a violation is detected. |
+| `src/core/build/chatPanelBuildHelpers.ts` | Added `contract?: BlueprintContract` field to `BuildContext` interface. Added `import type { BlueprintContract }` from blueprintContract. | `contract` must travel with `ctx` so the loop can accumulate and enforce it across all files in a single build. | Low — optional field, no callers affected. |
+| `src/core/build/chatPanelBuildRunner.ts` | Added `contract: emptyContract()` to BuildContext initialization. Added import of `emptyContract`. | Ensures contract starts empty and accumulates from file 1. Without initialization the optional field would be undefined and no accumulation would happen. | Low — one added field to one object. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AE: Duplicate Build Fix & CSS Centering)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/messageRouterSession.ts` | Added `isProcessingSession` semaphore around the `endSession` handler. | Prevents the "Done for Now" (Save) button from triggering multiple `endSessionWithData` calls which closed chat and triggered duplicate builds. | Low — standard concurrency control. |
+| `src/core/build/chatPanelChunkedGen.ts`, `src/core/build/chatPanelChunked.ts`, `src/core/build/chatPanelChunkedLoop.ts`, `src/services/ai/chassisWorkerRules.ts` | Enforced strict `display: block` for the canvas and `overflow: hidden` for the body in single-file game templates. | The game canvas was rendering off-center to the right due to inline display properties. | Low — CSS only. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AD: Post-Compile Auto-Deploy to Baked Extension)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `scripts/postcompile.js` | Added rsync deploy step that mirrors `out/` to the baked extension at `~/projects/chassis-build/.../chassis/out/` after every compile. Uses `rsync -a --delete` so stale files (like the old `out/ui/chat/` zombie outputs) are also removed. Non-fatal: skips with an info log if the baked extension path doesn't exist. | Every previous fix to source required a manual `cp` step to the baked extension — a step that was routinely missed, causing fixes to compile correctly but never reach the running build. This is the structural reason the MODULE_NOT_FOUND bug survived multiple fix attempts. | Low — rsync is idempotent; if the baked extension doesn't exist the script continues normally. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AC: Zombie Bug Elimination — MODULE_NOT_FOUND & Auto-Open)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/build/chatPanelBuildRunner.ts` | Fixed `require('./chatPanel.js')` → `require('../../ui/panels/chat/chatPanel.js')` inside the `onBuildFinished` callback (line 116). | `chatPanelBuildRunner.ts` lives at `src/core/build/`, so `./chatPanel.js` resolved to the non-existent `out/core/build/chatPanel.js`. This runtime MODULE_NOT_FOUND exception propagated up and was caught by the `try/catch` in `runBuildAfterGates`, showing "Build failed" to the user. It also aborted `runChunkedBuildFinalize` before the `vscode.openFolder` call on line 45 was ever reached, causing the workspace explorer to show "NO FOLDER OPENED" after every chunked build. Both bugs share a single root cause. | Low — one-line path fix in a runtime require inside a callback. |
+| `src/core/build/chatPanelChunkedFinalize.ts` | No source change needed. `vscode` is already imported statically at line 2 and `vscode.commands.executeCommand('vscode.openFolder', ...)` at line 45 is correct. It was simply never reached because Bug 1 threw first. | Confirmed by checking compiled output: `__importStar(require("vscode"))` on line 38 and `openFolder` call on line 78. | None. |
+| `scripts/test-webview-sanity.js` | Fixed stale test path `../out/ui/chatPanelHtml.js` → `../out/ui/panels/chat/chatPanelHtml.js`. Added `Module._load` intercept that stubs the `vscode` module for bare Node.js test execution. | Path was stale from before the `src/ui/chat/` → `src/ui/panels/chat/` restructure. Transitive imports of `chatPanelMsgArchitect.js` require the VS Code API which is only available inside the extension host. | Low — test-only change. All 12 tests now pass. |
+
+---
+
+## Recent Fixes — May 22, 2026 (Session 11AB: Single-File Enforcement & Build Resilience)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/chassisWorkerRules.ts` | Added rule 9 to explicitly force `[BROWSER GAMES AND SIMPLE TOOLS]` to output a single, self-contained `index.html` file without external `.js` files or `src/` directory. | Multi-file generation for simple games led to broken module scopes and import errors natively running via `file://`. | Low — enforces a more reliable paradigm for simple builds. |
+| `src/ui/panels/chat/chatPanelClarify.ts` | Added rule preventing the Supervisor AI from offering options that dramatically escalate scope during clarification (e.g., adding power-ups or multiple game modes). | The AI was generating options that turned simple requests into complex epics, complicating builds unnecessarily. | Low — scopes clarification questions strictly to design and feel. |
+| `src/core/build/chatPanelChunkedLoop.ts` | Wrapped the AI generation and code extraction block in a retry loop (`maxAttempts = 2`). | Transient API failures or completely empty AI responses were hard-stopping the entire multi-file build pipeline at part 15. | Low — transparently retries on failure. |
+| `src/core/build/chatPanelChunked.ts` | Added an explicit AI project classification step before planning. Updated the `planPrompt` to read the `projectType` and dynamically apply the single-file HTML rule for games and tools instead of treating all HTML projects the same. | The single-file rule needs to trigger automatically based on project architecture, not just prompt language, to ensure correct scaffolding. | Low — adds a lightweight classification step before planning. |
+
+## Recent Fixes — May 22, 2026 (Session 11AA: Flappy Bird Pipeline Bug Fixes)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/adaptiveClassifier.ts` | Updated `OBD1_FAST_PATHS` to allow intervening words: `(?:[a-zA-Z0-9\-_]+\s+)*`. | The regex failed to match "make me a flappy bird game" due to strict sequential word requirements. | Low. |
+| `src/core/build/chatPanelBuildInference.ts` | Updated `extractCodeFromResponse` regex to tolerate trailing spaces and filenames on the fence line (`/```(?:[a-zA-Z0-9]*)[ \t]*(?:[^\n]*)\n([\s\S]*?)```/g`). | A strict newline constraint dropped blocks containing ````javascript script.js`, silently failing multi-file builds. | Low. |
+| `src/core/build/chatPanelChunked.ts` | Replaced `workbench.view.explorer` with `vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), false)`. | `workbench.view.explorer` only focused the sidebar instead of actually loading the scaffolded standalone workspace directory. | Low. |
+| `src/commands/init.ts` | Added explicit `initChassisLogger` and `initMasterLogger` calls inside `onNewProject` during project initialization. | Standalone host didn't trigger `onDidChangeWorkspaceFolders` because auto-opening was disabled, causing logging to remain uninitialized during full builds. | Low. |
+| `src/ui/panels/chat/chatPanel.ts` | Fixed broken `require` paths targeting `chatPanelBuildUtils.js` and `chatPanelMessageRouter.js`, updating them to correctly point to `../../../core/build` and `../../../core/routing`. | A recent file split moved these utils to the `core/` domain, but `chatPanel.ts` was still attempting to load them from `./`. This caused a synchronous `MODULE_NOT_FOUND` crash that dropped all incoming webview messages, locking the UI on the Welcome screen. | High — fixes critical broken chat loop. |
+| `src/core/build/chatPanelChunked.ts` | Imported `vscode` statically at the top and replaced the dynamic `await import('vscode')` call on the `openFolder` line. | The dynamic `await import('vscode')` inside the VS Code extension host fails silently (swallowed by the `catch {}` block) because VS Code provides `vscode` as a synthetic module not resolvable via standard dynamic imports at runtime, preventing the folder from opening automatically. | Low. |
+| `src/core/build/chatPanelChunked.ts` | Extracted finalization logic to `chatPanelChunkedFinalize.ts`. | Adding the import pushed the file past the 200-line limit (Rule 9). Extracted the chunked build finalize logic to comply with the project's file size hard stop. | Low. |
+| `~/projects/flappy-bird-game/index.html` | Added explicit `<script>` tags for all 11 required JavaScript files generated by the AI build. | The AI generated multiple modular `.js` files but only linked `src/main.js` in `index.html`. Because the files were not using `type="module"`, all dependencies (like `GameState`, `Renderer`, etc.) were missing from the global scope, resulting in ReferenceErrors that halted the game loop immediately. | High — game now runs. |
+| `~/projects/flappy-bird-game/index.html` | Rewrote entire game logic, CSS, and DOM structure into a single HTML file. Deleted the `src/` directory entirely. | The multi-file generation resulted in broken module boundaries and dependency resolution failures (`SyntaxError: Unexpected token 'export'`). Combining into a single file sidesteps all cross-file contract failures for now. | Low. |
+
+## Recent Fixes — May 22, 2026 (Session 11Z: Handle Map Message Dispatcher)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/map/commands/*` | Created 8 distinct command files (`openFileCommand`, `mapChatCommand`, `explainFileCommand`, `analyzeFileCommand`, `fixFileCommand`, `architectReviewCommand`, `eli5Command`, `runCommand`). | Split the monolithic `handleMapMessage` function (Complexity Score 98) into a strict Command Dispatcher pattern. Each file strictly handles its own isolated logic. | Low — underlying logic is identical, just moved. |
+| `src/ui/map/mapMessageDispatcher.ts` | Replaced `mapPanelMessages.ts` with a lean router. | Acts as a simple switchboard for incoming webview messages, dispatching to the new command files. | Low. |
+| `src/ui/map/mapPanel.ts` & `src/ui/map/mapPanelTimelineMessages.ts` | Updated imports to `mapMessageDispatcher`. | Wiring for new dispatcher. | Low. |
+
+## Recent Fixes — May 22, 2026 (Session 11Y: Provider Factory Pattern)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/ai/providers/*` | Created `providerUtils.ts`, `geminiProvider.ts`, `claudeProvider.ts`, `openaiProvider.ts`, `groqProvider.ts`, `xaiProvider.ts`, `kimiProvider.ts`, and `providerFactory.ts`. | Rule 9 enforcement and architectural cleanliness. Split the monolithic `callProvider` (complexity score 96) into a clean Factory pattern where each provider handles its own payload generation, networking, and telemetry independently. | Low — `providerFactory` maintains the exact same `AIResponse` contract. Covered by strict nock tests. |
+| `src/services/ai/routingProviders.ts` | Deleted file entirely. | Replaced by the `src/core/ai/providers` factory. | None. |
+| 9 internal files | Updated imports to point from `routingProviders` to `../core/ai/providers/providerFactory.js`. | Rewired imports to match the new directory structure. | Low — validated via `npm run compile`. |
+
+## Recent Fixes — May 21, 2026 (Session 41A: AI reasoning quality — system messages + token limits)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/routingProviders.ts` | Added `systemMessage` optional parameter to `callProvider()`. All 6 providers (Gemini, Claude, OpenAI, Groq, xAI, Kimi) now support system messages. Gemini uses `system_instruction`, Claude uses top-level `system` field, OpenAI/Groq/xAI/Kimi use `role: 'system'` message. | AI had no persistent identity — all rules were crammed into one user message competing with the task for attention. System messages give the AI a stable behavioral anchor separate from task content. This is how every modern AI editor (Cursor, Windsurf, Copilot) structures their prompts. | Low — optional param, no existing callers break. |
+| `src/services/ai/routingProviders.ts` | Increased Claude `max_tokens` from 8,192 to 32,768. | Claude was being strangled at 1/8th capacity. Any non-trivial fix was being truncated. Gemini had 65,536 but Claude only had 8,192 — massive handicap on the most capable model. | Low — cost may increase slightly for long outputs but fixes are now complete. |
+| `src/services/ai/routingService.ts` | Added `systemMessage` parameter to `prompt()` method, passed through to `callProvider()`. | Allows any caller of `prompt()` to provide a system message. | None — optional param, backward compatible. |
+| `src/ui/chat/chatPanelMsgFixPhases.ts` | Split Supervisor and Worker prompts into system message (identity + rules) and user message (task + code). Supervisor system message contains behavioral rules; user message contains only the bug report and source files. Worker system message contains discipline rules + output format; user message contains only diagnosis and source files. | Rules were competing with task content in one giant user message. Now the AI processes rules as "who I am" (system) and task as "what to do" (user). This is the same architecture used by Cursor, Windsurf, and Copilot. | Medium — prompt restructure could affect output format. Monitor first few builds. |
+
+| `src/ui/chat/chatPanelMsgFixPhases.ts` | Added `runSupervisorVerify()` function — Phase 2.5 in the pipeline. Supervisor re-reads its own diagnosis + Worker output and checks if the logic matches intent. Returns PASS or FAIL with explanation. | Worker can produce syntactically correct code that misses the point logically. The Supervisor wrote the diagnosis so it knows the intent — it's the right AI to verify logical correctness. Guardian only checks scope/format. | Low — non-blocking: if verify fails to run, pipeline continues. |
+| `src/ui/chat/chatPanelMsgFixEscalation.ts` | Wired Supervisor Verify between Worker and Guardian in the escalation loop. If Supervisor rejects logic, Worker retries with the Supervisor's critique accumulated. Phase labels updated to 4-phase: Supervisor → Worker → Supervisor Verify → Guardian. | Closes the oversight gap where Supervisor never saw the Worker's output. | Medium — adds one more AI call per fix attempt. Cost is low (short prompt, same expensive model already loaded). |
+| `src/ui/chat/chatPanelClarify.ts` | Rewrote clarification system with 2-step Supervisor design triage. Step 1: AI decides IF questions are needed (lightbulb vs paint job). Step 2: generates 2-4 design-focused questions about what is AMBIGUOUS. Fast-path skips for fixes, edits, and single-property changes. | User had no say in design decisions. 'Build me a flappy bird game' went straight to AI defaults for colors, style, character, difficulty. Now the Supervisor asks targeted design questions when the request has visual/behavioral ambiguity. | Low -- triage adds one 50-token AI call. Questions only shown when needed. |
+| `src/ui/chat/chatPanelClarifyBridge.ts` | New shared module -- bridges the orchestrator's clarify promise with the webview message handler. Module-level resolver avoids threading panel references. | Clean separation between the orchestrator (sets promise) and early exit handler (resolves it). | None -- pure plumbing. |
+| `src/ui/chat/chatPanelOrchestrator.ts` | Wired design triage into nano build path. Clarify questions shown before createBuildContext. User answers injected into build task as USER DESIGN PREFERENCES block. | Previously only chunked builds got clarification. Now ALL builds get Supervisor design triage. | Low -- triage skips most requests via fast-path regex. |
+| `src/ui/chat/chatPanelMessageRouterEarlyExits.ts` | Updated clarify-submit handler to resolve orchestrator-level clarify via bridge module. | Required for the design triage flow to receive user answers. | None. || `src/services/sessionService.ts` | Added `startSessionSilent()` and `recordChange()` methods. Silent start creates a session without user prompts — used for auto-session on first message. recordChange logs build outcomes in the active session. | Users had to manually click "Start Session" before CHASSIS would track their work. This broke the flow for vibe-coders who expect tracking to start automatically. | Low -- adds lightweight state tracking. |
+| `src/commands/session.ts` | Wired `startSessionSilent` callback on ChatPanel. Added `ChatPanel.onBuildFinished` callback that creates a git save-point after every successful build and records the change in the session. | No automatic save points existed — users had to manually create git commits. Build history tracked builds internally but not as git checkpoints. | Low -- git commit runs asynchronously and non-blocking. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Added auto-session start on first user message. Calls `ChatPanel.startSessionSilent` with the user's message text as the goal. | Session tracking required explicit user action (clicking "Start Session"), which most users skipped, leaving sessions empty. | None -- silent start, no UI blocking. |
+
+
+
+
+
+
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40I: Prevent unexpected project switching)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/logging/projectContextLogger.ts` | **NEW FILE**: Project context validation and logging. Tracks all project switches and prevents silent context changes. Functions: `initProjectContextLogger()`, `logProjectContextSwitch()`, `validateProjectContext()`, `getCurrentProjectContext()`. Writes to `.chassis/logs/project-context.log`. | User experienced CHASSIS silently switching from flappy-bird project to a new "game-speed-controller" project during a fix request. This validation prevents that bug by blocking unexpected project switches and showing error messages. | None — logs and validates only, does not change behavior beyond blocking bugs. |
+| `src/extension.ts` | Added `initProjectContextLogger()` call during extension activation to track the initial workspace. | Project context tracking starts immediately when CHASSIS activates. | None — initialization only. |
+| `src/commands/init.ts` | Added project context validation in `onNewProject()` (lines 27-33) to log and block unexpected project switches. Added validation in the `pendingTask` handler (lines 76-85) to verify the current workspace matches the target before resuming build. | Prevents the bug where CHASSIS creates a new project folder and silently switches to it during a fix/build request. Now shows error message if context mismatch detected. | None — validation only, blocks buggy behavior. |
+| `src/ui/chat/chatPanelPublicAPI.ts` | Added import and validation in `panelResumeBuildTask()` (lines 32-46) to validate project context before switching chassis instance. Shows error message and blocks switch if attempted project change is not allowed. | This is where the actual chassis context switch happens. Added validation to catch and block unexpected switches at the lowest level. | None — validation only. |
+| `src/ui/chat/chatPanelMsgProjectOps.ts` | Added project context validation in `handleStartNewProject()` (lines 175-193). Detects if user is trying to edit current project vs create new project based on conversation context. | This is where the "new project" flow starts. The bug was CHASSIS interpreting "add speed control" as "create new project called game-speed-control". Now it detects when the conversation doesn't mention "new project" or "create" and blocks the unexpected project creation. | None — validation only, shows error message and returns early. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40J: Guardian AI import/export validation)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/guardianAI.ts` | Added explicit IMPORT/EXPORT VALIDATION section to Guardian AI prompt. Instructs Guardian to check that all imported functions actually exist in source files and exports are properly defined. | Guardian AI was passing fixes that imported functions that don't exist (e.g., `drawSpeedControl` imported but never defined). Now Guardian must verify: 1) imports reference actual functions, 2) exports are properly defined, 3) any import referencing non-existent function = COMPLETE FIX FAILURE. | None — prompt change only, no code behavior change. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40K: Prevent AI narrative text in code output)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixPhases.ts` | Added "ZERO TOLERANCE for narrative output" CRITICAL rule to Worker prompt. Explicitly forbids phrases like "I need to", "Let me check", "Here's the fix" and FILE: markers. Worker must ONLY output SEARCH/REPLACE blocks. | AI was outputting narrative thinking like "I need to check the config.js file..." which was being written directly to index.html and breaking the game. Now Worker is explicitly told any text outside the <<<SEARCH...REPLACE>>> format will break the project. | None — prompt change only. |
+| `src/services/ai/guardianAI.ts` | Added NARRATIVE TEXT DETECTION validation to Guardian prompt. Guardian must reject responses containing explanatory sentences or FILE: markers without comment prefixes. | Guardian was passing fixes that contained narrative text which would be written to files. Now Guardian validates that output is ONLY code blocks or SEARCH/REPLACE format. | None — prompt change only. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40L: Fixed freeze on reload)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/logging/chassisLogger.ts` | Removed `chassisLog()` call inside `initChassisLogger()` that was causing a circular dependency. Changed to use `console.log()` instead. | Extension was freezing on reload. The circular call to `chassisLog()` during logger initialization was causing an infinite loop or hang. | None — fixes freeze bug. |
+| `src/extension.ts` | Reverted error handling around `ChatPanel.show()` and `runAutoInit()` back to original implementation. | The error handling changes didn't fix the freeze and may have introduced issues. The root cause was the circular logger call. | None — reverts previous attempt. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40F: AI not using CHASSIS annotations for fixes)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixUtils.ts` | **File selection now prioritizes annotated files** (lines 93-95). Added `annotatedFiles` filter that detects `[SCOPE]`, `[ANNOTATION]`, `[TODO]`, `[WARN]`, `[DONE]` tags and prioritizes those files in the selection. Files with CHASSIS annotations are now explicitly included in context. | Core CHASSIS feature: files with annotations should be prioritized because they have self-documenting structure. The AI needs these to understand what to change without guessing. | Low — improves file selection logic. |
+| `src/ui/chat/chatPanelMsgFixPhases.ts` | **Supervisor prompt** (lines 23-26): Added "READ THE [SCOPE] AND [ANNOTATION] COMMENTS FIRST - they explain what each section does" to source files header. Supervisor now explicitly told to read annotations before diagnosing. | AI had annotations in files but wasn't using them to understand code structure. It was guessing instead of reading the documentation already in the code. | Low — prompt-only change. |
+| `src/ui/chat/chatPanelMsgFixPhases.ts` | **Worker prompt** (lines 64-65, 88): Added Rule #1 "READ THE ANNOTATIONS FIRST", Rule #2 "USE [SCOPE] TAGS TO LOCATE CHANGES", and CRITICAL rule "DO NOT create new files like .txt, .md, or documentation. ONLY edit the existing source files". | Worker now explicitly told to look for [SCOPE] tags describing the relevant functionality (e.g., "[SCOPE] Pipe movement and speed") and make surgical edits in THAT section only. | Low — prompt-only change. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40E: Guardian not verifying actual implementation)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixEscalation.ts` | Fixed critical bug on line 69-70. Changed `guardianContext` from broken `"${deps}"` (outputted `[object Object]`) to properly extract user request from conversation history. Guardian now receives actual user request instead of garbage context. | Guardian was passing fixes that didn't implement the requested feature because it didn't know what the user actually asked for. The context showed `[object Object]` instead of "add speed control for pipes". | High — fixes core review pipeline. |
+| `src/services/ai/guardianAI.ts` | Added "FEATURE IMPLEMENTATION VERIFICATION" section to Guardian prompt (lines 107-112). Instructs Guardian to verify the worker actually implemented the feature vs just writing instructions/comments. Explicitly tells Guardian to reject responses containing "1. Open the game 2. Press UP arrow" style instructions. | AI was claiming success but only wrote instructions ("Press UP to speed up") instead of actual code implementing the feature. Guardian wasn't catching this because it didn't know to look for it. | Low — prompt-only change. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Added instruction-only detection (lines 140-150). Scans written files for patterns like "1. Open the", "Press ", "2. Press" and shows warning: "[CRITICAL WARNING] AI wrote instructions/testing steps instead of actual CODE." | Third line of defense — even if Guardian misses it, user sees explicit warning that the "fix" contains no actual implementation. | None — warning-only. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40D: Fix pipeline not finding source files)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixUtils.ts` | Rewrote `collectSourceFiles()` (lines 68-94). Now includes: (1) files whose basenames are mentioned, (2) ALL files in `src/` folder, (3) files whose CONTENT contains keywords from user text (semantic matching), (4) files that import mentioned files. Previously only included files explicitly mentioned by filename, causing AI to only have package.json when user said "pipes" not "pipes.js". | User asked "add speed control for pipes" — AI modified package.json (+2/-1 lines) instead of game source files. The AI never received pipes.js or any game code in its context. | Low — broader context reduces precision but ensures relevant files are included. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Added config-only modification detection (lines 133-138). Warns user when AI only modified config files (package.json, tsconfig.json, etc.) and no actual source files: "[CRITICAL WARNING] AI only modified configuration files... The fix likely did NOT address your request." | Second line of defense — even if file selection fails, user is warned that the fix didn't touch actual code. | None — warning-only, non-blocking. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40C: Prevent over-engineering in fix pipeline)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFixPhases.ts` | Strengthened Worker AI rules (lines 63-72). Added "ZERO TOLERANCE for over-engineering" rule. Changed surgical edit rule to "modify ONLY the exact lines that need to change. Keep changes under 10 lines if possible." Explicitly forbids refactoring, renaming, reformatting, or "improving" anything beyond the requested fix. | User asked for "pipes take twice as long to move" — AI made 181 line changes including modifying the bird and other unrelated code. The fix should have been 1 line (speed value). | Low — prompt-only change, surgical edit fallback still works. |
+| `src/services/ai/guardianAI.ts` | Added "OVER-ENGINEERING DETECTION" section to Guardian prompt (lines 127-128). Guardian now rejects passes where worker changed 50+ lines for a simple request. Instructs Guardian to flag: "Worker rewrote entire file instead of making surgical edit." | Second line of defense — if Worker ignores surgical edit rules, Guardian catches and rejects the over-engineering. | Low — prompt-only change, improves quality control. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40B: Web search context-aware disambiguation)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgSendEarlyExits.ts` | Added `inferProjectContext()` function (lines 34-63) that scans last 10 chat messages for project-type keywords (game, flappy, canvas, react, api, etc.) and prepends inferred context to web search queries. | User asked about "pipes" in Flappy Bird context — search returned plumbing physics instead of game development results. CHASSIS should infer intent from conversation history like a human would. | Low — purely additive, falls back to raw query if no context matched. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40A: Fix build completion message not showing)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelBuild.ts` | Wrapped the complex `appendMsg` template (line 185) in try/catch with a failsafe fallback message. The complex template had multiple failure points: dynamic `require('./chatPanelBuildPipeline.js')`, potentially undefined `narration` variable, and complex string interpolation. | User reported "it does the edit but never finalizes" — the file was written but no completion message appeared. The complex template was likely throwing an error that stopped execution before `appendMsg` was called. | None — adds safety fallback that still shows basic completion info. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 40: Phase 4 — Adaptive Orchestration Engine)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/ai/adaptiveClassifier.ts` | **[NEW]** `evaluateTaskComplexity()` — 50-token AI classifier with fast-path regex. Routes each prompt to `obd1` or `obd2` based on whether it needs environment access. | Enables Adaptive mode: Supervisor auto-routes each prompt without user toggle. | Low — conservative defaults to OBD1 on failure. |
+| `src/ui/chat/chatPanelMsgFixEscalation.ts` | **[NEW]** `runEscalationLoop()` — wraps Worker→Guardian in a retry loop (max 2). Accumulates Guardian critiques across retries, escalates to best model on exhaustion. | Guardian rejections no longer halt the pipeline. | Medium — modifies core fix flow, but fallback path unchanged. |
+| `src/ui/chat/chatPanelMsgSendAgent.ts` | **[NEW]** Extracted `runAgentMode()` helper from `chatPanelMsgSendMessage.ts`. | Rule 9 split — `chatPanelMsgSendMessage.ts` hit 205 lines after adaptive routing addition. | None — pure extraction. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Added Adaptive routing branch (`deps.agentMode === 'adaptive'`). Calls `evaluateTaskComplexity()`, routes to OBD2 agent or falls through to OBD1. Changed explicit OBD2 check to `=== true`. | Wires Adaptive mode into the main chat path. | Low — OBD1/OBD2 explicit paths unchanged. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Replaced sequential Phase 2 + Phase 3 blocks with single `runEscalationLoop()` call. File shrunk from 199→179 lines. | Enables automatic retry+escalation on Guardian rejection. | Medium — core fix pipeline change, but escalation loop preserves all original behavior. |
+| `src/ui/chat/chatPanelMessageRouterEarlyExits.ts` | Added `toggle-adaptive-mode` handler. Sets `state.agentMode = 'adaptive'` and sends updated badge HTML. | Wires the Adaptive button from the webview to the extension state. | None. |
+| `src/ui/chat/chatPanelScriptGates.ts` | Updated `showAgentInfoPanel()` to support three-state display (OBD1/OBD2/Adaptive). Added Adaptive button with teal gradient. Header icon/title/subtitle now context-sensitive. | Premium UI for the new Adaptive mode. | None — cosmetic. |
+| `src/ui/chat/chatPanelHtml.ts` | Added `🔀 Adaptive` badge branch with teal border. Updated `window._agentMode` init to support `'adaptive'` string. | Badge displays correctly for all three modes. | None. |
+| `src/ui/chat/chatPanelMessages.ts` | Changed `agentMode` type from `boolean` to `boolean \| 'adaptive'`. | Type system support for three-state mode. | None. |
+
+---
+
+## Recent Fixes — May 20, 2026 (Session 39.2: Adaptive Handoff Pipeline)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgFix.ts` | Refactored Guardian limitation abort to instead set `needsObd2Handoff`, apply the code fixes, and hand off execution to the Agent pipeline. | To enable a seamless "Adaptive" workflow where OBD1 performs safe code edits, but OBD2 Agent handles terminal/environment verification automatically. | High — bridges two core pipelines. |
+| `src/ui/chat/chatPanelMsgFixHandoff.ts` | **[NEW]** Extracted `executeObd2Handoff` logic into new file. | Rule 9 (200-line hard stop) triggered on `chatPanelMsgFix.ts`. | None. |
+| `src/ui/chat/chatPanelMsgFixApply.ts` | **[NEW]** Extracted surgical edit application logic. | Rule 9 compliance. | None. |
+| `src/ui/chat/chatPanelMsgFixPhases.ts` | **[NEW]** Extracted Phase 1 and Phase 2 prompt logic. | Rule 9 compliance. | None. |
+
+| `flappy-bird/package.json` | Installed `esbuild` and added `npm run build`. | ES modules (`<script type="module">`) are strictly blocked over `file://` due to CORS. Bundling the game into a single JS file allows it to run perfectly "as it sits" locally without requiring a Node/Python HTTP server. | None — dev setup only. |
+| `flappy-bird/index.html` | Swapped `type="module" src="./src/main.js"` for standard script pointing to `dist/bundle.js`. | Allows immediate execution over `file://` protocol. | None. |
+| `src/services/ai/guardianAI.ts` | Further fortified the `DIRECT MODE (OBD1) LIMITATION RULE` to explicitly warn the Guardian that OBD1 workers are physically incapable of running code. instructed the Guardian to strictly ignore hallucinated "Verification Performed" output from workers. | Guardian was being tricked by OBD1 workers hallucinating successful test outputs. The LLM couldn't distinguish between a real test output (OBD2) and hallucinated text (OBD1), causing it to wrongly approve passes. | Low. |
+| `src/services/ai/agentTools.ts` | Added `routing` and `blueprintContext` to `AgentContext` and wired `routing.guardianReview` directly into the `write_file` tool. | OBD2 (Agent Mode) was completely bypassing the Guardian review layer. Now, the Guardian reviews all autonomous file writes and applies corrections/reviews in real-time, matching OBD1 quality. | Low — fully optional based on `isGuardianActive()`. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Passed `deps.routing` and `blueprintCtx` into the `agentCtx` configuration when executing agent tasks. | Required so that the built-in `write_file` tool can invoke the Guardian AI routing layer. | None — pure injection. |
+| `src/services/ai/agentService.ts` | Updated Verification Rule 6 with highly strict wording, mandating execution of a terminal testing/verification command and requiring the command + output in the final answer. | OBD2 agent claimed success without verification. Threats of answer rejection align LLM outputs to prioritize active proof of correctness. | Low — prompt-only change. |
+| `src/ui/chat/chatPanelMsgFix.ts` | Added check for Guardian's OBD1 insufficiency issue. If detected, intercepts the fix loop, blocks file writing, and displays a prominent visual block warning the user to switch to OBD2. | Essential for quality control — prevents direct mode from applying partial/broken edits to disk when Agent Mode is needed. | Low — clean early exit before writes. |
+| `flappy-bird/src/entities/pipes.js` | Fixed pipe generation condition from `lastPipeX - pipes[last].x < pipeSpacing` to `CONFIG.gameWidth - pipes[last].x >= pipeSpacing`. | Inverted condition flooded the screen with pipes on every single frame, making the game unplayable. | None — logic-only fix in game code. |
+| `flappy-bird/serve.js` | **[NEW]** Simple Node.js HTTP server for local development. | The game uses `<script type="module">` which Chrome blocks with CORS when loaded from `file://` protocol. This is the actual root cause of "START button does nothing". | None — new file. |
 
 ---
 
@@ -38,7 +532,44 @@
 
 ## [NEXT] Planned Phase: Transition from Extension to Full Fork Integration
 
-The user has requested transitioning CHASSIS from a VS Code extension model to a fully integrated fork. The chassis-build directory at `~/projects/chassis-build/` already has the VS Code fork source. The goal is to bake CHASSIS UI/UX directly into the editor chrome (titlebar, sidebar, activity bar) rather than relying on the extension activation model, eliminating the deploy friction entirely. This is a major phase — requires separate planning session.
+The user has requested transitioning CHASSIS from a VS Code extension model to a fully integrated, standalone IDE fork. The source for the VS Code fork is located at `~/projects/chassis-build/`. 
+
+The ultimate goal is to bake the CHASSIS UI/UX directly into the editor chrome (titlebar, sidebar, activity bar) to eliminate deployment friction, hide generic IDE features, and provide a dedicated "Workshop" experience out-of-the-box.
+
+### Phase 3: The Standalone Shop (IDE Fork Integration)
+
+#### Step 1: Native Sidebar & Core Integration
+- **Objective:** Move CHASSIS out of the Extension Host and into the native VS Code core (`src/vs/workbench`).
+- **Action:** 
+  - Migrate `chatPanel` and `chassisSetupHub` WebView code into native workbench parts.
+  - Hide default VS Code sidebars (Explorer, Search, Source Control) by default.
+  - Hardcode the CHASSIS Chat panel as the primary, un-closeable view in the secondary sidebar.
+
+#### Step 2: Custom Titlebar & Chrome
+- **Objective:** Rebrand the editor window to remove all "VS Code" references.
+- **Action:**
+  - Modify `src/vs/workbench/browser/parts/titlebar/titlebarPart.ts` to feature the CHASSIS logo and current Project Blueprint Status natively.
+  - Remove standard menu items (Terminal, Run, Help) and replace them with Workshop-specific controls (e.g., "Build Mode", "Blueprint Viewer").
+
+#### Step 3: Deep Configuration Override
+- **Objective:** Eliminate the need for `package.json` contributes and extension activation events.
+- **Action:**
+  - Hard-wire `chassis.geminiApiKey`, `chassis.startupBehavior`, and `chassis.guardianEnabled` into the native VS Code configuration registry (`src/vs/platform/configuration/common/configurationRegistry.ts`).
+  - Wire the CHASSIS initialization routine directly into the VS Code startup sequence so it boots instantly without waiting for an extension host.
+
+#### Step 4: The Branded Build Pipeline
+- **Objective:** Package the entire fork as a single, downloadable executable.
+- **Action:**
+  - Update `build/gulpfile.vscode.js` to output a branded `CHASSIS Setup.exe` / `CHASSIS-linux.AppImage`.
+    - Compile and verify that a fresh install boots directly to the Frictionless Intake Desk (API Key Wizard) without exposing the underlying VSCodium roots.
+
+### Phase 4: Adaptive Orchestration Engine (The "Shop")
+- **Objective:** Convert CHASSIS from a manual multi-mode tool into an autonomous "Shop" where a Supervisor AI manages task routing, execution, verification, and escalation dynamically.
+- **Action:**
+  - **Adaptive Mode Toggle:** Add an "Adaptive" mode that intercepts the user prompt. A lightweight Supervisor AI dynamically evaluates the task complexity to determine if it should route to the OBD1 (Direct Mode) surgical pipeline, or the OBD2 (Agent Mode) environment pipeline.
+  - **Autonomous Escalation Loop:** Currently, Guardian rejections halt the pipeline. We will build a feedback loop where the Guardian passes its critique back to the Worker (for up to 2 retries) before escalating the task to a smarter/more expensive API model (e.g., from Groq to Claude).
+  - **Parallel Dispatching:** Upgrade the Orchestrator to break a Blueprint into independent file domains and dispatch multiple Worker invocations concurrently, resolving them in a staging buffer for a final unified Guardian inspection.
+  - **Blueprint Contract Enforcement (Guardian Layer):** Before any file is written in a multi-file build, the Guardian must extract and lock the shared contract from the blueprint — HTML element IDs, global variable names, class/function interfaces, script paradigm (classic vs module). Every subsequent file the worker generates must be validated against that locked contract before being written to disk. A file that references game-canvas when the contract says gameCanvas must be rejected and regenerated, not written and patched later. This is the fix that makes CHASSIS genuinely better than other vibe editors for multi-file projects.
 
 ---
 
@@ -345,6 +876,20 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 6. Add `POST /api/validate` — takes code string, returns Guardian score (easy to test in isolation)
 7. Build from there
 
+## Recent Fixes — May 20, 2026 (Session 33: Template Showroom Finalization)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/services/project/templateRegistry.ts` | Modified `fetchTemplate` to implement a local fallback mechanism using `fs.existsSync` and `fs.promises.readFile`. | The `chassis-templates` GitHub repository is currently private, causing `fetchTemplate` to return 404s and forcing the wizard to fall back to zero-shot generation. By checking `~/projects/chassis-templates` locally first, developers can test the wizard flow and template compilation without making the repository public. | Low — cleanly falls back to the remote fetch if the local directory is missing. |
+| `src/ui/messageRouterCore.ts` | Removed duplicate `import * as path from 'path';`. | Fixed a TypeScript compiler error that was breaking the build. | None. |
+
+## Recent Fixes — May 20, 2026 (Session 32: API Key Onboarding Wizard Polish)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/commands/apiSetupHtml.ts` | Expanded provider `desc` array to include explicit `abilities` and `costDetails` fields. Modified HTML template to render these inline. Added dynamic feedback spans (`Verifying...`) and inline error text mapping. | User requested that the intake desk inform users not only of costs, but the distinct technical abilities of each AI model before selecting one. Also needed UI anchors for live verification errors. | Low — strictly UI/copy enhancement. |
+| `src/commands/apiSetup.ts` | Imported `checkProviderReachable`. Modified `save-keys` message handler to execute active network pings (`Promise.all`) for any newly saved keys *before* returning success. Passes specific HTTP/Auth errors back to the WebView payload. | Pushing "Apply Changes" previously just assumed the pasted string was valid. Now it acts as a true intake desk, catching bad keys immediately to prevent opaque build pipeline failures later. | Low — network timeouts degrade gracefully to 'warn' and still save the key, preventing offline lockouts. |
+
 ## Recent Fixes — May 20, 2026 (Session 31: Fix Build Intent Overreach on Packaging Requests)
 
 | File | What Changed | Why | Risk |
@@ -440,7 +985,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/commands/startRuntimeAnalysisHelpers.ts` | Converted static top-level `ChatPanel` import into a dynamic import within `postToChat()`. | Breaks circular dependency chain while maintaining synchronous signature for callers. | None. |
 | `src/extensionInlineCommandsB.ts` | Removed duplicate registration of `chassis.showBuildHistory` command. | The command is already registered in `src/commands/savePoint.ts`. Double-registration threw an unhandled error during startup that crashed the entire extension activation, rendering all sidebar commands non-functional. | None. |
 
-*Last updated: May 20, 2026 — resolve circular dependency in profile commands*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -452,7 +997,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelHtml.ts` | Removed the `Profile` button from the chat header. | Wrong location — it was added there by mistake during session 20Y. | None. |
 | `package.json` | Added `chassis.profileRuntime` to `contributes.commands`. | Command was never declared, causing "command not found" toast on click. VS Code requires all commands to be declared before use. | None. |
 
-*Last updated: May 20, 2026 — fix Profile Runtime location and missing package.json declaration*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -462,7 +1007,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelHtml.ts` | Restored `&#x26A1; Profile` header button (`data-cmd="chassis.profileRuntime"`). | Button was silently dropped during today's header rewrites — it appeared in the code-search result from the previous session but was no longer present in the current file. | None — restores existing command. |
 
-*Last updated: May 20, 2026 — restore Profile Runtime button*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -476,7 +1021,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/commands/apiSetupHtml.ts` | Redesigned card layouts to support enabling/disabling, active team roles, and models/cost metadata. Implemented active team sorting (Supervisor > Guardian > Worker > Configured > Disabled > Not set) and card highlights. Extracted CSS to `src/commands/apiSetupStyles.ts` to remain under 200 lines (Rule 9). | Delivers a highly aesthetic, premium, and functional experience for managing AI teams. Groups and highlights active AI members at the top of the interface. | None. |
 | `[NEW] src/commands/apiSetupStyles.ts` | Created standalone styles file containing all CSS layout and pulsing/glowing animations. | Adheres to Rule 9 file split limits. | None. |
 
-*Last updated: May 20, 2026 — API setup sorting, highlights, and split*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -486,7 +1031,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelRenderer.ts` | Wrapped each radio option label inside a block-level `div` with inline-flex alignment and flex-shrink protection. | Prevents the radio circles and option text from overlapping or running together horizontally in the build clarification card. | None. |
 
-*Last updated: May 20, 2026 — improve build clarification UI options*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -496,7 +1041,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelScriptActions.ts` | Updated the `'save-all-btn'` click handler to set `saveAllBtn.style.display = 'none'` and show a gorgeous green success message in its place. | Hides the Save All button after execution to prevent double clicks and make saving completion unambiguous. | None. |
 
-*Last updated: May 20, 2026 — improve Save All Files button UX*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -507,7 +1052,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelClassifier.ts` | Added `'chassis.scanVaultCodebase'` command type to `AvailableCommand` union type. | Declares the scan codebase command is valid for intent classification. | None. |
 | `src/ui/chat/chatPanelClassifierOverrides.ts` | Added fast-path keyword and regex check for scanning codebase/project to vault, returning the command intent `chassis.scanVaultCodebase`. | Enables users to type "scan my codebase for reusable blocks and save them to my vault" in the CHASSIS Chat panel and directly launch the folder scanning flow. | None. |
 
-*Last updated: May 20, 2026 — add chat fast-path routing to codebase vault scan*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -518,7 +1063,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelChunkedLoop.ts` | Added robust multi-file output extraction: when worker AI outputs both files in one response separated by markdown fences, splits by fence and extracts only the section matching the target filename. Fixed TS7006 type annotation. Compacted header to 199 lines (Rule 9). | Worker AI ignores "output ONLY one file" instruction and dumps both files in each response. The naive fence-strip only removed first/last fences, leaving inner fences as TS syntax errors. | Low — only improves output parsing. |
 | `~/projects/surgical-test-greet/tsconfig.json` | Added `"DOM"` to `lib` array alongside `"ES2020"`. | The project tsconfig lacked DOM lib, so `console` was undefined — causing TS2584 errors on any `console.log` the AI generated. | None. |
 
-*Last updated: May 20, 2026 — fix worker AI multi-file output extraction*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -528,7 +1073,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelChunkedLoop.ts` | 1) Vault snippets now only injected for NEW files (`!exists`), not existing files being surgically modified. 2) Added `surgicalRules` variable with explicit instructions: output complete updated file, preserve existing code, do NOT add vault code or unrelated functions, do NOT wrap in markdown fences. 3) Strengthened the general "no fences" instruction. | The worker AI was given vault snippets (playSound, downloadAudio, etc.) for EVERY file including surgical edits. It copied all vault code into `test-surgical.ts`, producing 100+ lines of unrelated audio functions alongside the greet/farewell functions. This caused massive TS1005/TS1128 compile errors. | Low — only affects chunked build worker prompt. |
 
-*Last updated: May 20, 2026 — fix vault snippet injection corrupting surgical edits*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -538,7 +1083,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelRenderer.ts` | Added HTML entity unescaping (`&quot;` → `"`, etc.) before `JSON.parse` in the `__CLARIFY__` token handler. Added `[WARN]` tag documenting the escapeHtml ordering issue. | `escapeHtml()` runs on line 27 before any token regex replacements, so the JSON inside `__CLARIFY__` has its quotes converted to `&quot;`, causing `JSON.parse` to fail silently and return an empty string — rendering the entire bubble blank. | None — mirrors the same unescape pattern used by the code block renderer. |
 
-*Last updated: May 20, 2026 — fix JSON parse failure in clarify token renderer*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -549,7 +1094,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelRenderer.ts` | Added `__CLARIFY__` token parser and renderer to parse the AI generated questions array and render them as an interactive radio-button form inside the message bubble. Checked that the file size is strictly under 200 lines (Rule 9). | The chat panel webview lacked a renderer for the `__CLARIFY__` token, leaving the raw JSON string exposed in the chat interface and stalling the build. | None — cleanly handles the token rendering. |
 | `src/ui/chat/chatPanelScriptActionsB.ts` | Added a `.clarify-submit-btn` click listener that gathers checked radio option values, maps them to their respective question IDs, sets the button to a disabled "Building..." state, and posts the `clarify-submit` event back to the extension router. | Needed client-side interaction support to collect and submit user answers back to the extension to unlock the pending build loop. | None — standard DOM event listener. |
 
-*Last updated: May 20, 2026 — fix build clarification UI rendering in chat panel*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -559,7 +1104,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelOrchestrator.ts` | Imported `runChunkedBuild` and `isChunkedBuildRequest` from `chatPanelBuild.js`. Updated `handleNanoBuild` and `handleStandardBuild` to check if a task is a chunked build request via `isChunkedBuildRequest`, and if so, route it to `runChunkedBuild(task, ctx)` instead of hardcoding `runSingleFileBuild(ctx)`. Compacted `handleDeepBuild` message strings to keep the file strictly under 200 lines (Rule 9). | The modification fast-path and standard-complexity project-initialized builds completely bypassed chunked build and directly executed `runSingleFileBuild`. This completely broke all multi-file requests on existing projects by forcing single-file behavior (resulting in wiping out files or single-file dumps). | None — properly integrates the chunked build router logic. |
 
-*Last updated: May 20, 2026 — fix multi-file chunked build bypass in orchestrator*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -570,7 +1115,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelChunked.ts` | Imported `getWorkspaceContextService` and fetched workspace files. Injected `wsBlock` (list of relative paths of all files in the active workspace) directly into the planner's prompt `planPrompt`. Compacted dead-ends and rules variable declarations to keep the file strictly under 200 lines (Rule 9). | The planner AI (Claude) had no context on what files actually existed in the user's workspace, so it assumed existing target files (like `src/test-surgical.ts`) didn't exist or shouldn't be planned. Supplying the workspace file list lets it successfully plan updates to existing files. | None — strictly adds context. |
 | `src/ui/chat/chatPanelChunkedLoop.ts` | Added logic to check if a planned file already exists in the workspace. If it does, reads the current file content, injects it into `filePrompt` as `existingBlock`, and adds a strict rule telling the worker AI to modify the file content surgically rather than overwriting it from scratch. | When a file was planned for modification, the loop wrote it from scratch because it never loaded the existing file contents from disk, leading to overwriting of other functions and imports. | None — mirrors the successful single-file target loading logic. |
 
-*Last updated: May 20, 2026 — fix chunked build surgical edits of existing files*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -580,7 +1125,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelChunked.ts` | Rewrote the supervisor's planning prompt in `runChunkedBuild` to explicitly command it to identify and list both brand new files to create AND existing files that need to be edited or updated. Removed the unused `plannerLabel` variable and condensed recent context declarations to keep the file strictly under 200 lines (Rule 9). | The planning prompt was too generic ("Break this into individual source files..."), so the supervisor AI (Claude) thought existing files didn't need to be in the returned JSON plan. Consequently, it only planned the new file `src/farewell.ts` and left the caller `src/test-surgical.ts` completely out of the plan. Adding explicit instructions guarantees both creations and updates are planned. | None — prompt content optimization only. Rule 9 line count constraints successfully met (file is exactly 198 lines). |
 
-*Last updated: May 20, 2026 — fix multi-file planning prompt for existing file edits*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -590,7 +1135,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelBuildHelpers.ts` | Added a structural fast-path in `isChunkedBuildRequest` to count unique file mentions (`\b[\w./-]+\.(ts\|tsx\|js\|...)\b`) in the task. If two or more unique files are mentioned, it immediately returns `true` (chunked build). Also sharpened the AI prompt to explicitly define creates + modifications/imports as a multi-file task, and parsed the answer robustly with `.includes()`. | When the user asked to create `src/farewell.ts` AND update `src/test-surgical.ts`, the model routing classified the build as "single-file" because the generic AI classifier in `isChunkedBuildRequest` didn't catch the multi-file requirement (likely returned prose or answered "single" because it wasn't a database/fullstack app). As a result, the single-file pipeline ran, wrote both functions to `src/farewell.ts`, and ignored `src/test-surgical.ts`. | None — regex is precise and handles any normal file references. Fallback prompt remains to catch non-explicit multi-file statements. |
 
-*Last updated: May 19, 2026 — fix single/multi-file chunked build routing on multiple file mentions*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -600,7 +1145,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|-----|------|
 | `src/ui/chat/chatPanelClassifier.ts` | Sharpened `build` vs `scaffold` intent definitions. `build` now explicitly includes "even if user says 'new project' — specific files/functions/features always means build." `scaffold` now says "ONLY when NO specific files, functions, or features are named." Added 3 disambiguating examples including the exact failing message: "create a new test project called surgical-test-greet with a specific TypeScript file" → `build`. | "create a new test project... with a single TypeScript file src/test-surgical.ts containing a greet function" was classified as `scaffold` because it said "new project". `handleScaffoldIntent` → `detectScaffoldIntent` found no matching template (React/Flask/Go/Express) → asked "which one?" instead of building. The distinction: scaffold = blank boilerplate template, build = specific named content. | Low — purely prompt text change. AI classifier now has explicit rule and a matching example. |
 
-*Last updated: May 19, 2026 — fix build vs scaffold misclassification for specific-content project requests*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -612,7 +1157,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelHeader.ts` | Reads `out/data/build-info.json` via `extensionContext.extensionPath` at header build time. Formats as `vX.Y.Z · May 19 HH:MM`. Silently skips on any error. Added `import * as fs from 'fs'`. | Need runtime access to build timestamp to display in UI. | None — all errors silently caught; `buildStamp` is optional on the interface. |
 | `src/ui/chat/chatPanelHtml.ts` | Added `buildStamp?: string` to `ChatHeaderInfo`. Renders as a monospace 10px dimmed stamp between the status dot and header-right buttons when `buildStamp` is present. | User needs to verify at a glance that a deploy took effect — build timestamp proves the running code matches the last compile. | None — purely additive; renders nothing when `buildStamp` is undefined. |
 
-*Last updated: May 19, 2026 — build stamp in chat header for deploy verification*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -631,7 +1176,7 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelClassifierOverrides.ts` | Removed `test` and `start` from the structural run-intent fast-path regex. Both words are ambiguous: `test` matched `test project` in create requests ("create a new test project..."), routing to `handleRunIntent` which returned "No project is open". `start` matched "start a new project" (scaffold intent). Added `[DEAD]` comment documenting the removal. AI classifier now handles these per Rule 18. | User sent "create a new test project..." and got "No project is open — open a project folder first." Root cause: the hardcoded regex `\b(run|launch|preview|start|execute|test)\s+(...)?` matched `test project`, bypassed the AI classifier, and called `handleRunIntent` which lacks any auto-create logic. | None — `run`, `launch`, `preview`, `execute` remain in the fast-path and are unambiguous. `test it` / "let me test it" still resolves via the `let me (see|test|try) it` clause. |
 | Deploy — `chassis-build/VSCode-linux-x64/resources/app/extensions/chassis/out/` | Deployed fix to the actual running baked IDE. Previous deploy only targeted `~/.vscode/extensions/papajoe.chassis-0.3.6/` — that is NOT the editor the user runs. The baked IDE at `chassis-build/VSCode-linux-x64/` is the real target per Rule 20. [DEAD] Never deploy only to `~/.vscode/extensions/` — always deploy to `chassis-build/VSCode-linux-x64/resources/app/extensions/chassis/`. | Fix was compiled and deployed to the wrong location — baked IDE kept running old code with the broken regex. | None — file copy only. |
 
-*Last updated: May 19, 2026 — deploy fix to correct baked IDE path, add [DEAD] note on deploy target*
+*Last updated:* May 21, 2026
 
 ---
 
@@ -1239,6 +1784,50 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 | `src/ui/chat/chatPanelMessageRouter.ts` | Added `setBlueprintContext: (ctx: string) => { state.blueprintContext = ctx; }` to deps construction. | Wires the setter from the panel state into the message handler deps. | None. |
 | `src/extensionInlineCommandsB.ts` | Updated `chassis.startExpandedInterview` command: now opens ChatPanel (or focuses existing) and posts `show-panel: expanded-interview` with `prefillTask` from blueprint.what. Removed `[TODO]` tag, added `[DONE]`. | Was just forwarding to `chassis.wizardRetrofit`. Now triggers the real expanded interview form. | Low — uses `(panel as any)._panel` accessor like other command handlers. |
 
+## Recent Fixes — May 21, 2026 (Session 10Y: Chat history wipe on auto-open & Agent HTML rules)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/extensionInlineCommands.ts` | Saved `ChatPanel` conversation array to `globalState('chassis.pendingRescueConversation')` right before calling `vscode.openFolder` for a new project. | VS Code's `openFolder` triggers a hard window reload. Since CHASSIS chat history is stored in-memory, the reload completely wiped the original session chat when the user created their first project. | Low — standard VS Code state persistence pattern. |
+| `src/extensionResumeState.ts` | Added logic to detect `pendingRescueConversation`, restore it into the new `ChatPanel` instance, and call `.refresh()`. | Completes the history-rescue cycle across the window reload boundary so the user doesn't lose context. | Low — safely cleans up the flag after use. |
+| `src/services/ai/agentService.ts` | Added rule #9 "PROPER WEB STRUCTURE" and rule #10 "ACTUALLY WRITE THE CODE" to the OBD2 Agent system prompt. | The OBD2 agent was hallucinating raw JS without HTML tags, and sometimes completely ignoring the `write_file` tool to just output a Markdown checklist of the requested features, leaving the auto-created project folder empty. | None — strengthens existing Agent constraints. |
+| `src/ui/chat/chatPanelChunkedLoop.ts` | Added explicit instruction preventing the use of ES modules (`<script type="module">`) and `import/export` for HTML projects. | The chunked build AI was splitting the game into multiple ES modules. When the user clicked "Preview in Browser", CHASSIS opened the `.html` file natively via the `file://` protocol, which caused a hard CORS block on all module scripts, leaving the game as a blank screen. | Low — keeps zero-build projects runnable from the filesystem. |
+| `src/ui/chat/chatPanelMsgSendMessage.ts` | Extracted `checkHardcodedOverrides` and placed it BEFORE the Adaptive/Agent mode routing block. | Hardcoded commands like "close project" were falling into Adaptive Mode, which incorrectly classified them as environment tasks (`obd2`). This caused the OBD2 Agent to spin up and get stuck trying to fulfill a UI command it had no tools for. | Low — restores correct fast-path execution. |
+| `src/extensionInlineCommands.ts` | Disabled automatic `vscode.openFolder` invocation for new projects; added manual `__OPEN_WORKSPACE__` button to chat result card instead. | Creating a new project triggered an unavoidable VS Code window reload when adding the folder to the empty workspace, causing the chat panel to aggressively close and reopen, breaking the user's flow. Now the user controls when the workspace opens. | Medium — modifies core project scaffolding flow, but improves UX. |
+| `src/commands/init.ts` | Removed `updateWorkspaceFolders` from `onNewProject` and removed the strict context check before `resumeBuildTask`. | Adding the new folder to an existing workspace forced VS Code into an "Untitled (Workspace)" multi-root mode. This disruptive state change caused the chat panel to re-render in place, spawning duplicate tabs. Disabling this keeps the build isolated until the user explicitly opens the new folder. | Medium — stabilizes new project initialization UX. |
+| `src/ui/chat/chatPanelChunked.ts` & `src/ui/chat/chatPanelChunkedLoop.ts` | Added strict BROWSER/HTML PROJECT ONLY rules to the Supervisor prompt to enforce planning a separate `.js` file instead of mixing JS inside `index.html`. | There was a split-brain issue: the Worker was told "Use standard `<script src...>`" but the Supervisor wasn't told to plan a separate JS file. So the Supervisor only planned `index.html`, and the Worker either broke the rule or output invalid JS tags trying to reference a non-existent external file, resulting in blank games. | High — fixes structural failures in zero-build HTML game generation. |
+
+## The Great Reorganization — May 22, 2026 (Architecture Stabilization)
+
+Because of Rule 9 (the 200-line hard stop), files were aggressively split and flattened into `src/ui/chat/` (92 files) and `src/services/` (78 files), mixing backend orchestration logic with UI rendering. 
+To resolve this architectural erosion, over 170 files were moved to domain-specific directories using `ts-morph` to safely rewrite all project imports.
+
+**New Structure Highlights:**
+- **`src/core/build/`**: Extracted build pipeline (`chatPanelBuild*.ts`, `chatPanelChunked*.ts`, etc.)
+- **`src/core/ai/`**: Extracted AI logic and intent classifiers (`chatPanelAI*.ts`, `chatPanelClassifier*.ts`)
+- **`src/core/routing/`**: Extracted message routing (`chatPanelMsg*.ts`, `commandRouter.ts`)
+- **`src/core/project/`**: Extracted file ops and project scaffolding
+- **`src/core/inspector/`, `src/core/diagnostics/`, `src/core/retrofit/`**: Backend services moved out of `src/services/`
+- **`src/ui/panels/chat/`**, **`src/ui/panels/analyzer/`**, **`src/ui/panels/wizard/`**: UI-specific webviews and rendering code isolated into discrete panel domains.
+
+## Recent Fixes — May 22, 2026 (Session 11X: Core Rules Update, Orphan Cleanup, Logging & Testing)
+
+| File | What Changed | Why | Risk |
+|------|--------------|-----|------|
+| `src/tests/*` & `.vscode-test.mjs` | Added layered testing architecture inside `src/tests/` (to preserve compilation stability). Included strict Baseline validation and Nock HTTP mocking. Implemented Static Analysis Quality Gates via `scripts/quality-gates.js` (Cyclomatic Complexity, Bundle Size, ts-prune dead code, Dependency Compliance). | Provides deterministic, zero false-positive testing without hitting live APIs. Defends architectural integrity post-test. Mirrors domain structure exactly. | Low — tests don't affect runtime. |
+| `src/tests/utils/logDumper.ts` | Created a global Mocha `afterEach` hook to automatically extract and dump domain logs on failure. | Makes debugging test failures vastly faster by pinning exactly what the internal AI pipelines did during the test. | Low. |
+| `src/core/logging/masterLogger.ts` & 11 Domain Loggers | Added a `masterLogger` and 11 domain-specific loggers to `src/core/` and `src/ui/panels/`. | Enforces NO FLAT FILES logging. Provides structured DEBUG, INFO, ERROR logging with automatic session rotation. | Low — new infrastructure, doesn't break existing code. |
+| `src/extension.ts` | Initialized `masterLogger` in `activate()`. | Connects the logging framework to the extension lifecycle. Note: File reached 212 lines, needs split per Rule 9. | Low. |
+| `src/core/ai/clarificationService.ts`, `src/services/deployService.ts`, etc. (18 files total) | `[DEAD]` Removed 18 completely orphaned files across `src/services` and `src/core`. | Rule 12 enforcement. Static analysis confirmed these files were entirely unreferenced dead ends left over from previous refactors. | Low — files were already unreachable. |
+| `GEMINI.md`, `CLAUDE.md`, `.cursorrules`, `.windsurf/rules.md` | Added Rule 13: NO FLAT FILES. | Enforces strict folder-based separation of concerns (UI in UI, logic in logic) across the CHASSIS project. | Low — documentation update. |
+| `src/services/rulesContent.ts`, `src/services/chassisRules.ts`, `src/services/ai/chassisWorkerRules.ts`, `src/services/ai/agentService.ts` | Added Rule 13: NO FLAT FILES. | Ensures CHASSIS injects this strict architectural rule into the AI agents when it generates or edits external projects. | Low — prompt engineering update. |
+
+## Recent Fixes — May 21, 2026 (Session 10X: OBD2 Agent workspace auto-open and UI result rendering)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/chat/chatPanelMsgSendAgent.ts` | Added `buildPostBuildGuidance`, `__PREVIEW_BROWSER__` token, and `__BUILD_RESULT__` token to the final agent output. Added `setTimeout` call to `ChatPanel.onBuildFinished` if any files were built. | The OBD2 Agent failed to trigger the workspace to open after auto-creating the folder, leaving users in an empty VS Code window. It also lacked the UI rendering tokens that the standard build pipeline uses to show interactive run/preview buttons. | Low — matches standard pipeline behavior. `ChatPanel.onBuildFinished` causes a window reload for first-time folder opens, which is the expected VS Code behavior. |
+
 ## Recent Fixes — May 16, 2026 (Session 10W: Rule 18 complete — all remaining regex NL violations fixed)
 
 | File | What Changed | Why | Risk |
@@ -1564,6 +2153,34 @@ Phase 2 enables the Pro tier — the Worker already has the user's keys in heade
 |------|-------------|------|------|
 | `src/ui/chat/chatPanelBuildRunner.ts` | Added `\b` word boundaries to `isSimpleUnit` regex. Was `/function\|script\|snippet\|.../i`, now `/\b(function\|script\|...)\b/i`. | "JavaScript" contains the substring "script" — without word boundaries, any task mentioning JavaScript, TypeScript, or className was falsely classified as a simple unit and routed to the compact vault wizard instead of the placement gate. A personal finance dashboard got the "Build & Save to Vault" compact panel instead of the proper project-creation flow. | None — stricter classification; tasks that genuinely ask for a "function" or "script" still match |
 | `src/ui/chat/chatPanelScriptProjects.ts` | Fixed "Make it a Project Instead" button click handler: was posting `{ type:'show-panel', panelType:'create-folder' }` to the extension (no inbound handler — silently dropped). Now calls `showCreateFolderPanel(prefillName, pendingTask)` directly in the webview, which posts `{ type:'create-folder', name, parentPath, pendingTask }` — a message the extension DOES handle. | Clicking "Make it a Project Instead" did nothing. The `showCreateFolderPanel` function was already defined in the webview; the button just needed to call it instead of posting a message the extension doesn't listen for. | None — calls existing webview function; create-folder handler unchanged |
+
+## Recent Fixes — May 22, 2026 (Sessions 11AJ–11AN: Visual Contract Editor + deploy pipeline fix)
+
+| File | What Changed | Why | Risk |
+|------|-------------|------|------|
+| `src/core/build/chatPanelChunkedFinalize.ts` | Removed `vscode.openFolder` call after every build; replaced with `vscode.workspace.updateWorkspaceFolders` for the has-folders case. Added `projectRoot` param to `buildResultCard`. | `vscode.openFolder` caused a full window/extension-host reload after every build, which (a) left the spinner running forever and (b) fired `pendingResumeTask` → full rebuild on reload. | None — `updateWorkspaceFolders` is non-destructive; no window reload |
+| `src/extensionInlineCommands.ts` | Added `_prevOnBuildFinished` chain to preserve the session.ts save-point callback. Removed `pendingResumeTask` and `pendingRescueConversation` globalState saves from `onBuildFinished`. | `extensionInlineCommands.ts` was overwriting the callback registered in `commands/session.ts`, silently dropping save-points. GlobalState saves here caused reload→rebuild loop. | None |
+| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | Added `open-workspace-btn` handler that saves `pendingRescueConversation` to globalState immediately before calling `vscode.openFolder` (the only intentional reload). Added `open-visual-editor` handler that calls `openVisualContractPanel` directly. | `pendingRescueConversation` must only be saved when the user intentionally opens a new folder — not on every build finish. | None |
+| `src/extensionResumeState.ts` | Added `pendingRescueConversation`-only recovery path that restores conversation without triggering a rebuild. | `pendingResumeTask` was the only recovery path — both intentional folder-opens and accidental reloads ended up triggering full rebuilds. | None |
+| `src/services/savePointService.ts` | Removed blocking git-init modal; silent early return when no git repo. | Modal fired automatically after every build for non-git projects, blocking the UI. | None — git init remains available manually |
+| `src/services/visualContract/visualContractTypes.ts` | NEW — shared types: `VisualProperty`, `VisualSection`, `VisualContract`, `PropType`, `PropCategory`. | Foundation for Visual Contract Editor. | None |
+| `src/services/visualContract/propertyExtractor.ts` | NEW — `extractVisualContract(root, files)`: scans HTML inline `<style>` blocks for colors and numeric properties; extracts page title, headings, buttons from HTML text; detects structural sections. Returns up to 14 colors + numbers + text properties per file. | Visual Contract Editor needs a property map to display editable controls. | Low — read-only file scan |
+| `src/services/visualContract/visualContractPatcher.ts` | NEW — `applyPropertyPatch` and `applyBatchPatches`: uses stored `findRegex`+`findGroup` to locate and in-place-replace property values in source files. | Translates Visual Editor control changes back to source code. | Medium — writes to user files; uses stored regex from extraction to minimize false matches |
+| `src/ui/panels/visualContract/visualContractPanel.ts` | NEW — singleton webview panel host. Embeds extracted contract as inline JSON in the webview HTML (no postMessage race). Handles `apply-all`, `property-changed`, `add-section` messages. | Visual Contract Editor panel controller. | None |
+| `src/ui/panels/visualContract/visualContractPanelHtml.ts` | NEW — full webview HTML with Catppuccin dark theme. Tabs: Colors, Text, Layout, Effects, Structure. Plain/Pro toggle. All event handling via delegated listeners (no inline onclick/oninput — required for VS Code CSP). Fixed template-literal backslash stripping for embedded regex. | VS Code webview CSP blocks inline event handlers regardless of extension CSP meta tag; must use addEventListener from nonce-allowed script block. | None |
+| `src/ui/panels/chat/chatPanelDashboard.ts` | Added `editVisuallyPill` — shown when any recent build produced `.html` or `.css` files. | Feature request: Edit Visually button on project dashboard. | None |
+| `src/ui/panels/chat/chatPanelStylesDash.ts` | Added `.dash-action-visual` and `:hover` styles for the Edit Visually pill. | Visual styling for new pill. | None |
+| `src/ui/panels/chat/chatPanelRenderer.ts` | Added renderer for `__EDIT_VISUALLY__` token — renders inline "Edit Visually" button in build result cards when built files include HTML/CSS. | Post-build entry point for Visual Contract Editor. | None |
+| `src/ui/panels/chat/chatPanelScriptActionsB.ts` | Added click handler for `.edit-visually-btn` — base64-decodes root path, posts `open-visual-editor` message. | Wires the result-card button to the panel open path. | None |
+| `src/extensionInlineCommandsC.ts` | Added `chassis.openVisualEditor` command registration with lazy `require` of `visualContractPanel.js` (inside handler, not top-level). Fixed top-level import that was silently killing all 4 commands in the file. | Top-level `import { openVisualContractPanel }` caused module load failure if the import threw — silently preventing `chassis.runProject`, `chassis.inspectElement`, `chassis.injectTerminalError`, and `chassis.openVisualEditor` from registering. | None |
+| `src/core/project/chatPanelMsgProjectOps.ts` | Added inline `chassis.openVisualEditor` handler that calls `openVisualContractPanel` directly instead of via `vscode.commands.executeCommand`. | Extension activation fails for `terminalDataWriteEvent` proposed API, preventing command registration entirely. Direct call bypasses the broken registry path. | None |
+| `scripts/postcompile.js` | Extended deploy to also sync `out/` to any `~/.vscode/extensions/papajoe.chassis-*` directory (auto-discovered). Previously only synced to the baked `chassis-build/` path. | Extension installed in `~/.vscode/extensions/` takes priority over the baked copy in VS Code's load order — the stale installed copy (May 20) was what ran, not the freshly compiled baked copy. | None — additive sync target |
+| `package.json` | Added `chassis.openVisualEditor` to `contributes.commands`. | Required for command palette visibility. | None |
+
+*Last updated: May 22, 2026 — Sessions 11AJ–11AN complete*
+
+### Known Issue (logged)
+Extension activation fails with `Extension 'papajoe.chassis' CANNOT use API proposal: terminalDataWriteEvent`. The `registerTerminalErrorService` call uses `(vscode.window as any).onDidWriteTerminalData` which is a proposed API. This kills full activation, preventing `vscode.commands.registerCommand` from working. Workaround: all dashboard/result-card commands that need this path call handlers directly. Fix: remove `onDidWriteTerminalData` usage or declare `terminalDataWriteEvent` in `package.json#enabledApiProposals` and run with `--enable-proposed-api`.
 
 ## Recent Fixes — May 15, 2026 (Session 4s: Bug 8 — status ticker freeze on no-workspace paths)
 
@@ -1899,6 +2516,35 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 
 ---
 
+## Recent Fixes — May 23, 2026 (Session 11AP: Clarify Flow — One Question + Elaboration + Summary)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/panels/chat/chatPanelRendererClarify.ts` | Complete rewrite — renders ONLY the first question in DOM, stores all questions as JSON in `data-questions` attr. Adds elaboration textarea per question. Summary div (empty, filled by JS after last question). | All-questions-at-once bug: was putting all question blocks in DOM and relying on display:none — unreliable. New approach: only the current question is ever in the DOM. | Low |
+| `src/ui/panels/chat/chatPanelScriptActionsB.ts` | Rewrote clarify section. Added `_buildQHtml()` (renders question HTML in JS), `_showClarifySummary()` (summary card after last question). New `clarify-build-btn` and `clarify-revise-btn` handlers. Summary shows all answers before building; Make Changes resets to Q1. | Three pillars: plain language for non-coders — summary says "Here's your build plan" before committing. | Low |
+| `src/core/build/chatPanelChunked.ts` | Answer processing merges `qN_detail` elaboration into parent answer: `"Web browser — make it work on mobile too"` | Elaboration text captured per question needs to flow into the build prompt | Low — one-liner filter/map change |
+
+---
+
+## Recent Fixes — May 23, 2026 (Session 11AP: Plain-Language Fix Output)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/routing/chatPanelMsgFixOutput.ts` | New file (77 lines) — extracted output block from chatPanelMsgFix.ts, rewritten in plain language | Non-coders were seeing "Phase 1: Supervisor diagnoses", "SEARCH/REPLACE block", "[CRITICAL WARNING]" — unreadable. Now shows "What I found: [plain sentence]" and "What I changed: • file.js". Technical diagnosis is collapsed under a "Technical analysis ▶" toggle. | Low — same logic, different presentation |
+| `src/core/routing/chatPanelMsgFix.ts` | 229→173 lines (Rule 9 fix). Phase status "Reading your project files..." and "Found the issue — writing the fix now..." instead of "[1/4] Supervisor: reading...". No-write path uses plain summary too. | Three pillars: code structure (under 200 lines), plain language for non-coders | Low |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | Supervisor system prompt now requires `PLAIN: [one sentence]` at the top of every response | This line is extracted by chatPanelMsgFixOutput.ts and displayed as the main "What I found" message | Low — Supervisor still writes full technical analysis after the PLAIN line; Worker reads both |
+| `src/ui/panels/chat/chatPanelRenderer.ts` | Added `__TECH_DETAILS__...__END_TECH__` token → collapsible `<details>` element with "Technical analysis ▶" | Hides verbose diagnosis from non-coders by default; still accessible to developers | Low |
+
+---
+
+## Recent Fixes — May 23, 2026 (Session 11AP: Fix Pipeline Blueprint Injection)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/routing/chatPanelMsgFixPhases.ts` | Added `fs` and `path` imports; injected blueprint (who/what/where/when/why), recent CHASSIS_ROADMAP.md entries (last 700 chars), and file-skeleton (SCOPE annotations per file) into Supervisor `diagPrompt` | Fix pipeline Supervisor had no project context — no blueprint, no history, no architecture overview. Now Supervisor knows what the project is, what recently changed, and each file's role before diagnosing. | Low — additions are additive context; all three blocks are guarded and fall back to empty string on failure |
+
+---
+
 ## Recent Fixes — May 13, 2026 (Session 5, compile fix)
 
 | File | What Changed | Why | Risk |
@@ -1975,6 +2621,10 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 
 ## Active Backlog — Top Items Only
 > Full backlog in `docs/CHASSIS_FEATURES.md`
+
+### 🔴 Critical Refactors (Complexity Warnings)
+- [ ] `handleSendMessage` in `src/ui/chat/chatPanelMsgSendMessage.ts` (complexity 77)
+- [ ] `runBuildAfterGates` in `src/ui/chat/chatPanelBuildRunner.ts` (complexity 81)
 
 ### ✅ Completed (Sessions 3–4o)
 - [x] **Terminal error awareness** — `terminalErrorService.ts`, `Ctrl+Shift+E`, inject into chat

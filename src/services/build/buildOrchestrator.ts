@@ -1,10 +1,8 @@
 // [SCOPE] Build Orchestrator Service — break complex builds into phased assembly
 // Like building a car: blueprint → parts → frame → drivetrain → body → polish → deliver
 
-import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
-import { ComplexityResult, ComplexityTier as _ComplexityTier } from '../complexityAssessment.js';
+import type * as vscode from 'vscode';
+import type { ComplexityResult, ComplexityTier as _ComplexityTier } from '../../core/ai/complexityAssessment';
 export type ComplexityTier = _ComplexityTier;
 import { BUILD_PHASES } from './buildPhaseDefinitions.js';
 
@@ -136,14 +134,14 @@ export class BuildOrchestrator {
 
   getCurrentPhase(planId: string): PhaseDefinition | null {
     const plan = this.plans.get(planId);
-    if (!plan || plan.currentPhase >= plan.phases.length) return null;
+    if (!plan || plan.currentPhase >= plan.phases.length) {return null;}
     const phaseId = plan.phases[plan.currentPhase];
     return BUILD_PHASES.find(p => p.id === phaseId) || null;
   }
 
   completeCurrentPhase(planId: string): boolean {
     const plan = this.plans.get(planId);
-    if (!plan) return false;
+    if (!plan) {return false;}
     const currentPhaseId = plan.phases[plan.currentPhase];
     plan.completedPhases.push(currentPhaseId);
     plan.currentPhase++;

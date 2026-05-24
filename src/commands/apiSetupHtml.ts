@@ -4,6 +4,7 @@
 import * as vscode from 'vscode';
 import { RoutingService } from '../services/ai/routingService.js';
 import { API_SETUP_CSS } from './apiSetupStyles.js';
+import { buildProviderCards } from './apiSetupHtmlCards.js';
 
 export function getApiSetupHtml(): string {
   const config = vscode.workspace.getConfiguration('chassis');
@@ -18,88 +19,52 @@ export function getApiSetupHtml(): string {
   const routing = new RoutingService();
   const roster = routing.buildRoster();
 
-  const mask = (k: string) => k ? '•'.repeat(Math.min(k.length, 20)) : '';
-
   const providers = [
-    { id: 'gemini', icon: '🤖', name: 'Gemini (Google)',        badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Fast, free tier available. Recommended for most users -- great starting point.',           link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey, model: 'gemini-2.5-flash', tier: '🚀 Ultra-Fast (Free / Low Cost)' },
-    { id: 'claude', icon: '🧠', name: 'Claude (Anthropic)',      badge: 'Paid',                badgeColor: '#b85c00', desc: 'Best for complex reasoning, long documents, and nuanced code review.',                    link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey, model: 'claude-3-5-sonnet', tier: '🧠 Deep Reasoning (Premium Paid)' },
-    { id: 'openai', icon: '⚡', name: 'OpenAI (GPT-4o)',         badge: 'Paid',                badgeColor: '#b85c00', desc: 'GPT-4o -- strong all-rounder for code, chat, and analysis.',                             link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey, model: 'gpt-4o-mini', tier: '⚖️ Strong Generalist (Low Cost)' },
-    { id: 'groq',   icon: '🔥', name: 'Groq (Llama / Mixtral)',  badge: 'FREE tier available', badgeColor: '#1a7a3a', desc: 'Extremely fast inference. Free tier available. Great for quick tasks.',                   link: 'https://console.groq.com/keys',                   linkLabel: 'Get free key', val: groqKey, model: 'llama-3.3-70b-versatile', tier: '⚡ Sub-second (Free Tier)' },
-    { id: 'xai',    icon: '🚀', name: 'xAI Grok',                badge: 'Paid',                badgeColor: '#b85c00', desc: 'Grok model -- strong reasoning, real-time data awareness.',                              link: 'https://console.x.ai/',                           linkLabel: 'Get API key', val: xaiKey, model: 'grok-2-1212', tier: '💬 Smart & Dynamic (Paid)' },
-    { id: 'kimi',   icon: '🔮', name: 'Kimi (Moonshot AI)',       badge: 'Paid',                badgeColor: '#b85c00', desc: 'Moonshot AI -- very large context window, good for big codebases.',                      link: 'https://platform.moonshot.cn/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)' },
+    { id: 'gemini', icon: '🤖', name: 'Gemini (Google)',        badge: 'FREE tier available', badgeColor: '#1a7a3a', 
+      desc: 'Recommended for most users. Fast, capable, and extremely generous free tier.', 
+      abilities: 'Excels at general coding, high-speed UI generation, and large context windows.', 
+      costDetails: 'Free tier: 15 requests/minute. Paid: ~$0.07 per 1M tokens (extremely cheap).',
+      link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey, model: 'gemini-2.5-flash', tier: '🚀 Ultra-Fast (Free / Low Cost)' },
+    { id: 'claude', icon: '🧠', name: 'Claude (Anthropic)',      badge: 'Paid',                badgeColor: '#b85c00', 
+      desc: 'The industry gold standard for complex coding tasks.', 
+      abilities: 'Best-in-class reasoning. Perfect for deep architectural refactoring, subtle bug hunting, and massive codebase analysis.', 
+      costDetails: 'No free tier. Paid: $3.00 per 1M input tokens. (Premium pricing).',
+      link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey, model: 'claude-3-5-sonnet', tier: '🧠 Deep Reasoning (Premium Paid)' },
+    { id: 'openai', icon: '⚡', name: 'OpenAI (GPT-4o)',         badge: 'Paid',                badgeColor: '#b85c00', 
+      desc: 'Strong all-rounder for code, chat, and analysis.', 
+      abilities: 'Highly reliable and consistent formatting. Excellent at following strict system rules and JSON schema generation.', 
+      costDetails: 'No free tier. Paid: $0.150 per 1M input tokens (GPT-4o-mini).',
+      link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey, model: 'gpt-4o-mini', tier: '⚖️ Strong Generalist (Low Cost)' },
+    { id: 'groq',   icon: '🔥', name: 'Groq (Llama / Mixtral)',  badge: 'FREE tier available', badgeColor: '#1a7a3a', 
+      desc: 'Extremely fast inference powered by LPU hardware.', 
+      abilities: 'Near-instant responses. Best used as a secondary "Worker" AI for rapid, small-scope component generation.', 
+      costDetails: 'Free tier available with rate limits. Paid: ~$0.59 per 1M tokens.',
+      link: 'https://console.groq.com/keys',                   linkLabel: 'Get free key', val: groqKey, model: 'llama-3.3-70b-versatile', tier: '⚡ Sub-second (Free Tier)' },
+    { id: 'xai',    icon: '🚀', name: 'xAI Grok',                badge: 'Paid',                badgeColor: '#b85c00', 
+      desc: 'Dynamic reasoning model with aggressive inference.', 
+      abilities: 'Strong analytical capabilities. Will challenge assumptions and provide alternative architectural viewpoints.', 
+      costDetails: 'No free tier. Paid: $2.00 per 1M input tokens.',
+      link: 'https://console.x.ai/',                           linkLabel: 'Get API key', val: xaiKey, model: 'grok-2-1212', tier: '💬 Smart & Dynamic (Paid)' },
+    { id: 'kimi',   icon: '🔮', name: 'Kimi (Moonshot AI)',       badge: 'Paid',                badgeColor: '#b85c00', 
+      desc: 'Specialized in processing massive amounts of context.', 
+      abilities: 'Can ingest up to 200k tokens reliably. Ideal for reading entire framework documentation or huge monolithic files.', 
+      costDetails: 'No free tier. Paid: ~$0.02 per 1M input tokens.',
+      link: 'https://platform.moonshot.cn/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)' },
   ];
 
   const getRank = (pId: string, val: string) => {
     const isKeySet = val && val.length > 0;
     const isDisabled = disabledProviders.includes(pId);
-    if (!isKeySet) return 6;
-    if (isDisabled) return 5;
-    if (roster.supervisor === pId) return 1;
-    if (roster.guardian === pId && roster.guardian !== roster.supervisor) return 2;
-    if (roster.workers.includes(pId)) return 3;
+    if (!isKeySet) {return 6;}
+    if (isDisabled) {return 5;}
+    if (roster.supervisor === pId) {return 1;}
+    if (roster.guardian === pId && roster.guardian !== roster.supervisor) {return 2;}
+    if (roster.workers.includes(pId)) {return 3;}
     return 4;
   };
 
   providers.sort((a, b) => getRank(a.id, a.val) - getRank(b.id, b.val));
-
-  const providerCards = providers.map(p => {
-    const isKeySet = p.val && p.val.length > 0;
-    const isDisabled = disabledProviders.includes(p.id);
-    const isActive = isKeySet && !isDisabled && (roster.supervisor === p.id || roster.workers.includes(p.id) || roster.guardian === p.id);
-
-    let statusClass = 'status-missing';
-    let statusText = '&#x274C; Not set';
-    let toggleBtnHtml = '';
-    let rolesHtml = '';
-
-    if (isKeySet) {
-      if (isDisabled) {
-        statusClass = 'status-disabled';
-        statusText = '&#x26A0;&#xFE0F; Disabled';
-        toggleBtnHtml = `<button type="button" class="btn-toggle btn-enable" onclick="toggleProvider('${p.id}')">🔓 Enable AI</button>`;
-      } else {
-        statusClass = 'status-ok';
-        statusText = '&#x2705; Configured';
-        toggleBtnHtml = `<button type="button" class="btn-toggle btn-disable" onclick="toggleProvider('${p.id}')">🔒 Disable AI</button>`;
-
-        // Compute current team roles
-        const roles: string[] = [];
-        if (roster.supervisor === p.id) {
-          roles.push('<span class="badge badge-supervisor">🎯 Supervisor</span>');
-        }
-        if (roster.workers.includes(p.id)) {
-          roles.push('<span class="badge badge-worker">⚙️ Worker</span>');
-        }
-        if (roster.guardian === p.id && roster.guardian !== roster.supervisor) {
-          roles.push('<span class="badge badge-guardian">🛡️ Guardian</span>');
-        }
-        if (roles.length > 0) {
-          rolesHtml = `<div class="provider-roles">${roles.join('')}</div>`;
-        }
-      }
-    }
-
-    const dotHtml = isActive ? `<span class="active-dot" title="Active Team Member"></span>` : '';
-
-    return `
-    <div class="provider ${isDisabled ? 'provider-disabled' : ''} ${isActive ? 'provider-active' : ''}">
-      <div class="provider-header">
-        <span class="provider-name">${p.icon} ${p.name} <span class="provider-type-badge" style="background:${p.badgeColor}30;color:${p.badgeColor};">${p.badge}</span></span>
-        <div style="display:flex;align-items:center;gap:8px;">
-          ${dotHtml}
-          <span class="provider-status ${statusClass}">${statusText}</span>
-          ${toggleBtnHtml}
-        </div>
-      </div>
-      <div class="provider-desc">${p.desc} <a href="${p.link}" style="color:#4a9eff;font-size:11px;">${p.linkLabel}</a></div>
-      <input type="password" id="${p.id}-key" placeholder="Enter ${p.name} API key" value="${mask(p.val)}" data-original="${p.val ? 'set' : ''}" ${isDisabled ? 'disabled' : ''}>
-      ${rolesHtml}
-      <div class="provider-meta">
-        <span>🤖 Active Model: <code>${p.model}</code></span>
-        <span>${p.tier}</span>
-      </div>
-    </div>`;
-  }).join('');
+  const providerCards = buildProviderCards(providers, disabledProviders, roster);
 
   return `<!DOCTYPE html><html><head>
   <style>
@@ -128,9 +93,15 @@ export function getApiSetupHtml(): string {
     }
 
     document.getElementById('apply-btn').addEventListener('click', () => {
+      const btn = document.getElementById('apply-btn');
+      btn.innerHTML = '&#8987; Verifying Keys...';
+      btn.style.opacity = '0.7';
+      btn.style.pointerEvents = 'none';
+      
       const ids = ['gemini','claude','openai','groq','xai','kimi'];
       const payload = { type: 'save-keys' };
       ids.forEach(id => {
+        document.getElementById(id + '-err').style.display = 'none'; // reset errors
         const el = document.getElementById(id + '-key');
         if (!el) return;
         const v = el.value;
@@ -143,10 +114,35 @@ export function getApiSetupHtml(): string {
     
     window.addEventListener('message', e => {
       if (e.data.type === 'saved') {
-        const fb = document.getElementById('apply-feedback');
-        document.getElementById('apply-time').textContent = 'Applied at ' + e.data.timestamp;
-        fb.classList.add('show');
-        setTimeout(() => fb.classList.remove('show'), 5000);
+        const btn = document.getElementById('apply-btn');
+        btn.innerHTML = '&#x2705; Apply Changes';
+        btn.style.opacity = '1';
+        btn.style.pointerEvents = 'auto';
+
+        if (e.data.errors && e.data.errors.length > 0) {
+            e.data.errors.forEach(err => {
+                const errDiv = document.getElementById(err.id + '-err');
+                if (errDiv) {
+                    errDiv.textContent = '❌ ' + err.msg;
+                    errDiv.style.display = 'block';
+                }
+                const statusDiv = document.getElementById(err.id + '-status');
+                if (statusDiv) {
+                    statusDiv.className = 'provider-status status-missing';
+                    statusDiv.innerHTML = '❌ Invalid Key';
+                }
+            });
+            const fb = document.getElementById('apply-feedback');
+            fb.innerHTML = '&#x26A0;&#xFE0F; <strong>Saved with errors.</strong> Some keys failed validation.<br><span id="apply-time" style="font-size:11px;opacity:0.7;">' + 'Applied at ' + e.data.timestamp + '</span>';
+            fb.style.borderLeft = '4px solid #b85c00';
+            fb.classList.add('show');
+            setTimeout(() => { fb.classList.remove('show'); fb.style.borderLeft = '4px solid #4ec959'; }, 8000);
+        } else {
+            const fb = document.getElementById('apply-feedback');
+            fb.innerHTML = '&#x2705; <strong>Keys verified and applied!</strong> CHASSIS is ready to build.<br><span id="apply-time" style="font-size:11px;opacity:0.7;">' + 'Applied at ' + e.data.timestamp + '</span>';
+            fb.classList.add('show');
+            setTimeout(() => fb.classList.remove('show'), 5000);
+        }
       }
     });
   </script>

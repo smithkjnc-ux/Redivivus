@@ -2,10 +2,11 @@
 // Split from 242-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import { SessionInfo, ExitInterview } from '../types/index.js';
-import { ChassisService } from './chassisService.js';
+import type { SessionInfo, ExitInterview } from '../types/index.js';
+import type { ChassisService } from './chassisService.js';
 import { runExitInterview } from './sessionInterview.js';
-import { saveSessionFile, generateId, getDuration } from './sessionStorage.js';
+import { generateId } from './sessionStorage.js';
+import { finalizeSession, parseEndSessionData } from './sessionServiceFinalize.js';
 
 export class SessionService {
   private currentSession: SessionInfo | null = null;
@@ -86,6 +87,43 @@ export class SessionService {
     return this.currentSession;
   }
 
+  /** Start a session WITHOUT user prompts — used for auto-session on first message */
+  startSessionSilent(goal: string, ai: string = 'CHASSIS'): SessionInfo {
+    if (this.currentSession) { return this.currentSession; }
+    const id = generateId();
+    this.currentSession = {
+      id,
+      startedAt: new Date().toISOString(),
+      ai,
+      goal,
+      changes: [],
+    };
+    this.chassis.appendWorkLog(
+      `- **Session Start** — ID: ${id}\n` +
+      `- AI: ${ai}\n` +
+      `- Goal: ${goal}`
+    );
+    const config = this.chassis.loadConfig();
+    if (config) {
+      config.sessions.push(id);
+      this.chassis.saveConfig(config);
+    }
+    vscode.commands.executeCommand('setContext', 'chassis.sessionActive', true);
+    return this.currentSession;
+  }
+
+  /** Record a change in the current session */
+  recordChange(file: string, action: string, result: 'worked' | 'failed' | 'partial', next: string): void {
+    if (!this.currentSession) { return; }
+    this.currentSession.changes.push({
+      file,
+      action,
+      result,
+      next,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   // ── session end (orchestrator-only — delegates interview and storage)
 
   async endSession(): Promise<void> {
@@ -99,7 +137,7 @@ export class SessionService {
     const interview = await runExitInterview();
 
     if (interview) {
-      this.finalizeSession(interview);
+      this.doFinalizeSession(interview);
     }
 
     this.currentSession = null;
@@ -111,7 +149,7 @@ export class SessionService {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (root) {
         const { LearnedMemoryService } = await import('./learnedMemoryService.js');
-        const { ChatPanel } = await import('../ui/chat/chatPanel.js');
+        const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
         const learned = new LearnedMemoryService(root);
         learned.pruneRecent();
         const panel = ChatPanel.currentPanel;
@@ -132,45 +170,13 @@ export class SessionService {
 
   async endSessionWithData(data: any): Promise<void> {
     if (!this.currentSession) { return; }
-
-    // [WARN] Fragile: relies on 'data' structure and string parsing.
-    const interview = {
-      completed: data.completed ? data.completed.split(',').map((s: string) => s.trim()) : [],
-      inProgress: data.inProgress ? data.inProgress.split(',').map((s: string) => s.trim()) : [],
-      risks: data.risks ? data.risks.split(',').map((s: string) => s.trim()) : [],
-      nextSessionStart: data.nextStart || '',
-    };
-
-    this.finalizeSession(interview);
+    finalizeSession(this.currentSession, this.chassis, parseEndSessionData(data));
     this.currentSession = null;
-    // [WARN] Directly manipulating VS Code UI context.
     vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
     vscode.window.showInformationMessage('CHASSIS session ended. Roadmap updated.');
   }
 
-  // ── session finalization (orchestrator-only — logs, roadmap, storage)
-
-  private finalizeSession(interview: ExitInterview): void {
-    // [WARN] Appending to work log involves file I/O.
-    this.chassis.appendWorkLog(
-      '- **Session End** — ID: ' + this.currentSession!.id + '\n' +
-      '- Duration: ' + getDuration(this.currentSession!) + '\n' +
-      '- Completed: ' + (interview.completed.join(', ') || 'none') + '\n' +
-      '- In Progress: ' + (interview.inProgress.join(', ') || 'none') + '\n' +
-      '- Risks: ' + (interview.risks.join(', ') || 'none') + '\n' +
-      '- Next session: ' + interview.nextSessionStart
-    );
-
-    // auto-update roadmap
-    // [WARN] Appending to roadmap involves file I/O.
-    this.chassis.appendRoadmap(
-      this.currentSession!.goal,
-      interview.completed,
-      interview.inProgress,
-      interview.nextSessionStart
-    );
-
-    // [WARN] Saving session file involves direct file I/O.
-    saveSessionFile(this.currentSession!, interview, this.chassis.sessionsDir);
+  private doFinalizeSession(interview: ExitInterview): void {
+    finalizeSession(this.currentSession!, this.chassis, interview);
   }
 }

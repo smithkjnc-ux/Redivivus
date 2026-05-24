@@ -1,40 +1,14 @@
 // [SCOPE] MCP (Model Context Protocol) Server Integration -- connects to external tool servers.
 // Allows CHASSIS to use external resources, databases, APIs, and tools via MCP protocol.
 // [WARN] MCP servers run as child processes. Always validate server paths before spawning.
+// Types extracted to mcpServiceTypes.ts (Rule 9 split).
 
-import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { spawn, ChildProcess } from 'child_process';
-
-export interface McpServerConfig {
-  name: string;
-  command: string;
-  args?: string[];
-  env?: Record<string, string>;
-  enabled: boolean;
-}
-
-export interface McpTool {
-  name: string;
-  description: string;
-  inputSchema?: any;
-  serverName: string;
-}
-
-export interface McpResource {
-  uri: string;
-  name: string;
-  description?: string;
-  mimeType?: string;
-  serverName: string;
-}
-
-export interface McpCallResult {
-  success: boolean;
-  content?: string;
-  error?: string;
-}
+import type { ChildProcess } from 'child_process';
+import { spawn } from 'child_process';
+import type { McpServerConfig, McpTool, McpResource, McpCallResult } from './mcpServiceTypes.js';
+export type { McpServerConfig, McpTool, McpResource, McpCallResult } from './mcpServiceTypes.js';
 
 interface McpConnection {
   config: McpServerConfig;
