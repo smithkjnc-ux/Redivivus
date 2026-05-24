@@ -21,24 +21,25 @@ const _buffers = new Map<vscode.Terminal, TerminalBuffer>();
 const ERROR_LINE_RE = /\b(error|Error|ERROR|exception|Exception|EXCEPTION|fatal|Fatal|FATAL|failed|Failed|FAILED|SyntaxError|TypeError|ReferenceError|RangeError|Cannot find|Cannot read|Unexpected token|undefined is not|null is not|is not a function|ENOENT|EACCES|EADDRINUSE|npm ERR!|tsc.*error|TS[0-9]{4}|command not found|ModuleNotFoundError|ImportError|AttributeError|NameError|KeyError|IndexError|ZeroDivisionError|AssertionError|Segmentation fault|Traceback)\b/;
 
 export function registerTerminalErrorService(context: vscode.ExtensionContext): void {
-  // [WARN] onDidWriteTerminalData requires the terminal to be focused/active — background terminals may miss output
-  const dataDisposable = (vscode.window as any).onDidWriteTerminalData?.((e: { terminal: vscode.Terminal; data: string }) => {
-    const clean = e.data.replace(ANSI_RE, '');
-    const existing = _buffers.get(e.terminal);
-    const combined = (existing?.text || '') + clean;
-    // Keep only the last MAX_BUFFER chars — drop oldest
-    _buffers.set(e.terminal, {
-      name: e.terminal.name,
-      text: combined.length > MAX_BUFFER ? combined.slice(combined.length - MAX_BUFFER) : combined,
+  // onDidWriteTerminalData is a proposed API — accessing the property throws in VS Code 1.110+
+  // if the extension hasn't declared "terminalDataWriteEvent" in enabledApiProposals.
+  // Wrap in try/catch so a missing proposed API never blocks extension activation.
+  try {
+    const dataDisposable = (vscode.window as any).onDidWriteTerminalData?.((e: { terminal: vscode.Terminal; data: string }) => {
+      const clean = e.data.replace(ANSI_RE, '');
+      const existing = _buffers.get(e.terminal);
+      const combined = (existing?.text || '') + clean;
+      _buffers.set(e.terminal, {
+        name: e.terminal.name,
+        text: combined.length > MAX_BUFFER ? combined.slice(combined.length - MAX_BUFFER) : combined,
+      });
     });
-  });
+    if (dataDisposable) { context.subscriptions.push(dataDisposable); }
+  } catch {
+    // Proposed API unavailable — terminal buffering disabled, getLastTerminalError() returns null
+  }
 
-  const closeDisposable = vscode.window.onDidCloseTerminal((t) => {
-    _buffers.delete(t);
-  });
-
-  if (dataDisposable) { context.subscriptions.push(dataDisposable); }
-  context.subscriptions.push(closeDisposable);
+  context.subscriptions.push(vscode.window.onDidCloseTerminal((t) => { _buffers.delete(t); }));
 }
 
 export interface TerminalError {

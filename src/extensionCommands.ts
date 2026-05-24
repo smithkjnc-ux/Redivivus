@@ -2,28 +2,28 @@
 // Extracted from extension.ts
 
 import * as vscode from 'vscode';
-import { ChassisService } from './services/chassisService.js';
-import { RoutingService } from './services/ai/routingService.js';
-import { UsageTracker } from './services/usageTracker.js';
-import { VaultService } from './services/vault/vaultService.js';
-import { MeasureTwiceService } from './services/build/measureTwiceService.js';
-import { ChangeTracker } from './services/build/changeTracker.js';
-import { AnalyzerService } from './services/analyzerService.js';
-import { RulesService } from './services/rulesService.js';
-import { RetrofitService } from './services/retrofitService.js';
-import { SessionService } from './services/sessionService.js';
-import { GuideService } from './services/guideService.js';
-import { BlueprintService } from './services/blueprint/blueprintService.js';
-import { StatusBar } from './ui/views/statusBar.js';
-import { GuardianService } from './services/ai/guardianService.js';
-import { RecommendationsPanel } from './services/analyzerPanel.js';
+import type { ChassisService } from './services/chassisService.js';
+import type { RoutingService } from './services/ai/routingService.js';
+import type { UsageTracker } from './services/usageTracker.js';
+import type { VaultService } from './services/vault/vaultService.js';
+import type { MeasureTwiceService } from './services/build/measureTwiceService.js';
+import type { ChangeTracker } from './services/build/changeTracker.js';
+import type { AnalyzerService } from './ui/panels/analyzer/analyzerService';
+import type { RulesService } from './services/rulesService.js';
+import type { RetrofitService } from './core/retrofit/retrofitService';
+import type { SessionService } from './services/sessionService.js';
+import type { GuideService } from './services/guideService.js';
+import type { BlueprintService } from './services/blueprint/blueprintService.js';
+import type { StatusBar } from './ui/views/statusBar.js';
+import type { GuardianService } from './services/ai/guardianService.js';
+import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel';
 import { MapPanel } from './ui/map/mapPanel.js';
 import { debugLog } from './services/workspace/diagnosticLogger.js';
 import { seedVault } from './services/vault/vaultSeeder.js';
-import { GitHubBackupService } from './services/githubBackupService.js';
-import { ChatPanel } from './ui/chat/chatPanel.js';
+import type { GitHubBackupService } from './services/githubBackupService.js';
+import { ChatPanel } from './ui/panels/chat/chatPanel';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
-import { ChassisSidebarProvider } from './ui/sidebar/chassisSidebar.js';
+import type { ChassisSidebarProvider } from './ui/sidebar/chassisSidebar.js';
 import { registerOnNewProject } from './commands/init.js';
 import { registerInitCommands } from './commands/initCommands.js';
 import { DelegationCodeLensProvider } from './services/delegationCodeLens.js';
@@ -52,7 +52,6 @@ import { registerGitHubBackupCommands } from './commands/githubBackup.js';
 import { registerSetupHubCommand } from './commands/setupHub.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
-import { registerTerminalErrorService, getLastTerminalError } from './services/workspace/terminalErrorService.js';
 import { registerInlineCommands } from './extensionInlineCommands.js';
 
 export function registerAllCommands(

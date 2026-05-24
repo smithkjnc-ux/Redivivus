@@ -2,23 +2,22 @@
 // Extracted from extensionCommands.ts
 
 import * as vscode from 'vscode';
-import { ChassisService } from './services/chassisService.js';
-import { RoutingService } from './services/ai/routingService.js';
-import { UsageTracker } from './services/usageTracker.js';
-import { VaultService } from './services/vault/vaultService.js';
-import { StatusBar } from './ui/views/statusBar.js';
-import { GuardianService } from './services/ai/guardianService.js';
-import { RecommendationsPanel } from './services/analyzerPanel.js';
+import type { ChassisService } from './services/chassisService.js';
+import type { RoutingService } from './services/ai/routingService.js';
+import type { UsageTracker } from './services/usageTracker.js';
+import type { VaultService } from './services/vault/vaultService.js';
+import type { StatusBar } from './ui/views/statusBar.js';
+import type { GuardianService } from './services/ai/guardianService.js';
+import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel';
 import { MapPanel } from './ui/map/mapPanel.js';
-import { GitHubBackupService } from './services/githubBackupService.js';
+import type { GitHubBackupService } from './services/githubBackupService.js';
 import { registerGitHubBackupCommands } from './commands/githubBackup.js';
 import { registerSetupHubCommand } from './commands/setupHub.js';
-import { ChatPanel } from './ui/chat/chatPanel.js';
+import { ChatPanel } from './ui/panels/chat/chatPanel';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
 import { seedVault } from './services/vault/vaultSeeder.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
-import { registerTerminalErrorService, getLastTerminalError } from './services/workspace/terminalErrorService.js';
 import { registerInlineCommandsB } from './extensionInlineCommandsB.js';
 
 export function registerInlineCommands(
@@ -57,41 +56,16 @@ export function registerInlineCommands(
     );
   }));
 
-  // ── GitHub auto-backup ──
-    try { registerGitHubBackupCommands(context, githubBackupService); } catch (e) { console.error('[CHASSIS] GitHub backup registration failed', e); }
-  githubBackupService.startTimer();
+  // ── GitHub commands ──
+  try { registerGitHubBackupCommands(context, githubBackupService); } catch (e) { console.error('[CHASSIS] GitHub backup registration failed', e); }
 
   // ── Setup hub — aggregates all global setup, shows on first install ──
   try { registerSetupHubCommand(context, githubBackupService); } catch (e) { console.error('[CHASSIS] Setup hub registration failed', e); }
-  // Hook auto-backup to build finish — fires after every successful build if enabled
+  // [FIX] Chain from existing onBuildFinished (save-point/session callback set by session.ts) instead of overwriting.
+  const _prevOnBuildFinished = ChatPanel.onBuildFinished;
   ChatPanel.onBuildFinished = async (_task: string, _files: string[], buildRoot?: string) => {
-    const cfg = githubBackupService.getConfig();
-    if (cfg.enabled && cfg.autoBackupOnBuild) {
-      await githubBackupService.backup();
-    }
-    // If the built project isn't in the workspace Explorer yet, add it automatically.
-    // [WARN] Only add when there is ALREADY at least one workspace folder. Adding the FIRST folder
-    //        triggers a VS Code window reload which kills the chat panel message channel — the webview
-    //        shows cached content but is disconnected, so the user cannot type or interact with it.
-    //        When no folders exist, skip the auto-add and let the user open the folder manually.
-    // [FIX] Use buildRoot passed from the build pipeline — getChassisRoot() returns stale activation root
-    const builtRoot = buildRoot || (ChatPanel.currentPanel ? (ChatPanel.currentPanel.getChassisRoot?.() || '') : '');
-    const existingFolders = vscode.workspace.workspaceFolders ?? [];
-    const alreadyInWs = existingFolders.some(f => f.uri.fsPath === builtRoot);
-    if (builtRoot && !alreadyInWs && existingFolders.length > 0) {
-      // Build is done — safe to add to workspace now. Set synchronous flag BEFORE updateWorkspaceFolders
-      // fires onDidChangeWorkspaceFolders (globalState.update is async and loses the race).
-      _suppressNextFolderAdd.value = true;
-      await context.globalState.update('chassis.suppressAutoOpen', builtRoot);
-      vscode.workspace.updateWorkspaceFolders(
-        existingFolders.length, 0,
-        { uri: vscode.Uri.file(builtRoot) }
-      );
-    } else if (builtRoot && !alreadyInWs && existingFolders.length === 0) {
-      // [DEAD] Was: showInformationMessage with "Open as Workspace" button -- users missed it every time
-      // Auto-open the project folder immediately so user can start working
-      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(builtRoot));
-    }
+    // [NOTE] No auto-backup here — GitHub commits are always user-initiated via the result card button.
+    if (_prevOnBuildFinished) { await _prevOnBuildFinished(_task, _files, buildRoot); }
   };
 
   context.subscriptions.push(
