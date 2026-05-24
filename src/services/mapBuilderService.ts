@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import {
-  walk, extractScope, countPattern, extractImports,
+  walk, extractScope, countPattern, extractImports, extractAnnotationTexts,
   getBlueprintIntent, getDeadEnds, findLongPaths, generateLogicFlow,
   MapNode, MapEdge, ProjectMap
 } from './mapBuilderHelpers.js';
@@ -33,9 +33,15 @@ export function buildProjectMap(root: string, intentService?: any): ProjectMap {
       const health: MapNode['health'] = lines > 200 ? 'bad'
         : (todos > 0 || !hasScope) ? 'warn'
         : 'good';
-      nodes.push({ 
+      const warnTexts = extractAnnotationTexts(content, 'WARN');
+      const todoTexts = extractAnnotationTexts(content, 'TODO');
+      const deadTexts = extractAnnotationTexts(content, 'DEAD');
+      nodes.push({
         id: rel, label: label || path.basename(rel), lines, todos, warns, hasScope, health,
-        confirmedIntent: intentService?.isConfirmedFile ? intentService.isConfirmedFile(rel) : false
+        confirmedIntent: intentService?.isConfirmedFile ? intentService.isConfirmedFile(rel) : false,
+        warnTexts: warnTexts.length ? warnTexts : undefined,
+        todoTexts: todoTexts.length ? todoTexts : undefined,
+        deadTexts: deadTexts.length ? deadTexts : undefined,
       });
     } catch (e) {
       console.error('[CHASSIS] Error processing file for map:', full, e);
@@ -112,7 +118,7 @@ export function buildProjectMap(root: string, intentService?: any): ProjectMap {
   // Final Pass: Complexity and Scenic Routes
   const scenicKeys = findLongPaths(nodes, edges);
   for (const e of edges) {
-    if (scenicKeys.has(`${e.from}→${e.to}`)) e.isScenicRoute = true;
+    if (scenicKeys.has(`${e.from}→${e.to}`)) {e.isScenicRoute = true;}
   }
 
   for (const n of nodes) {

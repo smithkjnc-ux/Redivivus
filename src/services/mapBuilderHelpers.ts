@@ -23,6 +23,9 @@ export interface MapNode {
   refactorRoadmap?: string[];
   logicFlow?: string;
   confirmedIntent?: boolean;
+  warnTexts?: string[];
+  todoTexts?: string[];
+  deadTexts?: string[];
 }
 
 export interface MapEdge {
@@ -86,18 +89,18 @@ export function extractImports(content: string, ext: string): string[] {
 
 export function getBlueprintIntent(root: string): string[] {
   const bpPath = path.join(root, '.chassis', 'blueprint.md');
-  if (!fs.existsSync(bpPath)) return [];
+  if (!fs.existsSync(bpPath)) {return [];}
   try {
     const content = fs.readFileSync(bpPath, 'utf-8');
     const whatMatch = content.match(/## WHAT\n([\s\S]*?)(?=\n##|$)/);
-    if (!whatMatch) return [];
+    if (!whatMatch) {return [];}
     return whatMatch[1].toLowerCase().split(/\W+/).filter(w => w.length > 3);
   } catch { return []; }
 }
 
 export function getDeadEnds(root: string): { from: string, to: string }[] {
   const dePath = path.join(root, '.chassis', 'dead_ends.md');
-  if (!fs.existsSync(dePath)) return [];
+  if (!fs.existsSync(dePath)) {return [];}
   try {
     const content = fs.readFileSync(dePath, 'utf-8');
     const ends: { from: string, to: string }[] = [];
@@ -114,7 +117,7 @@ export function getDeadEnds(root: string): { from: string, to: string }[] {
 export function findLongPaths(nodes: MapNode[], edges: MapEdge[]): Set<string> {
   const adj: Record<string, string[]> = {};
   edges.forEach(e => {
-    if (!adj[e.from]) adj[e.from] = [];
+    if (!adj[e.from]) {adj[e.from] = [];}
     adj[e.from].push(e.to);
   });
 
@@ -128,7 +131,7 @@ export function findLongPaths(nodes: MapNode[], edges: MapEdge[]): Set<string> {
       }
       return;
     }
-    if (path.includes(curr)) return; // circular
+    if (path.includes(curr)) {return;} // circular
 
     const neighbors = adj[curr] || [];
     for (const next of neighbors) {
@@ -144,7 +147,7 @@ export function generateLogicFlow(n: MapNode, edges: MapEdge[]): string {
   const inputs = edges.filter(e => e.to === n.id).map(e => path.basename(e.from));
   const outputs = edges.filter(e => e.from === n.id).map(e => path.basename(e.to));
   
-  if (inputs.length === 0 && outputs.length === 0) return "This file is a standalone module with no external logic tethers.";
+  if (inputs.length === 0 && outputs.length === 0) {return "This file is a standalone module with no external logic tethers.";}
   
   let text = "Logic flow: ";
   if (inputs.length > 0) {
@@ -154,6 +157,17 @@ export function generateLogicFlow(n: MapNode, edges: MapEdge[]): string {
     text += `${inputs.length > 0 ? 'and' : 'This file'} sends data/commands to ${outputs.slice(0,3).join(', ')}${outputs.length > 3 ? '...' : ''}.`;
   }
   return text;
+}
+
+export function extractAnnotationTexts(content: string, tag: string): string[] {
+  const re = new RegExp(`\\[${tag}\\]\\s*(.+)`, 'g');
+  const results: string[] = [];
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    const text = m[1].trim().slice(0, 120);
+    if (text) { results.push(text); }
+  }
+  return results;
 }
 
 // [SCOPE] Main entry — builds the full ProjectMap for a workspace root

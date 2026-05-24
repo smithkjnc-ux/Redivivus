@@ -73,6 +73,15 @@ body { background: #1e1e2e; color: #cdd6f4; font-family: Inter, -apple-system, B
 .roadmap-box strong { color: #cba6f7; display: block; margin-bottom: 6px; font-size: 11px; text-transform: uppercase; }
 .roadmap-box ul { padding-left: 18px; margin: 0; color: #a6adc8; }
 .roadmap-box li { margin-bottom: 6px; line-height: 1.4; }
+.annot-list { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.annot-row { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; line-height: 1.4; }
+.annot-tag { flex-shrink: 0; font-size: 9px; font-weight: 700; letter-spacing: 0.5px; padding: 2px 5px; border-radius: 4px; margin-top: 1px; }
+.annot-tag.warn { background: rgba(240,165,0,0.18); color: #f0a500; }
+.annot-tag.todo { background: rgba(74,158,255,0.18); color: #4a9eff; }
+.annot-tag.dead { background: rgba(160,160,160,0.15); color: #888; }
+.annot-text { flex: 1; color: #a6adc8; }
+.delegate-btn { flex-shrink: 0; background: rgba(74,158,255,0.12); border: 1px solid rgba(74,158,255,0.3); border-radius: 5px; color: #4a9eff; font-size: 10px; padding: 2px 7px; cursor: pointer; white-space: nowrap; }
+.delegate-btn:hover { background: rgba(74,158,255,0.25); border-color: #4a9eff; }
 #hover-tooltip { position: absolute; background: #1e1e2e; border: 1px solid #45475a; border-radius: 6px; padding: 10px 12px; font-size: 12px; color: #cdd6f4; pointer-events: none; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 250px; }
 #hover-tooltip strong { color: #cba6f7; display: block; margin-bottom: 4px; font-size: 13px; }
 .hidden { display: none !important; }

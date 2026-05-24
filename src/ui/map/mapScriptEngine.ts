@@ -152,6 +152,7 @@ export const MAP_SCRIPT_ENGINE = `
     else if (action==='improve') window.doImprove();
     else if (action==='refactor') window.doRefactor();
     else if (action&&action.startsWith('fix-')) window.doFix(action.slice(4));
+    else if (action==='delegate') window.doDelegate(btn.getAttribute('data-tag'),parseInt(btn.getAttribute('data-idx')||'0',10));
   });
 
   window.addEventListener('message', e => {

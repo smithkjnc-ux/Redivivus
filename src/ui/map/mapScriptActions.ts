@@ -82,6 +82,15 @@ export const MAP_SCRIPT_ACTIONS = `
   window.doImprove = function() { if (window._selectedNode&&vs) { const n=window._selectedNode; vs.postMessage({type:'analyzeFile',nodeId:n.id,label:n.label,lines:n.lines,health:n.health,todos:n.todos,mode:'improve'}); showToast('Analyzing...'); } };
   window.doRefactor = function() { if (window._selectedNode&&vs) { const n=window._selectedNode; vs.postMessage({type:'fixFile',nodeId:n.id,issueType:'refactor'}); showToast('Refactoring...'); } };
   window.doExplain = function() { if (window._selectedNode&&vs) { const n=window._selectedNode; vs.postMessage({type:'explainFile',nodeId:n.id,label:n.label,lines:n.lines,health:n.health,todos:n.todos}); showToast('Explaining...'); } };
+  window.doDelegate = function(tag, idx) {
+    if (!window._selectedNode||!vs) return;
+    const n=window._selectedNode;
+    const list = tag==='WARN'?n.warnTexts:tag==='TODO'?n.todoTexts:n.deadTexts;
+    const text = (list&&list[idx])||'';
+    const prompt = '['+tag+'] in \`'+n.id+'\`: '+text+'\n\nPlease address this annotation. Read the file, understand the context, and fix or resolve it.';
+    vs.postMessage({type:'delegateAnnotation',nodeId:n.id,tag:tag,text:text,prompt:prompt});
+    showToast('Delegating to AI...');
+  };
 
   function showToast(msg) {
     if (!toast) return;
@@ -106,6 +115,12 @@ export const MAP_SCRIPT_ACTIONS = `
     html += '</div>';
     if (n.isSledgehammer) html += '<div class="critique-box bad"><strong>Sledgehammer:</strong> Large file, low complexity.</div>';
     if (roadmap) html += '<div class="roadmap-box"><strong>Roadmap:</strong><ul>'+roadmap+'</ul></div>';
+    function renderAnnotations(texts, tag) {
+      if (!texts||!texts.length) return '';
+      return texts.map(function(t,i){return '<div class="annot-row"><span class="annot-tag '+tag.toLowerCase()+'">'+tag+'</span><span class="annot-text">'+t.replace(/</g,'&lt;')+'</span><button class="delegate-btn" data-action="delegate" data-tag="'+tag+'" data-idx="'+i+'">&#9889; Delegate</button></div>';}).join('');
+    }
+    const annotHtml = renderAnnotations(n.warnTexts,'WARN')+renderAnnotations(n.todoTexts,'TODO')+renderAnnotations(n.deadTexts,'DEAD');
+    if (annotHtml) html += '<div class="annot-list">'+annotHtml+'</div>';
     html += '<div id="eli5-container" class="eli5-loading"></div>';
     html += '</div>';
     html += '<div class="side-actions"><div class="action-grid">';
