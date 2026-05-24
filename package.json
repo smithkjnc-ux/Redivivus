@@ -1,7 +1,7 @@
 {
   "name": "chassis",
   "displayName": "CHASSIS",
-  "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
+  "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
   "version": "0.3.6",
   "publisher": "papajoe",
   "license": "MIT",
@@ -119,7 +119,7 @@
       },
       {
         "command": "chassis.wizardRetrofit",
-        "title": "CHASSIS: Wizard \u2014 Retrofit Existing Project"
+        "title": "CHASSIS: Wizard — Retrofit Existing Project"
       },
       {
         "command": "chassis.switchAI",
@@ -186,8 +186,16 @@
         "title": "CHASSIS: Inspect UI Element - Find Source Code"
       },
       {
+        "command": "chassis.openVisualEditor",
+        "title": "CHASSIS: Open Visual Editor"
+      },
+      {
         "command": "chassis.vaultDedup",
         "title": "CHASSIS: Vault - Find and Remove Duplicates"
+      },
+      {
+        "command": "chassis.vaultTranslate",
+        "title": "CHASSIS: Vault - Translate Item to Another Language"
       },
       {
         "command": "chassis.openSettingsInChat",
@@ -499,7 +507,7 @@
             "Google Gemini (free tier available)",
             "Anthropic Claude (paid)",
             "OpenAI GPT-4o / GPT-4o Mini (paid)",
-            "Groq \u2014 Llama 3 (free tier)",
+            "Groq — Llama 3 (free tier)",
             "xAI Grok (paid)",
             "Moonshot Kimi (paid)"
           ],
@@ -513,22 +521,22 @@
         "chassis.geminiApiKey": {
           "type": "string",
           "default": "",
-          "description": "Google Gemini API key \u2014 free at aistudio.google.com (or set GEMINI_API_KEY env var)"
+          "description": "Google Gemini API key — free at aistudio.google.com (or set GEMINI_API_KEY env var)"
         },
         "chassis.claudeApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic Claude API key \u2014 console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
+          "description": "Anthropic Claude API key — console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
         },
         "chassis.openaiApiKey": {
           "type": "string",
           "default": "",
-          "description": "OpenAI API key for GPT-4o \u2014 platform.openai.com (or set OPENAI_API_KEY env var)"
+          "description": "OpenAI API key for GPT-4o — platform.openai.com (or set OPENAI_API_KEY env var)"
         },
         "chassis.groqApiKey": {
           "type": "string",
           "default": "",
-          "description": "Groq API key \u2014 free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
+          "description": "Groq API key — free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
         },
         "chassis.xaiApiKey": {
           "type": "string",
@@ -576,8 +584,9 @@
     "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
     "watch": "tsc -watch -p ./",
     "pretest": "npm run compile && npm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test"
+    "test": "vscode-test",
+    "posttest": "node scripts/quality-gates.js",
+    "lint": "eslint src"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.10",
@@ -586,6 +595,8 @@
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2",
     "eslint": "^9.39.3",
+    "nock": "^14.0.15",
+    "ts-prune": "^0.10.3",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"
   }

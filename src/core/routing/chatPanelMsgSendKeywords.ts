@@ -49,6 +49,11 @@ export async function handleKeywordShortcuts(
     refresh(); await vscode.commands.executeCommand('chassis.retrofitBlueprint'); return true;
   }
 
+  if (/translate.*vault|translate.*function.*to\s+\w+|translate.*snippet|convert.*vault.*to|port.*vault.*to|vault.*translate/i.test(lowerText)) {
+    conversation.push({ role: 'assistant', content: 'Opening vault translator — pick an item and target language...', timestamp: Date.now() });
+    refresh(); await vscode.commands.executeCommand('chassis.vaultTranslate'); return true;
+  }
+
   if (/what\s+(am\s+i\s+working|project\s+is\s+this)/i.test(lowerText)) {
     const info = await new ProjectOperations().getCurrentProjectInfo();
     conversation.push({ role: 'assistant', content: `**Current project:** ${info || 'No project info available'}`, timestamp: Date.now() });

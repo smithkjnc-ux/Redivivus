@@ -35,6 +35,7 @@ import { registerRestructureCommands } from './commands/restructure.js';
 import { registerRetrofitCommands } from './commands/retrofit.js';
 import { registerVaultCommands } from './commands/vault.js';
 import { registerVaultBrowseCommand } from './commands/vaultBrowse.js';
+import { registerVaultTranslateCommand } from './commands/vaultTranslate.js';
 import { registerBuildFromVaultCommand } from './commands/buildFromVault.js';
 import { registerMiscCommands } from './commands/misc.js';
 import { registerApiSetupCommand } from './commands/apiSetup.js';
@@ -85,6 +86,7 @@ export function registerAllCommands(
   try {   registerRetrofitCommands(context, chassisService, retrofitService, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerRetrofitCommands(context, chassisService, retrofitService, refreshAll);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerRetrofitCommands(context, chassisService, retrofitService, refreshAll); failed: ' + e + '\n'); }
   try {   registerVaultCommands(context, chassisService, vaultService, routingService, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerVaultCommands(context, chassisService, vaultService, routingService, refreshAll);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerVaultCommands(context, chassisService, vaultService, routingService, refreshAll); failed: ' + e + '\n'); }
   try {   registerVaultBrowseCommand(context, vaultService); } catch (e) { console.error('Failed to register ' + 'registerVaultBrowseCommand(context, vaultService);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerVaultBrowseCommand(context, vaultService); failed: ' + e + '\n'); }
+  try {   registerVaultTranslateCommand(context, vaultService, routingService); } catch (e) { console.error('Failed to register ' + 'registerVaultTranslateCommand(context, vaultService, routingService);', e); require('fs').appendFileSync('/tmp/chassis_activation_errors.log', 'registerVaultTranslateCommand(context, vaultService, routingService); failed: ' + e + '\n'); }
   try { const { BuildFromVaultService } = require('./services/vault/buildFromVaultService.js'); registerBuildFromVaultCommand(context, new BuildFromVaultService(vaultService, routingService)); } catch (e) { console.error('Failed to register buildFromVault', e); }
   
   // [CHASSIS] Vault Deduplication command — scan + confirm merge via Quick Pick
