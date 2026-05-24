@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { Blueprint } from '../../types/index.js';
+import type { Blueprint } from '../../types/index.js';
 import { ChassisPaths } from './chassisPaths.js';
 import { generateRules } from '../chassisRules';
 
@@ -99,13 +99,13 @@ export async function scaffoldAt(targetPath: string, projectName: string, bluepr
     let confirmed = 0, assumed = 0, unknown = 0;
     for (const key of ['who', 'what', 'where', 'when', 'why'] as const) {
       const val = (blueprint[key] || '').trim();
-      if (val.length > 20) confirmed++;
-      else if (val.length > 0) assumed++;
-      else unknown++;
+      if (val.length > 20) {confirmed++;}
+      else if (val.length > 0) {assumed++;}
+      else {unknown++;}
     }
     let confidence: 'high' | 'medium' | 'low' = 'low';
-    if (unknown === 0 && assumed <= 1) confidence = 'high';
-    else if (unknown <= 1) confidence = 'medium';
+    if (unknown === 0 && assumed <= 1) {confidence = 'high';}
+    else if (unknown <= 1) {confidence = 'medium';}
     bp.health = { confirmed, assumed, unknown, confidence };
   }
 

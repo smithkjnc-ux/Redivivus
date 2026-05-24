@@ -1,9 +1,10 @@
 // [SCOPE] AI Routing Service — supervisor planning and guardian review
 // Extracted from routingService.ts
 
-import { callProvider } from './routingProviders.js';
-import { selectGuardianAI, runGuardianReview, GuardianReviewResult } from './guardianAI.js';
-import { RoutingService } from './routingService.js';
+import { callProvider } from '../../core/ai/providers/providerFactory.js';
+import type { GuardianReviewResult } from './guardianAI.js';
+import { selectGuardianAI, runGuardianReview } from './guardianAI.js';
+import type { RoutingService } from './routingService.js';
 
 export type ProjectType = 'web' | 'api' | 'game' | 'single';
 

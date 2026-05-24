@@ -1,9 +1,9 @@
 // [SCOPE] CHASSIS Session commands — start/end workflow with exit interview
 
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
-import { SessionService } from '../services/sessionService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { SessionService } from '../services/sessionService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerSessionCommands(
   context: vscode.ExtensionContext,
@@ -11,9 +11,14 @@ export function registerSessionCommands(
   sessions: SessionService,
   refreshAll: () => void
 ): void {
-  // Register callback so ChatPanel can call startSession without circular imports
+  // Register callbacks so ChatPanel can call startSession without circular imports
   ChatPanel.onStartSession = async (goal: string, ai: string) => {
     await sessions.startSession(goal, ai);
+    refreshAll();
+  };
+  // [CHASSIS] Auto-session: silently start on first message without user prompts
+  (ChatPanel as any).startSessionSilent = (goal: string, ai?: string) => {
+    sessions.startSessionSilent(goal, ai || 'CHASSIS');
     refreshAll();
   };
 
@@ -42,4 +47,23 @@ export function registerSessionCommands(
       refreshAll();
     })
   );
+
+  // [CHASSIS] Auto-save-point: create git commit after successful builds
+  ChatPanel.onBuildFinished = async (task: string, files: string[], buildRoot?: string) => {
+    const root = buildRoot || chassis.getWorkspaceRoot();
+    if (!root) { return; }
+    const { SavePointService } = await import('../services/savePointService.js');
+    const svc = new SavePointService(root);
+    const description = `CHASSIS build: ${task.slice(0, 60)} (${files.length} file${files.length !== 1 ? 's' : ''})`;
+    try {
+      const result = await svc.create(description);
+      if (result.success) {
+        vscode.window.showInformationMessage(`Save point created: ${description}`);
+      }
+    } catch { /* non-blocking */ }
+    // Also record in session
+    if (sessions.isActive) {
+      sessions.recordChange(files.join(', '), task.slice(0, 80), 'worked', '');
+    }
+  };
 }

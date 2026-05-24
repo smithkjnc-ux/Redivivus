@@ -3,8 +3,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { ChassisService } from '../services/chassisService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import { logProjectContextSwitch, validateProjectContext } from '../services/logging/projectContextLogger.js';
 
 export function registerOnNewProject(context: vscode.ExtensionContext): void {
   ChatPanel.onNewProject = async (name: string, answers: Record<string, string>, folderPath?: string) => {
@@ -22,6 +23,15 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
     }
     const pendingTask = (answers['_originalTask'] || '').trim() || ChatPanel.currentPanel?.getPendingTask?.() || (answers['what'] || '').trim();
     require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] name=${name} folder=${targetFolder} task=${pendingTask.slice(0,60)}\n`);
+    
+    // [LOG] Track project context change
+    const validation = logProjectContextSwitch(targetFolder, 'onNewProject', pendingTask);
+    if (!validation.allowed) {
+      // This is a critical error - we're trying to switch projects unexpectedly
+      vscode.window.showErrorMessage(`CHASSIS Error: ${validation.reason}. Current: ${currentRoot}, Attempted: ${targetFolder}`);
+      return;
+    }
+    
     if (!fs.existsSync(targetFolder)) { fs.mkdirSync(targetFolder, { recursive: true }); }
     const { ChassisService } = await import('../services/chassisService.js');
     const chassis = new ChassisService(targetFolder);
@@ -39,6 +49,16 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
       }
     }
     await context.globalState.update('pendingChassisInit', undefined);
+    
+    // [LOG] Initialize logging in the standalone extension host explicitly before build starts
+    const { initChassisLogger, chassisLog } = await import('../services/logging/chassisLogger.js');
+    const { initMasterLogger } = await import('../core/logging/masterLogger.js');
+    const { initProjectContextLogger } = await import('../services/logging/projectContextLogger.js');
+    const sessionId = initChassisLogger(targetFolder);
+    chassisLog({ operation: 'system', message: 'New project initialized', data: { root: targetFolder, sessionId } });
+    initMasterLogger(targetFolder);
+    initProjectContextLogger(targetFolder);
+
     require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] init complete, resuming build in-place\n`);
 
     // [FIX] Save pending task BEFORE updateWorkspaceFolders — going from 0→1 folder causes extension host restart,
@@ -47,21 +67,22 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
       await context.globalState.update('chassis.pendingResumeTask', JSON.stringify({ task: pendingTask, projectRoot: targetFolder }));
     }
 
-    // [FIX] Add the new folder to the workspace so the VS Code explorer shows it.
-    // [WARN] updateWorkspaceFolders on an empty workspace causes a re-activation (window reload).
-    //        Set suppressAutoOpen BEFORE adding the folder so the second auto-open timer doesn't
-    //        create a duplicate chat panel.
-    try {
-      const currentFolders = vscode.workspace.workspaceFolders || [];
-      const alreadyOpen = currentFolders.some(f => f.uri.fsPath === targetFolder);
-      if (!alreadyOpen) {
-        await context.globalState.update('chassis.suppressAutoOpen', targetFolder);
-        const added = vscode.workspace.updateWorkspaceFolders(currentFolders.length, 0, { uri: vscode.Uri.file(targetFolder), name });
-        require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] workspace folder added=${added} path=${targetFolder}\n`);
-      }
-    } catch (e) {
-      require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] workspace folder add failed: ${e}\n`);
-    }
+    // [CHASSIS] Disabled automatic workspace folder addition here.
+    // Adding a folder to an existing workspace forces VS Code into an "Untitled (Workspace)"
+    // multi-root mode, which is highly disruptive and causes duplicate chat tabs to spawn.
+    // We now rely on the __OPEN_WORKSPACE__ manual button at the end of the build to
+    // explicitly switch (openFolder) to the new project instead of polluting the current workspace.
+    // try {
+    //   const currentFolders = vscode.workspace.workspaceFolders || [];
+    //   const alreadyOpen = currentFolders.some(f => f.uri.fsPath === targetFolder);
+    //   if (!alreadyOpen) {
+    //     await context.globalState.update('chassis.suppressAutoOpen', targetFolder);
+    //     const added = vscode.workspace.updateWorkspaceFolders(currentFolders.length, 0, { uri: vscode.Uri.file(targetFolder), name });
+    //     require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] workspace folder added=${added} path=${targetFolder}\n`);
+    //   }
+    // } catch (e) {
+    //   require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[onNewProject] workspace folder add failed: ${e}\n`);
+    // }
 
     if (pendingTask && ChatPanel.currentPanel) {
       ChatPanel.currentPanel.resumeBuildTask(pendingTask, targetFolder);
@@ -107,13 +128,13 @@ export async function runAutoInit(
               let confirmed = 0, assumed = 0, unknown = 0;
               for (const key of ['who', 'what', 'where', 'when', 'why'] as const) {
                 const val = (pending.blueprint[key] || '').trim();
-                if (val.length > 20) confirmed++;
-                else if (val.length > 0) assumed++;
-                else unknown++;
+                if (val.length > 20) {confirmed++;}
+                else if (val.length > 0) {assumed++;}
+                else {unknown++;}
               }
               let confidence: 'high' | 'medium' | 'low' = 'low';
-              if (unknown === 0 && assumed <= 1) confidence = 'high';
-              else if (unknown <= 1) confidence = 'medium';
+              if (unknown === 0 && assumed <= 1) {confidence = 'high';}
+              else if (unknown <= 1) {confidence = 'medium';}
               config.blueprint = {
                 who: pending.blueprint.who || '', what: pending.blueprint.what || '',
                 where: pending.blueprint.where || '', when: pending.blueprint.when || '', why: pending.blueprint.why || '',

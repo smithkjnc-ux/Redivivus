@@ -2,7 +2,7 @@
 // Step checker functions -> setupProgressSteps.ts
 
 import * as path from 'path';
-import { ChassisService } from '../chassisService.js';
+import type { ChassisService } from '../chassisService.js';
 import {
   checkStep1, checkStep2, checkStep3, checkStep4, checkStep5,
   checkStep6, checkStep7, checkStep8, checkStep9, checkStep10,

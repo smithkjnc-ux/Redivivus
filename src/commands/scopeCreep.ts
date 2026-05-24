@@ -2,9 +2,9 @@
 
 import * as vscode from 'vscode';
 import { ScopeCreepDetectionService } from '../services/code/scopeCreepDetection.js';
-import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerScopeCreepCommand(
   context: vscode.ExtensionContext,

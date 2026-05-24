@@ -3,7 +3,7 @@
 // assigns each step to the best-fit worker AI, dispatches work, and reviews the assembled output.
 
 import { AI_CAPABILITIES } from './guardianAI.js';
-import { AIResponse } from './routingTypes.js';
+import type { AIResponse } from './routingTypes.js';
 
 /** A single step in the supervisor's execution plan */
 export interface PlanStep {

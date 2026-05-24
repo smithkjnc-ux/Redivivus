@@ -3,8 +3,8 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { WizardPanelState } from './messageRouterTypes.js';
-import { GuardianService } from '../services/ai/guardianService.js';
+import type { WizardPanelState } from './messageRouterTypes.js';
+import type { GuardianService } from '../services/ai/guardianService.js';
 
 export async function handleMapMessage(
   msg: any,
@@ -15,7 +15,7 @@ export async function handleMapMessage(
   intentService?: any
 ): Promise<boolean> {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root) return false;
+  if (!root) {return false;}
 
   switch (msg.type) {
     case 'openFile':

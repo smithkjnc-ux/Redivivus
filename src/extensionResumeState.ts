@@ -2,18 +2,18 @@
 // Handles: pendingBuildTask, pendingVaultBuild, pendingNewProjectMode.
 
 import * as vscode from 'vscode';
-import { ChassisService } from './services/chassisService.js';
-import { RoutingService } from './services/ai/routingService.js';
-import { UsageTracker } from './services/usageTracker.js';
-import { VaultService } from './services/vault/vaultService.js';
-import { ChatPanel } from './ui/chat/chatPanel.js';
+import type { ChassisService } from './services/chassisService.js';
+import type { RoutingService } from './services/ai/routingService.js';
+import type { UsageTracker } from './services/usageTracker.js';
+import type { VaultService } from './services/vault/vaultService.js';
+import { ChatPanel } from './ui/panels/chat/chatPanel';
 
 type ShowArgs = [ChassisService, RoutingService, UsageTracker | undefined, VaultService];
 
-async function openPanel(args: ShowArgs, delayMs = 800): Promise<void> {
+async function openPanel(args: ShowArgs, delayMs = 800, innerDelayMs = 400): Promise<void> {
   await new Promise(r => setTimeout(r, delayMs));
   ChatPanel.show(...args);
-  await new Promise(r => setTimeout(r, 400));
+  await new Promise(r => setTimeout(r, innerDelayMs));
 }
 
 export function resumePendingState(
@@ -28,11 +28,40 @@ export function resumePendingState(
     try {
       const { task, projectRoot } = JSON.parse(pendingResumeRaw);
       (async () => {
-        await openPanel(showArgs, 1200);
-        if (ChatPanel.currentPanel) { ChatPanel.currentPanel.resumeBuildTask(task, projectRoot); }
+        await openPanel(showArgs, 100, 400);
+        if (ChatPanel.currentPanel) {
+          // [FIX] Restore chat history wiped by the window reload
+          const rescuedConv = context.globalState.get<any[]>('chassis.pendingRescueConversation');
+          if (rescuedConv && rescuedConv.length > 0) {
+             context.globalState.update('chassis.pendingRescueConversation', undefined);
+             const conv = ChatPanel.currentPanel.getConversation();
+             conv.splice(0, conv.length, ...rescuedConv);
+             (ChatPanel.currentPanel as any).refresh();
+          }
+          ChatPanel.currentPanel.resumeBuildTask(task, projectRoot);
+        }
       })();
     } catch { /* ignore parse errors from stale entries */ }
     return; // skip other resume paths — this takes priority
+  }
+
+  // ── conversation restore after intentional __OPEN_WORKSPACE__ reload (no rebuild) ──
+  // [FIX] pendingRescueConversation without pendingResumeTask = user clicked Open Workspace button.
+  // Restore the chat history and stop — do NOT call resumeBuildTask / handleBuildRequest.
+  // [FIX] Use short delay (100ms) so rescue fires BEFORE the 500ms auto-open timer, preventing
+  // a window where the timer creates an empty panel that the user sees before conversation is restored.
+  const rescueOnly = context.globalState.get<any[]>('chassis.pendingRescueConversation');
+  if (rescueOnly && rescueOnly.length > 0) {
+    context.globalState.update('chassis.pendingRescueConversation', undefined);
+    (async () => {
+      await openPanel(showArgs, 100, 250);
+      if (ChatPanel.currentPanel) {
+        const conv = ChatPanel.currentPanel.getConversation();
+        conv.splice(0, conv.length, ...rescueOnly);
+        (ChatPanel.currentPanel as any).refresh();
+      }
+    })();
+    return;
   }
 
   // ── resume build task (wizard path — shows new-project panel) ──

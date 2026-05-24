@@ -51,7 +51,7 @@ import type { RoutingService } from '../ai/routingService.js';
 
 export function getQuestionsForTier(tier: 'standard' | 'deep'): InterviewQuestion[] {
   return EXPANDED_QUESTIONS.filter(q => {
-    if (tier === 'deep') return true;
+    if (tier === 'deep') {return true;}
     return q.complexityTrigger === 'standard';
   });
 }
@@ -87,7 +87,7 @@ export function compileInterviewAnswers(answers: Record<string, string | string[
   const expanded: Record<string, string[]> = {};
   for (const [key, value] of Object.entries(answers)) {
     const category = key.split('-')[0];
-    if (!expanded[category]) expanded[category] = [];
+    if (!expanded[category]) {expanded[category] = [];}
     if (Array.isArray(value)) { expanded[category].push(...value); }
     else { expanded[category].push(value); }
   }

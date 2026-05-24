@@ -2,7 +2,9 @@
 // Called by messageRouter orchestrator. No wizard or vault logic here.
 
 import * as vscode from 'vscode';
-import { SessionService } from '../services/sessionService.js';
+import type { SessionService } from '../services/sessionService.js';
+
+let isProcessingSession = false;
 
 export async function handleSessionMessage(
   msg: any,
@@ -15,11 +17,17 @@ export async function handleSessionMessage(
       refresh();
       return true;
     case 'endSession':
-      await sessions.endSessionWithData(msg.data);
-      refresh();
+      if (isProcessingSession) {return true;}
+      isProcessingSession = true;
+      try {
+        await sessions.endSessionWithData(msg.data);
+        refresh();
+      } finally {
+        isProcessingSession = false;
+      }
       return true;
     case 'openExternal':
-      if (msg.url) vscode.env.openExternal(vscode.Uri.parse(msg.url));
+      if (msg.url) {vscode.env.openExternal(vscode.Uri.parse(msg.url));}
       return true;
     case 'switchAI': {
       const aiCfg = vscode.workspace.getConfiguration('chassis');
@@ -32,7 +40,7 @@ export async function handleSessionMessage(
       const keyCfg = vscode.workspace.getConfiguration('chassis');
       const keyMap: Record<string, string> = { gemini: 'geminiApiKey', claude: 'claudeApiKey', openai: 'openaiApiKey', groq: 'groqApiKey', xai: 'xaiApiKey', kimi: 'kimiApiKey' };
       const setting = keyMap[msg.ai];
-      if (!setting) return false;
+      if (!setting) {return false;}
       await keyCfg.update(setting, msg.key || '', vscode.ConfigurationTarget.Global);
       if (msg.key) {
         vscode.window.showInformationMessage(`✓ ${msg.ai.charAt(0).toUpperCase() + msg.ai.slice(1)} API key saved.`);

@@ -54,8 +54,9 @@ export function getSidebarHtml(): string {
       <span>&#x2014; SETUP</span><span class="chevron">&#9660;</span>
     </div>
     <div class="section-body hidden" id="body-setup">
+      <button class="item primary" data-cmd="chassis.openSetupHub">&#9881;&#65039; Setup Hub (AI + GitHub)</button>
       <button class="item" data-cmd="chassis.guide">&#10067; Getting Started</button>
-      <button class="item" data-cmd="chassis.openSettings">&#128273; AI API Setup</button>
+      <button class="item" data-cmd="chassis.openSettings">&#128273; AI API Keys</button>
       <button class="item" data-cmd="chassis.generateRules">&#128196; Generate Rules</button>
       <button class="item" data-cmd="chassis.retrofit">&#128296; Retrofit</button>
     </div>
@@ -97,7 +98,7 @@ export function getSidebarHtml(): string {
       <button class="item" data-cmd="chassis.openVault">&#128190; Open Vault</button>
       <button class="item" data-cmd="chassis.buildFromVault">&#128230; Build from Vault</button>
       <button class="item" data-cmd="chassis.validateVault">&#10003; Validate Vault</button>
-      <button class="item" data-cmd="chassis.configureGitHubBackup">&#128279; GitHub Backup</button>
+      <button class="item" data-cmd="chassis.backupNow">&#128190; Commit to GitHub</button>
     </div>
   </div>
 

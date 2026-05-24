@@ -2,7 +2,7 @@
 // Own panel = full HTML document = no CSS interference from chat panel styles.
 
 import * as vscode from 'vscode';
-import { VaultService } from '../services/vault/vaultService.js';
+import type { VaultService } from '../services/vault/vaultService.js';
 import { renderVaultBrowser } from '../ui/views/vaultBrowserRenderer.js';
 
 let _vaultPanel: vscode.WebviewPanel | undefined;

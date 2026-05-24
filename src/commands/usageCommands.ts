@@ -2,8 +2,9 @@
 // Commands: view usage report, reset session/day/week/month/all with lifetime preservation
 
 import * as vscode from 'vscode';
-import { UsageTracker, UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
-import { RoutingService } from '../services/ai/routingService.js';
+import type { UsageTracker} from '../services/usageTracker.js';
+import { UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
+import type { RoutingService } from '../services/ai/routingService.js';
 import { showInChatPanel } from '../services/chatPanelContent.js';
 
 export function registerUsageCommands(context: vscode.ExtensionContext, usageTracker: UsageTracker, routing?: RoutingService): void {

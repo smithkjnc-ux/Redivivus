@@ -1,5 +1,5 @@
 // [SCOPE] Vault code extraction — quality filters
-import { ExtractedBlock } from './vaultTypes.js';
+import type { ExtractedBlock } from './vaultTypes.js';
 
 export function isSingleReturnWrapper(block: ExtractedBlock): boolean {
   const code = block.code.trim();

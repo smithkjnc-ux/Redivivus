@@ -1,7 +1,7 @@
 // [SCOPE] Defines and registers VSCode commands for CHASSIS Blueprint operations, including running the interview process and opening the blueprint file.
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
-import { BlueprintService } from '../services/blueprint/blueprintService.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { BlueprintService } from '../services/blueprint/blueprintService.js';
 import { syncBlueprintMd } from '../services/blueprint/blueprintWriter.js';
 
 export function registerBlueprintCommands(

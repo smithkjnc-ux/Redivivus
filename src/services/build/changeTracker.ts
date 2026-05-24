@@ -1,7 +1,7 @@
 // [SCOPE] Change Tracker — auto-summarizes every modification CHASSIS makes
 
 import * as fs from 'fs';
-import { ChassisService } from '../chassisService.js';
+import type { ChassisService } from '../chassisService.js';
 
 interface ChangeSummary {
   file: string;

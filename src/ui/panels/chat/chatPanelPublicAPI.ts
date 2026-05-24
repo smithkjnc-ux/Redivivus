@@ -1,0 +1,150 @@
+// [SCOPE] Chat Panel Public API — public methods exposed on ChatPanel class
+// Extracted from chatPanel.ts
+
+import * as vscode from 'vscode';
+import type { ChatMessage } from './chatPanelHtml';
+import { ChatPanel } from './chatPanel';
+import { buildHeaderInfo } from './chatPanelHeader';
+import { SetupProgressService } from '../../../services/project/setupProgressService';
+import { buildChatHtml } from './chatPanelHtml';
+import { readDashboardData } from './chatPanelDashboard';
+import { logProjectContextSwitch } from '../../../services/logging/projectContextLogger';
+
+export function panelShowGettingStarted(panel: any): void {
+  panel._panel.webview.postMessage({ type: 'show-panel', panelType: 'getting-started' });
+  panel._panel.reveal(vscode.ViewColumn.Beside);
+}
+
+export function panelShowStartSession(panel: any): void {
+  panel._panel.webview.postMessage({ type: 'show-panel', panelType: 'start-session' });
+  panel._panel.reveal(vscode.ViewColumn.Beside);
+}
+
+export async function panelResumeBuildTask(panel: any, task: string, projectRoot?: string): Promise<void> {
+  if (!task) { return; }
+  const state = panel.state;
+  const last = state.conversation[state.conversation.length - 1];
+  if (!last || last.role !== 'user' || last.content !== task) {
+    state.conversation.push({ role: 'user', content: task, timestamp: Date.now() });
+  }
+  panel.refresh();
+  if (projectRoot) {
+    const currentChassisRoot = panel.chassis?.getWorkspaceRoot?.();
+    const validation = logProjectContextSwitch(projectRoot, 'resumeBuildTask', task);
+    if (!validation.allowed) {
+      vscode.window.showErrorMessage(`CHASSIS Bug Detected: Attempted to switch from "${currentChassisRoot}" to "${projectRoot}" during build. This should not happen.`, 'OK');
+      console.error('[CHASSIS] Blocked project switch in resumeBuildTask:', validation.reason);
+      return;
+    }
+    panel.chassis = new panel.chassis.constructor(projectRoot);
+    panel.loadBlueprintContext();
+    ChatPanel.extensionContext?.globalState.update('chassis.lastActiveProject', projectRoot);
+  }
+  await panel._handleBuildRequest(task, true, false);
+}
+
+export function panelShowNewProject(panel: any, suggestedParent?: string, prefillTask?: string, compact?: boolean): void {
+  const task = prefillTask || panel._pendingTask || '';
+  const isSimple = compact !== undefined ? compact : /function|script|snippet|utility|helper|class|method|component|hook|module/i.test(task);
+  panel._panel.webview.postMessage({ type: 'show-panel', panelType: 'new-project', suggestedParent: suggestedParent || '', prefillTask: task, compact: isSimple });
+  panel._panel.reveal(panel._panel.viewColumn ?? vscode.ViewColumn.One);
+}
+
+export function panelShowPanel(panel: any, panelType: string, title: string, content: string): void {
+  panel._panel.webview.postMessage({ type: 'show-panel', panelType, title, content });
+  panel._panel.reveal(panel._panel.viewColumn ?? vscode.ViewColumn.One);
+}
+
+export function panelSetLastModel(panel: any, model: string): void {
+  panel.state.lastModel = model;
+  panel.refresh();
+}
+
+/** Key for persisting conversation. Project-specific so switching workspaces restores the right history. */
+export function chatHistoryKey(root?: string): string {
+  return `chassis.chatHistory.${root || 'global'}`;
+}
+
+/** Restore saved conversation from globalState. Call in ChatPanel constructor before refresh(). */
+export function restoreConversation(panel: any): void {
+  try {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const ctx = ChatPanel.extensionContext;
+    if (!ctx || !root) { return; }
+    const saved = ctx.globalState.get<string>(chatHistoryKey(root));
+    if (saved) {
+      const msgs: ChatMessage[] = JSON.parse(saved);
+      if (Array.isArray(msgs) && msgs.length > 0) { panel.state.conversation = msgs; }
+    }
+  } catch { /* never block panel creation */ }
+}
+
+/** Clear persisted conversation for current workspace. Call when user clears chat. */
+export function clearPersistedConversation(): void {
+  try {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const ctx = ChatPanel.extensionContext;
+    if (ctx && root) { ctx.globalState.update(chatHistoryKey(root), undefined); }
+  } catch {}
+}
+
+export async function panelRefresh(panel: any): Promise<void> {
+  const state = panel.state;
+  const usageTracker = panel.usageTracker;
+  const headerInfo = buildHeaderInfo(panel.chassis, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
+  const _panel = panel._panel;
+  const _initialized = panel._initialized;
+  if (!_initialized) {
+    let progress;
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (headerInfo.isInitialized && root && state.conversation.length === 0) {
+      try { progress = await new SetupProgressService(panel.chassis, root).getProgress(); } catch {}
+    }
+    if (root && (headerInfo as any).workspaceHasChassis && !(headerInfo as any).workspaceIsAssistMode && state.conversation.length === 0) {
+      try { const config = panel.chassis.isInitialized() ? panel.chassis.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
+    }
+    _panel.webview.html = buildChatHtml(state.conversation, headerInfo, progress);
+    panel._initialized = true;
+    // Persist conversation after first load so existing messages survive a panel reopen
+    saveConversation(state, root);
+    return;
+  }
+  const { renderMessages } = await import('./chatPanelRenderer.js');
+  const messagesHtml = renderMessages(state.conversation);
+  let htmlToInject = messagesHtml;
+  if (!htmlToInject) {
+    let progress;
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (headerInfo.isInitialized && root) {
+      try { progress = await new SetupProgressService(panel.chassis, root).getProgress(); } catch {}
+    }
+    if (root && (headerInfo as any).workspaceHasChassis && !(headerInfo as any).workspaceIsAssistMode) {
+      try { const config = panel.chassis.isInitialized() ? panel.chassis.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
+    }
+    const { buildEmptyStateHtml } = await import('./chatPanelEmptyState.js');
+    htmlToInject = buildEmptyStateHtml(headerInfo, progress);
+  }
+  _panel.webview.postMessage({ type: 'update-conversation', html: htmlToInject });
+  // Persist conversation on every update
+  const root2 = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  saveConversation(state, root2);
+}
+
+function saveConversation(state: any, root?: string): void {
+  try {
+    const ctx = ChatPanel.extensionContext;
+    if (!ctx || !root || !state.conversation.length) { return; }
+    ctx.globalState.update(chatHistoryKey(root), JSON.stringify(state.conversation.slice(-100)));
+  } catch {}
+}
+
+export function panelBuildFromVaultPrefill(panel: any): { task?: string; targetFile?: string } {
+  const state = panel.state;
+  const msgs = state.conversation.filter((m: ChatMessage) => m.role === 'user');
+  const config = panel.chassis.isInitialized() ? panel.chassis.loadConfig() : null;
+  const task = (msgs.length > 0 ? msgs[msgs.length - 1].content.trim() : '') || config?.blueprint?.what || undefined;
+  const where = (config?.blueprint?.where || '').toLowerCase();
+  const ext = where.includes('python') ? '.py' : where.includes('react') || where.includes('tsx') ? '.tsx' : where.includes('javascript') || where.includes('node') ? '.js' : '.ts';
+  const targetFile = config?.projectName ? `src/${config.projectName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}${ext}` : undefined;
+  return { task, targetFile };
+}

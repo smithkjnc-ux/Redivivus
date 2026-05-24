@@ -4,8 +4,9 @@
 // [WARN] Wizard runs inside the build pipeline — postToWebview MUST be passed in for the modal to appear.
 //        If postToWebview is not available, bail immediately so the build continues normally.
 
-import { TEMPLATE_CATEGORIES, TemplateDef, matchTaskToTemplate, fetchTemplate } from './templateRegistry.js';
-import { RoutingService } from '../../services/ai/routingService.js';
+import type { TemplateDef} from './templateRegistry.js';
+import { TEMPLATE_CATEGORIES, matchTaskToTemplate, fetchTemplate } from './templateRegistry.js';
+import type { RoutingService } from '../../services/ai/routingService.js';
 
 export interface TemplateWizardResult {
   handled: boolean;

@@ -5,7 +5,7 @@
 // [DONE] Added DOM utils, storage wrapper, string utils, array utils — see starterPatternsUtils.ts
 // Utility patterns + makeItem factory -> starterPatternsUtils.ts
 
-import { VaultItem } from '../vault/vaultTypes.js';
+import type { VaultItem } from '../vault/vaultTypes.js';
 import { makeItem, getUtilityPatterns, getDOMPatterns, getStoragePatterns, getStringPatterns } from './starterPatternsUtils.js';
 
 export function getStarterPatterns(): VaultItem[] {

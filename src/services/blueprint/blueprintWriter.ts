@@ -2,7 +2,7 @@
 // Called by blueprintService. No interview or health calculation logic here.
 
 import * as fs from 'fs';
-import { Blueprint } from '../../types/index.js';
+import type { Blueprint } from '../../types/index.js';
 
 export function writeBlueprintMd(bp: Blueprint, blueprintPath: string, projectName: string): void {
   const status = bp.locked ? '🔒 LOCKED' : '🔶 DRAFT';
@@ -47,6 +47,6 @@ ${bp.why || '❓ Not answered'}
 // [SCOPE] Syncs the internal .chassis/blueprint.md with the current config blueprint
 // Call this everywhere saveConfig is called with updated blueprint data
 export function syncBlueprintMd(chassis: any, config: any): void {
-  if (!config || !config.blueprint || !chassis.blueprintPath) return;
+  if (!config || !config.blueprint || !chassis.blueprintPath) {return;}
   writeBlueprintMd(config.blueprint, chassis.blueprintPath, config.projectName || 'Unknown');
 }

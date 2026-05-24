@@ -1,12 +1,12 @@
 // [SCOPE] CHASSIS Misc commands — core status, guides, AI switching, rules
 
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
-import { SessionService } from '../services/sessionService.js';
-import { GuideService } from '../services/guideService.js';
-import { RulesService } from '../services/rulesService.js';
-import { ChassisWebviewProvider } from '../ui/views/chassisWebviewProvider.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { SessionService } from '../services/sessionService.js';
+import type { GuideService } from '../services/guideService.js';
+import type { RulesService } from '../services/rulesService.js';
+import type { ChassisWebviewProvider } from '../ui/views/chassisWebviewProvider.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerMiscCommands(
   context: vscode.ExtensionContext,

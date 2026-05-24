@@ -6,7 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import * as crypto from 'crypto';
-import { VaultItem, VAULT_CATEGORIES } from './vaultTypes.js';
+import type { VaultItem} from './vaultTypes.js';
+import { VAULT_CATEGORIES } from './vaultTypes.js';
 
 const VAULT_ROOT = path.join(os.homedir(), '.chassis-vault');
 // [DEAD] Legacy Windsurf globalStorage path removed — CHASSIS only reads from ~/.chassis-vault/
@@ -17,7 +18,7 @@ function computeContentHash(code: string): string {
 
 /** Convert old-format vault files to new flat VaultItem */
 function migrateOldItem(raw: any): VaultItem | null {
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object') {return null;}
 
   // Format 1: new flat (already correct)
   if (raw.code && raw.name && raw.category && raw.contentHash) {
@@ -110,7 +111,7 @@ export class VaultStorage {
   deleteItem(itemId: string): boolean {
     for (const cat of VAULT_CATEGORIES) {
       const catDir = path.join(this.rootDir, cat);
-      if (!fs.existsSync(catDir)) continue;
+      if (!fs.existsSync(catDir)) {continue;}
       const files = fs.readdirSync(catDir).filter(f => f.endsWith('.json'));
       for (const f of files) {
         const item = this.loadItem(path.join(catDir, f));
@@ -170,13 +171,13 @@ export class VaultStorage {
 
   getItemsByCategory(category: string): VaultItem[] {
     const catDir = path.join(this.rootDir, category);
-    if (!fs.existsSync(catDir)) return [];
+    if (!fs.existsSync(catDir)) {return [];}
     const files = fs.readdirSync(catDir).filter(f => f.endsWith('.json'));
     return files.map(f => this.loadItem(path.join(catDir, f))).filter(Boolean) as VaultItem[];
   }
 
   getCategories(): { name: string; count: number }[] {
-    if (!fs.existsSync(this.rootDir)) return [];
+    if (!fs.existsSync(this.rootDir)) {return [];}
     return VAULT_CATEGORIES.map(cat => {
       const catDir = path.join(this.rootDir, cat);
       const count = fs.existsSync(catDir)

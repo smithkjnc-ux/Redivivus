@@ -14,10 +14,25 @@ let failed = 0;
 function pass(name) { console.log('  ✅', name); passed++; }
 function fail(name, reason) { console.error('  ❌', name, '—', reason); failed++; }
 
+// Stub vscode for tests that transitively import VS Code APIs
+const Module = require('module');
+const _origLoad = Module._load.bind(Module);
+Module._load = function(request, parent, isMain) {
+  if (request === 'vscode') {
+    const stub = new Proxy({}, { get: () => stub, apply: () => undefined, construct: () => stub });
+    stub.Uri = { file: (p) => ({ fsPath: p, toString: () => p }) };
+    stub.workspace = { workspaceFolders: [], getConfiguration: () => ({ get: () => undefined }) };
+    stub.window = { showErrorMessage: () => {}, showInformationMessage: () => {} };
+    stub.commands = { executeCommand: () => Promise.resolve() };
+    return stub;
+  }
+  return _origLoad(request, parent, isMain);
+};
+
 // ── Test 1: chatPanelHtml webview script syntax ──────────────────────────────
 console.log('\n[1] chatPanelHtml — webview script syntax');
 try {
-  const { buildChatHtml } = require('../out/ui/chatPanelHtml.js');
+  const { buildChatHtml } = require('../out/ui/panels/chat/chatPanelHtml.js');
 
   const scenarios = [
     { label: 'empty conversation', args: [[], { projectName: 'test', isInitialized: true, aiLabel: 'Gemini', displayModel: 'Gemini' }] },

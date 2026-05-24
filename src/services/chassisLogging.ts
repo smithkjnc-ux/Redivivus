@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisPaths } from './project/chassisPaths.js';
+import type { ChassisPaths } from './project/chassisPaths.js';
 
 export async function updateGitignore(root: string): Promise<void> {
   const gitignorePath = path.join(root, '.gitignore');
@@ -34,9 +34,9 @@ export function appendRoadmap(paths: ChassisPaths, sessionGoal: string, complete
     `## [${timestamp}] — Session End`,
     `- **Goal:** ${sessionGoal}`,
   ];
-  if (completed.length > 0) lines.push(`- **Completed:** ${completed.join(', ')}`);
-  if (inProgress.length > 0) lines.push(`- **In Progress:** ${inProgress.join(', ')}`);
-  if (nextStart) lines.push(`- **Next session starts with:** ${nextStart}`);
+  if (completed.length > 0) {lines.push(`- **Completed:** ${completed.join(', ')}`);}
+  if (inProgress.length > 0) {lines.push(`- **In Progress:** ${inProgress.join(', ')}`);}
+  if (nextStart) {lines.push(`- **Next session starts with:** ${nextStart}`);}
   lines.push('');
 
   // Update the "Last updated" line

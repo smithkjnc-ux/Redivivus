@@ -5,8 +5,10 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as cp from 'child_process';
-import { BuildContext, updateLastMsg, appendMsg } from '../../ui/chat/chatPanelBuildHelpers.js';
+import type { BuildContext} from '../../core/build/chatPanelBuildHelpers';
+import { updateLastMsg, appendMsg } from '../../core/build/chatPanelBuildHelpers';
 import { runCompileCheck, CompileResult } from './compileRunner.js';
+import { appendProjectDeadEnd } from '../../core/routing/chatPanelMsgFixUtils.js';
 
 const MAX_RETRIES = 3;
 const MISSING_NODE_PKG_RE = /Cannot find module '([^'./@][^']*)'/;
@@ -72,7 +74,12 @@ async function aiFixCompileError(ctx: BuildContext, relPath: string, errorOutput
 
   const res = await ctx.routing.prompt(prompt, 60_000);
   if (!res.success || !res.text || res.text.trim().length < 10) { return null; }
-  return res.text.replace(/^```[a-z]*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+  const fixed = res.text.replace(/^```[a-z]*\n?/m, '').replace(/\n?```\s*$/m, '').trim();
+  // Reject AI explanations masquerading as code — must contain actual code syntax
+  const hasCodeSyntax = /[{};()=<>]/.test(fixed) || /\b(function|class|const|let|var|def|import|export|return|if|for)\b/.test(fixed);
+  const isExplanation = /^(to (address|fix|resolve)|i (can't|cannot|will|would)|the (issue|problem|error|code|file)|please note|unfortunately|here is)/i.test(fixed);
+  if (!hasCodeSyntax || isExplanation) { return null; }
+  return fixed;
 }
 
 /**
@@ -89,9 +96,10 @@ export async function runCompileAutoFix(ctx: BuildContext, builtFiles: string[])
     if (result.success) { updateLastMsg(ctx, 'Package installed — compiled successfully.'); return; }
   }
 
-  // Snapshot built files before any AI writes — restored if all retries fail
+  // Snapshot built files AND error files before any AI writes — restored if all retries fail
   const preFixSnapshots = new Map<string, string>();
-  for (const relPath of builtFiles) {
+  const allCandidates = [...new Set([...builtFiles, ...parseErrorFiles(result.output, ctx.root, builtFiles)])];
+  for (const relPath of allCandidates) {
     const absPath = path.join(ctx.root, relPath);
     try { if (fs.existsSync(absPath)) { preFixSnapshots.set(relPath, fs.readFileSync(absPath, 'utf8')); } } catch { }
   }
@@ -137,6 +145,9 @@ export async function runCompileAutoFix(ctx: BuildContext, builtFiles: string[])
   for (const [relPath, content] of preFixSnapshots) {
     try { fs.writeFileSync(path.join(ctx.root, relPath), content, 'utf8'); restoredCount++; } catch { }
   }
+  // Log the persistent error as a dead end so future fix attempts know this pattern resists AI repair
+  const errorSig = result.output.slice(0, 120).replace(/\s+/g, ' ').trim();
+  appendProjectDeadEnd(ctx.root, `compile-fail: ${errorSig}`, `AI attempted ${MAX_RETRIES} auto-fix passes`, `Compile error persisted after all retries: ${result.output.slice(0, 400)}`, 'Provide the full error text to the AI and describe the intended behavior explicitly');
   const rollbackNote = restoredCount > 0 ? ` Restored ${restoredCount} file${restoredCount !== 1 ? 's' : ''} to post-build state.` : '';
   updateLastMsg(ctx,
     `After ${MAX_RETRIES} attempts, compile still fails.${rollbackNote} Paste the error below and describe what you're trying to build:\n\n` +

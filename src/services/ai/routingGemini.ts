@@ -1,8 +1,8 @@
 // [SCOPE] Routing Gemini provider — callGemini with comment style and vault context
 // Called by routingService for analyzeFile. No other provider logic here.
 
-import { VaultContextService } from '../vault/vaultContextService.js';
-import { AIResponse } from './routingTypes.js';
+import type { VaultContextService } from '../vault/vaultContextService.js';
+import type { AIResponse } from './routingTypes.js';
 import { getCommentStyle } from './routingCommentStyle.js';
 
 export async function callGemini(

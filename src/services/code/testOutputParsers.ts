@@ -2,7 +2,7 @@
 // Extracted from testExecutionService.ts
 
 import * as path from 'path';
-import { TestResult, TestFailure } from './testExecutionService.js';
+import type { TestResult, TestFailure } from './testExecutionService.js';
 
 export function parseJestOutput(output: string, duration: number): TestResult {
   const lines = output.split('\n');
@@ -119,7 +119,7 @@ export function parsePytestOutput(output: string, duration: number): TestResult 
     if (stackMatch && currentFailure) {
       currentFailure.filePath = stackMatch[1];
       currentFailure.lineNumber = parseInt(stackMatch[2]);
-      if (!currentFailure.stackTrace) currentFailure.stackTrace = '';
+      if (!currentFailure.stackTrace) {currentFailure.stackTrace = '';}
       currentFailure.stackTrace += line + '\n';
     }
   }

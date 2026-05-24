@@ -2,7 +2,7 @@
 // Checks for hallucinations and scope drift. Supervisor corrects or takes over on failure.
 // [WARN] scope_check makes a real AI call (max_tokens:50). Keep fast — called after every phase.
 
-import { callProvider } from './routingProviders.js';
+import { callProvider } from '../../core/ai/providers/providerFactory.js';
 
 /** Caller signature injected from RoutingService to avoid circular imports */
 export type ProviderCaller = (ai: string, prompt: string) => Promise<{ text: string; success: boolean; error?: string }>;
@@ -71,17 +71,17 @@ export async function scopeCheck(
   supervisorAI: string,
   caller: ProviderCaller
 ): Promise<{ onScope: boolean; reason: string }> {
-  const checkPrompt = `You are a code reviewer. Does the following code correctly implement what was asked?
+  const checkPrompt = `You are a senior code reviewer. Does the following code correctly and completely implement what was asked?
 
 ORIGINAL REQUEST:
 "${originalPrompt.slice(0, 400)}"
 
-CODE (first 60 lines):
+CODE:
 \`\`\`
-${code.split('\n').slice(0, 60).join('\n')}
+${code.slice(0, 8000)}
 \`\`\`
 
-Reply with EXACTLY "YES" if the code matches the request, or "NO: [one sentence reason]" if it does not. Nothing else.`;
+Reply with EXACTLY "YES" if the code fully implements the request, or "NO: [one sentence reason]" if it does not or is missing key functionality. Nothing else.`;
 
   try {
     const res = await caller(supervisorAI, checkPrompt);

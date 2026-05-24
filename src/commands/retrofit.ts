@@ -1,7 +1,7 @@
 // [SCOPE] Registers VS Code commands related to CHASSIS retrofit operations, including initiating, confirming, and reverting project retrofits.
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
-import { RetrofitService } from '../services/retrofitService.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { RetrofitService } from '../core/retrofit/retrofitService';
 
 export function registerRetrofitCommands(
   context: vscode.ExtensionContext,

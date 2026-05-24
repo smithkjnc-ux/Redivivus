@@ -2,9 +2,11 @@
 // Thin router: HTML/JS templates live in blueprintInterviewHtml.ts and blueprintInterviewScript.ts
 
 import * as vscode from 'vscode';
+import type { BlueprintSpec, ProjectType
+} from '../../services/blueprint/blueprintInterview.js';
 import {
   detectProjectType, getLayersForType, scoreBlueprint,
-  buildBlueprintSummary, BlueprintSpec, ProjectType
+  buildBlueprintSummary
 } from '../../services/blueprint/blueprintInterview.js';
 import { buildInterviewHtmlFull } from './blueprintInterviewHtmlFull.js';
 import { buildBlueprintViewHtml } from './blueprintInterviewHtml.js';

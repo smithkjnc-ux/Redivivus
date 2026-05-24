@@ -1,6 +1,6 @@
 // [SCOPE] CHASSIS Vault commands — scan result display helpers
 
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 const catIcons: Record<string, string> = {
   component: '🧩', utility: '🔧', algorithm: '⚙️', pattern: '🏗️',

@@ -2,13 +2,13 @@
 // Split from 434-line monolith. Each responsibility now lives in its own file under 200 lines.
 // [WARN] All handler modules share the same state object — mutations must be coordinated.
 
-import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
-import { SessionService } from '../services/sessionService.js';
-import { VaultService } from '../services/vault/vaultService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { GuardianService } from '../services/ai/guardianService.js';
-import { IntentService } from '../services/intentService.js';
+import type * as vscode from 'vscode';
+import type { ChassisService } from '../services/chassisService.js';
+import type { SessionService } from '../services/sessionService.js';
+import type { VaultService } from '../services/vault/vaultService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import type { GuardianService } from '../services/ai/guardianService.js';
+import type { IntentService } from '../core/routing/intentService';
 import { WizardPanelState } from './messageRouterTypes.js';
 
 export { WizardPanelState };

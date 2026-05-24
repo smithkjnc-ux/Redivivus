@@ -3,8 +3,9 @@
 // HTML template -> apiSetupHtml.ts
 
 import * as vscode from 'vscode';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 import { getApiSetupHtml } from './apiSetupHtml.js';
+import { checkProviderReachable } from '../core/diagnostics/selfDiagnosticChecks';
 
 export function registerApiSetupCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -56,18 +57,41 @@ class ApiSetupPanel {
     this._panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'save-keys') {
         const config = vscode.workspace.getConfiguration('chassis');
-        if (msg.geminiKey !== undefined) { await config.update('geminiApiKey', msg.geminiKey || undefined, true); }
-        if (msg.claudeKey !== undefined) { await config.update('claudeApiKey', msg.claudeKey || undefined, true); }
-        if (msg.openaiKey !== undefined) { await config.update('openaiApiKey', msg.openaiKey || undefined, true); }
-        if (msg.groqKey !== undefined)   { await config.update('groqApiKey',   msg.groqKey   || undefined, true); }
-        if (msg.xaiKey !== undefined)    { await config.update('xaiApiKey',    msg.xaiKey    || undefined, true); }
-        if (msg.kimiKey !== undefined)   { await config.update('kimiApiKey',   msg.kimiKey   || undefined, true); }
+        const toCheck: { id: string, name: string, key: string }[] = [];
+
+        if (msg.geminiKey !== undefined) { await config.update('geminiApiKey', msg.geminiKey || undefined, true); if (msg.geminiKey) {toCheck.push({id: 'gemini', name: 'Gemini', key: msg.geminiKey});} }
+        if (msg.claudeKey !== undefined) { await config.update('claudeApiKey', msg.claudeKey || undefined, true); if (msg.claudeKey) {toCheck.push({id: 'claude', name: 'Claude', key: msg.claudeKey});} }
+        if (msg.openaiKey !== undefined) { await config.update('openaiApiKey', msg.openaiKey || undefined, true); if (msg.openaiKey) {toCheck.push({id: 'openai', name: 'OpenAI', key: msg.openaiKey});} }
+        if (msg.groqKey !== undefined)   { await config.update('groqApiKey',   msg.groqKey   || undefined, true); if (msg.groqKey) {toCheck.push({id: 'groq', name: 'Groq', key: msg.groqKey});} }
+        if (msg.xaiKey !== undefined)    { await config.update('xaiApiKey',    msg.xaiKey    || undefined, true); if (msg.xaiKey) {toCheck.push({id: 'xai', name: 'xAI', key: msg.xaiKey});} }
+        if (msg.kimiKey !== undefined)   { await config.update('kimiApiKey',   msg.kimiKey   || undefined, true); if (msg.kimiKey) {toCheck.push({id: 'kimi', name: 'Kimi', key: msg.kimiKey});} }
         
+        // Actively verify keys via network ping
+        const errors: { id: string, msg: string }[] = [];
+        if (toCheck.length > 0) {
+            const results = await Promise.all(toCheck.map(async (provider) => {
+                const res = await checkProviderReachable(provider.name);
+                return { id: provider.id, res };
+            }));
+
+            for (const { id, res } of results) {
+                if (res.status === 'fail' || res.status === 'warn') {
+                    // warn happens on timeout/offline, fail on 401/403. We report both.
+                    errors.push({ id, msg: res.message });
+                }
+            }
+        }
+
         // Refresh HTML after saving so thatConfigured/Not Set labels update in real-time
         this._panel.webview.html = getApiSetupHtml();
         
-        this._panel.webview.postMessage({ type: 'saved', timestamp: new Date().toLocaleTimeString() });
-        vscode.window.showInformationMessage('CHASSIS API keys applied successfully!');
+        this._panel.webview.postMessage({ type: 'saved', timestamp: new Date().toLocaleTimeString(), errors });
+        
+        if (errors.length > 0) {
+            vscode.window.showWarningMessage('CHASSIS API keys saved, but some failed verification. Please check the setup panel.');
+        } else {
+            vscode.window.showInformationMessage('CHASSIS API keys applied and verified successfully!');
+        }
       } else if (msg.type === 'toggle-provider') {
         const config = vscode.workspace.getConfiguration('chassis');
         const disabled = config.get<string[]>('disabledProviders') || [];

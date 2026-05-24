@@ -36,7 +36,7 @@ export function showBuildHistoryPanel(context: vscode.ExtensionContext): void {
       let relPath = meta.preExisting[0];
       if (meta.preExisting.length > 1) {
         const pick = await vscode.window.showQuickPick(meta.preExisting, { placeHolder: 'Which file do you want to diff?' });
-        if (!pick) return;
+        if (!pick) {return;}
         relPath = pick;
       }
       const content = snap.getSnapshotFileContent(msg.snapshotId, relPath);

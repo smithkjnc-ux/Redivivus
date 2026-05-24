@@ -65,7 +65,7 @@ export class ChassisService {
 
   async updateGitignore() {
     const root = this.paths.getWorkspaceRoot();
-    if (root) await updateGitignore(root);
+    if (root) {await updateGitignore(root);}
   }
 
   appendWorkLog(text: string) {

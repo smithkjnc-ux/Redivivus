@@ -1,0 +1,443 @@
+
+/home/papajoe/projects/chassis/src/commands/analysis.ts
+  111:45  warning  Expected { after 'for-of'        curly
+  114:42  warning  Expected { after 'if' condition  curly
+  119:28  warning  Expected { after 'if' condition  curly
+  120:91  warning  Expected { after 'if' condition  curly
+  121:36  warning  Expected { after 'if' condition  curly
+  122:12  warning  Expected { after 'else'          curly
+  129:31  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/apiSetup.ts
+  62:134  warning  Expected { after 'if' condition  curly
+  63:134  warning  Expected { after 'if' condition  curly
+  64:134  warning  Expected { after 'if' condition  curly
+  65:132  warning  Expected { after 'if' condition  curly
+  66:131  warning  Expected { after 'if' condition  curly
+  67:132  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/apiSetupHtml.ts
+  59:20  warning  Expected { after 'if' condition  curly
+  60:21  warning  Expected { after 'if' condition  curly
+  61:36  warning  Expected { after 'if' condition  curly
+  62:75  warning  Expected { after 'if' condition  curly
+  63:39  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/init.ts
+  121:38  warning  Expected { after 'if' condition  curly
+  122:42  warning  Expected { after 'if' condition  curly
+  123:22  warning  Expected { after 'else'          curly
+  126:50  warning  Expected { after 'if' condition  curly
+  127:38  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/miscUndo.ts
+  21:27  warning  Expected { after 'if' condition  curly
+  33:27  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/usageFormatters.ts
+  12:39  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/usageHtmlTemplate.ts
+  19:39  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/vault.ts
+  71:47  warning  Expected { after 'if' condition  curly
+  73:44  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/commands/vaultValidate.ts
+  26:46  warning  Expected { after 'if' condition  curly
+  37:52  warning  Expected { after 'if' condition  curly
+  43:29  warning  Expected { after 'if' condition  curly
+  48:23  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/ai/chatPanelClassifier.ts
+  185:15  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/ai/chatPanelIntent.ts
+  77:21  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/ai/clarificationService.ts
+   25:32  warning  Expected { after 'if' condition  curly
+   26:32  warning  Expected { after 'if' condition  curly
+  121:31  warning  Expected { after 'if' condition  curly
+  122:55  warning  Expected { after 'if' condition  curly
+  123:29  warning  Expected { after 'if' condition  curly
+  124:29  warning  Expected { after 'if' condition  curly
+  125:29  warning  Expected { after 'if' condition  curly
+  126:56  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/build/chatPanelBuild.ts
+  120:62  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/build/chatPanelBuildHelpers.ts
+  63:42  warning  Expected { after 'if' condition  curly
+  64:8   warning  Expected { after 'else'          curly
+
+/home/papajoe/projects/chassis/src/core/build/chatPanelBuildInference.ts
+   36:29   warning  Expected { after 'if' condition  curly
+   42:29   warning  Expected { after 'if' condition  curly
+   50:21   warning  Expected { after 'if' condition  curly
+   56:27   warning  Expected { after 'if' condition  curly
+   63:33   warning  Expected { after 'if' condition  curly
+   64:33   warning  Expected { after 'if' condition  curly
+   65:33   warning  Expected { after 'if' condition  curly
+   66:60   warning  Expected { after 'if' condition  curly
+   67:41   warning  Expected { after 'if' condition  curly
+   68:69   warning  Expected { after 'if' condition  curly
+   69:33   warning  Expected { after 'if' condition  curly
+   70:33   warning  Expected { after 'if' condition  curly
+   73:31   warning  Expected { after 'if' condition  curly
+   74:32   warning  Expected { after 'if' condition  curly
+   75:59   warning  Expected { after 'if' condition  curly
+   78:125  warning  Expected { after 'if' condition  curly
+   79:76   warning  Expected { after 'if' condition  curly
+   80:106  warning  Expected { after 'if' condition  curly
+   81:51   warning  Expected { after 'if' condition  curly
+   82:66   warning  Expected { after 'if' condition  curly
+   83:92   warning  Expected { after 'if' condition  curly
+   84:45   warning  Expected { after 'if' condition  curly
+   85:54   warning  Expected { after 'if' condition  curly
+   91:94   warning  Expected { after 'if' condition  curly
+   92:67   warning  Expected { after 'if' condition  curly
+   96:30   warning  Expected { after 'if' condition  curly
+  109:56   warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/build/chatPanelBuildReview.ts
+  21:25  warning  Expected { after 'if' condition  curly
+  22:39  warning  Expected { after 'if' condition  curly
+  23:40  warning  Expected { after 'if' condition  curly
+  24:43  warning  Expected { after 'if' condition  curly
+  45:24  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/build/chatPanelBuildWorker.ts
+  47:38  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/build/chatPanelBuildWriter.ts
+  35:28  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/build/chatPanelChunked.ts
+  132:125  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/routing/chatPanelMsgFix.ts
+  99:14  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/core/routing/chatPanelMsgSendEarlyExits.ts
+  39:33  warning  Expected { after 'if' condition  curly
+  40:57  warning  Expected { after 'if' condition  curly
+  44:73  warning  Expected { after 'if' condition  curly
+  46:65  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/ai/agentTools.ts
+  106:21  warning  Expected { after 'if' condition  curly
+  107:21  warning  Expected { after 'if' condition  curly
+  108:22  warning  Expected { after 'if' condition  curly
+  152:27  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/ai/guardianHealth.ts
+  34:19  warning  Expected { after 'if' condition  curly
+  35:24  warning  Expected { after 'if' condition  curly
+  36:24  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/ai/routingComplexity.ts
+  69:19  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/ai/routingKeys.ts
+  13:29  warning  Expected { after 'if' condition  curly
+  20:29  warning  Expected { after 'if' condition  curly
+  26:29  warning  Expected { after 'if' condition  curly
+  32:27  warning  Expected { after 'if' condition  curly
+  38:26  warning  Expected { after 'if' condition  curly
+  44:27  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/ai/routingProviders.ts
+   37:20  warning  Expected { after 'if' condition  curly
+   62:20  warning  Expected { after 'if' condition  curly
+   79:20  warning  Expected { after 'if' condition  curly
+   96:20  warning  Expected { after 'if' condition  curly
+  113:20  warning  Expected { after 'if' condition  curly
+  130:20  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/ai/routingService.ts
+  50:30  warning  Expected { after 'if' condition  curly
+  94:44  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/ai/streamingProviders.ts
+  19:15  warning  Expected { after 'if' condition  curly
+  24:39  warning  Expected { after 'if' condition  curly
+  26:29  warning  Expected { after 'if' condition  curly
+  49:45  warning  Expected { after 'if' condition  curly
+  55:33  warning  Expected { after 'if' condition  curly
+  61:45  warning  Expected { after 'if' condition  curly
+  66:33  warning  Expected { after 'if' condition  curly
+  79:13  warning  Expected { after 'if' condition  curly
+  80:36  warning  Expected { after 'if' condition  curly
+  83:31  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/blueprint/blueprintWriter.ts
+  50:63  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/blueprint/expandedInterview.ts
+  54:26  warning  Expected { after 'if' condition  curly
+  90:30  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/build/buildOrchestrator.ts
+  139:59  warning  Expected { after 'if' condition  curly
+  146:16  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/build/buildOrchestratorPrompt.ts
+  10:16  warning  Expected { after 'if' condition  curly
+  31:26  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/build/buildSafetyCheck.ts
+  65:34  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/build/measureTwiceService.ts
+  175:23  warning  Expected { after 'if' condition  curly
+  176:28  warning  Expected { after 'if' condition  curly
+  177:28  warning  Expected { after 'if' condition  curly
+  178:28  warning  Expected { after 'if' condition  curly
+  179:28  warning  Expected { after 'if' condition  curly
+  180:28  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/chassisLogging.ts
+  37:29  warning  Expected { after 'if' condition  curly
+  38:30  warning  Expected { after 'if' condition  curly
+  39:18  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/chassisRules.ts
+  11:14  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/chassisService.ts
+  68:15  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/code/testExecutionService.ts
+  65:55  warning  Expected { after 'if' condition  curly
+  66:59  warning  Expected { after 'if' condition  curly
+  67:57  warning  Expected { after 'if' condition  curly
+  69:42  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/code/testOutputParsers.ts
+  122:39  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/code/testOutputParsersExt.ts
+  45:36  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/logging/chassisLogger.ts
+   84:50  warning  Expected { after 'if' condition  curly
+  239:32  warning  Expected { after 'if' condition  curly
+  262:32  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/logging/fixPipelineLogger.ts
+  41:50  warning  Expected { after 'if' condition  curly
+  75:32  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/logging/projectContextLogger.ts
+   23:36  warning  Expected { after 'if' condition  curly
+  139:24  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/mapBuilderHelpers.ts
+   89:31  warning  Expected { after 'if' condition  curly
+   93:21  warning  Expected { after 'if' condition  curly
+  100:31  warning  Expected { after 'if' condition  curly
+  117:23  warning  Expected { after 'if' condition  curly
+  131:30  warning  Expected { after 'if' condition  curly
+  147:52  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/mapBuilderService.ts
+  115:46  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/phaseUndoServiceImpl.ts
+   62:19  warning  Expected { after 'if' condition  curly
+   75:38  warning  Expected { after 'if' condition  curly
+   88:62  warning  Expected { after 'if' condition  curly
+  112:19  warning  Expected { after 'if' condition  curly
+  124:62  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/pipelineTracer.ts
+   30:20  warning  Expected { after 'if' condition  curly
+   42:23  warning  Expected { after 'if' condition  curly
+   53:24  warning  Expected { after 'if' condition  curly
+   57:12  warning  Expected { after 'if' condition  curly
+   64:16  warning  Expected { after 'if' condition  curly
+   68:21  warning  Expected { after 'if' condition  curly
+   69:17  warning  Expected { after 'if' condition  curly
+   70:17  warning  Expected { after 'if' condition  curly
+   72:17  warning  Expected { after 'if' condition  curly
+   78:24  warning  Expected { after 'if' condition  curly
+   85:24  warning  Expected { after 'if' condition  curly
+   93:24  warning  Expected { after 'if' condition  curly
+  100:24  warning  Expected { after 'if' condition  curly
+  107:24  warning  Expected { after 'if' condition  curly
+  112:34  warning  Expected { after 'if' condition  curly
+  119:47  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/project/chassisInit.ts
+  102:28  warning  Expected { after 'if' condition  curly
+  103:32  warning  Expected { after 'if' condition  curly
+  104:12  warning  Expected { after 'else'          curly
+  107:40  warning  Expected { after 'if' condition  curly
+  108:28  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/vault/vaultAutoCapture.ts
+  51:34  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/vault/vaultExtractorLang.ts
+  72:54  warning  Expected { after 'if' condition  curly
+  80:21  warning  Expected { after 'if' condition  curly
+  82:53  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/vault/vaultExtractorTsJs.ts
+  15:27  warning  Expected { after 'if' condition  curly
+  16:27  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/vault/vaultService.ts
+   34:54  warning  Expected { after 'if' condition  curly
+  134:16  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/vault/vaultStorage.ts
+   20:40  warning  Expected { after 'if' condition  curly
+  113:35  warning  Expected { after 'if' condition  curly
+  173:33  warning  Expected { after 'if' condition  curly
+  179:39  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/vscodeCommandService.ts
+   32:39  warning  Expected { after 'if' condition  curly
+   34:48  warning  Expected { after 'if' condition  curly
+   36:45  warning  Expected { after 'if' condition  curly
+   38:59  warning  Expected { after 'if' condition  curly
+   40:35  warning  Expected { after 'if' condition  curly
+   42:37  warning  Expected { after 'if' condition  curly
+   44:37  warning  Expected { after 'if' condition  curly
+   46:33  warning  Expected { after 'if' condition  curly
+   48:35  warning  Expected { after 'if' condition  curly
+  140:39  warning  Expected { after 'if' condition  curly
+  141:33  warning  Expected { after 'if' condition  curly
+  142:35  warning  Expected { after 'if' condition  curly
+  143:37  warning  Expected { after 'if' condition  curly
+  144:63  warning  Expected { after 'if' condition  curly
+  145:65  warning  Expected { after 'if' condition  curly
+  146:35  warning  Expected { after 'if' condition  curly
+  147:45  warning  Expected { after 'if' condition  curly
+  148:35  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/workspace/workspaceContext.ts
+  50:16  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/workspace/workspaceContextDetect.ts
+  31:49  warning  Expected { after 'if' condition  curly
+  32:59  warning  Expected { after 'if' condition  curly
+  33:47  warning  Expected { after 'if' condition  curly
+  34:47  warning  Expected { after 'if' condition  curly
+  35:47  warning  Expected { after 'if' condition  curly
+  36:54  warning  Expected { after 'if' condition  curly
+  49:16  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/services/workspace/workspaceContextScan.ts
+  16:58  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/map/mapPanelMessages.ts
+  36:114  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/messageRouterCore.ts
+  104:32  warning  Expected { after 'if' condition  curly
+  105:36  warning  Expected { after 'if' condition  curly
+  106:16  warning  Expected { after 'else'          curly
+  109:44  warning  Expected { after 'if' condition  curly
+  110:32  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/messageRouterMap.ts
+  18:14  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/messageRouterSession.ts
+  22:20  warning  Expected { after 'if' condition  curly
+  35:21  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/messageRouterVaultRecategorize.ts
+  17:41  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/messageRouterVaultScan.ts
+  26:47  warning  Expected { after 'if' condition  curly
+  28:44  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/messageRouterWizard.ts
+  39:23  warning  Expected { after 'if' condition  curly
+  56:56  warning  Expected { after 'if' condition  curly
+  58:24  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/chat/chatPanelDashboard.ts
+  42:56  warning  Expected { after 'if' condition  curly
+  44:46  warning  Expected { after 'if' condition  curly
+  45:89  warning  Expected { after 'if' condition  curly
+  93:18  warning  Expected { after 'if' condition  curly
+  93:54  warning  Expected { after 'if' condition  curly
+  94:21  warning  Expected { after 'if' condition  curly
+  95:22  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/chat/chatPanelEmptyState.ts
+  10:16  warning  Expected { after 'if' condition  curly
+  31:14  warning  Expected { after 'if' condition  curly
+  33:20  warning  Expected { after 'if' condition  curly
+  34:22  warning  Expected { after 'if' condition  curly
+  35:23  warning  Expected { after 'if' condition  curly
+  36:24  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/chat/chatPanelHeader.ts
+  132:27  warning  Expected { after 'if' condition  curly
+  139:35  warning  Expected { after 'if' condition  curly
+  140:33  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/chat/chatPanelImportCheck.ts
+   41:22  warning  Expected { after 'if' condition  curly
+   54:39  warning  Expected { after 'if' condition  curly
+   94:14  warning  Expected { after 'if' condition  curly
+   98:14  warning  Expected { after 'if' condition  curly
+  103:55  warning  Expected { after 'if' condition  curly
+  136:36  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/chat/chatPanelRenderer.ts
+  25:20  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/chat/chatPanelRendererCards.ts
+  8:15  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/wizard/wizardActiveSession.ts
+  36:13  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/panels/wizard/wizardNewProject.ts
+  31:14  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/views/buildHistoryPanel.ts
+  39:20  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/views/chassisWebviewProvider.ts
+  115:28  warning  Expected { after 'if' condition  curly
+  116:30  warning  Expected { after 'if' condition  curly
+  117:26  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/views/historyTab.ts
+   8:33  warning  Expected { after 'if' condition  curly
+  10:32  warning  Expected { after 'if' condition  curly
+  28:33  warning  Expected { after 'if' condition  curly
+  30:31  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/views/mapTab.ts
+  9:16  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/views/vaultBrowserRenderer.ts
+  67:21  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/views/vaultDataUtils.ts
+  13:37  warning  Expected { after 'for-of'  curly
+
+/home/papajoe/projects/chassis/src/ui/views/vaultScanSummary.ts
+  25:30  warning  Expected { after 'if' condition  curly
+  26:26  warning  Expected { after 'if' condition  curly
+
+/home/papajoe/projects/chassis/src/ui/views/wizardPanel.ts
+  66:22  warning  Expected { after 'if' condition  curly
+  86:40  warning  Expected { after 'if' condition  curly
+  88:30  warning  Expected { after 'if' condition  curly
+
+✖ 279 problems (0 errors, 279 warnings)
+  0 errors and 279 warnings potentially fixable with the `--fix` option.
+

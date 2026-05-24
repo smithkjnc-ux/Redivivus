@@ -7,7 +7,7 @@ function statusBadge(ok: boolean, okLabel: string, notLabel: string): string {
     : `<span style="background:#b85c00;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;">${notLabel}</span>`;
 }
 
-export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string, anthropicKey: string, kimiKey: string, hasGitHub: boolean, githubUser: string, githubRepo: string, guardianActive = false, guardianAI = 'none', workerAI = 'none', guardianCfg = true): string {
+export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string, anthropicKey: string, kimiKey: string, hasGitHub: boolean, githubUser: string, githubRepo: string, guardianActive = false, guardianAI = 'none', workerAI = 'none', guardianCfg = true, vaultEnabled = true): string {
   const aiDetail = hasAI
     ? [geminiKey && 'Gemini', openaiKey && 'OpenAI', anthropicKey && 'Anthropic', kimiKey && 'Kimi'].filter(Boolean).join(', ')
     : 'No API key set';
@@ -76,6 +76,14 @@ export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string,
         ${guardianActive ? `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;"><input type="checkbox" id="guardian-toggle" ${guardianCfg ? 'checked' : ''} onchange="send('toggle-guardian',{enabled:this.checked})" style="width:auto;" /> Enable Guardian review</label>` : `<button class="btn btn-secondary" onclick="send('open-api-setup')">Add a second AI key &#x2192;</button>`}
       </div>
     </div>
+    <div class="section">
+      <div class="section-icon">&#x1F5C4;&#xFE0F;</div>
+      <div class="section-body">
+        <div class="section-title">Vault Context ${statusBadge(vaultEnabled, 'Active', 'Off')}</div>
+        <div class="section-detail">Inject your saved code patterns into every build and fix &mdash; AI reuses proven code instead of reinventing it. On by default.</div>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;"><input type="checkbox" id="vault-toggle" ${vaultEnabled ? 'checked' : ''} onchange="send('toggle-vault',{enabled:this.checked})" style="width:auto;" /> Inject vault context into builds &amp; fixes</label>
+      </div>
+    </div>
     <hr class="divider">
     <p style="font-size:13px;color:#888;margin-bottom:12px;">Per-project setup (run these after opening a project folder):</p>
     <div class="section">
@@ -102,38 +110,38 @@ export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string,
   </div>
   <div id="gh-overlay" onclick="if(event.target===this)closeGitHubModal()">
     <div id="gh-modal">
-      <h2>&#x1F419; Connect GitHub Backup</h2>
-      <p class="sub">Your code will auto-backup to a private GitHub repo after every build.</p>
+      <h2>&#x1F419; Connect GitHub</h2>
+      <p class="sub">Lets CHASSIS back up your code to GitHub. You decide when &mdash; nothing is automatic.</p>
+      <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.7;color:#c8c8c8;">
+        <div style="font-weight:700;color:#fff;margin-bottom:6px;">How to get your token (2 minutes):</div>
+        <div><span style="color:#4a9eff;font-weight:700;">1.</span> Click <a class="gh-ext-link" data-url="https://github.com/settings/tokens/new?scopes=repo" style="color:#4a9eff;cursor:pointer;font-weight:600;">Open GitHub Token Page &rarr;</a></div>
+        <div><span style="color:#4a9eff;font-weight:700;">2.</span> Give it any name &mdash; e.g. <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">chassis</code></div>
+        <div><span style="color:#4a9eff;font-weight:700;">3.</span> <strong style="color:#fff;">Only check &ldquo;repo&rdquo;</strong> &mdash; it&rsquo;s already pre-selected. Ignore everything else.</div>
+        <div><span style="color:#4a9eff;font-weight:700;">4.</span> Scroll down and click <strong style="color:#fff;">Generate token</strong></div>
+        <div><span style="color:#4a9eff;font-weight:700;">5.</span> Copy the token and paste it below</div>
+      </div>
       <div class="gh-field">
-        <label>GitHub Personal Access Token <span style="color:#e05c5c">*</span></label>
+        <label>Paste your token here <span style="color:#e05c5c">*</span></label>
         <input id="gh-token" type="password" placeholder="ghp_..." value="${hasGitHub ? '&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;' : ''}" />
-        <div class="gh-hint">Needs <strong>repo</strong> scope. <a href="https://github.com/settings/tokens/new?scopes=repo" style="color:#4a9eff;">Create one here</a></div>
+        <div class="gh-hint" style="color:#888;">Your token is stored securely inside VS Code &mdash; never on disk or sent anywhere except GitHub.</div>
       </div>
       <div class="gh-field">
-        <label>GitHub Username <span style="color:#e05c5c">*</span></label>
+        <label>Your GitHub username <span style="color:#e05c5c">*</span></label>
         <input id="gh-user" type="text" placeholder="your-github-username" value="${githubUser || ''}" />
+        <div class="gh-hint" style="color:#888;">The name that appears at github.com/&lt;your-username&gt;</div>
       </div>
       <div class="gh-field">
-        <label>Repository Name <span style="color:#888;font-weight:400;">(optional -- uses project folder name if blank)</span></label>
-        <input id="gh-repo" type="text" placeholder="auto-named from project" value="${githubRepo || ''}" />
-      </div>
-      <div class="gh-field">
-        <label>Auto-backup frequency</label>
-        <select id="gh-interval">
-          <option value="0">After every build only</option>
-          <option value="15">Every 15 minutes</option>
-          <option value="30">Every 30 minutes</option>
-          <option value="60">Every hour</option>
-        </select>
+        <label>Default repository name <span style="color:#888;font-weight:400;">(optional &mdash; uses project folder name if blank)</span></label>
+        <input id="gh-repo" type="text" placeholder="auto-named from project folder" value="${githubRepo || ''}" />
       </div>
       <div class="gh-field" style="display:flex;align-items:center;gap:8px;">
         <input id="gh-private" type="checkbox" checked style="width:auto;margin:0;" />
-        <label for="gh-private" style="margin:0;cursor:pointer;">Make repository private (recommended)</label>
+        <label for="gh-private" style="margin:0;cursor:pointer;">Keep repositories private <span style="color:#888;font-weight:400;">(recommended &mdash; only you can see them)</span></label>
       </div>
       <div id="gh-err" style="color:#e05c5c;font-size:12px;margin-top:8px;display:none;"></div>
       <div class="gh-btns">
         <button class="btn btn-secondary" onclick="closeGitHubModal()">Cancel</button>
-        <button class="btn btn-primary" onclick="saveGitHub()">Save &amp; Connect</button>
+        <button id="gh-save-btn" class="btn btn-primary" onclick="saveGitHub()">Save &amp; Connect</button>
       </div>
     </div>
   </div>
@@ -141,17 +149,37 @@ export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string,
     const vscode = acquireVsCodeApi();
     function send(type, extra) { vscode.postMessage(Object.assign({ type }, extra || {})); }
     function openGitHubModal() { document.getElementById('gh-overlay').classList.add('open'); }
-    function closeGitHubModal() { document.getElementById('gh-overlay').classList.remove('open'); }
+    function closeGitHubModal() {
+      document.getElementById('gh-overlay').classList.remove('open');
+      const btn = document.getElementById('gh-save-btn');
+      if (btn) { btn.textContent = 'Save & Connect'; btn.disabled = false; }
+      const err = document.getElementById('gh-err');
+      if (err) { err.style.display = 'none'; }
+    }
     function saveGitHub() {
       const token = document.getElementById('gh-token').value.trim();
       const username = document.getElementById('gh-user').value.trim();
       const err = document.getElementById('gh-err');
-      if (!token || token.includes('•')) { err.textContent = 'Token is required.'; err.style.display='block'; return; }
+      if (!token) { err.textContent = 'Token is required.'; err.style.display='block'; return; }
       if (!username) { err.textContent = 'Username is required.'; err.style.display='block'; return; }
       err.style.display = 'none';
-      send('save-github', { token, username, repoName: document.getElementById('gh-repo').value.trim(), interval: document.getElementById('gh-interval').value, isPrivate: document.getElementById('gh-private').checked });
-      closeGitHubModal();
+      const btn = document.getElementById('gh-save-btn');
+      if (btn) { btn.textContent = 'Validating...'; btn.disabled = true; }
+      send('save-github', { token, username, repoName: document.getElementById('gh-repo').value.trim(), isPrivate: document.getElementById('gh-private').checked });
     }
+    document.querySelectorAll('.gh-ext-link').forEach(a => {
+      a.addEventListener('click', () => send('openExternal', { url: a.dataset.url }));
+    });
+    window.addEventListener('message', e => {
+      if (e.data.type === 'github-error') {
+        const err = document.getElementById('gh-err');
+        if (err) { err.textContent = e.data.message; err.style.display = 'block'; }
+        const btn = document.getElementById('gh-save-btn');
+        if (btn) { btn.textContent = 'Save & Connect'; btn.disabled = false; }
+      } else if (e.data.type === 'github-saved') {
+        closeGitHubModal();
+      }
+    });
   <\/script>
   </body></html>`;
 }

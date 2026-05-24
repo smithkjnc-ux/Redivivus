@@ -3,16 +3,16 @@
 
 import * as vscode from 'vscode';
 import { debugLog } from './services/workspace/diagnosticLogger.js';
-import { ChassisService } from './services/chassisService.js';
-import { RoutingService } from './services/ai/routingService.js';
-import { UsageTracker } from './services/usageTracker.js';
-import { VaultService } from './services/vault/vaultService.js';
-import { StatusBar } from './ui/views/statusBar.js';
-import { GuardianService } from './services/ai/guardianService.js';
-import { RecommendationsPanel } from './services/analyzerPanel.js';
+import type { ChassisService } from './services/chassisService.js';
+import type { RoutingService } from './services/ai/routingService.js';
+import type { UsageTracker } from './services/usageTracker.js';
+import type { VaultService } from './services/vault/vaultService.js';
+import type { StatusBar } from './ui/views/statusBar.js';
+import type { GuardianService } from './services/ai/guardianService.js';
+import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel';
 import { MapPanel } from './ui/map/mapPanel.js';
-import { GitHubBackupService } from './services/githubBackupService.js';
-import { ChatPanel } from './ui/chat/chatPanel.js';
+import type { GitHubBackupService } from './services/githubBackupService.js';
+import { ChatPanel } from './ui/panels/chat/chatPanel';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';

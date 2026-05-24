@@ -1,7 +1,7 @@
 // [SCOPE] Build From Vault command — assembles features from vault + AI gap fill
 
 import * as vscode from 'vscode';
-import { BuildFromVaultService } from '../services/vault/buildFromVaultService.js';
+import type { BuildFromVaultService } from '../services/vault/buildFromVaultService.js';
 
 export function registerBuildFromVaultCommand(
   context: vscode.ExtensionContext,

@@ -3,12 +3,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { Blueprint } from '../types/index.js';
-import { ChassisPaths } from './project/chassisPaths.js';
+import type { Blueprint } from '../types/index.js';
+import type { ChassisPaths } from './project/chassisPaths.js';
 
 export function generateRules(paths: ChassisPaths, projectName: string, blueprint: Blueprint, targetPath?: string): void {
   const root = targetPath || paths.getWorkspaceRoot();
-  if (!root) return;
+  if (!root) {return;}
 
   const rulesPath = path.join(root, '.chassis', 'rules.md');
   const rules = buildRulesContent(projectName, blueprint);
@@ -134,6 +134,10 @@ Every new file needs [SCOPE]. Every feature must trace to the blueprint. If outs
   [SCOPE] WARNING — Not in original blueprint. Added because: [reason]
 
 ---
+
+### Rule 13: NO FLAT FILES
+Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects CHASSIS builds and to CHASSIS itself. No exceptions, no matter what vibe editor is being used.
+
 
 *These rules are enforced by CHASSIS. Removing this file does not remove the rules — they are in .chassis/rules.md and every other AI editor config file in this project.*
 `;

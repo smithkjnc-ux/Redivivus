@@ -1,8 +1,8 @@
 // [SCOPE] Manages and updates the VS Code status bar items for CHASSIS — blueprint, session, tokens, save status
 import * as vscode from 'vscode';
-import { ChassisService } from '../../services/chassisService.js';
-import { SessionService } from '../../services/sessionService.js';
-import { UsageTracker } from '../../services/usageTracker.js';
+import type { ChassisService } from '../../services/chassisService.js';
+import type { SessionService } from '../../services/sessionService.js';
+import type { UsageTracker } from '../../services/usageTracker.js';
 import { getDuration } from '../../services/sessionStorage.js';
 
 export class StatusBar {

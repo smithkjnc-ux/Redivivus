@@ -2,8 +2,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisService } from '../chassisService.js';
-import { RoutingService } from '../ai/routingService.js';
+import type { ChassisService } from '../chassisService.js';
+import type { RoutingService } from '../ai/routingService.js';
 
 export interface ScopeIssue {
   type: 'missing_file' | 'extra_file' | 'drift';

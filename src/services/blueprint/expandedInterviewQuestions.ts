@@ -2,7 +2,7 @@
 // WHO+WHAT+WHERE -> expandedInterviewQuestionsA.ts
 // WHEN+WHY -> expandedInterviewQuestionsB.ts
 
-import { InterviewQuestion } from './expandedInterview.js';
+import type { InterviewQuestion } from './expandedInterview.js';
 import { EXPANDED_QUESTIONS_A } from './expandedInterviewQuestionsA.js';
 import { EXPANDED_QUESTIONS_B } from './expandedInterviewQuestionsB.js';
 

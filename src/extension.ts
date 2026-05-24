@@ -9,12 +9,12 @@ import { SessionService } from './services/sessionService.js';
 import { RulesService } from './services/rulesService.js';
 import { ChangeTracker } from './services/build/changeTracker.js';
 import { MeasureTwiceService } from './services/build/measureTwiceService.js';
-import { ChatPanel } from './ui/chat/chatPanel.js';
-import { WizardService } from './services/wizardService.js';
-import { RetrofitService } from './services/retrofitService.js';
+import { ChatPanel } from './ui/panels/chat/chatPanel';
+import { WizardService } from './ui/panels/wizard/wizardService';
+import { RetrofitService } from './core/retrofit/retrofitService';
 import { RoutingService } from './services/ai/routingService.js';
 import { GuideService } from './services/guideService.js';
-import { AnalyzerService } from './services/analyzerService.js';
+import { AnalyzerService } from './ui/panels/analyzer/analyzerService';
 import { AnnotationService } from './services/annotationService.js';
 import { VaultService } from './services/vault/vaultService.js';
 import { VaultContextService } from './services/vault/vaultContextService.js';
@@ -23,11 +23,14 @@ import { StatusBar } from './ui/views/statusBar.js';
 import { UsageTracker } from './services/usageTracker.js';
 import { GuardianService } from './services/ai/guardianService.js';
 import { GitHubBackupService } from './services/githubBackupService.js';
-import { runDiagnostic } from './services/selfDiagnostic.js';
+import { runDiagnostic } from './core/diagnostics/selfDiagnostic';
 
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
 import { resumePendingState } from './extensionResumeState.js';
+import { initChassisLogger, chassisLog, finalizeChassisLogger } from './services/logging/chassisLogger.js';
+import { initProjectContextLogger } from './services/logging/projectContextLogger.js';
+import { initMasterLogger } from './core/logging/masterLogger.js';
 
 // [WARN] Synchronous suppress flag — set BEFORE updateWorkspaceFolders fires onDidChangeWorkspaceFolders.
 // globalState.update() is async and loses the race against the folder-change event, causing a duplicate panel.
@@ -73,6 +76,23 @@ export function activate(context: vscode.ExtensionContext) {
     }, 3000);
   }
 
+  // [CHASSIS] Initialize comprehensive logging and project context tracking
+  const initialRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (initialRoot) {
+    try {
+      const sessionId = initChassisLogger(initialRoot);
+      chassisLog({ operation: 'system', message: 'CHASSIS extension activated', data: { root: initialRoot, sessionId } });
+      initMasterLogger(initialRoot);
+    } catch (e) {
+      console.error('[CHASSIS] Logger init failed:', e);
+    }
+    try {
+      initProjectContextLogger(initialRoot);
+    } catch (e) {
+      console.error('[CHASSIS] Project context logger init failed:', e);
+    }
+  }
+
   // ── set initial context ──
   vscode.commands.executeCommand('setContext', 'chassis.initialized', chassisService.isInitialized());
   vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
@@ -91,6 +111,8 @@ export function activate(context: vscode.ExtensionContext) {
         if (removedPath && panelRoot && removedPath === panelRoot) {
           ChatPanel.close();
         }
+        // [LOG] Finalize logging when workspace closes
+        finalizeChassisLogger(true);
       } else if (e.added.length > 0) {
         // New folder added externally (not by onNewProject) — trigger init
         // onNewProject handles its own init inline; this only fires for external folder additions
@@ -106,6 +128,12 @@ export function activate(context: vscode.ExtensionContext) {
             context.globalState.update('chassis.suppressAutoOpen', undefined);
           }
         }
+        // [LOG] Initialize logging for new workspace
+        const addedRoot = e.added[0]?.uri.fsPath;
+        if (addedRoot) {
+          const sessionId = initChassisLogger(addedRoot);
+          chassisLog({ operation: 'system', message: 'Workspace opened', data: { root: addedRoot, sessionId } });
+        }
       }
     })
   );
@@ -114,17 +142,11 @@ export function activate(context: vscode.ExtensionContext) {
   resumePendingState(context, [chassisService, routingService, usageTracker, vaultService]);
 
   // ── chat panel command ──
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openChatPanel', () => {
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
-    })
-  );
+  context.subscriptions.push(vscode.commands.registerCommand('chassis.openChatPanel', () => ChatPanel.show(chassisService, routingService, usageTracker, vaultService)));
 
   // ── sidebar view with CHASSIS functions ──
   const sidebarProvider = new (ChassisSidebarProvider as any)(chassisService, sessionService);
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(ChassisSidebarProvider.viewType, sidebarProvider)
-  );
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider(ChassisSidebarProvider.viewType, sidebarProvider));
 
   // ── auto-open chat panel on startup (first activation only) ──
   // Guard: skip if pendingChassisInit is queued — runAutoInit poll will create the panel at the right time
@@ -159,19 +181,13 @@ export function activate(context: vscode.ExtensionContext) {
   registerOnNewProject(context);
 
   // ── self-diagnostic command ──
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.selfDiagnostic', () => {
-      runDiagnostic(context, chassisService);
-    })
-  );
+  context.subscriptions.push(vscode.commands.registerCommand('chassis.selfDiagnostic', () => runDiagnostic(context, chassisService)));
 
   // ── pipeline trace viewer ──
-  context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.showPipelineTrace', async () => {
-      const { tracer } = await import('./services/pipelineTracer.js');
-      tracer.show();
-    })
-  );
+  context.subscriptions.push(vscode.commands.registerCommand('chassis.showPipelineTrace', async () => {
+    const { tracer } = await import('./services/pipelineTracer.js');
+    tracer.show();
+  }));
 
   // ── register all commands ──
   const githubBackupService = new GitHubBackupService(context);

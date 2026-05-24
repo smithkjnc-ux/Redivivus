@@ -4,8 +4,8 @@
 // Only pulls MIT/Apache/BSD licensed code. Never overwrites user vault items.
 
 import * as crypto from 'crypto';
-import { VaultItem, VaultCategory } from './vaultTypes.js';
-import { VaultService } from './vaultService.js';
+import type { VaultItem, VaultCategory } from './vaultTypes.js';
+import type { VaultService } from './vaultService.js';
 import { getStarterPatterns } from '../project/starterPatterns.js';
 
 // [DONE] Added: localStorage, date format, DOM helpers, array utilities, CSS animation

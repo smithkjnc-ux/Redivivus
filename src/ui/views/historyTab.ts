@@ -2,12 +2,12 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import { ChassisService } from '../../services/chassisService.js';
+import type { ChassisService } from '../../services/chassisService.js';
 
 export function getSessionHistory(chassis: ChassisService): {html:string,path:string}[] {
-  if (!chassis.isInitialized()) return [];
+  if (!chassis.isInitialized()) {return [];}
   const sessDir = chassis.sessionsDir;
-  if (!fs.existsSync(sessDir)) return [];
+  if (!fs.existsSync(sessDir)) {return [];}
   try {
     const files = fs.readdirSync(sessDir).filter(f => f.endsWith('.json')).sort().reverse().slice(0, 10);
     return files.map(f => {
@@ -25,9 +25,9 @@ export function getSessionHistory(chassis: ChassisService): {html:string,path:st
 }
 
 export function getReviews(chassis: ChassisService): {html:string,path:string}[] {
-  if (!chassis.isInitialized()) return [];
+  if (!chassis.isInitialized()) {return [];}
   const revDir = path.join(chassis.chassisDir, 'reviews');
-  if (!fs.existsSync(revDir)) return [];
+  if (!fs.existsSync(revDir)) {return [];}
   try {
     return fs.readdirSync(revDir).filter(f => f.endsWith('.md')).sort().reverse().slice(0, 10)
       .map(f => ({

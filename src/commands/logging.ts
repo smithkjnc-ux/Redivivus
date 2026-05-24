@@ -2,8 +2,8 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import { ChassisService } from '../services/chassisService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerLoggingCommands(
   context: vscode.ExtensionContext,

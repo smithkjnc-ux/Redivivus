@@ -62,7 +62,7 @@ export function checkBuildSafety(task: string): SafetyReport {
 
 /** Formats a SafetyReport into a human-readable chat message block. */
 export function formatSafetyReport(report: SafetyReport): string {
-  if (report.flags.length === 0) return '';
+  if (report.flags.length === 0) {return '';}
   const lines = [`**🛡️ Pre-Build Safety Check** — Score: ${report.score}/100\n${report.summary}\n`];
   for (const f of report.flags) {
     const icon = f.level === 'block' ? '🚫' : '⚠️';

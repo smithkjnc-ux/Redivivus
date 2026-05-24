@@ -2,10 +2,10 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { ChangeTracker } from '../services/build/changeTracker.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import type { ChangeTracker } from '../services/build/changeTracker.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerReviewCommands(
   context: vscode.ExtensionContext,

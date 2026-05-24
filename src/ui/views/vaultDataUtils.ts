@@ -1,7 +1,8 @@
 // [SCOPE] Vault data utilities — getVaultItems, getVaultCategoryCounts, HTML escaping
 // Called by vaultScanSummary and vaultTabRenderer. No rendering logic here.
 
-import { VaultService, VaultCategory, VaultItem, VAULT_CATEGORIES } from '../../services/vault/vaultService.js';
+import type { VaultService, VaultItem} from '../../services/vault/vaultService.js';
+import { VaultCategory, VAULT_CATEGORIES } from '../../services/vault/vaultService.js';
 
 export function getVaultItems(vaultService: VaultService): VaultItem[] {
   return vaultService.listItems();
@@ -10,7 +11,7 @@ export function getVaultItems(vaultService: VaultService): VaultItem[] {
 export function getVaultCategoryCounts(vaultService: VaultService): Record<string, number> {
   const all = vaultService.listItems();
   const counts: Record<string, number> = {};
-  for (const c of VAULT_CATEGORIES) counts[c] = 0;
+  for (const c of VAULT_CATEGORIES) {counts[c] = 0;}
   for (const item of all) {
     counts[item.category] = (counts[item.category] || 0) + 1;
   }

@@ -2,8 +2,8 @@
 // Split from 327-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import { ChassisService } from '../chassisService.js';
-import { GuardianConfig, HealthScore, RiskReport, FileMetrics, ELI5Entry } from './guardianTypes.js';
+import type { ChassisService } from '../chassisService.js';
+import type { GuardianConfig, HealthScore, RiskReport, FileMetrics, ELI5Entry } from './guardianTypes.js';
 import { computeHealthScore } from './guardianHealth.js';
 import { scanForRisks, analyzeFileMetrics } from './guardianRisk.js';
 import { translateToELI5 } from './guardianELI5.js';

@@ -47,7 +47,7 @@ export class WorkspaceContextService {
 
   async getContext(): Promise<WorkspaceContext | null> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) return null;
+    if (!root) {return null;}
     if (this.cache && Date.now() - this.cacheTime < this.CACHE_TTL) { return this.cache; }
     this.cache = await this.buildContext(root);
     this.cacheTime = Date.now();

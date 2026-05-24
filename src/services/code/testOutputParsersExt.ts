@@ -2,7 +2,7 @@
 // Extracted from testOutputParsers.ts
 
 import * as path from 'path';
-import { TestResult, TestFailure } from './testExecutionService.js';
+import type { TestResult, TestFailure } from './testExecutionService.js';
 
 export function parseCargoOutput(output: string, duration: number): TestResult {
   // Pattern: "test result: ok. X passed; Y failed"
@@ -42,7 +42,7 @@ export function parseCargoOutput(output: string, duration: number): TestResult {
     
     // Capture failure output
     if (inFailure && currentFailure && line.trim()) {
-      if (!currentFailure.message) currentFailure.message = '';
+      if (!currentFailure.message) {currentFailure.message = '';}
       currentFailure.message += line + '\n';
     }
   }

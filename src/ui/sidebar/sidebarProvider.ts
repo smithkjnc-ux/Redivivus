@@ -1,8 +1,8 @@
 // [SCOPE] Structured sidebar — section headers + action items for all CHASSIS commands
 
 import * as vscode from 'vscode';
-import { ChassisService } from '../../services/chassisService.js';
-import { SessionService } from '../../services/sessionService.js';
+import type { ChassisService } from '../../services/chassisService.js';
+import type { SessionService } from '../../services/sessionService.js';
 
 type NodeType = 'section' | 'action' | 'disabled';
 

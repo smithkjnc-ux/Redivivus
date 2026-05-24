@@ -1,140 +1,130 @@
-// [SCOPE] GitHub auto-backup service — initializes git, creates/links a GitHub repo, and auto-commits + pushes on a configurable schedule or on every build.
+// [SCOPE] GitHub integration — token in VS Code secret storage, manual-only commits (never auto).
+// User connects once in Setup Hub. CHASSIS never commits or pushes without explicit user action.
+// validateToken(): verifies PAT against GitHub API before saving.
+// commitFiles(): commits specific files only — never git add -A on user's full project.
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync, exec } from 'child_process';
 
-export interface GitHubBackupConfig {
-  enabled: boolean;
-  token: string;          // GitHub personal access token
-  username: string;       // GitHub username
-  repoName: string;       // repo name (auto-derived from project folder if empty)
-  autoBackupOnBuild: boolean;
-  autoBackupInterval: number; // minutes, 0 = off
+export interface GitHubConfig {
+  username: string;
+  repoName: string;
   private: boolean;
 }
 
-const CONFIG_KEY = 'chassis.githubBackup';
+const CFG_KEY = 'chassis.githubConfig';
+const SECRET_KEY = 'chassis.github.token';
+const DEFAULT_GITIGNORE = 'node_modules/\n.env\n*.log\n.chassis/logs/\n';
 
 export class GitHubBackupService {
-  private _timer: NodeJS.Timeout | undefined;
-  private _root: string;
   private _context: vscode.ExtensionContext;
 
   constructor(context: vscode.ExtensionContext) {
     this._context = context;
-    this._root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
   }
 
-  /** Returns current backup config from global state */
-  getConfig(): GitHubBackupConfig {
-    return this._context.globalState.get<GitHubBackupConfig>(CONFIG_KEY, {
-      enabled: false,
-      token: '',
-      username: '',
-      repoName: '',
-      autoBackupOnBuild: true,
-      autoBackupInterval: 0,
-      private: true,
-    });
+  private get _root(): string {
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
   }
 
-  /** Saves config to global state */
-  async saveConfig(config: GitHubBackupConfig): Promise<void> {
-    await this._context.globalState.update(CONFIG_KEY, config);
+  /** Token stored in VS Code SecretStorage — never in globalState or on disk */
+  async getToken(): Promise<string> {
+    return (await this._context.secrets.get(SECRET_KEY)) || '';
   }
 
-  /** One-time setup: init git, create GitHub repo, add remote, push */
-  async setupRepo(): Promise<{ success: boolean; message: string }> {
-    if (!this._root) { return { success: false, message: 'No workspace folder open.' }; }
-    const cfg = this.getConfig();
-    if (!cfg.token || !cfg.username) {
-      return { success: false, message: 'GitHub token and username required. Run "chassis: Configure GitHub Backup".' };
-    }
+  async storeToken(token: string): Promise<void> {
+    if (token) { await this._context.secrets.store(SECRET_KEY, token); }
+    else { await this._context.secrets.delete(SECRET_KEY); }
+  }
 
-    const repoName = cfg.repoName || path.basename(this._root);
+  /** Non-sensitive config (username, repo name, visibility) in globalState */
+  getConfig(): GitHubConfig {
+    return this._context.globalState.get<GitHubConfig>(CFG_KEY, { username: '', repoName: '', private: true });
+  }
 
+  async saveConfig(cfg: GitHubConfig): Promise<void> {
+    await this._context.globalState.update(CFG_KEY, cfg);
+  }
+
+  /** Validates PAT against GitHub API — returns login name on success */
+  async validateToken(token: string): Promise<{ valid: boolean; login?: string; error?: string }> {
     try {
-      // Init git if not already
-      if (!fs.existsSync(path.join(this._root, '.git'))) {
-        execSync('git init', { cwd: this._root });
-        execSync('git checkout -b main', { cwd: this._root });
+      const res = await fetch('https://api.github.com/user', {
+        headers: { 'Authorization': `token ${token}`, 'User-Agent': 'CHASSIS-Extension' },
+      });
+      if (res.ok) {
+        const data = await res.json() as { login?: string };
+        return { valid: true, login: data.login };
       }
+      return { valid: false, error: res.status === 401 ? 'Token rejected by GitHub' : `GitHub error ${res.status}` };
+    } catch {
+      return { valid: false, error: 'Network error — check your connection' };
+    }
+  }
 
-      // Create .gitignore if missing
-      const giPath = path.join(this._root, '.gitignore');
-      if (!fs.existsSync(giPath)) {
-        fs.writeFileSync(giPath, 'node_modules/\n.env\n*.log\n');
+  async isConnected(): Promise<boolean> {
+    return !!(await this.getToken());
+  }
+
+  /** One-time per-project: git init, create GitHub repo, add remote, initial push */
+  async setupRepo(): Promise<{ success: boolean; message: string }> {
+    const token = await this.getToken();
+    const cfg = this.getConfig();
+    const root = this._root;
+    if (!token || !cfg.username) { return { success: false, message: 'GitHub not connected. Open Setup Hub to connect.' }; }
+    if (!root) { return { success: false, message: 'No workspace folder open.' }; }
+    const repoName = cfg.repoName || path.basename(root);
+    try {
+      if (!fs.existsSync(path.join(root, '.git'))) {
+        execSync('git init', { cwd: root, stdio: 'ignore' });
+        try { execSync('git checkout -b main', { cwd: root, stdio: 'ignore' }); } catch { }
       }
-
-      // Create GitHub repo via API
+      if (!fs.existsSync(path.join(root, '.gitignore'))) {
+        fs.writeFileSync(path.join(root, '.gitignore'), DEFAULT_GITIGNORE, 'utf-8');
+      }
       const createRes = await fetch('https://api.github.com/user/repos', {
         method: 'POST',
-        headers: {
-          'Authorization': `token ${cfg.token}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'CHASSIS-Extension',
-        },
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'CHASSIS-Extension' },
         body: JSON.stringify({ name: repoName, private: cfg.private, auto_init: false }),
       });
-
       if (!createRes.ok && createRes.status !== 422) {
-        // 422 = repo already exists, that's fine
         const err = await createRes.json() as { message?: string };
         return { success: false, message: `GitHub API error: ${err.message || createRes.status}` };
       }
-
-      const remoteUrl = `https://${cfg.token}@github.com/${cfg.username}/${repoName}.git`;
-
-      // Add or update remote
-      try { execSync('git remote remove origin', { cwd: this._root }); } catch { /* no remote yet */ }
-      execSync(`git remote add origin ${remoteUrl}`, { cwd: this._root });
-
-      // Initial commit + push
-      await this.backup('Initial CHASSIS backup');
-
-      await this.saveConfig({ ...cfg, repoName });
-      return { success: true, message: `✅ Repo "${repoName}" created and pushed to GitHub.` };
-
+      const remoteUrl = `https://${cfg.username}:${token}@github.com/${cfg.username}/${repoName}.git`;
+      try { execSync('git remote remove origin', { cwd: root, stdio: 'ignore' }); } catch { }
+      execSync(`git remote add origin ${remoteUrl}`, { cwd: root, stdio: 'ignore' });
+      await this.commitFiles('Initial CHASSIS commit', []);
+      await this._context.globalState.update(CFG_KEY, { ...cfg, repoName });
+      return { success: true, message: `Repo "${repoName}" created on GitHub.` };
     } catch (e) {
       return { success: false, message: `Setup failed: ${e instanceof Error ? e.message : String(e)}` };
     }
   }
 
-  /** Commits and pushes all changes with a timestamped message */
-  async backup(message?: string): Promise<{ success: boolean; message: string }> {
-    if (!this._root) { return { success: false, message: 'No workspace open.' }; }
-    const cfg = this.getConfig();
-    if (!cfg.enabled) { return { success: false, message: 'GitHub backup is disabled.' }; }
-
-    const commitMsg = message || `CHASSIS backup — ${new Date().toISOString().replace('T', ' ').slice(0, 19)}`;
-
+  /** Commits specific files and pushes. Called only when user explicitly clicks Commit in the result card. */
+  async commitFiles(message: string, files: string[]): Promise<{ success: boolean; message: string }> {
+    const token = await this.getToken();
+    const root = this._root;
+    if (!token) { return { success: false, message: 'GitHub not connected.' }; }
+    if (!root) { return { success: false, message: 'No workspace folder open.' }; }
     return new Promise(resolve => {
-      exec(
-        `git add -A && git diff --cached --quiet || git commit -m "${commitMsg}" && git push origin main --force-with-lease`,
-        { cwd: this._root },
-        (err, _stdout, stderr) => {
-          if (err && !stderr.includes('nothing to commit')) {
-            resolve({ success: false, message: `Backup failed: ${stderr || err.message}` });
+      try {
+        const addParts = files.length > 0
+          ? files.map(f => `git add -- "${(path.isAbsolute(f) ? f : path.join(root, f)).replace(/"/g, '\\"')}"`).join(' && ')
+          : 'git add -A';
+        const safeMsg = message.replace(/"/g, "'").replace(/\n/g, ' ').slice(0, 150);
+        const cmd = `${addParts} && git diff --cached --quiet || (git commit -m "${safeMsg}" && git push origin main --force-with-lease)`;
+        exec(cmd, { cwd: root }, (err, _stdout, stderr) => {
+          if (err && !stderr?.includes('nothing to commit')) {
+            resolve({ success: false, message: stderr || err.message });
           } else {
-            resolve({ success: true, message: `✅ Backed up to GitHub: "${commitMsg}"` });
+            resolve({ success: true, message: `Committed: "${safeMsg}"` });
           }
-        }
-      );
+        });
+      } catch (e) { resolve({ success: false, message: String(e) }); }
     });
-  }
-
-  /** Start interval-based auto-backup timer */
-  startTimer(): void {
-    const cfg = this.getConfig();
-    if (this._timer) { clearInterval(this._timer); this._timer = undefined; }
-    if (cfg.enabled && cfg.autoBackupInterval > 0) {
-      this._timer = setInterval(() => { this.backup(); }, cfg.autoBackupInterval * 60 * 1000);
-    }
-  }
-
-  stopTimer(): void {
-    if (this._timer) { clearInterval(this._timer); this._timer = undefined; }
   }
 }

@@ -1,8 +1,8 @@
 // [SCOPE] CHASSIS Timeline Command — view project history in chat panel
 
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 import { TimelineService } from '../services/timelineService.js';
 
 export function registerTimelineCommand(

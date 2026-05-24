@@ -2,7 +2,7 @@
 // Asks the AI: Is this reusable? What does it do? Quality score 1-5?
 // Only items scoring 3+ get saved. Prevents junk accumulation.
 
-import { AIResponse } from '../ai/routingTypes.js';
+import type { AIResponse } from '../ai/routingTypes.js';
 
 export interface QualityVerdict {
   reusable: boolean;

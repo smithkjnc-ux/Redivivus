@@ -2,8 +2,8 @@
 // Split from 202-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import { ChassisService } from './chassisService.js';
-import { SessionService } from './sessionService.js';
+import type { ChassisService } from './chassisService.js';
+import type { SessionService } from './sessionService.js';
 import { buildGuide } from './guideContent.js';
 import { mdToHtml } from './guideMarkdown.js';
 

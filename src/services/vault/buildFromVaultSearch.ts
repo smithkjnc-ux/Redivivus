@@ -1,7 +1,7 @@
 // [SCOPE] Build from vault search — task-aware vault search with keyword extraction and scoring
 // Called by buildFromVaultService. No build planning or assembly logic here.
 
-import { VaultItem } from './vaultService.js';
+import type { VaultItem } from './vaultService.js';
 
 export interface VaultSearchResult {
   items: Array<VaultItem & { score: number }>;
@@ -35,6 +35,8 @@ export function findRelevantByTask(task: string, items: VaultItem[]): VaultSearc
         item.sourceFile.toLowerCase(),
         item.category,
         item.tags.join(' '),
+        (item.description || '').toLowerCase(),
+        ((item as any).useCase || '').toLowerCase(),
         item.code.slice(0, 300).toLowerCase(),
       ].join(' ');
 

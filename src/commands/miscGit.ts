@@ -1,7 +1,7 @@
 // [SCOPE] CHASSIS Misc commands — git auto-commit
 
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
+import type { ChassisService } from '../services/chassisService.js';
 import { SessionService } from '../services/sessionService.js';
 
 export function registerGitCommands(context: vscode.ExtensionContext, chassis: ChassisService): void {

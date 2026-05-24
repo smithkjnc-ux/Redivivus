@@ -1,6 +1,6 @@
 // [SCOPE] Vault code extraction — Python, Markdown, and category helpers
 import * as path from 'path';
-import { ExtractedBlock, VaultCategory } from './vaultTypes.js';
+import type { ExtractedBlock, VaultCategory } from './vaultTypes.js';
 import { isVaultWorthy } from './vaultExtractorQuality.js';
 
 export function extractPython(lines: string[], filePath: string): ExtractedBlock[] {
@@ -69,7 +69,7 @@ export function suggestCategory(name: string, code: string): VaultCategory {
     { keywords: ['pattern', 'factory', 'singleton', 'observer', 'middleware', 'decorator', 'strategy', 'proxy', 'builder'], category: 'pattern' },
   ];
   for (const rule of rules) {
-    if (rule.keywords.some(kw => text.includes(kw))) return rule.category;
+    if (rule.keywords.some(kw => text.includes(kw))) {return rule.category;}
   }
   return 'other';
 }
@@ -77,9 +77,9 @@ export function suggestCategory(name: string, code: string): VaultCategory {
 export function generateDescription(name: string, code: string): string {
   const firstLine = code.split('\n')[0]?.trim() || '';
   const commentMatch = code.match(/\/\*\*?\s*(.+?)\*\//);
-  if (commentMatch) return commentMatch[1].trim();
+  if (commentMatch) {return commentMatch[1].trim();}
   const lineComment = code.match(/\/\/\s*(.+)/);
-  if (lineComment && !firstLine.includes('import')) return lineComment[1].trim();
+  if (lineComment && !firstLine.includes('import')) {return lineComment[1].trim();}
   return `${name} — extracted code block`;
 }
 

@@ -4,8 +4,8 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { execSync } from 'child_process';
-import { ChassisService } from '../chassisService.js';
-import { SetupStep } from './setupProgressService.js';
+import type { ChassisService } from '../chassisService.js';
+import type { SetupStep } from './setupProgressService.js';
 import { getResolvedPaths } from '../resolvedItems.js';
 
 type Ctx = { chassis: ChassisService; root: string };

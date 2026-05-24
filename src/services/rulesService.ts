@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisService } from './chassisService.js';
+import type { ChassisService } from './chassisService.js';
 import { buildRules } from './rulesContent.js';
 import { wrapForClaude, wrapForGemini } from './rulesWrappers.js';
 

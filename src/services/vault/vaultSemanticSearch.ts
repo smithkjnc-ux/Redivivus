@@ -3,7 +3,7 @@
 // Catches any wording, grammar variations, synonyms — not just keyword overlap.
 // [WARN] Makes one AI call per build request. Keep the prompt compact to stay under 500 tokens.
 
-import { VaultItem } from './vaultTypes.js';
+import type { VaultItem } from './vaultTypes.js';
 import { suggestCategory } from './vaultService.js';
 
 export interface SemanticMatch {

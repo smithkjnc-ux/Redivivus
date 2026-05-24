@@ -1,7 +1,7 @@
 // [SCOPE] Usage HTML template — full webview HTML for CHASSIS usage report
 // CSS extracted to usageHtmlStyles.ts. Imported by usageCommands.ts.
 
-import { UsageReport, UsageEntry } from '../services/usageTracker.js';
+import type { UsageReport, UsageEntry } from '../services/usageTracker.js';
 import { getUsageCss } from './usageHtmlStyles.js';
 
 export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>, history?: UsageEntry[]): string {
@@ -16,7 +16,7 @@ export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; l
   const formatAIBreakdown = (byAI: { aiProvider: string; tokens: number; cost: number; messages: number }[], periodRoster?: typeof roster) => {
     const displayRoster = periodRoster || roster;
     if (!displayRoster || displayRoster.length === 0) {
-      if (!byAI || byAI.length === 0) return '';
+      if (!byAI || byAI.length === 0) {return '';}
       const lines = byAI.map(ai =>
         `        <div class="ai-breakdown">
           <span class="ai-name">&#x21B3; ${aiLabels[ai.aiProvider] || ai.aiProvider}</span>

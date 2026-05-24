@@ -1,12 +1,12 @@
 // [SCOPE] Architecture Map tab renderer for the CHASSIS dashboard
 // Logic moved from mapPanel.ts to support dashboard integration while keeping file sizes small.
 
-import { ProjectMap } from '../../services/mapBuilderService.js';
+import type { ProjectMap } from '../../services/mapBuilderService.js';
 import { MAP_SCRIPT } from '../map/mapScript.js';
 import { MAP_STYLES } from '../map/mapStyles.js';
 
 export function renderMapTab(map: ProjectMap, projectName: string, active: boolean): string {
-  if (!active) return '<div id="tab-map" class="tab-content"></div>';
+  if (!active) {return '<div id="tab-map" class="tab-content"></div>';}
   
   const title = projectName + ' — Architecture Map';
   const data = JSON.stringify(map);

@@ -1,7 +1,7 @@
 // [SCOPE] Vault Context Service — finds relevant vault items before AI writes code
 
 import * as path from 'path';
-import { VaultService, VaultItem } from './vaultService.js';
+import type { VaultService, VaultItem } from './vaultService.js';
 
 export interface VaultContext {
   items: VaultItem[];
@@ -180,6 +180,14 @@ export class VaultContextService {
     lines.push('=== END VAULT CONTEXT ===');
     return lines.join('\n');
   }
+}
+
+/** Returns false when user has disabled vault context injection in Setup Hub. Defaults to true. */
+export function isVaultEnabled(): boolean {
+  try {
+    const ctx = (require('../../ui/panels/chat/chatPanel.js') as any).ChatPanel?.extensionContext;
+    return ctx ? ctx.globalState.get('chassis.vaultEnabled', true) !== false : true;
+  } catch { return true; }
 }
 
 /** Standalone formatter — call with findRelevantByTask results to get a vault context block for any AI prompt. */

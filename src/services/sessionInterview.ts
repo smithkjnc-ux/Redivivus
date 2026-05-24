@@ -2,7 +2,7 @@
 // Called by sessionService. No session lifecycle or file writing logic here.
 
 import * as vscode from 'vscode';
-import { ExitInterview } from '../types/index.js';
+import type { ExitInterview } from '../types/index.js';
 
 export async function runExitInterview(): Promise<ExitInterview | null> {
   // [WARN] User interaction point, can be canceled.

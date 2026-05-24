@@ -3,10 +3,11 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { VaultService, VaultItem } from './vaultService.js';
-import { RoutingService } from '../ai/routingService.js';
+import type { VaultService, VaultItem } from './vaultService.js';
+import type { RoutingService } from '../ai/routingService.js';
 import { BuildPlan } from './buildFromVaultTypes.js';
-import { findRelevantByTask, VaultSearchResult } from './buildFromVaultSearch.js';
+import type { VaultSearchResult } from './buildFromVaultSearch.js';
+import { findRelevantByTask } from './buildFromVaultSearch.js';
 import { BuildFromVaultModal } from '../../ui/views/buildFromVaultModal.js';
 import { handleBuildOutput } from './buildFromVaultOutput.js';
 

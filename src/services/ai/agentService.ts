@@ -1,9 +1,10 @@
 // [SCOPE] Agentic Execution Service.
 // Runs the Supervisor AI in a ReAct (Reasoning and Acting) loop, allowing it to autonomously use tools.
 
-import { BUILT_IN_TOOLS, getToolInstructions, AgentContext } from './agentTools.js';
-import { RoutingService } from './routingService.js';
-import { AIResponse } from './routingTypes.js';
+import type { AgentContext } from './agentTools.js';
+import { BUILT_IN_TOOLS, getToolInstructions } from './agentTools.js';
+import type { RoutingService } from './routingService.js';
+import type { AIResponse } from './routingTypes.js';
 import { CHASSIS_WORKER_RULES } from './chassisWorkerRules.js';
 import { getAllTools, callTool } from '../mcpService.js';
 import { BuildLedger } from '../build/buildLedgerService.js';
@@ -44,6 +45,12 @@ CRITICAL RULES FOR CHASSIS AGENT:
 3. NO HALLUCINATIONS. Do not claim that files, folders (like 'dist/'), or executables exist unless you have actively verified them or created them yourself using tools.
 4. NEVER GUESS FILE PATHS. Always use \`list_dir\` or \`search_code\` to verify the exact path of the files you intend to modify before using \`write_file\`.
 5. Be concise in your final answer. The user wants results, not a wall of text.
+6. VERIFY YOUR WORK (MANDATORY RUNTIME TESTING). You are strictly forbidden from declaring "the fix is complete" or outputting your final answer unless you have actually executed a command via \`run_command\` that tests and proves the system works. If you wrote or edited code, run a test script, compile script, or start the server. You MUST explicitly cite the exact command you ran and the resulting command output in your final answer as proof. If you do not run a command to verify your work, your solution is incomplete and invalid.
+7. DIAGNOSE BEFORE FIXING. Read the relevant files FIRST. Understand the actual root cause before proposing a fix. If the user says "X doesn't work" and you add defensive null checks without finding the real bug, you have failed.
+8. BROWSER PROJECTS. If the project uses ES modules (\`<script type="module">\`), it MUST be served via HTTP, not opened from \`file://\`. Use \`run_command\` with \`python3 -m http.server\` or a Node.js server to verify.
+9. PROPER WEB STRUCTURE. If you create an \`.html\` file, it MUST contain a valid, fully-formed HTML5 structure (\`<!DOCTYPE html><html><body>...\`). DO NOT just write raw JavaScript or CSS directly into an \`.html\` file.
+10. NO FLAT FILES. Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects CHASSIS builds and to CHASSIS itself. No exceptions.
+11. ACTUALLY WRITE THE CODE. If the user asks you to build an app, game, or project, you MUST use the \`write_file\` tool to create the actual source files. Do NOT just output a text description, markdown checkboxes, or a plan of the project in your final answer. The user expects a working, runnable project in their workspace.
 
 AVAILABLE TOOLS:
 ${getToolInstructions()}${mcpInstructions}
@@ -73,7 +80,7 @@ Begin. Think step-by-step.`;
   const MAX_ITERATIONS = 15;
   let iterations = 0;
 
-  onUpdate('🧠 **OBD2 Agent** spinning up — analysing your task and preparing a plan...');
+  onUpdate('🧠 **Autonomous Agent** spinning up — analysing your task and preparing a plan...');
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;

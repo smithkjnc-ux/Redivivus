@@ -1,9 +1,9 @@
 // [SCOPE] Vault Enrichment — retroactively adds AI descriptions/quality scores to existing vault items
 // Run once via chassis.vault.enrich to upgrade items captured before AI quality gate was wired.
 
-import { VaultService } from './vaultService.js';
+import type { VaultService } from './vaultService.js';
 import { evaluateQuality } from './vaultQualityGate.js';
-import { AIResponse } from '../ai/routingTypes.js';
+import type { AIResponse } from '../ai/routingTypes.js';
 
 export interface EnrichResult {
   enriched: number;

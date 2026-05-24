@@ -3,11 +3,11 @@
 
 import * as fs from 'fs';
 import * as nodePath from 'path';
-import { VaultService } from './vaultService.js';
+import type { VaultService } from './vaultService.js';
 import { extractFromFile } from './vaultExtractor.js';
 import { suggestCategory } from './vaultService.js';
 import { evaluateQuality } from './vaultQualityGate.js';
-import { AIResponse } from '../ai/routingTypes.js';
+import type { AIResponse } from '../ai/routingTypes.js';
 
 export interface CaptureResult {
   newItems: number;
@@ -48,7 +48,7 @@ export async function autoCaptureFile(
 ): Promise<CaptureResult> {
   const result: CaptureResult = { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
   try {
-    if (!fs.existsSync(absPath)) return result;
+    if (!fs.existsSync(absPath)) {return result;}
     const content = fs.readFileSync(absPath, 'utf8');
     const { items, filteredCount } = extractFromFile(absPath, content);
     result.totalExtracted = items.length + filteredCount;

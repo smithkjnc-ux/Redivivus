@@ -1,6 +1,6 @@
 // [SCOPE] CHASSIS Setup Progress Command — shows the 10-step setup checklist
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
+import type { ChassisService } from '../services/chassisService.js';
 import { SetupProgressService } from '../services/project/setupProgressService.js';
 import { showSetupProgressPanel } from '../services/project/setupProgressPanel.js';
 

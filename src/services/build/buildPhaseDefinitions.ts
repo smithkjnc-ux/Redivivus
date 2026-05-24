@@ -1,8 +1,8 @@
 // [SCOPE] Build Phase Definitions — phase names, descriptions, prompts
 // Extracted from buildOrchestrator.ts
 
-import { BuildPhase, PhaseDefinition } from './buildOrchestrator.js';
-import type { ComplexityTier } from './buildOrchestrator.js';
+import { BuildPhase } from './buildOrchestrator.js';
+import type { ComplexityTier , PhaseDefinition } from './buildOrchestrator.js';
 
 export const BUILD_PHASES: PhaseDefinition[] = [
   {

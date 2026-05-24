@@ -1,7 +1,7 @@
 // [SCOPE] Setup Progress Panel HTML builder — extracted from setupProgressPanel.ts
 // Rule 13: emoji in script blocks use String.fromCodePoint(); HTML uses &#x; entities.
 
-import { SetupProgress } from './setupProgressService.js';
+import type { SetupProgress } from './setupProgressService.js';
 
 export function buildSetupProgressHtml(progress: SetupProgress): string {
   const stepsHtml = progress.steps.map(step => {

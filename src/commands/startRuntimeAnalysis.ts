@@ -8,14 +8,14 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as cp from 'child_process';
-import { loadRuntimeProfile } from '../services/runtimeProfiler.js';
+import { loadRuntimeProfile } from '../core/runtime/runtimeProfiler';
 import { buildPythonTraceScript } from '../runtime/pythonInstrumentor.js';
 import { buildJsHookScript } from '../runtime/jsInstrumentor.js';
 
-import { ChassisService } from '../services/chassisService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { UsageTracker } from '../services/usageTracker.js';
-import { VaultService } from '../services/vault/vaultService.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import type { UsageTracker } from '../services/usageTracker.js';
+import type { VaultService } from '../services/vault/vaultService.js';
 import { postToChat, deleteSafe, readTraceEntries, summariseEntries, buildConnections, buildPlainEnglishReport } from './startRuntimeAnalysisHelpers.js';
 
 const DURATION_S  = 30;
@@ -110,7 +110,7 @@ export function registerStartRuntimeAnalysisCommand(
     vscode.commands.registerCommand('chassis.startRuntimeAnalysis', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) { vscode.window.showErrorMessage('CHASSIS: No workspace folder open.'); return; }
-      const { ChatPanel } = await import('../ui/chat/chatPanel.js');
+      const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
       ChatPanel.show(chassis, routing, usageTracker, vault);
       await new Promise(r => setTimeout(r, 300));
       try {

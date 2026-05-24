@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { buildResultCard } from '../../ui/chat/chatPanelStory.js';
+import { buildResultCard } from '../../ui/panels/chat/chatPanelStory';
 
 const HISTORY_FILE = '.chassis/build_history.json';
 const MAX_ENTRIES = 50;

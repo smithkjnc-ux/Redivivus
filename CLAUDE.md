@@ -134,6 +134,10 @@ Every new file needs `[SCOPE]`. Every feature must trace back to the blueprint. 
 
 ---
 
+### Rule 13: NO FLAT FILES
+Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects CHASSIS builds and to CHASSIS itself. No exceptions, no matter what vibe editor is being used.
+
+
 ## Why These Rules Exist
 
 An AI that skips these rules — even once, even for a "small" change — breaks the chain. The next AI that opens this project will have an incomplete roadmap, missing annotations, and no way to know what was done, why, or what failed. That is the exact problem CHASSIS was built to prevent.

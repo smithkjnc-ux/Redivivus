@@ -23,5 +23,6 @@ export default [{
         eqeqeq: "warn",
         "no-throw-literal": "warn",
         semi: "warn",
+        complexity: ["warn", 10],
     },
 }];

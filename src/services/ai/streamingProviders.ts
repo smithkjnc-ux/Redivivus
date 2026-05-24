@@ -2,7 +2,7 @@
 // Used by chatPanelBuildWorker.ts to show code appearing in real-time as the AI generates it.
 // Falls back to a single onChunk call with the full response when streaming is unsupported.
 
-import { AIResponse } from './routingTypes.js';
+import type { AIResponse } from './routingTypes.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from './routingKeys.js';
 
 type KeyGetter = () => string | null;
@@ -16,14 +16,14 @@ async function readSSE(body: ReadableStream<Uint8Array>, onChunk: ChunkFn, extra
   let full = '';
   while (true) {
     const { done, value } = await reader.read();
-    if (done) break;
+    if (done) {break;}
     buf += dec.decode(value, { stream: true });
     const lines = buf.split('\n');
     buf = lines.pop() ?? '';
     for (const line of lines) {
-      if (!line.startsWith('data: ')) continue;
+      if (!line.startsWith('data: ')) {continue;}
       const raw = line.slice(6).trim();
-      if (raw === '[DONE]') continue;
+      if (raw === '[DONE]') {continue;}
       try {
         const chunk = extract(JSON.parse(raw));
         if (chunk) { full += chunk; onChunk(chunk); }
@@ -39,29 +39,31 @@ export async function streamProvider(
   text: string,
   onChunk: ChunkFn,
   timeoutMs = 300_000,
+  systemMessage?: string,
 ): Promise<AIResponse> {
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort(), timeoutMs);
   const signal = ctrl.signal;
   try {
     if (ai === 'gemini') {
-      const key = getGeminiKey(); if (!key) throw new Error('No Gemini key');
+      const key = getGeminiKey(); if (!key) {throw new Error('No Gemini key');}
       const model = 'gemini-2.5-flash';
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?key=${key}&alt=sse`;
-      const body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { maxOutputTokens: 65536 } });
+      const _sysInstruction = systemMessage ? { system_instruction: { parts: [{ text: systemMessage }] } } : {};
+        const body = JSON.stringify({ ..._sysInstruction, contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { maxOutputTokens: 65536 } });
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, signal });
-      if (!res.ok || !res.body) throw new Error(`Gemini ${res.status}`);
+      if (!res.ok || !res.body) {throw new Error(`Gemini ${res.status}`);}
       const full = await readSSE(res.body, onChunk, j => j.candidates?.[0]?.content?.parts?.[0]?.text ?? null);
       return { text: full, model, success: !!full, error: full ? undefined : 'Empty Gemini stream' };
     }
 
     if (ai === 'claude') {
-      const key = getClaudeKey(); if (!key) throw new Error('No Claude key');
+      const key = getClaudeKey(); if (!key) {throw new Error('No Claude key');}
       const model = 'claude-haiku-4-5-20251001';
       const url = 'https://api.anthropic.com/v1/messages';
-      const body = JSON.stringify({ model, max_tokens: 8192, stream: true, messages: [{ role: 'user', content: text }] });
+      const body = JSON.stringify({ model, max_tokens: 32768, stream: true, ...(systemMessage ? { system: systemMessage } : {}), messages: [{ role: 'user', content: text }] });
       const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body, signal });
-      if (!res.ok || !res.body) throw new Error(`Claude ${res.status}`);
+      if (!res.ok || !res.body) {throw new Error(`Claude ${res.status}`);}
       const full = await readSSE(res.body, onChunk, j => (j.type === 'content_block_delta' ? j.delta?.text : null) ?? null);
       return { text: full, model, success: !!full, error: full ? undefined : 'Empty Claude stream' };
     }
@@ -74,11 +76,11 @@ export async function streamProvider(
       kimi:   { url: 'https://api.moonshot.ai/v1/chat/completions',        model: 'moonshot-v1-32k',          key: getKimiKey   },
     };
     const p = providerMap[ai];
-    if (!p) throw new Error(`Unknown AI: ${ai}`);
-    const key = p.key(); if (!key) throw new Error(`No key for ${ai}`);
-    const body = JSON.stringify({ model: p.model, stream: true, messages: [{ role: 'user', content: text }] });
+    if (!p) {throw new Error(`Unknown AI: ${ai}`);}
+    const key = p.key(); if (!key) {throw new Error(`No key for ${ai}`);}
+    const _msgs: any[] = systemMessage ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }] : [{ role: 'user', content: text }]; const body = JSON.stringify({ model: p.model, stream: true, messages: _msgs });
     const res = await fetch(p.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body, signal });
-    if (!res.ok || !res.body) throw new Error(`${ai} ${res.status}`);
+    if (!res.ok || !res.body) {throw new Error(`${ai} ${res.status}`);}
     const full = await readSSE(res.body, onChunk, j => j.choices?.[0]?.delta?.content ?? null);
     return { text: full, model: p.model, success: !!full, error: full ? undefined : `Empty ${ai} stream` };
 

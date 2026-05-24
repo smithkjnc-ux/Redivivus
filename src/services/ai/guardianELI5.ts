@@ -1,7 +1,7 @@
 // [SCOPE] Guardian ELI5 translation — converts technical work-log entries to plain English for non-technical guardians
 // Called by guardianService. No risk scanning or health score logic here.
 
-import { ELI5Entry } from './guardianTypes.js';
+import type { ELI5Entry } from './guardianTypes.js';
 
 export function translateToELI5(technical: string, sessionId: string): ELI5Entry {
   // Dictionary of common technical terms → plain English

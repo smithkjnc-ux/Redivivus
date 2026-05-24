@@ -3,9 +3,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisService } from '../../services/chassisService.js';
-import { SessionService } from '../../services/sessionService.js';
-import { VaultService, VaultItem, VaultCategory } from '../../services/vault/vaultService.js';
+import type { ChassisService } from '../../services/chassisService.js';
+import type { SessionService } from '../../services/sessionService.js';
+import type { VaultItem, VaultCategory } from '../../services/vault/vaultService.js';
+import { VaultService } from '../../services/vault/vaultService.js';
 import { RoutingService } from '../../services/ai/routingService.js';
 import { getStyles } from '../styles.js';
 import { getScripts } from './scripts.js';
@@ -15,7 +16,8 @@ import { renderFilesTab, renderSwitchForm } from './filesTab.js';
 import { renderHistoryTab, getSessionHistory, getReviews } from './historyTab.js';
 import { renderVaultTab, renderVaultScanSummary, getVaultItems } from './vaultTab.js';
 import { renderWizardStep } from './wizardSteps.js';
-import { attachMessageRouter, WizardPanelState } from '../messageRouter.js';
+import type { WizardPanelState } from '../messageRouter.js';
+import { attachMessageRouter } from '../messageRouter.js';
 
 export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'chassisPanel';
@@ -112,9 +114,9 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
     let badges = '';
     if (initialized) {
       const parts: string[] = [];
-      if (blueprintLocked) parts.push('<span class="badge green">Blueprint Locked</span>');
-      else if (hasBlueprint) parts.push('<span class="badge yellow">Blueprint Draft</span>');
-      if (sessionActive) parts.push('<span class="badge green">Session Active</span>');
+      if (blueprintLocked) {parts.push('<span class="badge green">Blueprint Locked</span>');}
+      else if (hasBlueprint) {parts.push('<span class="badge yellow">Blueprint Draft</span>');}
+      if (sessionActive) {parts.push('<span class="badge green">Session Active</span>');}
       parts.push(`<span class="badge ${aiBadgeColor}">${aiBadgeLabel}</span>`);
       badges = '<div class="badges">' + parts.join('') + '</div>';
     }

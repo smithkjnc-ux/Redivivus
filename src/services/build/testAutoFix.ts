@@ -3,7 +3,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { BuildContext, updateLastMsg, appendMsg } from '../../ui/chat/chatPanelBuildHelpers.js';
+import type { BuildContext} from '../../core/build/chatPanelBuildHelpers';
+import { updateLastMsg, appendMsg } from '../../core/build/chatPanelBuildHelpers';
 import { runTests } from './testRunner.js';
 
 const MAX_RETRIES = 3;

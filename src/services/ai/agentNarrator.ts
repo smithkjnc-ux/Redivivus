@@ -32,10 +32,16 @@ export function narrateTool(toolName: string, args: Record<string, any>, iterati
     }
     case 'write_file': {
       const fp = args.filePath || args.path || 'unknown file';
-      const lineCount = (args.content || '').split('\n').length;
-      const isNew = !(args.content || '').includes('// [DONE]');
+      const content = args.content || '';
+      const lineCount = content.split('\n').length;
+      const isNew = !content.includes('// [DONE]');
       const verb = isNew ? 'Creating' : 'Updating';
-      return `✍️ ${step}\n\n**${verb}** \`${fp}\` — writing ${lineCount} lines of code to disk.`;
+      const ext = fp.split('.').pop()?.toLowerCase() || '';
+      // [CHASSIS] Show actual code in the chat — truncate at 30 lines for readability
+      const previewLines = content.split('\n').slice(0, 30);
+      const truncated = lineCount > 30 ? `\n... (${lineCount - 30} more lines)` : '';
+      const codeBlock = '```' + ext + '\n' + previewLines.join('\n') + truncated + '\n```';
+      return `✍️ ${step}\n\n**${verb}** \`${fp}\` — writing ${lineCount} lines:\n\n${codeBlock}`;
     }
     case 'run_command': {
       const cmd = args.command || args.cmd || '';

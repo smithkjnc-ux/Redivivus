@@ -62,11 +62,11 @@ export async function detectTestFramework(rootPath: string): Promise<TestFramewo
         if (pkg.scripts?.test) {
           // Check for specific test runner in dependencies
           const deps = { ...pkg.dependencies, ...pkg.devDependencies };
-          if (framework.name === 'jest' && deps.jest) return framework;
-          if (framework.name === 'vitest' && deps.vitest) return framework;
-          if (framework.name === 'mocha' && deps.mocha) return framework;
+          if (framework.name === 'jest' && deps.jest) {return framework;}
+          if (framework.name === 'vitest' && deps.vitest) {return framework;}
+          if (framework.name === 'mocha' && deps.mocha) {return framework;}
           // Default to jest if test script exists
-          if (framework.name === 'jest') return framework;
+          if (framework.name === 'jest') {return framework;}
         }
       } else {
         return framework;

@@ -1,13 +1,14 @@
 // [SCOPE] CHASSIS Build Orchestrator — prompt generation helpers.
 // Extracted from buildOrchestrator.ts to keep source files under 200 lines.
 
-import { BuildOrchestrator, BuildPlan, PhaseDefinition, BuildPhase } from './buildOrchestrator.js';
+import type { BuildOrchestrator, BuildPhase } from './buildOrchestrator.js';
+import { BuildPlan, PhaseDefinition } from './buildOrchestrator.js';
 import { BUILD_PHASES } from './buildPhaseDefinitions.js';
 import { CHASSIS_WORKER_RULES } from '../ai/chassisWorkerRules.js';
 
   export function getPlanSummaryImpl(orch: BuildOrchestrator, planId: string): string {
     const plan = (orch as any).plans.get(planId);
-    if (!plan) return 'No active build plan.';
+    if (!plan) {return 'No active build plan.';}
     const current = (orch as any).getCurrentPhase(planId);
     const progress = Math.round((plan.completedPhases.length / plan.phases.length) * 100);
     let summary = `## 🏗️ Build Plan: ${plan.task}\n\n`;
@@ -28,7 +29,7 @@ import { CHASSIS_WORKER_RULES } from '../ai/chassisWorkerRules.js';
   export function generatePhasePromptImpl(orch: BuildOrchestrator, planId: string, vaultContext: string): string {
     const plan = (orch as any).plans.get(planId);
     const phase = (orch as any).getCurrentPhase(planId);
-    if (!plan || !phase) return '';
+    if (!plan || !phase) {return '';}
     const isFirstPhase = plan.currentPhase === 0;
     const isLastPhase = plan.currentPhase === plan.phases.length - 1;
     let prompt = `You are building: ${plan.blueprint.what}\n\n`;

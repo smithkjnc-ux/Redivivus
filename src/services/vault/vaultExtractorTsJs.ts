@@ -1,6 +1,6 @@
 // [SCOPE] Vault code extraction — TypeScript/JavaScript block extraction
 import * as path from 'path';
-import { ExtractedBlock } from './vaultTypes.js';
+import type { ExtractedBlock } from './vaultTypes.js';
 import { detectLanguage } from './vaultExtractor.js';
 import { isVaultWorthy } from './vaultExtractorQuality.js';
 
@@ -12,8 +12,8 @@ export function extractTSJS(lines: string[], filePath: string): ExtractedBlock[]
     let braceCount = 0;
     for (let j = startLine; j < lines.length; j++) {
       for (const char of lines[j]) {
-        if (char === '{') braceCount++;
-        if (char === '}') braceCount--;
+        if (char === '{') {braceCount++;}
+        if (char === '}') {braceCount--;}
       }
       if (braceCount <= 0) { return j + 1; }
     }

@@ -1,7 +1,7 @@
 // [SCOPE] Vault Service — main facade for vault operations
 // Rebuilt to spec: ~/.chassis-vault/{category}/{name}_{hash}.json
 
-import * as vscode from 'vscode';
+import type * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { VAULT_CATEGORIES, VaultCategory, VaultItem } from './vaultTypes.js';
@@ -9,7 +9,7 @@ import { extractFromFile, computeContentHash } from './vaultExtractor.js';
 import { aiCategorize as _aiCategorize, scanCodebase as _scanCodebase } from './vaultScanner.js';
 import { VaultStorage } from './vaultStorage.js';
 import { chassisFormat } from '../code/chassisFormatter.js';
-import { RoutingService } from '../ai/routingService.js';
+import type { RoutingService } from '../ai/routingService.js';
 
 export { VAULT_CATEGORIES, VaultCategory, VaultItem };
 
@@ -31,7 +31,7 @@ export function suggestCategory(name: string, code: string): VaultCategory {
     { keywords: ['pattern', 'factory', 'singleton', 'observer', 'middleware', 'decorator', 'strategy', 'proxy', 'builder'], category: 'pattern' },
   ];
   for (const rule of rules) {
-    if (rule.keywords.some(kw => text.includes(kw))) return rule.category;
+    if (rule.keywords.some(kw => text.includes(kw))) {return rule.category;}
   }
   return 'other';
 }
@@ -131,7 +131,7 @@ export class VaultService {
 
   importItem(itemId: string, targetProject: string): string | null {
     const item = this.getItem(itemId);
-    if (!item) return null;
+    if (!item) {return null;}
 
     const vaultDir = path.join(targetProject, 'src', 'vault');
     if (!fs.existsSync(vaultDir)) {

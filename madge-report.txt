@@ -1,0 +1,68 @@
+Processed 376 files (3.5s) 
+
+1) services/ai/routingService.ts > services/ai/routingComplexity.ts
+2) services/ai/routingService.ts > services/ai/routingGemini.ts > services/vault/vaultContextService.ts > services/vault/vaultService.ts
+3) services/vault/vaultExtractor.ts > services/vault/vaultExtractorTsJs.ts
+4) services/ai/routingService.ts > services/ai/routingGemini.ts > services/vault/vaultContextService.ts > services/vault/vaultService.ts > services/vault/vaultScanner.ts
+5) services/ai/routingService.ts > services/ai/routingGuardian.ts
+6) services/ai/routingService.ts > services/ai/routingOrchestration.ts
+7) core/ai/chatPanelClassifier.ts > core/ai/chatPanelClassifierOverrides.ts
+8) services/project/setupProgressService.ts > services/project/setupProgressSteps.ts
+9) ui/panels/chat/chatPanelHtml.ts > ui/panels/chat/chatPanelDashboard.ts
+10) ui/panels/chat/chatPanelHtml.ts > ui/panels/chat/chatPanelEmptyState.ts
+11) ui/panels/chat/chatPanelHtml.ts > ui/panels/chat/chatPanelEmptyState.ts > ui/panels/chat/chatPanelRenderer.ts
+12) ui/panels/chat/chatPanelHtml.ts > ui/panels/chat/chatPanelEmptyState.ts > ui/panels/chat/chatPanelRenderer.ts > ui/panels/chat/chatPanelRendererArchitect.ts > ui/panels/chat/chatPanelMsgArchitect.ts
+13) ui/panels/chat/chatPanelRenderer.ts > ui/panels/chat/chatPanelRendererArchitect.ts
+14) ui/panels/chat/chatPanelRenderer.ts > ui/panels/chat/chatPanelRendererCards.ts
+15) services/workspace/workspaceContext.ts > services/workspace/workspaceContextDetect.ts
+16) services/workspace/workspaceContext.ts > services/workspace/workspaceContextScan.ts
+17) services/workspace/workspaceContext.ts > services/workspace/workspaceContextTarget.ts
+18) core/build/chatPanelBuild.ts > core/build/chatPanelBuildReview.ts
+19) core/build/chatPanelBuild.ts > core/build/chatPanelBuildVault.ts
+20) core/build/chatPanelBuild.ts > core/build/chatPanelBuildVault.ts > core/build/chatPanelBuildPipeline.ts
+21) core/build/chatPanelBuild.ts > core/build/chatPanelBuildVault.ts > core/build/chatPanelBuildWriter.ts
+22) core/build/chatPanelBuild.ts > core/build/chatPanelBuildWorker.ts
+23) core/build/chatPanelBuild.ts > core/build/chatPanelChunked.ts
+24) core/build/chatPanelBuild.ts > core/build/chatPanelChunked.ts > core/build/chatPanelChunkedLoop.ts
+25) core/build/chatPanelChunked.ts > core/build/chatPanelChunkedLoop.ts
+26) core/ai/chatPanelIntent.ts > core/build/chatPanelBuildAutoCreate.ts
+27) core/ai/chatPanelIntent.ts > core/build/chatPanelBuildRunner.ts
+28) core/ai/chatPanelIntent.ts > core/build/chatPanelBuildRunner.ts > core/build/chatPanelBuildUtils.ts
+29) ui/panels/chat/chatPanel.ts > core/ai/chatPanelIntent.ts > core/build/chatPanelBuildRunner.ts > core/build/chatPanelBuildUtils.ts
+30) core/build/chatPanelOrchestrator.ts > core/build/chatPanelPhasedBuild.ts > core/build/chatPanelBuildPhase.ts > core/build/chatPanelBuildOrchestrated.ts
+31) services/build/buildOrchestrator.ts > services/build/buildPhaseDefinitions.ts
+32) core/build/chatPanelOrchestrator.ts > core/build/chatPanelPhasedBuild.ts > core/build/chatPanelBuildPhase.ts
+33) core/inspector/phaseInspector.ts > core/inspector/phaseInspectorChecks.ts
+34) core/inspector/phaseInspector.ts > core/inspector/phaseInspectorChecks.ts > core/inspector/phaseInspectorTests.ts
+35) core/build/chatPanelOrchestrator.ts > core/build/chatPanelPhasedBuild.ts
+36) services/blueprint/expandedInterview.ts > services/blueprint/expandedInterviewQuestions.ts
+37) services/blueprint/expandedInterview.ts > services/blueprint/expandedInterviewQuestions.ts > services/blueprint/expandedInterviewQuestionsA.ts
+38) services/blueprint/expandedInterview.ts > services/blueprint/expandedInterviewQuestions.ts > services/blueprint/expandedInterviewQuestionsB.ts
+39) core/ai/chatPanelIntent.ts > core/build/chatPanelBuildRunner.ts > ui/panels/chat/chatPanelEditHandler.ts
+40) core/ai/chatPanelIntent.ts > ui/panels/chat/chatPanelGates.ts
+41) ui/panels/chat/chatPanel.ts > core/routing/chatPanelMessageRouter.ts > core/routing/chatPanelMessageRouterEarlyExits.ts
+42) services/blueprint/blueprintInterview.ts > services/blueprint/blueprintInterviewLayers.ts
+43) core/routing/chatPanelMessages.ts > core/project/chatPanelMsgFileOps.ts
+44) core/routing/chatPanelMessages.ts > core/project/chatPanelMsgProjectOps.ts
+45) ui/panels/chat/chatPanel.ts > core/routing/chatPanelMessageRouter.ts > core/routing/chatPanelMessages.ts > core/project/chatPanelMsgProjectOps.ts
+46) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts
+47) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgFix.ts
+48) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgFix.ts > core/routing/chatPanelMsgFixEscalation.ts
+49) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgFix.ts > core/routing/chatPanelMsgFixEscalation.ts > core/routing/chatPanelMsgFixPhases.ts
+50) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgFix.ts > core/routing/chatPanelMsgFixHandoff.ts
+51) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgIntentActions.ts
+52) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgSendAI.ts
+53) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgSendAgent.ts
+54) ui/panels/chat/chatPanel.ts > core/routing/chatPanelMessageRouter.ts > core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgSendAgent.ts
+55) core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts > core/routing/chatPanelMsgSpecial.ts
+56) ui/panels/chat/chatPanel.ts > core/routing/chatPanelMessageRouter.ts > core/routing/chatPanelMessages.ts > core/routing/chatPanelMsgSendMessage.ts
+57) core/routing/chatPanelMessages.ts > ui/panels/chat/chatPanelMsgExpandedInterview.ts
+58) core/routing/chatPanelMessages.ts > ui/panels/chat/chatPanelMsgMapContext.ts
+59) ui/panels/chat/chatPanel.ts > core/routing/chatPanelMessageRouter.ts
+60) core/runtime/runtimeProfiler.ts > core/runtime/runtimeProfilerDetect.ts
+61) core/runtime/runtimeProfiler.ts > core/runtime/runtimeProfilerIpc.ts
+62) commands/vault.ts > commands/vaultValidate.ts
+63) ui/map/mapPanelMessages.ts > ui/map/mapPanelTimelineMessages.ts
+64) services/code/testExecutionService.ts > services/code/testOutputParsers.ts
+65) services/code/testExecutionService.ts > services/code/testOutputParsers.ts > services/code/testOutputParsersExt.ts
+

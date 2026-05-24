@@ -26,7 +26,7 @@ export interface Connection {
 }
 
 export function postToChat(text: string): void {
-  import('../ui/chat/chatPanel.js').then(({ ChatPanel }) => {
+  import('../ui/panels/chat/chatPanel.js').then(({ ChatPanel }) => {
     ChatPanel.currentPanel?.handleMessage({ type: 'assistant-message', text });
   });
 }

@@ -12,15 +12,16 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { buildProjectMap, ProjectMap } from '../../services/mapBuilderService.js';
-import { GuardianService } from '../../services/ai/guardianService.js';
+import type { ProjectMap } from '../../services/mapBuilderService.js';
+import { buildProjectMap } from '../../services/mapBuilderService.js';
+import type { GuardianService } from '../../services/ai/guardianService.js';
 import { MAP_SCRIPT } from './mapScript.js';
 import { MAP_STYLES } from './mapStyles.js';
 import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
 import { SavePointService } from '../../services/savePointService.js';
 import { SnapshotService } from '../../services/snapshotService.js';
 import { buildMapHtml as buildFullMapHtml } from './mapPanelHtml.js';
-import { handleMapMessage } from './mapPanelMessages.js';
+import { handleMapMessage } from './mapMessageDispatcher.js';
 
 export class MapPanel {
   private static _instance: MapPanel | undefined;

@@ -78,6 +78,7 @@ CSS / SCSS:                    /* [TAG] description */
 10. Read `.chassis/` context before starting
 11. New file → [SCOPE] at line 1, comments on new functions, [WARN] on risky logic
 12. No orphan code — every file traces to the blueprint
+13. **NO FLAT FILES** — Every file lives in a folder that matches its responsibility (UI in UI, logic in logic). No exceptions.
 
 ### Rule 20: Build & Deploy Protocol
 - After any code change, always run: npm run compile

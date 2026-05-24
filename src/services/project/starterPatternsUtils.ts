@@ -2,7 +2,7 @@
 // Imported by starterPatterns.ts. Extracted to keep it under 200 lines.
 
 import * as crypto from 'crypto';
-import { VaultItem, VaultCategory } from '../vault/vaultTypes.js';
+import type { VaultItem, VaultCategory } from '../vault/vaultTypes.js';
 
 export function makeItem(
   name: string, code: string, language: string,

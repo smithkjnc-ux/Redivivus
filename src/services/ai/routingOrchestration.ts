@@ -2,8 +2,9 @@
 // Coordinates multi-AI builds: plan → execute → review pipeline
 
 import { AI_RANK } from './guardianAI.js';
-import { callProvider } from './routingProviders.js';
-import { createPlan, executeStep, reviewOutput, OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
+import { callProvider } from '../../core/ai/providers/providerFactory.js';
+import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
+import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
 import type { RoutingService } from './routingService.js';
 
 /** Full orchestrated build pipeline — called by RoutingService.orchestratedBuild() */

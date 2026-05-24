@@ -2,9 +2,10 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { VaultService, VAULT_CATEGORIES } from '../services/vault/vaultService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { VaultService} from '../services/vault/vaultService.js';
+import { VAULT_CATEGORIES } from '../services/vault/vaultService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 import { ensureChatPanelOpen } from './vault.js';
 
 export function registerVaultValidate(
@@ -23,7 +24,7 @@ export function registerVaultValidate(
         let processed = 0;
         let updated = 0;
         for (let i = 0; i < allItems.length; i += BATCH) {
-          if (token.isCancellationRequested) break;
+          if (token.isCancellationRequested) {break;}
           const batch = allItems.slice(i, i + BATCH);
           progress.report({ message: `Processing ${i + 1}-${Math.min(i + BATCH, allItems.length)} of ${allItems.length}` });
 
@@ -34,18 +35,18 @@ export function registerVaultValidate(
           const prompt = `You are a code librarian. For each code block return TWO things:\n1. category — exactly ONE of: ${VAULT_CATEGORIES.join(', ')}\n2. subcategory — a short domain label (1-2 words, lowercase)\n\nCurrent categories may be wrong. Re-evaluate based on actual code content.\n\nRespond with ONLY a JSON array: [{"category":"...","subcategory":"..."},...]\n\nItems:\n${listStr}`;
 
           const response = await routing.prompt(prompt);
-          if (!response.success || !response.text) continue;
+          if (!response.success || !response.text) {continue;}
 
           try {
             let raw = response.text.trim();
             raw = raw.replace(/^\s*```[a-zA-Z]*\n?/i, '').replace(/\n?```\s*$/i, '').trim();
             const arrayMatch = raw.match(/\[[\s\S]*\]/);
-            if (arrayMatch) raw = arrayMatch[0];
+            if (arrayMatch) {raw = arrayMatch[0];}
             const results: { category: string; subcategory: string }[] = JSON.parse(raw);
 
             batch.forEach((item, idx) => {
               const r = results[idx];
-              if (!r) return;
+              if (!r) {return;}
               const oldCat = item.category || 'other';
               if (r.category && r.category !== oldCat) {
                 item.category = r.category;

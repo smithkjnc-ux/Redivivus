@@ -1,11 +1,11 @@
 // [SCOPE] AI Routing Service — complexity-based routing (Auto AI Routing)
 // Extracted from routingService.ts
 
-import { AIResponse } from './routingTypes.js';
+import type { AIResponse } from './routingTypes.js';
 import { classifyTask, estimateTokens, estimateCost } from './routingClassifier.js';
-import { callProvider } from './routingProviders.js';
+import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from './routingKeys.js';
-import { RoutingService } from './routingService.js';
+import type { RoutingService } from './routingService.js';
 
 // [Rule 18] AI classifier: 50-token call instead of regex. Falls back to classifyTask() on failure.
 // Only fires for mid-range prompts (500–50k tokens) where classification changes routing decisions.
@@ -66,7 +66,7 @@ export async function routeByComplexityImpl(
       groq: 'Groq chosen — fastest available',
     };
     chosenAI = ['gemini', 'claude', 'openai', 'xai', 'kimi', 'groq'].find(has) || null;
-    if (chosenAI) routingReason = reasonMap[chosenAI] || chosenAI;
+    if (chosenAI) {routingReason = reasonMap[chosenAI] || chosenAI;}
   }
 
   if (!chosenAI) {

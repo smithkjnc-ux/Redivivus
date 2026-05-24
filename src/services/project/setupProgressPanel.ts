@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SetupProgress } from './setupProgressService.js';
+import type { SetupProgress } from './setupProgressService.js';
 import { buildSetupProgressHtml } from './setupProgressPanelHtml.js';
 
 let _activePanel: vscode.WebviewPanel | undefined;

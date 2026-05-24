@@ -1,7 +1,8 @@
 // [SCOPE] Usage chat formatters — formats usage report for chat panel display
 // Extracted from usageCommands.ts
 
-import { UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
+import type { UsageReport} from '../services/usageTracker.js';
+import { AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
 
 export function formatUsageForChat(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>): string {
   const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
@@ -9,7 +10,7 @@ export function formatUsageForChat(report: UsageReport, roster?: Array<{ ai: str
   const formatAIBreakdownChat = (byAI: { aiProvider: string; tokens: number; cost: number; messages: number }[], periodRoster?: typeof roster) => {
     const displayRoster = periodRoster || roster;
     if (!displayRoster || displayRoster.length === 0) {
-      if (!byAI || byAI.length === 0) return '';
+      if (!byAI || byAI.length === 0) {return '';}
       return byAI.map(ai =>
         `<div style="margin-left:16px;font-size:12px;color:var(--vscode-descriptionForeground);">
           ↳ ${aiLabels[ai.aiProvider] || ai.aiProvider}: ${ai.tokens.toLocaleString()} tokens ($${ai.cost.toFixed(4)})

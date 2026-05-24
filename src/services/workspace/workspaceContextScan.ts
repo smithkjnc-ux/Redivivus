@@ -1,7 +1,7 @@
 // [SCOPE] Workspace Context Service — file scanning and classification helpers
 import * as fs from 'fs';
 import * as path from 'path';
-import { FileInfo } from './workspaceContext.js';
+import type { FileInfo } from './workspaceContext.js';
 
 export function scanWorkspaceFiles(root: string): { files: FileInfo[]; entryPoints: string[] } {
   const files: FileInfo[] = [];
@@ -13,7 +13,7 @@ export function scanWorkspaceFiles(root: string): { files: FileInfo[]; entryPoin
 function walkDirectory(root: string, relativeDir: string, files: FileInfo[], entryPoints: string[]): void {
   const fullDir = path.join(root, relativeDir);
   const skipDirs = ['node_modules', '.git', 'dist', 'build', '.chassis', 'out', 'coverage', '.vscode'];
-  if (skipDirs.some(skip => relativeDir.includes(skip))) return;
+  if (skipDirs.some(skip => relativeDir.includes(skip))) {return;}
   try {
     const entries = fs.readdirSync(fullDir, { withFileTypes: true });
     for (const entry of entries) {

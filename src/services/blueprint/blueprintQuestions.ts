@@ -1,7 +1,7 @@
 // [SCOPE] Blueprint interview questions — InterviewQuestion interface and QUESTIONS constant
 // Used by blueprintService for the 5-question blueprint interview.
 
-import { Blueprint } from '../../types/index.js';
+import type { Blueprint } from '../../types/index.js';
 
 export interface InterviewQuestion {
   key: keyof Pick<Blueprint, 'who' | 'what' | 'where' | 'when' | 'why'>;

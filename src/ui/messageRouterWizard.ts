@@ -5,8 +5,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { ChassisService } from '../services/chassisService.js';
-import { WizardPanelState } from './messageRouterTypes.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { WizardPanelState } from './messageRouterTypes.js';
 
 export async function handleWizardMessage(
   msg: any,
@@ -36,7 +36,7 @@ export async function handleWizardMessage(
       });
       if (fp && fp.length > 0) {
         state.wizardData.parentFolder = fp[0].fsPath;
-        if (msg.name) state.wizardData.projectName = msg.name;
+        if (msg.name) {state.wizardData.projectName = msg.name;}
         refresh();
       }
       return true;
@@ -53,9 +53,9 @@ export async function handleWizardMessage(
       refresh();
       try {
         if (state.wizardData.folder && state.wizardData.projectName) {
-          if (!fs.existsSync(state.wizardData.folder)) fs.mkdirSync(state.wizardData.folder, { recursive: true });
+          if (!fs.existsSync(state.wizardData.folder)) {fs.mkdirSync(state.wizardData.folder, { recursive: true });}
           await chassis.scaffoldAt(state.wizardData.folder, state.wizardData.projectName, state.wizardData.blueprint);
-          if (context) await context.globalState.update('pendingChassisInit', undefined);
+          if (context) {await context.globalState.update('pendingChassisInit', undefined);}
           const _wsFile = path.join(state.wizardData.folder, `${state.wizardData.projectName}.code-workspace`);
           if (!fs.existsSync(_wsFile)) {
             try { fs.writeFileSync(_wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { /* best-effort */ }

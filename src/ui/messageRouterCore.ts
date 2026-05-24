@@ -4,9 +4,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as path from 'path';
 import { ChassisService } from '../services/chassisService.js';
-import { WizardPanelState } from './messageRouterTypes.js';
+import type { WizardPanelState } from './messageRouterTypes.js';
 import { syncBlueprintMd } from '../services/blueprint/blueprintWriter.js';
 
 export async function handleCoreMessage(
@@ -102,13 +101,13 @@ export async function handleCoreMessage(
         let confirmed = 0, assumed = 0, unknown = 0;
         for (const key of ['who','what','where','when','why'] as const) {
           const val = (msg.data[key] || '').trim();
-          if (val.length > 20) confirmed++;
-          else if (val.length > 0) assumed++;
-          else unknown++;
+          if (val.length > 20) {confirmed++;}
+          else if (val.length > 0) {assumed++;}
+          else {unknown++;}
         }
         let confidence: 'high'|'medium'|'low' = 'low';
-        if (unknown === 0 && assumed <= 1) confidence = 'high';
-        else if (unknown <= 1) confidence = 'medium';
+        if (unknown === 0 && assumed <= 1) {confidence = 'high';}
+        else if (unknown <= 1) {confidence = 'medium';}
         cfg.blueprint = {
           who: msg.data.who||'', what: msg.data.what||'', where: msg.data.where||'',
           when: msg.data.when||'', why: msg.data.why||'',
@@ -116,7 +115,6 @@ export async function handleCoreMessage(
           locked: msg.data.lock || false,
           lockedAt: msg.data.lock ? new Date().toISOString() : undefined,
           version: '1.0',
-        };
         };
         chassis.saveConfig(cfg);
         syncBlueprintMd(chassis, cfg);

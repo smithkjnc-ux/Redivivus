@@ -1,5 +1,5 @@
 // [SCOPE] Workspace Context Service — project structure detection and summary generation
-import { FileInfo, ProjectStructure } from './workspaceContext.js';
+import type { FileInfo, ProjectStructure } from './workspaceContext.js';
 
 export function detectProjectStructure(files: FileInfo[]): ProjectStructure {
   const hasSrc = files.some(f => f.relativePath.startsWith('src/'));
@@ -28,12 +28,12 @@ export function detectProjectStructure(files: FileInfo[]): ProjectStructure {
   const framework = hasReact ? 'React' : hasVue ? 'Vue' : hasAngular ? 'Angular' : 'None/Vanilla';
 
   let projectType: ProjectStructure['projectType'] = 'unknown';
-  if (files.some(f => f.extension === '.html')) projectType = 'web';
-  if (files.some(f => f.relativePath === 'package.json')) projectType = 'node';
-  if (files.some(f => f.extension === '.py')) projectType = 'python';
-  if (files.some(f => f.extension === '.rs')) projectType = 'rust';
-  if (files.some(f => f.extension === '.go')) projectType = 'go';
-  if (new Set(files.map(f => f.extension)).size > 3) projectType = 'mixed';
+  if (files.some(f => f.extension === '.html')) {projectType = 'web';}
+  if (files.some(f => f.relativePath === 'package.json')) {projectType = 'node';}
+  if (files.some(f => f.extension === '.py')) {projectType = 'python';}
+  if (files.some(f => f.extension === '.rs')) {projectType = 'rust';}
+  if (files.some(f => f.extension === '.go')) {projectType = 'go';}
+  if (new Set(files.map(f => f.extension)).size > 3) {projectType = 'mixed';}
 
   return { hasSrc, hasTests, hasDocs, hasConfig, mainLanguage, framework, projectType };
 }
@@ -46,7 +46,7 @@ export function findMainEntryPoint(files: FileInfo[], structure: ProjectStructur
   ];
   for (const candidate of candidates) {
     const found = files.find(f => f.relativePath === candidate);
-    if (found) return found.relativePath;
+    if (found) {return found.relativePath;}
   }
   return files.find(f => f.isEntryPoint)?.relativePath || null;
 }

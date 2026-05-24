@@ -15,6 +15,8 @@ export interface AgentContext {
   log: (msg: string) => void;
   modifiedFiles: Set<string>;
   snapshotId?: string;
+  routing?: any; // RoutingService instance
+  blueprintContext?: string;
 }
 
 export interface AgentTool {
@@ -48,12 +50,40 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
       const absPath = path.join(ctx.root, args.filePath);
       try {
         if (!ctx.snapshotId) {
-          const { createSnapshot } = await import('../../ui/chat/chatPanelBuildWriter.js');
+          const { createSnapshot } = await import('../../core/build/chatPanelBuildWriter.js');
           ctx.snapshotId = createSnapshot(ctx.root, `Agent task: ${ctx.task.substring(0, 50)}`, args.filePath);
         }
+        
+        let contentToWrite = args.content || '';
+        
+        // [CHASSIS] Guardian AI Oversight
+        if (ctx.routing && ctx.routing.isGuardianActive()) {
+          ctx.log(`🛡️ **Guardian AI** reviewing proposed write to \`${args.filePath}\`...`);
+          try {
+            const review = await ctx.routing.guardianReview(
+              ctx.task,
+              contentToWrite,
+              'agent',
+              ctx.blueprintContext || ''
+            );
+            if (review && !review.passed && review.correctedText) {
+              const issues = review.issues && review.issues.length ? review.issues.join('; ') : 'Quality/correctness improvements';
+              ctx.log(`⚠️ **Guardian AI** corrected proposed write to \`${args.filePath}\` (Issues: ${issues})`);
+              
+              // Extract the code block safely if it is wrapped in markdown formatting by the Guardian
+              const { extractCodeFromResponse } = await import('../../core/build/chatPanelBuildInference.js');
+              contentToWrite = extractCodeFromResponse(review.correctedText);
+            } else {
+              ctx.log(`🟢 **Guardian AI** approved proposed write to \`${args.filePath}\``);
+            }
+          } catch (e: any) {
+            ctx.log(`⚠️ **Guardian AI** review skipped due to an error: ${e.message}`);
+          }
+        }
+
         const dir = path.dirname(absPath);
         if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
-        fs.writeFileSync(absPath, args.content, 'utf8');
+        fs.writeFileSync(absPath, contentToWrite, 'utf8');
         ctx.modifiedFiles.add(args.filePath);
         ctx.log(`✅ Wrote \`${args.filePath}\``);
         // [CHASSIS] Live preview: open written file beside the chat immediately.
@@ -73,9 +103,9 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
       try {
         const { stdout, stderr } = await execAsync(args.command, { cwd: ctx.root });
         let result = '';
-        if (stdout) result += `STDOUT:\n${stdout}\n`;
-        if (stderr) result += `STDERR:\n${stderr}\n`;
-        if (!result) result = 'Command completed successfully with no output.';
+        if (stdout) {result += `STDOUT:\n${stdout}\n`;}
+        if (stderr) {result += `STDERR:\n${stderr}\n`;}
+        if (!result) {result = 'Command completed successfully with no output.';}
         return result;
       } catch (e: any) {
         return `Command failed:\nSTDOUT:\n${e.stdout}\nSTDERR:\n${e.stderr}\nERROR:\n${e.message}`;
@@ -119,7 +149,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         if (!stdout) { return 'No results found.'; }
         return stdout;
       } catch (e: any) {
-        if (e.code === 1) return 'No results found.';
+        if (e.code === 1) {return 'No results found.';}
         return `Error searching codebase: ${e.message}`;
       }
     }

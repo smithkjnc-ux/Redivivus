@@ -6,7 +6,7 @@
 // I/O helpers (read/write/append) -> learnedMemoryServiceIO.ts
 
 import * as path from 'path';
-import { RoutingService } from './ai/routingService.js';
+import type { RoutingService } from './ai/routingService.js';
 import {
   LearnedEntry, RECENT_TTL_DAYS,
   readLearnedEntries, writeLearnedEntries, appendLearnedEntry,

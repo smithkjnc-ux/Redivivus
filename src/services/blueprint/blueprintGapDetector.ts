@@ -2,7 +2,7 @@
 // and returns targeted inline chat questions to fill them before a build.
 // Zero AI cost — pure heuristics. Called before handleBuildRequest when blueprint health is low.
 
-import { Blueprint } from '../../types/index.js';
+import type { Blueprint } from '../../types/index.js';
 
 // Min characters for a field to be considered "answered" (not just a one-word placeholder)
 const MIN_FIELD_LENGTH = 12;

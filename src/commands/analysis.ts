@@ -2,8 +2,8 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ChassisService } from '../services/chassisService.js';
-import { AnalyzerService } from '../services/analyzerService.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { AnalyzerService } from '../ui/panels/analyzer/analyzerService';
 
 export function registerAnalysisCommands(
   context: vscode.ExtensionContext,
@@ -108,25 +108,25 @@ export function registerAnalysisCommands(
         'DONE': { emoji: '\u2705', label: 'Finished' },
       };
       const counts: Record<string, number> = {};
-      for (const k of Object.keys(tagDefs)) counts[k] = 0;
+      for (const k of Object.keys(tagDefs)) {counts[k] = 0;}
       lines.forEach((l: string) => {
         for (const k of Object.keys(tagDefs)) {
-          if (l.includes('[' + k + ']')) counts[k]++;
+          if (l.includes('[' + k + ']')) {counts[k]++;}
         }
       });
       const totalTags = Object.values(counts).reduce((a, b) => a + b, 0);
       let health = '';
-      if (totalTags === 0) health = '\u{1F525} Not annotated yet \u2014 try Clean Up File first';
-      else if (counts['SCOPE'] > 0 && counts['// [TODO] '] === 0 && counts['WARN'] === 0) health = '\u{1F4AA} Looking good! No warnings or open tasks';
-      else if (counts['WARN'] > 0) health = '\u26A0\uFE0F Has warnings that need attention';
-      else health = '\u{1F527} In progress \u2014 work remaining';
+      if (totalTags === 0) {health = '\u{1F525} Not annotated yet \u2014 try Clean Up File first';}
+      else if (counts['SCOPE'] > 0 && counts['// [TODO] '] === 0 && counts['WARN'] === 0) {health = '\u{1F4AA} Looking good! No warnings or open tasks';}
+      else if (counts['WARN'] > 0) {health = '\u26A0\uFE0F Has warnings that need attention';}
+      else {health = '\u{1F527} In progress \u2014 work remaining';}
       let msg = filePath + ' \u2014 ' + lines.length + ' lines\n\n' + health + '\n\n';
       for (const [key, info] of Object.entries(tagDefs)) {
         if (counts[key] > 0) {
           msg += info.emoji + ' ' + info.label + ': ' + counts[key] + '\n';
         }
       }
-      if (lines.length > 500) msg += '\n\u{1F4CF} This file is pretty long. Consider splitting it up.';
+      if (lines.length > 500) {msg += '\n\u{1F4CF} This file is pretty long. Consider splitting it up.';}
       const next = await vscode.window.showInformationMessage(
         'Health check complete for ' + filePath + '\n\nWhat would you like to do next?',
         { modal: true },

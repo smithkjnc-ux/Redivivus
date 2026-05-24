@@ -2,7 +2,7 @@
 // Provides breakdowns by session, day, week, month with reset capability while preserving lifetime totals.
 // Tracks: timestamp, tokens, cost, AI provider, message count per interaction
 
-import * as vscode from 'vscode';
+import type * as vscode from 'vscode';
 
 export interface UsageEntry {
   timestamp: number;

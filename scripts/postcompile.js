@@ -60,6 +60,43 @@ fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2));
 const outDataDir = path.join(workspaceRoot, 'out', 'data');
 if (fs.existsSync(outDataDir)) { fs.writeFileSync(path.join(outDataDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2)); }
 
+// Deploy compiled out/ to all known extension locations — runs unconditionally so every compile stays in sync.
+// Prevents zombie bugs where a source fix is compiled but never reaches the running build.
+const home = require('os').homedir();
+const deployTargets = [
+  // Baked extension (custom VSCode build)
+  path.join(home, 'projects', 'chassis-build', 'VSCode-linux-x64', 'resources', 'app', 'extensions', 'chassis'),
+];
+
+// Also sync to any installed chassis extension in ~/.vscode/extensions/ (takes priority over baked in VS Code/Cursor)
+const vscodeExts = path.join(home, '.vscode', 'extensions');
+if (fs.existsSync(vscodeExts)) {
+  for (const entry of fs.readdirSync(vscodeExts)) {
+    if (/^papajoe\.chassis-/.test(entry)) {
+      deployTargets.push(path.join(vscodeExts, entry));
+    }
+  }
+}
+
+let deployed = 0;
+for (const target of deployTargets) {
+  if (!fs.existsSync(target)) { continue; }
+  try {
+    execSync(
+      `rsync -a --delete "${path.join(workspaceRoot, 'out')}/" "${path.join(target, 'out')}/"`,
+      { stdio: 'pipe' }
+    );
+    deployed++;
+  } catch (e) {
+    console.warn(`⚠️  Deploy to ${path.basename(target)} failed:`, e.stderr?.toString()?.trim() || e.message);
+  }
+}
+if (deployed > 0) {
+  console.log(`✓ Deployed out/ → ${deployed} extension location(s)`);
+} else {
+  console.log('ℹ  No extension locations found — skipping deploy (non-fatal)');
+}
+
 // Auto-commit logic
 try {
   // [WARN] File system operation: `fs.existsSync` can fail due to permissions or path issues.

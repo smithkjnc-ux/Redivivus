@@ -3,9 +3,9 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { VaultService } from '../services/vault/vaultService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { WizardPanelState } from './messageRouterTypes.js';
+import type { VaultService } from '../services/vault/vaultService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import type { WizardPanelState } from './messageRouterTypes.js';
 
 export async function handleVaultRecategorizeMessage(
   msg: any,
@@ -14,7 +14,7 @@ export async function handleVaultRecategorizeMessage(
   state: WizardPanelState,
   refresh: () => void
 ): Promise<boolean> {
-  if (msg.type !== 'vaultRecategorize') return false;
+  if (msg.type !== 'vaultRecategorize') {return false;}
 
   if (!routingService) {
     vscode.window.showErrorMessage('No AI routing service available for re-categorization.');

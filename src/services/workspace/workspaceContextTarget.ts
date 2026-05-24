@@ -1,6 +1,6 @@
 // [SCOPE] Workspace Context Service — find best target file for a modification request
 import * as path from 'path';
-import { WorkspaceContext } from './workspaceContext.js';
+import type { WorkspaceContext } from './workspaceContext.js';
 
 export function findBestTargetForModification(
   context: WorkspaceContext,

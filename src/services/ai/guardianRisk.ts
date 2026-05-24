@@ -1,7 +1,7 @@
 // [SCOPE] Guardian risk scanning — scanForRisks and analyzeFileMetrics for security, architecture, and modularity
 // Called by guardianService. No health score or ELI5 logic here.
 
-import { GuardianConfig, RiskReport, FileMetrics } from './guardianTypes.js';
+import type { GuardianConfig, RiskReport, FileMetrics } from './guardianTypes.js';
 
 export function scanForRisks(filePath: string, content: string, config: GuardianConfig): RiskReport[] {
   const risks: RiskReport[] = [];

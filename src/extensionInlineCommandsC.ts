@@ -1,16 +1,15 @@
-// [SCOPE] Extension Inline Commands C — chassis.runProject, chassis.inspectElement, chassis.injectTerminalError.
+// [SCOPE] Extension Inline Commands C — chassis.runProject, chassis.inspectElement, chassis.injectTerminalError, chassis.openVisualEditor.
 // Extracted from extensionInlineCommandsB.ts to keep it under 200 lines.
 
 import * as vscode from 'vscode';
-import { ChassisService } from './services/chassisService.js';
-import { RoutingService } from './services/ai/routingService.js';
-import { UsageTracker } from './services/usageTracker.js';
-import { VaultService } from './services/vault/vaultService.js';
-import { ChatPanel } from './ui/chat/chatPanel.js';
+import type { ChassisService } from './services/chassisService.js';
+import type { RoutingService } from './services/ai/routingService.js';
+import type { UsageTracker } from './services/usageTracker.js';
+import type { VaultService } from './services/vault/vaultService.js';
+import { ChatPanel } from './ui/panels/chat/chatPanel';
 import { registerTerminalErrorService, getLastTerminalError } from './services/workspace/terminalErrorService.js';
-import { detectPostBuildInfo } from './ui/chat/chatPanelPostBuild.js';
+import { detectPostBuildInfo } from './core/build/chatPanelPostBuild';
 import { BuildHistoryService } from './services/build/buildHistoryService.js';
-
 export function registerInlineCommandsC(
   context: vscode.ExtensionContext,
   chassisService: ChassisService,
@@ -85,6 +84,35 @@ export function registerInlineCommandsC(
         ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
         setTimeout(() => { ChatPanel.currentPanel?.handleMessage({ type: 'inject-terminal-error', error: err }); }, 600);
       }
+    })
+  );
+
+  // chassis.openVisualEditor — opens the Visual Contract Editor panel for a project root
+  context.subscriptions.push(
+    vscode.commands.registerCommand('chassis.openVisualEditor', async (projectRoot?: string) => {
+      const root = projectRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      if (!root) { vscode.window.showWarningMessage('CHASSIS: Open a project folder first.'); return; }
+      // Collect built files from the build history; fall back to scanning for HTML/CSS
+      let builtFiles: string[] = [];
+      try {
+        const history = new BuildHistoryService(root);
+        const last = history.list()[0];
+        builtFiles = last?.files ?? [];
+      } catch { /* ignore */ }
+      if (!builtFiles.length) {
+        // Fallback: scan for HTML/CSS files in the project root (non-recursive, top two levels)
+        const { readdirSync, statSync } = require('fs');
+        const scan = (dir: string, depth: number) => {
+          try { for (const f of readdirSync(dir)) {
+            const abs = require('path').join(dir, f);
+            if (statSync(abs).isDirectory() && depth > 0) { scan(abs, depth - 1); }
+            else if (/\.(html|css)$/i.test(f)) { builtFiles.push(require('path').relative(root, abs)); }
+          }} catch { /* ignore */ }
+        };
+        scan(root, 2);
+      }
+      const { openVisualContractPanel } = require('./ui/panels/visualContract/visualContractPanel.js');
+      openVisualContractPanel(context, root, builtFiles, routingService);
     })
   );
 }

@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { VaultItem } from './vaultService.js';
+import type { VaultItem } from './vaultService.js';
 
 export interface OutputArgs {
   task: string;

@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { SessionInfo, ExitInterview } from '../types/index.js';
+import type { SessionInfo, ExitInterview } from '../types/index.js';
 
 export function saveSessionFile(session: SessionInfo, interview: ExitInterview, sessionsDir: string): void {
   const content = JSON.stringify({

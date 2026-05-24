@@ -2,7 +2,7 @@
 // Called by vaultTab. No data retrieval or main tab rendering logic here.
 
 import * as path from 'path';
-import { VaultItem } from '../../services/vault/vaultService.js';
+import type { VaultItem } from '../../services/vault/vaultService.js';
 import { esc } from './vaultDataUtils.js';
 
 export function renderVaultScanSummary(
@@ -22,8 +22,8 @@ export function renderVaultScanSummary(
       <div style="font-size: 13px; margin-bottom: 8px; line-height: 1.5;">
         Scan complete — <strong style="color: #4ec959;">${newItems.length} new blocks</strong> found`;
   const parts: string[] = [];
-  if (duplicates.length > 0) parts.push(`${duplicates.length} duplicates skipped`);
-  if (filteredCount > 0) parts.push(`${filteredCount} trivial filtered`);
+  if (duplicates.length > 0) {parts.push(`${duplicates.length} duplicates skipped`);}
+  if (filteredCount > 0) {parts.push(`${filteredCount} trivial filtered`);}
   if (parts.length > 0) {
     html += ` (${parts.join(', ')})`;
   }

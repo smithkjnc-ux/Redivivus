@@ -2,8 +2,8 @@
 
 import * as vscode from 'vscode';
 import { DuplicateCodeDetectionService } from '../services/code/duplicateCodeDetection.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerDuplicateCodeCommand(
   context: vscode.ExtensionContext,

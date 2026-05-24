@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
 import { SavePointService } from '../../services/savePointService.js';
 import { SnapshotService } from '../../services/snapshotService.js';
-import { MapMsgCtx } from './mapPanelMessages.js';
+import type { MapMsgCtx } from './mapMessageDispatcher.js';
 
 export async function handleMapTimelineMessage(msg: any, ctx: MapMsgCtx): Promise<void> {
   const { root, panel } = ctx;

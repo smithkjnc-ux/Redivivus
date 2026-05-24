@@ -2,9 +2,9 @@
 // Called by messageRouter orchestrator. No vault navigation or recategorize logic here.
 
 import * as vscode from 'vscode';
-import { VaultService } from '../services/vault/vaultService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { WizardPanelState } from './messageRouterTypes.js';
+import type { VaultService } from '../services/vault/vaultService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import type { WizardPanelState } from './messageRouterTypes.js';
 
 export async function handleVaultScanMessage(
   msg: any,
@@ -23,9 +23,9 @@ export async function handleVaultScanMessage(
         const scanRoot = msg.root || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!scanRoot) { vscode.window.showErrorMessage('No workspace to scan.'); return; }
         const result = await vaultService.scanCodebase(scanRoot, undefined, undefined, (m: string) => {
-          if (!token.isCancellationRequested) progress.report({ message: m });
+          if (!token.isCancellationRequested) {progress.report({ message: m });}
         });
-        if (token.isCancellationRequested) return;
+        if (token.isCancellationRequested) {return;}
 
         const newItems: any[] = [];
         const duplicates: any[] = [];

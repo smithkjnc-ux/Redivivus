@@ -10,38 +10,38 @@ function isDisabled(providerId: string): boolean {
 }
 
 export function getGeminiKey(): string | null {
-  if (isDisabled('gemini')) return null;
+  if (isDisabled('gemini')) {return null;}
   const config = vscode.workspace.getConfiguration('chassis');
   const key = config.get<string>('geminiApiKey') || process.env.GEMINI_API_KEY || '';
   return key || null;
 }
 
 export function getClaudeKey(): string | null {
-  if (isDisabled('claude')) return null;
+  if (isDisabled('claude')) {return null;}
   const config = vscode.workspace.getConfiguration('chassis');
   return config.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY || null;
 }
 
 export function getOpenAIKey(): string | null {
-  if (isDisabled('openai')) return null;
+  if (isDisabled('openai')) {return null;}
   const config = vscode.workspace.getConfiguration('chassis');
   return config.get<string>('openaiApiKey') || process.env.OPENAI_API_KEY || null;
 }
 
 export function getGroqKey(): string | null {
-  if (isDisabled('groq')) return null;
+  if (isDisabled('groq')) {return null;}
   const config = vscode.workspace.getConfiguration('chassis');
   return config.get<string>('groqApiKey') || process.env.GROQ_API_KEY || null;
 }
 
 export function getXAIKey(): string | null {
-  if (isDisabled('xai')) return null;
+  if (isDisabled('xai')) {return null;}
   const config = vscode.workspace.getConfiguration('chassis');
   return config.get<string>('xaiApiKey') || process.env.XAI_API_KEY || null;
 }
 
 export function getKimiKey(): string | null {
-  if (isDisabled('kimi')) return null;
+  if (isDisabled('kimi')) {return null;}
   const config = vscode.workspace.getConfiguration('chassis');
   return config.get<string>('kimiApiKey') || process.env.MOONSHOT_API_KEY || null;
 }

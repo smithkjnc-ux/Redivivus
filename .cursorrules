@@ -99,4 +99,8 @@ Every new file needs [SCOPE]. Every feature must trace to the blueprint. If outs
 
 ---
 
+### Rule 13: NO FLAT FILES
+Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects CHASSIS builds and to CHASSIS itself. No exceptions, no matter what vibe editor is being used.
+
+
 *Rules enforced via: `CLAUDE.md` · `.windsurf/rules.md` · `.cursor/rules` · `.cursorrules` · `.github/copilot-instructions.md` · `GEMINI.md` · `.chassis/rules.md` — removing one does not remove the rules.*

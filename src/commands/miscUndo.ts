@@ -18,7 +18,7 @@ export function registerUndoCommands(context: vscode.ExtensionContext): void {
         detail: b.buildId,
       }));
       const selectedBuild = await vscode.window.showQuickPick(buildItems, { placeHolder: 'Select a build to undo a phase from' });
-      if (!selectedBuild) return;
+      if (!selectedBuild) {return;}
 
       const buildId = selectedBuild.detail;
       const undoablePhases = phaseUndo.getUndoablePhases(buildId);
@@ -30,7 +30,7 @@ export function registerUndoCommands(context: vscode.ExtensionContext): void {
         detail: p.phaseNumber.toString(),
       }));
       const selectedPhase = await vscode.window.showQuickPick(phaseItems, { placeHolder: 'Select phase to undo (newest first)' });
-      if (!selectedPhase) return;
+      if (!selectedPhase) {return;}
 
       const phaseNumber = parseInt(selectedPhase.detail!);
       const success = phaseUndo.undoPhase(buildId, phaseNumber);

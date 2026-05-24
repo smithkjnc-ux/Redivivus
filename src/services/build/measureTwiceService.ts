@@ -172,12 +172,12 @@ export class MeasureTwiceService {
         inString = true; stringChar = ch; continue;
       }
 
-      if (ch === '(') parens++;
-      else if (ch === ')') parens--;
-      else if (ch === '{') braces++;
-      else if (ch === '}') braces--;
-      else if (ch === '[') squares++;
-      else if (ch === ']') squares--;
+      if (ch === '(') {parens++;}
+      else if (ch === ')') {parens--;}
+      else if (ch === '{') {braces++;}
+      else if (ch === '}') {braces--;}
+      else if (ch === '[') {squares++;}
+      else if (ch === ']') {squares--;}
     }
 
     return { parens, braces, squares };

@@ -1,8 +1,8 @@
 // [SCOPE] Guardian health score computation — computes real-time Blueprint Health Score for status bar display
 // Called by guardianService. No risk scanning or ELI5 logic here.
 
-import { ChassisService } from '../chassisService.js';
-import { HealthScore } from './guardianTypes.js';
+import type { ChassisService } from '../chassisService.js';
+import type { HealthScore } from './guardianTypes.js';
 
 export function computeHealthScore(chassisService: ChassisService): HealthScore {
   const config = chassisService.loadConfig();
@@ -31,9 +31,9 @@ export function computeHealthScore(chassisService: ChassisService): HealthScore 
   const score = Math.round((security + modularity + maintainability + blueprintAlignment) / 4);
 
   let summary = 'Health: Good';
-  if (score < 40) summary = 'Health: CRITICAL — Review needed';
-  else if (score < 60) summary = 'Health: At Risk — Check warnings';
-  else if (score < 80) summary = 'Health: Fair — Room to improve';
+  if (score < 40) {summary = 'Health: CRITICAL — Review needed';}
+  else if (score < 60) {summary = 'Health: At Risk — Check warnings';}
+  else if (score < 80) {summary = 'Health: Fair — Room to improve';}
 
   return {
     score,

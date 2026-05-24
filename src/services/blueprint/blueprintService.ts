@@ -2,8 +2,8 @@
 // Split from 215-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import { Blueprint } from '../../types/index.js';
-import { ChassisService } from '../chassisService.js';
+import type { Blueprint } from '../../types/index.js';
+import type { ChassisService } from '../chassisService.js';
 import { QUESTIONS } from './blueprintQuestions.js';
 import { calculateHealth } from './blueprintHealth.js';
 import { writeBlueprintMd } from './blueprintWriter.js';

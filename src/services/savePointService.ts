@@ -25,22 +25,9 @@ export class SavePointService {
 
   /** Create a save point with a description */
   async create(description: string): Promise<{ success: boolean; message: string; hash?: string }> {
+    // [FIX] Never auto-prompt for git init — if no repo exists, skip silently.
     if (!this.isGitRepo()) {
-      const choice = await vscode.window.showWarningMessage(
-        'This folder is not a git repository. Initialize one to use Save Points?',
-        { modal: true },
-        'Initialize Git',
-        'Cancel'
-      );
-      if (choice !== 'Initialize Git') {
-        return { success: false, message: 'Save point cancelled — no git repository.' };
-      }
-      try {
-        execSync('git init', { cwd: this.root, stdio: 'ignore' });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        return { success: false, message: `Failed to initialize git: ${msg}` };
-      }
+      return { success: false, message: 'No git repository — save point skipped.' };
     }
     try {
       // Stage all changes

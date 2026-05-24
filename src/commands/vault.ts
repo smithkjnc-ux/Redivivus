@@ -1,13 +1,14 @@
 // [SCOPE] CHASSIS Vault commands — save, scan, cleanup + panel helpers
 
 import * as vscode from 'vscode';
-import { ChassisService } from '../services/chassisService.js';
-import { VaultService } from '../services/vault/vaultService.js';
-import { RoutingService } from '../services/ai/routingService.js';
-import { ChatPanel } from '../ui/chat/chatPanel.js';
+import type { ChassisService } from '../services/chassisService.js';
+import type { VaultService } from '../services/vault/vaultService.js';
+import type { RoutingService } from '../services/ai/routingService.js';
+import { ChatPanel } from '../ui/panels/chat/chatPanel';
 import { registerVaultValidate } from './vaultValidate.js';
 import { showVaultScanResults } from './vaultResults.js';
 import { enrichVaultDescriptions } from '../services/vault/vaultEnrich.js';
+import { evaluateQuality } from '../services/vault/vaultQualityGate.js';
 
 export let _pendingScanItems: any[] = [];
 
@@ -28,9 +29,12 @@ export function registerVaultCommands(
         );
         if (confirm !== 'Save All') { return; }
         let savedCount = 0; let dupCount = 0;
+        const callAI = (p: string) => routing.prompt(p, 12_000);
         for (const item of itemsToSave) {
-          if (!vaultService.isDuplicate(item.contentHash)) { vaultService.saveItem(item); savedCount++; }
-          else { dupCount++; }
+          if (vaultService.isDuplicate(item.contentHash)) { dupCount++; continue; }
+          const verdict = await evaluateQuality(item.name, item.code, item.language, callAI).catch(() => null);
+          if (verdict) { item.description = verdict.description; (item as any).useCase = verdict.useCase; (item as any).qualityScore = verdict.qualityScore; item.tags = [...new Set([...item.tags, ...verdict.tags])]; }
+          vaultService.saveItem(item); savedCount++;
         }
         _pendingScanItems = [];
         await ensureChatPanelOpen();
@@ -45,9 +49,12 @@ export function registerVaultCommands(
       const result = vaultService.extractFromFile(filePath, content);
       if (result.items.length === 0) { vscode.window.showInformationMessage('No extractable blocks found in this file.'); return; }
       let savedCount = 0; let dupCount = 0;
+      const callAI2 = (p: string) => routing.prompt(p, 12_000);
       for (const item of result.items) {
-        if (!vaultService.isDuplicate(item.contentHash)) { vaultService.saveItem(item); savedCount++; }
-        else { dupCount++; }
+        if (vaultService.isDuplicate(item.contentHash)) { dupCount++; continue; }
+        const v = await evaluateQuality(item.name, item.code, item.language, callAI2).catch(() => null);
+        if (v) { item.description = v.description; (item as any).useCase = v.useCase; (item as any).qualityScore = v.qualityScore; item.tags = [...new Set([...item.tags, ...v.tags])]; }
+        vaultService.saveItem(item); savedCount++;
       }
       await ensureChatPanelOpen();
       showVaultScanResults(result.items, 1, result.filteredCount, savedCount, dupCount);
@@ -68,9 +75,9 @@ export function registerVaultCommands(
         location: vscode.ProgressLocation.Notification, title: 'CHASSIS Vault: Scanning codebase...', cancellable: true,
       }, async (progress, token) => {
         const scanned = await vaultService.scanCodebase(root, undefined, undefined, (msg: string) => {
-          if (!token.isCancellationRequested) progress.report({ message: msg });
+          if (!token.isCancellationRequested) {progress.report({ message: msg });}
         });
-        if (token.isCancellationRequested) return null;
+        if (token.isCancellationRequested) {return null;}
         return scanned;
       });
       if (!result || result.items.length === 0) { vscode.window.showInformationMessage('No extractable blocks found.'); return; }
