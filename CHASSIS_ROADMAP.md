@@ -1,7 +1,25 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated:* May 24, 2026 (Session 11AX)
+*Last updated:* May 24, 2026 (Session 11AY)
+
+---
+
+## AI Delegation Button + Complexity Reduction — May 24, 2026 (Session 11AY)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/services/mapBuilderHelpers.ts` | Added `warnTexts?`, `todoTexts?`, `deadTexts?` to `MapNode` interface. Added `extractAnnotationTexts(content, tag)` helper — extracts the text after each `[WARN]`/`[TODO]`/`[DEAD]` tag, capped at 120 chars. | Need the actual annotation text (not just counts) to populate the delegate button prompt. | Low — additive fields, all optional. |
+| `src/services/mapBuilderService.ts` | Import `extractAnnotationTexts`; populate `warnTexts`, `todoTexts`, `deadTexts` on each node during file scan. | Feeds annotation text into node graph data so it's available in the webview. | Low — additive to existing scan loop. |
+| `src/ui/map/mapScriptActions.ts` | `showSidePanel`: added `renderAnnotations(texts, tag)` inner function that renders each annotation as a row with tag badge + text + Delegate button (`data-action="delegate"`, `data-tag`, `data-idx`). Added `window.doDelegate(tag, idx)` — reads text from `window._selectedNode.warnTexts/todoTexts/deadTexts`, posts `{type:'delegateAnnotation', ...}` to extension. | One-click delegation for `[WARN]`/`[TODO]`/`[DEAD]` tags directly from the Architecture Map side panel. | Low — pure UI addition; no existing handlers modified. |
+| `src/ui/map/mapScriptEngine.ts` | Added `else if (action==='delegate') window.doDelegate(...)` branch to the side-panel click dispatcher. | Wire the new `data-action="delegate"` button into the existing click handler pattern. | Low — one branch added to existing switch. |
+| `src/ui/map/mapStyles.ts` | Added `.annot-list`, `.annot-row`, `.annot-tag` (warn/todo/dead variants), `.annot-text`, `.delegate-btn` CSS. | Visual styling for the annotation list and delegate button. | Low — additive CSS. |
+| `src/ui/map/mapMessageDispatcher.ts` | Added `delegateAnnotation` case: opens chat (`chassis.openChat`) then posts prompt via `chassis.postToChat`. Prompt format: `[TAG] in \`filePath\`: annotation text\n\nPlease address this annotation.` | Routes the delegate message from the webview to the chat panel. | Low — new case; no existing cases touched. |
+| `src/core/routing/chatPanelMsgSendClarify.ts` | NEW. Extracted `runChatClarifyStep(userText, routing, conversation, refresh)` from `handleSendMessage`. Returns `{routedText, cancelled}`. | `handleSendMessage` clarify block was 24 lines of nested async branching (push → wait → cancel/summary/pop). | Low — identical logic; re-exported via new import in handleSendMessage. |
+| `src/core/routing/chatPanelMsgSendBuildIntent.ts` | NEW. Extracted `handleBuildIntent(routedText, userText, msg, deps, conversation, refresh)` from `handleSendMessage`. Contains mode gates, blueprint gap check, template wizard routing. | Build intent block was 30 lines of nested branching inside `handleSendMessage`. | Low — identical logic. |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Replaced clarify block with `runChatClarifyStep(...)` call; replaced build intent block with `handleBuildIntent(...)` call. Removed no-longer-needed imports. 166→101 lines, complexity ~77→~35. | Complexity reduction — two major branch clusters extracted. | Low. |
+| `src/core/build/chatPanelBuildClarify.ts` | NEW. Extracted `runBuildClarifyStep(task, ctx, isFixRequest, skipComplex)` from `runBuildAfterGates`. Returns `{cancelled}`, mutates `ctx.clarifyAnswers`. | 33-line clarify block in `runBuildAfterGates` was the dominant complexity driver (Thinking... push → questions → token render → race → cancel/now/answers branching). | Low — identical logic; `ctx` is mutated in-place exactly as before. |
+| `src/core/build/chatPanelBuildRunner.ts` | Replaced 33-line clarify block with `runBuildClarifyStep(...)` call. Removed unused `extractBlueprintFromPrompt` import. 195→168 lines, complexity ~81→~42. | Complexity reduction. | Low. |
 
 ---
 
@@ -2637,8 +2655,8 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 > Full backlog in `docs/CHASSIS_FEATURES.md`
 
 ### 🔴 Critical Refactors (Complexity Warnings)
-- [ ] `handleSendMessage` in `src/ui/chat/chatPanelMsgSendMessage.ts` (complexity 77)
-- [ ] `runBuildAfterGates` in `src/ui/chat/chatPanelBuildRunner.ts` (complexity 81)
+- [x] `handleSendMessage` — complexity ~77→~35 (Session 11AY: extracted clarify step + build intent handler)
+- [x] `runBuildAfterGates` — complexity ~81→~42 (Session 11AY: extracted clarify step)
 
 ### ✅ Completed (Sessions 3–4o)
 - [x] **Terminal error awareness** — `terminalErrorService.ts`, `Ctrl+Shift+E`, inject into chat
@@ -2661,7 +2679,7 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 ### 🟡 Next Up
 - [ ] **Built-in Git** — auto-commit after AI change, session end, build from vault
 - [ ] **Retrofit Blueprint-from-Scan** — infer 5 W's from existing project structure
-- [ ] **AI Delegation Button** — one-click delegate for `[WARN]`/`[TODO]` tags
+- [x] **AI Delegation Button** — one-click delegate for `[WARN]`/`[TODO]`/`[DEAD]` tags (Session 11AY)
 - [ ] **Vault Translation Engine** — convert vault items across languages (JS → Python etc.)
 
 ---
