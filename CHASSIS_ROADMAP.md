@@ -1,7 +1,16 @@
 # CHASSIS — Roadmap Index
 > **Rule:** Every AI working on CHASSIS MUST read this file first AND update `docs/CHASSIS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated:* May 24, 2026 (Session 11AY)
+*Last updated:* May 24, 2026 (Session 11AZ)
+
+---
+
+## Retrofit Blueprint-from-Scan — May 24, 2026 (Session 11AZ)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/core/retrofit/retrofitBlueprint.ts` | Added `STACK_MAP` (17 entries) mapping package.json dep names to readable stack labels (React, Next.js, Electron, Phaser, Prisma, VS Code extension, etc.). Added `detectTechStack(pkg)` private method — filters `STACK_MAP` against `dependencies` + `devDependencies`, returns comma-joined label string. Added `sampleEntryPoint()` — searches `index.html`, `main.ts`, `app.py`, `server.js`, etc. and returns first 25 non-comment lines. `scanCodebase()` updated to: include `devDependencies` alongside `dependencies`; call `detectTechStack` and append `=== DETECTED TECH STACK ===` section; call `sampleEntryPoint` and append entry point code; read `requirements.txt` / `Dockerfile` when present. | For non-CHASSIS projects with no README and no `[SCOPE]` tags, the old scan returned almost no signal — AI had little to work with. Tech stack detection and entry-point sampling give strong "what does this do" context even for blank-slate projects. | Low — all additions are optional/fallback; no existing scan logic removed. |
+| `src/core/routing/chatPanelMsgSendKeywords.ts` | Added keyword intercept for retrofit blueprint trigger: matches "retrofit blueprint", "figure out what my project does", "generate blueprint from my code", "what does my project do", "auto blueprint", "infer blueprint", etc. Posts "Scanning your project..." to chat then fires `chassis.retrofitBlueprint`. | Users had to know the command name to run it. Now accessible from natural language in chat. | Low — new branch before AI classifier; no existing intercepts modified. |
 
 ---
 
@@ -2678,7 +2687,7 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 
 ### 🟡 Next Up
 - [ ] **Built-in Git** — auto-commit after AI change, session end, build from vault
-- [ ] **Retrofit Blueprint-from-Scan** — infer 5 W's from existing project structure
+- [x] **Retrofit Blueprint-from-Scan** — infer 5 W's from existing project structure (Session 11AZ)
 - [x] **AI Delegation Button** — one-click delegate for `[WARN]`/`[TODO]`/`[DEAD]` tags (Session 11AY)
 - [ ] **Vault Translation Engine** — convert vault items across languages (JS → Python etc.)
 
