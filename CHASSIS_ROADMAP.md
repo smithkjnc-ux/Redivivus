@@ -2686,7 +2686,7 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 - [ ] **Vault dedup** — seed duplicates, run `chassis.vaultDedup`, confirm merge
 
 ### 🟡 Next Up
-- [ ] **Built-in Git** — auto-commit after AI change, session end, build from vault
+- [x] **Built-in Git** — auto-commit after AI change, session end, build from vault (Sessions 14 + 11AT)
 - [x] **Retrofit Blueprint-from-Scan** — infer 5 W's from existing project structure (Session 11AZ)
 - [x] **AI Delegation Button** — one-click delegate for `[WARN]`/`[TODO]`/`[DEAD]` tags (Session 11AY)
 - [ ] **Vault Translation Engine** — convert vault items across languages (JS → Python etc.)
