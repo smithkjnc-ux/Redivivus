@@ -60,6 +60,19 @@ fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2));
 const outDataDir = path.join(workspaceRoot, 'out', 'data');
 if (fs.existsSync(outDataDir)) { fs.writeFileSync(path.join(outDataDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2)); }
 
+// Sync brand media overrides (letterpress SVGs, code-icon) into the build shell.
+// Stored in resources/media/ so they survive a fresh build deploy.
+const mediaSrc = path.join(workspaceRoot, 'resources', 'media');
+const mediaDest = path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'out', 'media');
+if (fs.existsSync(mediaSrc) && fs.existsSync(mediaDest)) {
+  try {
+    execSync(`rsync -a "${mediaSrc}/" "${mediaDest}/"`, { stdio: 'pipe' });
+    console.log('✓ Brand media synced to build');
+  } catch (e) {
+    console.warn('⚠️  Brand media sync failed:', e.stderr?.toString()?.trim() || e.message);
+  }
+}
+
 // Deploy compiled out/ to all known extension locations — runs unconditionally so every compile stays in sync.
 // Prevents zombie bugs where a source fix is compiled but never reaches the running build.
 const home = require('os').homedir();
