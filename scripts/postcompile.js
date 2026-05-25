@@ -82,10 +82,13 @@ let deployed = 0;
 for (const target of deployTargets) {
   if (!fs.existsSync(target)) { continue; }
   try {
-    execSync(
-      `rsync -a --delete "${path.join(workspaceRoot, 'out')}/" "${path.join(target, 'out')}/"`,
-      { stdio: 'pipe' }
-    );
+    // Sync compiled output
+    execSync(`rsync -a --delete "${path.join(workspaceRoot, 'out')}/" "${path.join(target, 'out')}/"`, { stdio: 'pipe' });
+    // Sync package.json and resources so extension identity + icons stay current
+    execSync(`cp "${path.join(workspaceRoot, 'package.json')}" "${target}/"`, { stdio: 'pipe' });
+    if (fs.existsSync(path.join(workspaceRoot, 'resources'))) {
+      execSync(`rsync -a --delete "${path.join(workspaceRoot, 'resources')}/" "${path.join(target, 'resources')}/"`, { stdio: 'pipe' });
+    }
     deployed++;
   } catch (e) {
     console.warn(`⚠️  Deploy to ${path.basename(target)} failed:`, e.stderr?.toString()?.trim() || e.message);
