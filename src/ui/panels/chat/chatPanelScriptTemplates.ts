@@ -9,7 +9,7 @@ export function buildTemplatesScript(): string {
       const ov = document.createElement('div'); ov.id = 'tmpl-wiz-overlay'; ov.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;z-index:9999;';
       const cd = document.createElement('div'); cd.style.cssText = 'background:#1e2740;color:#e8edf8;border-radius:14px;width:500px;max-width:94vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 12px 48px rgba(0,0,0,0.6);border:1px solid #2d3a55;overflow:hidden;font-family:inherit;';
       const wizHdr = document.createElement('div'); wizHdr.style.cssText = 'padding:18px 22px 14px;border-bottom:1px solid #2d3a55;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;';
-      const wizTitle = document.createElement('div'); wizTitle.style.cssText = 'font-size:15px;font-weight:700;color:#e8edf8;'; wizTitle.textContent = 'CHASSIS Template Library';
+      const wizTitle = document.createElement('div'); wizTitle.style.cssText = 'font-size:15px;font-weight:700;color:#e8edf8;'; wizTitle.textContent = 'Redivivus Template Library';
       const wizSub = document.createElement('div'); wizSub.id = 'tmpl-wiz-sub'; wizSub.style.cssText = 'font-size:12px;color:#8899bb;margin-top:3px;'; wizSub.textContent = 'Step 1 of 3 \u2014 Choose a project type';
       const wizTitleWrap = document.createElement('div'); wizTitleWrap.appendChild(wizTitle); wizTitleWrap.appendChild(wizSub);
       const wizClose = document.createElement('button'); wizClose.textContent = '\\u00D7'; wizClose.style.cssText = 'background:none;border:none;color:#8899bb;font-size:22px;cursor:pointer;padding:0 4px;line-height:1;flex-shrink:0;';

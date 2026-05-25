@@ -1,12 +1,12 @@
-// [SCOPE] CHASSIS History tab — past sessions and file reviews
+// [SCOPE] Redivivus History tab — past sessions and file reviews
 
 import * as path from 'path';
 import * as fs from 'fs';
-import type { ChassisService } from '../../services/chassisService.js';
+import type { RedivivusService } from '../../services/redivivusService.js';
 
-export function getSessionHistory(chassis: ChassisService): {html:string,path:string}[] {
-  if (!chassis.isInitialized()) {return [];}
-  const sessDir = chassis.sessionsDir;
+export function getSessionHistory(redivivus: RedivivusService): {html:string,path:string}[] {
+  if (!redivivus.isInitialized()) {return [];}
+  const sessDir = redivivus.sessionsDir;
   if (!fs.existsSync(sessDir)) {return [];}
   try {
     const files = fs.readdirSync(sessDir).filter(f => f.endsWith('.json')).sort().reverse().slice(0, 10);
@@ -24,9 +24,9 @@ export function getSessionHistory(chassis: ChassisService): {html:string,path:st
   } catch { return []; }
 }
 
-export function getReviews(chassis: ChassisService): {html:string,path:string}[] {
-  if (!chassis.isInitialized()) {return [];}
-  const revDir = path.join(chassis.chassisDir, 'reviews');
+export function getReviews(redivivus: RedivivusService): {html:string,path:string}[] {
+  if (!redivivus.isInitialized()) {return [];}
+  const revDir = path.join(redivivus.redivivusDir, 'reviews');
   if (!fs.existsSync(revDir)) {return [];}
   try {
     return fs.readdirSync(revDir).filter(f => f.endsWith('.md')).sort().reverse().slice(0, 10)

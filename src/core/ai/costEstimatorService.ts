@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Cost Estimator — estimates token count and USD cost before a build starts.
+// [SCOPE] Redivivus Cost Estimator — estimates token count and USD cost before a build starts.
 // Called by chatPanelBuild.ts BEFORE any AI call. Never makes AI calls itself.
 
 /** Cost per token by model family (USD) */

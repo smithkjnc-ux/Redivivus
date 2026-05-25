@@ -5,7 +5,7 @@ import * as path from 'path';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { modelLabel } from './chatPanelMsgFixUtils';
 import { buildSupervisorNotes, buildWorkerRules } from './chatPanelMsgFixPatterns';
-import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules';
+import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 
 export async function runPhase1Supervisor(
   userText: string,
@@ -20,7 +20,7 @@ export async function runPhase1Supervisor(
   imageType?: string,
   isRetry = false
 ): Promise<{ diagnosis: string, supervisorLabel: string, expandedFilesBlock: string } | null> {
-  const supervisorSystem = `You are the Supervisor AI in the CHASSIS code editing system. Your role is to analyze the user's request and identify exactly what changes are needed in the existing code.
+  const supervisorSystem = `You are the Supervisor AI in the Redivivus code editing system. Your role is to analyze the user's request and identify exactly what changes are needed in the existing code.
 
 BEHAVIORAL RULES:
 - Handle BOTH bug reports AND feature/change requests (add X, change Y, update Z). Identify ONLY the specific changes needed for this exact request.
@@ -30,17 +30,18 @@ BEHAVIORAL RULES:
 - For bugs: state Severity (CRITICAL/HIGH/MODERATE), File + function/line, What is wrong, What the correct fix is.
 - For features/changes: state which files to modify, what to add or change, and the exact implementation details.
 - Number each required change.
-CRITICAL: Do NOT write "Solution:", "Verification Completed:", grep command results, or any language implying the fix was already applied. You are DIAGNOSING what needs to change. The Worker implements it AFTER you. Never claim to have run commands or tested anything.
-REQUIRED FORMAT: Begin your entire response with exactly this line (do not skip it):
-PLAIN: [One plain-English sentence — what is wrong and what needs to change. No jargon. Example: "The bird moves too fast because the speed value is too high — I'll lower it to something more playable."]
-Then continue with your full technical analysis.${buildSupervisorNotes(activePatterns)}
-CONTEXT EXPANSION: If you see an import or reference to a file not included in the provided sources, add at the very end of your response:
-NEEDS_FILES:
-relative/path/to/file.ts
-CHASSIS will fetch those files and re-run your analysis with full context. Only list files you have strong reason to need. Max 8 files. Omit this section entirely if the provided files are sufficient.`;
+CRITICAL: Do NOT write "Solution:", "Verification Completed:", or anything implying the fix was already applied. You are DIAGNOSING. The Worker implements AFTER you.
+REQUIRED FORMAT: Start with: PLAIN: [one plain-English sentence — what is wrong and what changes. No jargon.]
+Then your full technical analysis. End with a PRESCRIPTION section (mandatory — Worker reads this directly instead of inferring):
+PRESCRIPTION:
+## filename
+- [label]: change \`[exact old code]\` → \`[exact new code]\`
+- [label]: add \`[new code]\` [where — e.g. "inside body{} CSS rule", "after function X"]
+Quote exact code. One line per surgical change. Worker will apply PRESCRIPTION verbatim.${buildSupervisorNotes(activePatterns)}
+CONTEXT EXPANSION: If you need files not in sources, append: NEEDS_FILES:\nrelative/path.ts (max 8, omit section if sufficient).`;
 
   // Blueprint context (who/what/where/when/why) — tells Supervisor what the project is
-  const _cfg = deps.chassis?.loadConfig?.();
+  const _cfg = deps.redivivus?.loadConfig?.();
   const _bp = _cfg?.blueprint;
   const _bpBlock = _bp
     ? `PROJECT BLUEPRINT:\n- What: ${_bp.what}\n- Who: ${_bp.who}\n- Platform/Where: ${_bp.where}\n- Timeline: ${_bp.when}\n- Goal: ${_bp.why}\n\n`
@@ -48,13 +49,7 @@ CHASSIS will fetch those files and re-run your analysis with full context. Only 
 
   // Recent roadmap entries — tells Supervisor what changed recently
   let _roadmapBlock = '';
-  try {
-    const _rp = path.join(root, 'CHASSIS_ROADMAP.md');
-    if (fs.existsSync(_rp)) {
-      const _recent = fs.readFileSync(_rp, 'utf-8').slice(-700).trim();
-      if (_recent) { _roadmapBlock = `RECENT PROJECT CHANGES:\n${_recent}\n\n`; }
-    }
-  } catch {}
+  try { const _rp = path.join(root, 'REDIVIVUS_ROADMAP.md'); if (fs.existsSync(_rp)) { const _recent = fs.readFileSync(_rp, 'utf-8').slice(-700).trim(); if (_recent) { _roadmapBlock = `RECENT PROJECT CHANGES:\n${_recent}\n\n`; } } } catch {}
 
   // File skeleton — architecture overview from [SCOPE] annotations without full file content
   const _skelLines: string[] = [];
@@ -98,16 +93,16 @@ export async function runPhase2Worker(
   deps: MessageHandlerDeps,
   root: string
 ): Promise<{ workerResponse: string, workerLabel: string } | null> {
-  const workerSystem = `You are the Worker AI in the CHASSIS code editing system. You make precise, surgical code changes.
+  const workerSystem = `You are the Worker AI in the Redivivus code editing system. You make precise, surgical code changes.
 
 IDENTITY AND DISCIPLINE:
-- You implement ONLY the specific changes described in the Supervisor's analysis. Nothing else.
+- The Supervisor's analysis ends with a PRESCRIPTION section — implement each listed change exactly. Nothing beyond what PRESCRIPTION specifies.
 - You make surgical edits -- modify ONLY the exact lines that need to change.
 - You NEVER refactor, rename variables, reformat code, or "improve" anything beyond the requested change.
 - You NEVER create new files or invent file paths that the Supervisor did not identify.
 - You read [SCOPE] and [ANNOTATION] comments to understand code structure before changing anything.
 - For every block of code you REMOVE or REPLACE, add a [DEAD] comment above it.
-${deps.assistMode ? '' : CHASSIS_WORKER_RULES + '\n'}${buildWorkerRules(activePatterns, 9)}
+${deps.assistMode ? '' : Redivivus_WORKER_RULES + '\n'}${buildWorkerRules(activePatterns, 9)}
 OUTPUT FORMAT — choose based on scope:
 
 SURGICAL (targeted change ≤ ~30% of file):

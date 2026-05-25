@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Learned Memory Service — reads/writes .chassis/learned.md
+// [SCOPE] Redivivus Learned Memory Service — reads/writes .redivivus/learned.md
 // Manages two memory tiers:
 //   Permanent — architectural decisions, user preferences, file facts. Never deleted.
 //   Recent    — session observations. Auto-pruned after 30 days.
@@ -13,7 +13,7 @@ import {
 } from './learnedMemoryServiceIO.js';
 export { LearnedEntry };
 
-const LEARNED_FILE = '.chassis/learned.md';
+const LEARNED_FILE = '.redivivus/learned.md';
 
 export class LearnedMemoryService {
   private filePath: string;

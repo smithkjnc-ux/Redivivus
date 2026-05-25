@@ -44,7 +44,7 @@ export async function presentFixResult(params: {
 
   // Pattern validation
   fixLog('VALIDATION: Running pattern validation...', { fileCount: written.length });
-  const patternViolations = validateOutputFiles(writtenFixes);
+  const patternViolations = validateOutputFiles(writtenFixes, userText);
   fixLog('VALIDATION: Pattern violations found', { count: patternViolations.length });
 
   // Write dead-end entries for resolved patterns
@@ -66,7 +66,7 @@ export async function presentFixResult(params: {
   const failLine = failed.length > 0 ? `\n\n⚠️ Couldn't write: ${failed.join(', ')}` : '';
   const configWarn = onlyConfigModified ? `\n\n⚠️ Only config files were changed, not actual code — describe which feature or file to fix more specifically.` : '';
   const instrWarn = containsOnlyInstructions ? `\n\n⚠️ The AI wrote instructions instead of code — try asking: "write the code that does X" rather than "add X."` : '';
-  const validWarn = patternViolations.length > 0 ? `\n\n⚠️ A known issue pattern is still present — try asking again with more detail.` : '';
+  const validWarn = patternViolations.length > 0 ? `\n\n⚠️ This pattern persisted after an automatic retry — try describing the fix more specifically.` : '';
   const techBlock = technical ? `\n\n__TECH_DETAILS__${technical}__END_TECH__` : '';
   const commitPayload = written.length > 0 ? Buffer.from(JSON.stringify({ files: written, message: plainSummary || `fix: ${userText.slice(0, 80)}` })).toString('base64') : '';
   const commitToken = commitPayload ? `\n__GITHUB_COMMIT__${commitPayload}|||END_GITHUB_COMMIT__` : '';
@@ -76,4 +76,12 @@ export async function presentFixResult(params: {
     `**What I changed:**\n${fileList}` +
     `${skipLine}${failLine}${configWarn}${instrWarn}${validWarn}${scopeNote}${previewToken}${techBlock}${commitToken}`;
   refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+  // Auto-open/refresh preview after fix if web files were changed and server is running
+  const webExts = ['.html', '.css', '.js', '.ts', '.svg'];
+  if (written.some(f => webExts.some(ext => f.endsWith(ext)))) {
+    deps.panel.webview.postMessage({ type: 'preview-show-refresh' });
+  }
+  if (written.length > 0 && fixSnapId) {
+    deps.panel.webview.postMessage({ type: 'preview-fix-applied', snapId: fixSnapId, files: written });
+  }
 }

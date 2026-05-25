@@ -16,7 +16,7 @@ let _blueprintPanel: vscode.WebviewPanel | undefined;
 /** Opens the Blueprint Interview as a standalone full-width panel in the main editor column */
 export function openBlueprintPanel(
   context: vscode.ExtensionContext,
-  chassis: any,
+  redivivus: any,
   routingService: any
 ): void {
   // Singleton — reveal existing panel if open
@@ -26,7 +26,7 @@ export function openBlueprintPanel(
   }
 
   const panel = vscode.window.createWebviewPanel(
-    'chassisBlueprint',
+    'redivivusBlueprint',
     'Blueprint Interview',
     { viewColumn: vscode.ViewColumn.One, preserveFocus: false },
     { enableScripts: true, retainContextWhenHidden: true }
@@ -45,7 +45,7 @@ export function openBlueprintPanel(
         panel.webview.html = buildInterviewHtmlFull(lj, n2);
         return;
       }
-      await handleInterviewMessage(msg, panel.webview, chassis, routingService);
+      await handleInterviewMessage(msg, panel.webview, redivivus, routingService);
     },
     undefined,
     context.subscriptions
@@ -54,7 +54,7 @@ export function openBlueprintPanel(
   // Check if blueprint.md already exists — show it instead of blank form
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const existingBlueprint = root ? (() => {
-    try { return require('fs').readFileSync(require('path').join(root, '.chassis', 'blueprint.md'), 'utf8'); } catch { return null; }
+    try { return require('fs').readFileSync(require('path').join(root, '.redivivus', 'blueprint.md'), 'utf8'); } catch { return null; }
   })() : null;
 
   const nonce = Math.random().toString(36).slice(2);
@@ -75,7 +75,7 @@ export function openBlueprintPanel(
 export async function handleInterviewMessage(
   msg: any,
   webview: vscode.Webview,
-  chassis: any,
+  redivivus: any,
   routingService: any
 ): Promise<boolean> {
   if (msg.type === 'bi-start') {
@@ -105,14 +105,14 @@ export async function handleInterviewMessage(
     if (root) {
       const fs = require('fs');
       const path = require('path');
-      const chassisDir = path.join(root, '.chassis');
-      fs.mkdirSync(chassisDir, { recursive: true });
-      fs.writeFileSync(path.join(chassisDir, 'blueprint.md'), spec.summary, 'utf8');
+      const redivivusDir = path.join(root, '.redivivus');
+      fs.mkdirSync(redivivusDir, { recursive: true });
+      fs.writeFileSync(path.join(redivivusDir, 'blueprint.md'), spec.summary, 'utf8');
       // Also save to config if available
       try {
-        const config = chassis.loadConfig?.() || {};
+        const config = redivivus.loadConfig?.() || {};
         config.blueprintSpec = spec;
-        chassis.saveConfig?.(config);
+        redivivus.saveConfig?.(config);
       } catch (_) {}
     }
 

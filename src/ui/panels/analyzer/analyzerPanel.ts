@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Recommendations webview panel — creates the panel and wires up message handling
+// [SCOPE] Redivivus Recommendations webview panel — creates the panel and wires up message handling
 // Section HTML is built in analyzerSections.ts. This file is panel lifecycle only.
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -29,7 +29,7 @@ export class RecommendationsPanel {
       return;
     }
     const panel = vscode.window.createWebviewPanel(
-      'chassisRecommendations', 'CHASSIS Recommendations',
+      'redivivusRecommendations', 'Redivivus Recommendations',
       vscode.ViewColumn.Beside, { enableScripts: true, retainContextWhenHidden: true }
     );
     RecommendationsPanel._instance = new RecommendationsPanel(panel, result, projectName);
@@ -61,28 +61,28 @@ export class RecommendationsPanel {
       this._panel.webview.postMessage({ type: 'buildStarted', fileName: msg.fileName });
       try {
         const issueType = msg.issueType || 'largeFile';
-        // [CHASSIS] Strip "# CHASSIS Review — " and similar heading prefixes from filenames
+        // [Redivivus] Strip "# Redivivus Review — " and similar heading prefixes from filenames
         const rawFileName: string = msg.fileName || '';
         const cleanFileName = rawFileName.startsWith('batch-')
           ? rawFileName  // keep batch marker as-is
           : rawFileName.replace(/^#[^—\-]*[—\-]\s*/, '').trim();
         if ((issueType === 'todo' || issueType === 'uncommented') && cleanFileName && !cleanFileName.startsWith('batch-')) {
-          // [CHASSIS] Edit existing file in-place — skip vault search, skip new-file creation
-          await vscode.commands.executeCommand('chassis.runEditFix', msg.prompt, cleanFileName, issueType);
+          // [Redivivus] Edit existing file in-place — skip vault search, skip new-file creation
+          await vscode.commands.executeCommand('redivivus.runEditFix', msg.prompt, cleanFileName, issueType);
         } else if ((issueType === 'todo' || issueType === 'uncommented') && cleanFileName.startsWith('batch-')) {
-          // [CHASSIS] Fix All batch for todo/uncommented — parse filePath from the prompt itself
-          await vscode.commands.executeCommand('chassis.runEditFix', msg.prompt, null, issueType);
+          // [Redivivus] Fix All batch for todo/uncommented — parse filePath from the prompt itself
+          await vscode.commands.executeCommand('redivivus.runEditFix', msg.prompt, null, issueType);
         } else {
-          // [CHASSIS] Large file split or unknown — use existing new-file build pipeline
-          await vscode.commands.executeCommand('chassis.postToChat', msg.prompt);
+          // [Redivivus] Large file split or unknown — use existing new-file build pipeline
+          await vscode.commands.executeCommand('redivivus.postToChat', msg.prompt);
         }
       } catch (err) {
         this._panel.webview.postMessage({ type: 'clipboardError' });
       }
     } else if (msg.type === 'verifyFix' && msg.filePath && msg.issueType) {
-      // [CHASSIS] Persist the resolution so it survives re-scans
+      // [Redivivus] Persist the resolution so it survives re-scans
       markResolved(msg.filePath, msg.issueType);
-      const result = await vscode.commands.executeCommand('chassis.verifyFix', msg.filePath, msg.issueType);
+      const result = await vscode.commands.executeCommand('redivivus.verifyFix', msg.filePath, msg.issueType);
       this._panel.webview.postMessage({ type: 'verifyFixResult', result, rowId: msg.rowId });
     } else if (msg.type === 'copyToClipboard' && msg.text) {
       try {
@@ -92,7 +92,7 @@ export class RecommendationsPanel {
         this._panel.webview.postMessage({ type: 'clipboardError' });
       }
     } else if (msg.type === 'markResolved' && msg.filePath && msg.issueType) {
-      // [CHASSIS] Explicit Done-button persist — called from webview when user clicks ✓ Done
+      // [Redivivus] Explicit Done-button persist — called from webview when user clicks ✓ Done
       markResolved(msg.filePath, msg.issueType);
     }
   }

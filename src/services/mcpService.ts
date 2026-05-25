@@ -1,5 +1,5 @@
 // [SCOPE] MCP (Model Context Protocol) Server Integration -- connects to external tool servers.
-// Allows CHASSIS to use external resources, databases, APIs, and tools via MCP protocol.
+// Allows Redivivus to use external resources, databases, APIs, and tools via MCP protocol.
 // [WARN] MCP servers run as child processes. Always validate server paths before spawning.
 // Types extracted to mcpServiceTypes.ts (Rule 9 split).
 
@@ -22,10 +22,10 @@ interface McpConnection {
 const _connections = new Map<string, McpConnection>();
 
 /**
- * Load MCP server configurations from .chassis/mcp.json or workspace settings.
+ * Load MCP server configurations from .redivivus/mcp.json or workspace settings.
  */
 export function loadMcpConfigs(root: string): McpServerConfig[] {
-  const configPath = path.join(root, '.chassis', 'mcp.json');
+  const configPath = path.join(root, '.redivivus', 'mcp.json');
   if (!fs.existsSync(configPath)) { return []; }
   try {
     const raw = fs.readFileSync(configPath, 'utf-8');

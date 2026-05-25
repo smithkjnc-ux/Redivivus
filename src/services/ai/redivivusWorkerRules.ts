@@ -1,11 +1,11 @@
-// [SCOPE] Shared CHASSIS annotation rules -- injected into every Worker/Supervisor AI prompt.
-// Single source of truth. Import CHASSIS_WORKER_RULES and append to any prompt that generates code.
+// [SCOPE] Shared Redivivus annotation rules -- injected into every Worker/Supervisor AI prompt.
+// Single source of truth. Import Redivivus_WORKER_RULES and append to any prompt that generates code.
 // This is why annotation rules were missing from internal pipelines: they were written for
-// external AI editors (CLAUDE.md, .windsurfrules) but never wired into CHASSIS's own Worker prompts.
+// external AI editors (CLAUDE.md, .windsurfrules) but never wired into Redivivus's own Worker prompts.
 // All build and fix pipelines must import this and append it to their Worker prompt.
 
-export const CHASSIS_WORKER_RULES = `
-CHASSIS ANNOTATION RULES -- required in all code you write or modify:
+export const Redivivus_WORKER_RULES = `
+Redivivus ANNOTATION RULES -- required in all code you write or modify:
 1. [SCOPE] at line 1 of every NEW file you create.
    Format: [SCOPE] What this file does -- one line.
    Correct syntax: // [SCOPE] for JS/TS, <!-- [SCOPE] --> for HTML, # [SCOPE] for Python/Shell/YAML.

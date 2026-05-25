@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Files & AI tab — project tools, blueprint editor, AI switcher
+// [SCOPE] Redivivus Files & AI tab — project tools, blueprint editor, AI switcher
 
 function esc(s: string): string {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -18,11 +18,11 @@ export function renderFilesTab(
   html += `
     <div class="section-title">Project Health</div>
     <div class="cards">
-      <div class="card" data-cmd="chassis.analyze">
+      <div class="card" data-cmd="redivivus.analyze">
         <div class="card-icon">�</div><div class="card-body"><div class="card-title">Scan Project</div><div class="card-sub">Find messy files, unfinished TODOs, and things that need attention</div></div>
       </div>
-      <div class="card" data-cmd="chassis.retrofit">
-        <div class="card-icon">�</div><div class="card-body"><div class="card-title">Add Notes to Existing Code</div><div class="card-sub">Have CHASSIS label and organize your existing files</div></div>
+      <div class="card" data-cmd="redivivus.retrofit">
+        <div class="card-icon">�</div><div class="card-body"><div class="card-title">Add Notes to Existing Code</div><div class="card-sub">Have Redivivus label and organize your existing files</div></div>
       </div>
       <div class="card" data-action="showBlueprintForm">
         <div class="card-icon">📋</div><div class="card-body"><div class="card-title">My Project Plan</div><div class="card-sub">View or update what you're building and why</div></div>
@@ -31,7 +31,7 @@ export function renderFilesTab(
     <div class="section-title">AI Settings</div>
     <div class="cards">
       <div class="card" data-action="showSwitchForm">
-        <div class="card-icon">🤖</div><div class="card-body"><div class="card-title">Switch AI</div><div class="card-sub">Choose which AI assistant CHASSIS talks to</div></div>
+        <div class="card-icon">🤖</div><div class="card-body"><div class="card-title">Switch AI</div><div class="card-sub">Choose which AI assistant Redivivus talks to</div></div>
       </div>
       <div class="card" data-action="showApiKeysForm">
         <div class="card-icon">🔑</div><div class="card-body"><div class="card-title">API Keys</div><div class="card-sub">Connect your AI accounts (Gemini is free to start)</div></div>
@@ -39,14 +39,14 @@ export function renderFilesTab(
     </div>
     <div class="section-title">History & Help</div>
     <div class="cards">
-      <div class="card" data-cmd="chassis.log">
+      <div class="card" data-cmd="redivivus.log">
         <div class="card-icon">📜</div><div class="card-body"><div class="card-title">Work Log</div><div class="card-sub">See everything you've done in this project</div></div>
       </div>
-      <div class="card" data-cmd="chassis.deadends">
+      <div class="card" data-cmd="redivivus.deadends">
         <div class="card-icon">🚫</div><div class="card-body"><div class="card-title">Dead Ends</div><div class="card-sub">Things you tried that didn't work — so you don't repeat them</div></div>
       </div>
-      <div class="card" data-cmd="chassis.guide">
-        <div class="card-icon">📖</div><div class="card-body"><div class="card-title">Help & Guide</div><div class="card-sub">How to use CHASSIS — a plain English walkthrough</div></div>
+      <div class="card" data-cmd="redivivus.guide">
+        <div class="card-icon">📖</div><div class="card-body"><div class="card-title">Help & Guide</div><div class="card-sub">How to use Redivivus — a plain English walkthrough</div></div>
       </div>
     </div>`;
   html += `
@@ -78,7 +78,7 @@ export function renderFilesTab(
   html += `
     <div id="api-keys-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
       <h3 style="margin:0 0 4px 0; font-size:14px;">🔑 AI API Keys</h3>
-      <p style="margin:0 0 14px 0; font-size:11px; color:var(--vscode-descriptionForeground);">Keys are saved to your editor settings and never shared. Set one or more — CHASSIS will fall back automatically.</p>
+      <p style="margin:0 0 14px 0; font-size:11px; color:var(--vscode-descriptionForeground);">Keys are saved to your editor settings and never shared. Set one or more — Redivivus will fall back automatically.</p>
 
       ${keyRow('gemini', 'Gemini 2.5 Flash', 'Free', 'AIza...', 'https://aistudio.google.com/apikey', aiKeys?.gemini)}
       ${keyRow('groq',   'Groq (Llama 3)',    'Free', 'gsk_...', 'https://console.groq.com/keys', aiKeys?.groq)}

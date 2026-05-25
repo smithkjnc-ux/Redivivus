@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Chat Panel Content Helper — provides utility to show command results in chat panel
+// [SCOPE] Redivivus Chat Panel Content Helper — provides utility to show command results in chat panel
 // Allows commands to display their output in the main chat window instead of separate webviews.
 
 import * as vscode from 'vscode';
@@ -17,7 +17,7 @@ export interface ContentPanelOptions {
 export function showInChatPanel(options: ContentPanelOptions): void {
   // Ensure chat panel is open
   if (!ChatPanel.currentPanel) {
-    vscode.window.showInformationMessage('Please open CHASSIS Chat first');
+    vscode.window.showInformationMessage('Please open Redivivus Chat first');
     return;
   }
 

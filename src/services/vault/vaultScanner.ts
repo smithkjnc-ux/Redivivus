@@ -46,7 +46,7 @@ ${listStr}`;
 
     const response = await routingService.prompt(prompt);
     if (!response.success || !response.text) {
-      console.warn(`[CHASSIS] aiCategorize batch ${i}-${i + BATCH} failed: ${response.error || 'no response'}`);
+      console.warn(`[Redivivus] aiCategorize batch ${i}-${i + BATCH} failed: ${response.error || 'no response'}`);
       continue;
     }
     // [WARN] AI responses can be malformed; robust parsing is critical here.
@@ -66,7 +66,7 @@ ${listStr}`;
         }
       });
     } catch {
-      console.warn(`[CHASSIS] aiCategorize batch ${i}-${i + BATCH} parse failed:`, response.text.slice(0, 200));
+      console.warn(`[Redivivus] aiCategorize batch ${i}-${i + BATCH} parse failed:`, response.text.slice(0, 200));
     }
   }
   return result;
@@ -78,7 +78,7 @@ export async function scanCodebase(
   root: string,
   fileTypes = ['.ts', '.tsx', '.js', '.jsx', '.py'],
   ignorePaths: string[] = [
-    'node_modules', '.git', 'dist', 'build', 'out', '.next', 'coverage', '.chassis',
+    'node_modules', '.git', 'dist', 'build', 'out', '.next', 'coverage', '.redivivus',
     'functions/node_modules', 'ios/Pods', 'android/build',
     'site-packages', 'dist-packages', '__pycache__', '.venv', 'venv',
     'env', '.env', 'lib/python', 'lib64/python', '.tox', 'eggs',

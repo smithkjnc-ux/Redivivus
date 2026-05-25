@@ -1,7 +1,7 @@
-// [SCOPE] CHASSIS Vault commands — save, scan, cleanup + panel helpers
+// [SCOPE] Redivivus Vault commands — save, scan, cleanup + panel helpers
 
 import * as vscode from 'vscode';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { VaultService } from '../services/vault/vaultService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
@@ -14,14 +14,14 @@ export let _pendingScanItems: any[] = [];
 
 export function registerVaultCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   vaultService: VaultService,
   routing: RoutingService,
   refreshAll: () => void
 ): void {
   // Save to Vault
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.saveToVault', async () => {
+    vscode.commands.registerCommand('redivivus.saveToVault', async () => {
       const itemsToSave = _pendingScanItems.length > 0 ? _pendingScanItems : null;
       if (itemsToSave) {
         const confirm = await vscode.window.showInformationMessage(
@@ -63,7 +63,7 @@ export function registerVaultCommands(
 
   // Scan Codebase to Vault
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.scanVaultCodebase', async () => {
+    vscode.commands.registerCommand('redivivus.scanVaultCodebase', async () => {
       const defaultUri = vscode.workspace.workspaceFolders?.[0]?.uri || vscode.Uri.file(require('os').homedir() + '/projects');
       const picked = await vscode.window.showOpenDialog({
         canSelectFiles: false, canSelectFolders: true, canSelectMany: false,
@@ -72,7 +72,7 @@ export function registerVaultCommands(
       if (!picked || picked.length === 0) { return; }
       const root = picked[0].fsPath;
       const result = await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification, title: 'CHASSIS Vault: Scanning codebase...', cancellable: true,
+        location: vscode.ProgressLocation.Notification, title: 'Redivivus Vault: Scanning codebase...', cancellable: true,
       }, async (progress, token) => {
         const scanned = await vaultService.scanCodebase(root, undefined, undefined, (msg: string) => {
           if (!token.isCancellationRequested) {progress.report({ message: msg });}
@@ -89,7 +89,7 @@ export function registerVaultCommands(
 
   // Vault Cleanup
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.vaultCleanupSystemPaths', async () => {
+    vscode.commands.registerCommand('redivivus.vaultCleanupSystemPaths', async () => {
       const SYSTEM_PATH_SIGNALS = [
         'site-packages', 'dist-packages', '__pycache__', '.venv', '/venv/',
         'lib/python', 'lib64/python', '.tox', '.eggs', 'sdist', 'wheels',
@@ -100,13 +100,13 @@ export function registerVaultCommands(
         const src = (item as any).sourceFile || (item as any).filePath || '';
         return SYSTEM_PATH_SIGNALS.some(sig => src.includes(sig));
       });
-      if (toRemove.length === 0) { vscode.window.showInformationMessage('CHASSIS Vault: No system/pip path items found. Vault is already clean.'); return; }
+      if (toRemove.length === 0) { vscode.window.showInformationMessage('Redivivus Vault: No system/pip path items found. Vault is already clean.'); return; }
       const confirm = await vscode.window.showWarningMessage(
-        `CHASSIS Vault: Found ${toRemove.length} item(s) sourced from Python pip/env paths. Remove them?`, { modal: true }, 'Remove All'
+        `Redivivus Vault: Found ${toRemove.length} item(s) sourced from Python pip/env paths. Remove them?`, { modal: true }, 'Remove All'
       );
       if (confirm !== 'Remove All') { return; }
       for (const item of toRemove) { vaultService.deleteItem(item.id); }
-      vscode.window.showInformationMessage(`CHASSIS Vault: Removed ${toRemove.length} system path item(s).`);
+      vscode.window.showInformationMessage(`Redivivus Vault: Removed ${toRemove.length} system path item(s).`);
     })
   );
 
@@ -114,26 +114,26 @@ export function registerVaultCommands(
 
   // Enrich existing vault items with AI descriptions and quality scores
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.vault.enrich', async () => {
+    vscode.commands.registerCommand('redivivus.vault.enrich', async () => {
       const items = vaultService.listItems();
       const needsEnrich = items.filter((i: any) => !i.description || !i.qualityScore);
       if (needsEnrich.length === 0) {
-        vscode.window.showInformationMessage('CHASSIS Vault: All items already have AI descriptions.');
+        vscode.window.showInformationMessage('Redivivus Vault: All items already have AI descriptions.');
         return;
       }
       const choice = await vscode.window.showInformationMessage(
-        `CHASSIS Vault: ${needsEnrich.length} item(s) need AI descriptions. This will make ${needsEnrich.length} AI calls. Continue?`,
+        `Redivivus Vault: ${needsEnrich.length} item(s) need AI descriptions. This will make ${needsEnrich.length} AI calls. Continue?`,
         { modal: true }, 'Enrich Now', 'Cancel'
       );
       if (choice !== 'Enrich Now') { return; }
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: 'CHASSIS Vault: Enriching...', cancellable: false },
+        { location: vscode.ProgressLocation.Notification, title: 'Redivivus Vault: Enriching...', cancellable: false },
         async (progress) => {
           const callAI = (p: string) => routing.prompt(p, 12_000);
           const result = await enrichVaultDescriptions(vaultService, callAI, (done, total, name) => {
             progress.report({ message: `${done + 1}/${total}: ${name}`, increment: (1 / total) * 100 });
           });
-          vscode.window.showInformationMessage(`CHASSIS Vault: Enriched ${result.enriched} items, removed ${result.skipped} low-quality, ${result.failed} failed.`);
+          vscode.window.showInformationMessage(`Redivivus Vault: Enriched ${result.enriched} items, removed ${result.skipped} low-quality, ${result.failed} failed.`);
         }
       );
     })
@@ -142,7 +142,7 @@ export function registerVaultCommands(
 
 export async function ensureChatPanelOpen(): Promise<void> {
   if (!ChatPanel.currentPanel) {
-    await vscode.commands.executeCommand('chassis.openChatPanel');
+    await vscode.commands.executeCommand('redivivus.openChatPanel');
     await new Promise(resolve => setTimeout(resolve, 300));
   }
 }

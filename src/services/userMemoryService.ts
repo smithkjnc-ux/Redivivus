@@ -1,5 +1,5 @@
 // [SCOPE] Global User Memory Service -- persistent cross-project preferences and learned patterns.
-// Storage: ~/.chassis/user_memory.json (global, not per-project)
+// Storage: ~/.redivivus/user_memory.json (global, not per-project)
 // Learning: ZERO AI tokens. All learning is passive via observation or explicit "remember" commands.
 // Injection: ~30 tokens prepended to AI prompts when relevant.
 
@@ -34,7 +34,7 @@ export interface UserMemory {
   };
 }
 
-const MEMORY_DIR = path.join(os.homedir(), '.chassis');
+const MEMORY_DIR = path.join(os.homedir(), '.redivivus');
 const MEMORY_PATH = path.join(MEMORY_DIR, 'user_memory.json');
 
 const DEFAULT_MEMORY: UserMemory = {

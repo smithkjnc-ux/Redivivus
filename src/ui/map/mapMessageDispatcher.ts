@@ -54,14 +54,14 @@ export async function handleMapMessage(msg: any, ctx: MapMsgCtx): Promise<void> 
       
     case 'delegateAnnotation': {
       const promptText = msg.prompt || `[${msg.tag}] in \`${msg.nodeId}\`: ${msg.text}\n\nPlease address this annotation.`;
-      await vscode.commands.executeCommand('chassis.openChat');
-      await vscode.commands.executeCommand('chassis.postToChat', promptText);
+      await vscode.commands.executeCommand('redivivus.openChat');
+      await vscode.commands.executeCommand('redivivus.postToChat', promptText);
       return;
     }
 
     case 'back-to-chat':
       panel.dispose();
-      await vscode.commands.executeCommand('chassis.openChat');
+      await vscode.commands.executeCommand('redivivus.openChat');
       return;
       
     case 'refresh':

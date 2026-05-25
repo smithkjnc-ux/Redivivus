@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Chat Panel Build Pipeline — single-file build entry point
+// [SCOPE] Redivivus Chat Panel Build Pipeline — single-file build entry point
 // Step functions (path inference, review, write, post-build) extracted to chatPanelBuildSteps.ts.
 
 import * as fs from 'fs';
@@ -15,7 +15,7 @@ import { buildSingleFileResult } from './chatPanelBuildResult';
 import type { BuildContext } from './chatPanelBuildHelpers';
 import { updateLastMsg, appendMsg } from './chatPanelBuildHelpers';
 import { buildGitContextBlock } from '../../services/workspace/gitContext';
-import { chassisLog } from '../../services/logging/chassisLogger';
+import { redivivusLog } from '../../services/logging/redivivusLogger';
 import { inferBuildTarget, runCodeReviewPipeline, applyCodeToFile, runPostBuildActions, resolveWorkerPrompt } from './chatPanelBuildSteps';
 
 export type { BuildContext } from './chatPanelBuildHelpers';
@@ -23,7 +23,7 @@ export { registerVaultHitResolver, resolveVaultHit, isChunkedBuildRequest } from
 
 export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const { task, root, routing } = ctx;
-  chassisLog({ operation: 'build', phase: 'start', message: 'Build started', data: { task, root } });
+  redivivusLog({ operation: 'build', phase: 'start', message: 'Build started', data: { task, root } });
 
   const deadEnds = readProjectDeadEnds(root);
   const projectRules = readProjectRules(root);
@@ -44,7 +44,7 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   appendMsg(ctx, vaultOn ? '🔍 Checking your saved code library...' : '⚙️ Building...');
   const vaultItems = (ctx.vault && vaultOn) ? ctx.vault.listItems() : [];
   const searchResult = findRelevantByTask(task, vaultItems);
-  chassisLog({ operation: 'build', phase: 'vault_search', message: `Found ${searchResult.items.length} vault matches`, data: { vaultMatches: searchResult.items.length } });
+  redivivusLog({ operation: 'build', phase: 'vault_search', message: `Found ${searchResult.items.length} vault matches`, data: { vaultMatches: searchResult.items.length } });
   if (vaultOn) { updateLastMsg(ctx, `🔍 Found ${searchResult.items.length} useful match${searchResult.items.length !== 1 ? 'es' : ''} in your code library`); }
 
   const { relPath, absPath, existingTarget, isCrossLang, isMod, ext } = await inferBuildTarget(task, root, blueprintContext, routing);

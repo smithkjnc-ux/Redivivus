@@ -28,10 +28,10 @@ export async function executeAgentHandoff(
             modifiedFiles: new Set<string>(written),
             snapshotId: fixSnapId,
             routing: deps.routing,
-            blueprintContext: deps.chassis.isInitialized() ? JSON.stringify(deps.chassis.loadConfig()?.blueprint || {}) : ''
+            blueprintContext: deps.redivivus.isInitialized() ? JSON.stringify(deps.redivivus.loadConfig()?.blueprint || {}) : ''
         };
         
-        const config = deps.chassis.isInitialized() ? deps.chassis.loadConfig() : null;
+        const config = deps.redivivus.isInitialized() ? deps.redivivus.loadConfig() : null;
         let projectContext = config?.blueprint ? `Blueprint: ${JSON.stringify(config.blueprint)}` : 'No blueprint available.';
         
         await executeAgentTask(agentCtx.task, projectContext, deps.routing, agentCtx, agentCtx.log);

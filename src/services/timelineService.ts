@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Project Timeline — aggregates work_log, sessions, and git history into a visual timeline
+// [SCOPE] Redivivus Project Timeline — aggregates work_log, sessions, and git history into a visual timeline
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -35,7 +35,7 @@ export class TimelineService {
   }
 
   private addWorkLogEntries(entries: TimelineEntry[]): void {
-    const worklogPath = path.join(this.root, '.chassis', 'work_log.md');
+    const worklogPath = path.join(this.root, '.redivivus', 'work_log.md');
     if (!fs.existsSync(worklogPath)) { return; }
 
     const content = fs.readFileSync(worklogPath, 'utf-8');
@@ -72,7 +72,7 @@ export class TimelineService {
   }
 
   private addBuildErrors(entries: TimelineEntry[]): void {
-    const errorPath = path.join(this.root, '.chassis', 'build_errors.log');
+    const errorPath = path.join(this.root, '.redivivus', 'build_errors.log');
     if (!fs.existsSync(errorPath)) { return; }
 
     const content = fs.readFileSync(errorPath, 'utf-8');

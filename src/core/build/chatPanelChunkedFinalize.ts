@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Chat Panel Chunked Finalize — handles post-loop teardown, UI rendering, and vault capture
+// [SCOPE] Redivivus Chat Panel Chunked Finalize — handles post-loop teardown, UI rendering, and vault capture
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { BuildContext } from './chatPanelBuild';
@@ -20,7 +20,7 @@ export async function runChunkedBuildFinalize(
   ctx: BuildContext, task: string, builtFiles: string[], totalTokens: number, totalCost: number, elapsed: number, snapshotId: string | undefined, ledger: BuildLedger, storyLines: string[], storyMsgIndex: number, supervisorLabel: string, worker: string | null, filePlan: any[], blueprintContext: string
 ): Promise<void> {
   const { root, routing, vault, conversation } = ctx;
-  const projectName = ctx.chassis?.loadConfig?.()?.projectName || 'Unknown';
+  const projectName = ctx.redivivus?.loadConfig?.()?.projectName || 'Unknown';
   const absPaths = builtFiles.map(f => path.join(root, f));
   const _callAI = (p: string) => routing.prompt(p, 12_000);
   const capture = vault ? await autoCaptureFiles(absPaths, projectName, vault as VaultService, task, _callAI) : { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
@@ -41,7 +41,7 @@ export async function runChunkedBuildFinalize(
   tracer.end(builtFiles, totalTokens, totalCost);
   if (!ctx.assistMode) { writeProjectRoadmapEntry(root, `AI build: ${task.slice(0, 60)}`, builtFiles.map(f=>`Built \`${f}\``).concat([`Supervisor: ${supervisorLabel} Tokens: ~${totalTokens} Cost: $${totalCost.toFixed(4)}`])); }
   if (ctx.onBuildFinished) { ctx.onBuildFinished(task, builtFiles); }
-  if (!ctx.assistMode) { await autoCommitIfEnabled(root, `CHASSIS added ${builtFiles.length} files: ${task.slice(0, 60)}`, builtFiles); }
+  if (!ctx.assistMode) { await autoCommitIfEnabled(root, `Redivivus added ${builtFiles.length} files: ${task.slice(0, 60)}`, builtFiles); }
   // Auto-open project in Explorer — no button required
   const _wsf = vscode.workspace.workspaceFolders ?? [];
   if (!_wsf.some(f => f.uri.fsPath === root)) {
@@ -49,7 +49,7 @@ export async function runChunkedBuildFinalize(
       vscode.workspace.updateWorkspaceFolders(_wsf.length, null, { uri: vscode.Uri.file(root) });
       vscode.commands.executeCommand('workbench.view.explorer').then(() => { vscode.commands.executeCommand('workbench.files.action.focusFilesExplorer'); }, () => {});
     } else {
-      try { const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; if (CP?.extensionContext) { CP.extensionContext.globalState.update('chassis.pendingRescueConversation', ctx.conversation); } } catch {}
+      try { const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); } } catch {}
       vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root));
     }
   }

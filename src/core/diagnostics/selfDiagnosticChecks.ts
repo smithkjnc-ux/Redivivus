@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Self-Diagnostic — workspace, services, and AI provider checks
+// [SCOPE] Redivivus Self-Diagnostic — workspace, services, and AI provider checks
 // Extracted from selfDiagnostic.ts. Imported by runDiagnostic in selfDiagnostic.ts.
 
 import * as vscode from 'vscode';
@@ -23,18 +23,18 @@ export function checkWorkspace(): DiagResult {
   return { name: 'Workspace', category: 'Workspace', status: 'warn', message: 'No workspace folder open -- some features require a project folder' };
 }
 
-export function checkChassisDir(): DiagResult {
+export function checkRedivivusDir(): DiagResult {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root) { return { name: '.chassis dir', category: 'Workspace', status: 'skip', message: 'No workspace -- skipped' }; }
-  const chassisDir = path.join(root, '.chassis');
-  if (fs.existsSync(chassisDir)) { return { name: '.chassis dir', category: 'Workspace', status: 'pass', message: 'Found', detail: chassisDir }; }
-  return { name: '.chassis dir', category: 'Workspace', status: 'warn', message: 'Not found -- project not initialized. Run CHASSIS: Initialize Project.' };
+  if (!root) { return { name: '.redivivus dir', category: 'Workspace', status: 'skip', message: 'No workspace -- skipped' }; }
+  const redivivusDir = path.join(root, '.redivivus');
+  if (fs.existsSync(redivivusDir)) { return { name: '.redivivus dir', category: 'Workspace', status: 'pass', message: 'Found', detail: redivivusDir }; }
+  return { name: '.redivivus dir', category: 'Workspace', status: 'warn', message: 'Not found -- project not initialized. Run Redivivus: Initialize Project.' };
 }
 
 export function checkConfigFile(): DiagResult {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { return { name: 'Config file', category: 'Workspace', status: 'skip', message: 'No workspace -- skipped' }; }
-  const configPath = path.join(root, '.chassis', 'config.json');
+  const configPath = path.join(root, '.redivivus', 'config.json');
   if (fs.existsSync(configPath)) {
     try {
       JSON.parse(fs.readFileSync(configPath, 'utf-8'));
@@ -54,12 +54,12 @@ export function checkServiceExists(service: any, serviceName: string, methodName
   return { name: `${serviceName}.${methodName}`, category: 'Services', status: 'fail', message: `Method '${methodName}' not found on ${serviceName}` };
 }
 
-export function checkInitState(chassis: any): DiagResult {
-  if (!chassis) { return { name: 'Init state', category: 'Services', status: 'skip', message: 'ChassisService not available' }; }
+export function checkInitState(redivivus: any): DiagResult {
+  if (!redivivus) { return { name: 'Init state', category: 'Services', status: 'skip', message: 'RedivivusService not available' }; }
   try {
-    const initialized = chassis.isInitialized();
+    const initialized = redivivus.isInitialized();
     if (initialized) { return { name: 'Init state', category: 'Services', status: 'pass', message: 'Project is initialized' }; }
-    return { name: 'Init state', category: 'Services', status: 'warn', message: 'Not initialized -- open a project folder or run CHASSIS: Initialize' };
+    return { name: 'Init state', category: 'Services', status: 'warn', message: 'Not initialized -- open a project folder or run Redivivus: Initialize' };
   } catch (e: any) {
     return { name: 'Init state', category: 'Services', status: 'fail', message: `isInitialized() threw: ${e.message}` };
   }
@@ -78,12 +78,12 @@ export function checkApiKey(providerName: string, configKey: string): DiagResult
 
 // Provider ping config: config key + model-list URL (cheap, auth-only, no tokens consumed)
 const PROVIDER_PING: Record<string, { configKey: string; url: (k: string) => string; headers: (k: string) => Record<string, string> }> = {
-  Gemini:  { configKey: 'chassis.geminiApiKey',  url: k => `https://generativelanguage.googleapis.com/v1beta/models?key=${k}&pageSize=1`, headers: () => ({}) },
-  OpenAI:  { configKey: 'chassis.openaiApiKey',  url: () => 'https://api.openai.com/v1/models',    headers: k => ({ Authorization: `Bearer ${k}` }) },
-  Claude:  { configKey: 'chassis.claudeApiKey',  url: () => 'https://api.anthropic.com/v1/models', headers: k => ({ 'x-api-key': k, 'anthropic-version': '2023-06-01' }) },
-  Groq:    { configKey: 'chassis.groqApiKey',    url: () => 'https://api.groq.com/openai/v1/models', headers: k => ({ Authorization: `Bearer ${k}` }) },
-  xAI:     { configKey: 'chassis.xaiApiKey',     url: () => 'https://api.x.ai/v1/models',          headers: k => ({ Authorization: `Bearer ${k}` }) },
-  Kimi:    { configKey: 'chassis.kimiApiKey',    url: () => 'https://api.moonshot.cn/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
+  Gemini:  { configKey: 'redivivus.geminiApiKey',  url: k => `https://generativelanguage.googleapis.com/v1beta/models?key=${k}&pageSize=1`, headers: () => ({}) },
+  OpenAI:  { configKey: 'redivivus.openaiApiKey',  url: () => 'https://api.openai.com/v1/models',    headers: k => ({ Authorization: `Bearer ${k}` }) },
+  Claude:  { configKey: 'redivivus.claudeApiKey',  url: () => 'https://api.anthropic.com/v1/models', headers: k => ({ 'x-api-key': k, 'anthropic-version': '2023-06-01' }) },
+  Groq:    { configKey: 'redivivus.groqApiKey',    url: () => 'https://api.groq.com/openai/v1/models', headers: k => ({ Authorization: `Bearer ${k}` }) },
+  xAI:     { configKey: 'redivivus.xaiApiKey',     url: () => 'https://api.x.ai/v1/models',          headers: k => ({ Authorization: `Bearer ${k}` }) },
+  Kimi:    { configKey: 'redivivus.kimiApiKey',    url: () => 'https://api.moonshot.cn/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
 };
 
 export async function checkProviderReachable(providerName: string): Promise<DiagResult> {
@@ -107,7 +107,7 @@ export async function checkProviderReachable(providerName: string): Promise<Diag
 
 // ── SYSTEM PROMPT ──
 
-export function checkSystemPrompt(chassis: any): DiagResult {
+export function checkSystemPrompt(redivivus: any): DiagResult {
   try {
     const root = __dirname;
     const possiblePaths = [
@@ -120,10 +120,10 @@ export function checkSystemPrompt(chassis: any): DiagResult {
         const mod = require(p);
         if (typeof mod.getSystemPrompt === 'function') {
           const prompt = mod.getSystemPrompt('No blueprint set.');
-          if (prompt && prompt.toLowerCase().includes('chassis')) {
-            return { name: 'System prompt', category: 'System Prompt', status: 'pass', message: 'CHASSIS identity found in prompt', detail: `Length: ${prompt.length} chars` };
+          if (prompt && prompt.toLowerCase().includes('redivivus')) {
+            return { name: 'System prompt', category: 'System Prompt', status: 'pass', message: 'Redivivus identity found in prompt', detail: `Length: ${prompt.length} chars` };
           }
-          return { name: 'System prompt', category: 'System Prompt', status: 'fail', message: 'System prompt builds but does NOT contain "chassis"' };
+          return { name: 'System prompt', category: 'System Prompt', status: 'fail', message: 'System prompt builds but does NOT contain "redivivus"' };
         }
       }
     }

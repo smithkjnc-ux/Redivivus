@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { applyChassisStructure } from '../../ui/panels/chat/chatPanelCodeStructure';
+import { applyRedivivusStructure } from '../../ui/panels/chat/chatPanelCodeStructure';
 import type { RoutingService } from '../../services/ai/routingService';
 
 // Minimum lines in a code block to qualify for auto-save
@@ -122,8 +122,8 @@ export async function autoSaveAndOpen(code: string, filename: string, root: stri
 
   const absPath = path.join(root, filename);
 
-  // Apply CHASSIS structure rules (generate first, structure after)
-  let finalCode = applyChassisStructure(code, filename);
+  // Apply Redivivus structure rules (generate first, structure after)
+  let finalCode = applyRedivivusStructure(code, filename);
 
   // Strip JSON comments if target is .json
   if (filename.toLowerCase().endsWith('.json')) {
@@ -143,7 +143,7 @@ export async function autoSaveAndOpen(code: string, filename: string, root: stri
     await vscode.window.showTextDocument(doc, { preview: false });
   } catch { /* best-effort */ }
 
-  // [CHASSIS] Show full path so non-technical users know exactly where the file went
+  // [Redivivus] Show full path so non-technical users know exactly where the file went
   const friendlyDir = root.replace(/^\/home\/\w+/, '~');
   return `✅ Saved: \`${filename}\` → \`${friendlyDir}/\``;
 }

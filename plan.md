@@ -17,9 +17,9 @@ Fix four specific bugs identified during the Flappy Bird agentic test run relate
 - **Fix:** On lines 115-121, replace the brittle string manipulation with a robust RegExp block extractor that explicitly targets the file's `basename` if multiple code blocks are found, defaulting to the single block if only one exists.
 
 ### `src/core/build/chatPanelChunked.ts`
-- **Bug 3:** CHASSIS should automatically open the created project folder in the VS Code workspace explorer after a build.
+- **Bug 3:** Redivivus should automatically open the created project folder in the VS Code workspace explorer after a build.
 - **Fix:** At the end of `runChunkedBuild` (around line 191), trigger the `workbench.view.explorer` command to bring focus to the file explorer so the user immediately sees the newly generated files.
 
 ## Verification
-- Run CHASSIS tests to ensure no regressions.
+- Run Redivivus tests to ensure no regressions.
 - Execute a browser subagent test run for "make me a flappy bird game" to verify it routes to OBD1, produces clean files without Guardian narrative, creates all planned files, and successfully renders the game in a webview.

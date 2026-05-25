@@ -1,7 +1,7 @@
 // [SCOPE] Sanity tests for recently shipped features — run with: node scripts/test-webview-sanity.js
 // Tests:
 //   1. chatPanelHtml: generated webview script has no JS syntax errors
-//   2. diagnosticLogger: writes and prunes .chassis/debug.log correctly
+//   2. diagnosticLogger: writes and prunes .redivivus/debug.log correctly
 //   3. routingService: getModelName returns known model strings (via mock)
 // [WARN] Must be run after `npm run compile` — tests the compiled out/ files, not src/
 
@@ -46,7 +46,7 @@ try {
     const scriptEnd = html.lastIndexOf('</script>');
     if (scriptStart === -1 || scriptEnd === -1) { fail(s.label, 'no <script> block found'); continue; }
     const scriptContent = html.slice(scriptStart, scriptEnd).replace(/<script[^>]*>\n?/, '');
-    const tmpFile = path.join('/tmp', `chassis_test_${Date.now()}.js`);
+    const tmpFile = path.join('/tmp', `redivivus_test_${Date.now()}.js`);
     fs.writeFileSync(tmpFile, scriptContent);
     try {
       require('child_process').execSync(`node --check ${tmpFile}`, { stdio: 'pipe' });
@@ -65,8 +65,8 @@ try {
 console.log('\n[2] DiagnosticLogger — write and prune');
 try {
   const { debugLog } = require('../out/services/diagnosticLogger.js');
-  const tmpRoot = fs.mkdtempSync('/tmp/chassis-test-');
-  const logPath = path.join(tmpRoot, '.chassis', 'debug.log');
+  const tmpRoot = fs.mkdtempSync('/tmp/redivivus-test-');
+  const logPath = path.join(tmpRoot, '.redivivus', 'debug.log');
 
   // Should create file and write entry
   debugLog(tmpRoot, 'test', 'hello world');

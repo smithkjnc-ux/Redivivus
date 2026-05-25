@@ -1,5 +1,5 @@
-// [SCOPE] CHASSIS Retrofit Blueprint — scan existing codebase, auto-generate 5 W's blueprint
-// Saves generated blueprint directly into .chassis/config.json so CHASSIS uses it immediately.
+// [SCOPE] Redivivus Retrofit Blueprint — scan existing codebase, auto-generate 5 W's blueprint
+// Saves generated blueprint directly into .redivivus/config.json so Redivivus uses it immediately.
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -147,9 +147,9 @@ Return ONLY the JSON object. No markdown, no explanation.`;
     } catch { return null; }
   }
 
-  // [WARN] Creates .chassis/config.json if it doesn't exist — safe for non-CHASSIS projects
+  // [WARN] Creates .redivivus/config.json if it doesn't exist — safe for non-Redivivus projects
   saveToConfig(blueprint: Blueprint5W): void {
-    const cfgPath = path.join(this.root, '.chassis', 'config.json');
+    const cfgPath = path.join(this.root, '.redivivus', 'config.json');
     try {
       const existing = fs.existsSync(cfgPath)
         ? JSON.parse(fs.readFileSync(cfgPath, 'utf-8'))
@@ -167,6 +167,6 @@ Return ONLY the JSON object. No markdown, no explanation.`;
   }
 
   formatMarkdown(blueprint: Blueprint5W): string {
-    return `# CHASSIS Blueprint (Retrofit)\nGenerated from project scan.\n\n---\n\n## Who\n${blueprint.who}\n\n## What\n${blueprint.what}\n\n## When\n${blueprint.when}\n\n## Where\n${blueprint.where}\n\n## Why\n${blueprint.why}`;
+    return `# Redivivus Blueprint (Retrofit)\nGenerated from project scan.\n\n---\n\n## Who\n${blueprint.who}\n\n## What\n${blueprint.what}\n\n## When\n${blueprint.when}\n\n## Where\n${blueprint.where}\n\n## Why\n${blueprint.why}`;
   }
 }

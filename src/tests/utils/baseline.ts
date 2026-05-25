@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Test Utility - Strict Baseline Validation
+// [SCOPE] Redivivus Test Utility - Strict Baseline Validation
 import * as fs from 'fs';
 import * as path from 'path';
 import * as assert from 'assert';

@@ -1,4 +1,4 @@
-// [SCOPE] Curated starter patterns shipped with CHASSIS — hand-verified, zero AI variance.
+// [SCOPE] Curated starter patterns shipped with Redivivus — hand-verified, zero AI variance.
 // These seed the vault on first install so every user gets quality reference patterns from day one.
 // Categories: component, utility, api, auth, algorithm, pattern, error, validation, network, config
 // [WARN] All patterns here must be verified working before adding. Test before committing.

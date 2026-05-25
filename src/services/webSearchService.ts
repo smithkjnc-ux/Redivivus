@@ -15,7 +15,7 @@ export interface WebPageContent {
   truncated: boolean;
 }
 
-const USER_AGENT = 'CHASSIS-VSCode-Extension/1.0 (AI Coding Assistant)';
+const USER_AGENT = 'Redivivus-VSCode-Extension/1.0 (AI Coding Assistant)';
 const DEFAULT_TIMEOUT = 10_000;
 const MAX_PAGE_CHARS = 12_000; // Cap page content to fit in AI context window
 

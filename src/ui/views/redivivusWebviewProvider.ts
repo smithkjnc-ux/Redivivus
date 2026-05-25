@@ -1,9 +1,9 @@
-// [SCOPE] CHASSIS sidebar WebviewViewProvider — renders the full dashboard inside the activity bar sidebar panel
+// [SCOPE] Redivivus sidebar WebviewViewProvider — renders the full dashboard inside the activity bar sidebar panel
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisService } from '../../services/chassisService.js';
+import type { RedivivusService } from '../../services/redivivusService.js';
 import type { SessionService } from '../../services/sessionService.js';
 import type { VaultItem, VaultCategory } from '../../services/vault/vaultService.js';
 import { VaultService } from '../../services/vault/vaultService.js';
@@ -19,8 +19,8 @@ import { renderWizardStep } from './wizardSteps.js';
 import type { WizardPanelState } from '../messageRouter.js';
 import { attachMessageRouter } from '../messageRouter.js';
 
-export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
-  public static readonly viewType = 'chassisPanel';
+export class RedivivusWebviewProvider implements vscode.WebviewViewProvider {
+  public static readonly viewType = 'redivivusPanel';
   private _view?: vscode.WebviewView;
   private vaultService: VaultService;
   private routingService: RoutingService;
@@ -33,7 +33,7 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
   };
 
   constructor(
-    private chassis: ChassisService,
+    private redivivus: RedivivusService,
     private sessions: SessionService,
     private context: vscode.ExtensionContext
   ) {
@@ -49,7 +49,7 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
     this._view = webviewView;
     webviewView.webview.options = { enableScripts: true };
     attachMessageRouter(
-      webviewView.webview, this.chassis, this.sessions,
+      webviewView.webview, this.redivivus, this.sessions,
       this.vaultService, this.context, this.state,
       () => this.refresh(), this.routingService
     );
@@ -78,22 +78,22 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
   }
 
   private _buildHtml(): string {
-    const initialized = this.chassis.isInitialized();
-    const config = initialized ? this.chassis.loadConfig() : null;
+    const initialized = this.redivivus.isInitialized();
+    const config = initialized ? this.redivivus.loadConfig() : null;
     const hasBlueprint = config?.blueprint?.who ? true : false;
     const blueprintLocked = config?.blueprint?.locked || false;
     const sessionActive = this.sessions.isActive;
     const session = this.sessions.session;
-    const backupExists = initialized && fs.existsSync(path.join(this.chassis.chassisDir, 'backup'));
+    const backupExists = initialized && fs.existsSync(path.join(this.redivivus.redivivusDir, 'backup'));
     const projectName = config?.projectName || path.basename(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'Project');
-    const currentAI = vscode.workspace.getConfiguration('chassis').get<string>('defaultAI') || 'gemini';
+    const currentAI = vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || 'gemini';
 
-    const sessions = getSessionHistory(this.chassis);
-    const reviews = getReviews(this.chassis);
+    const sessions = getSessionHistory(this.redivivus);
+    const reviews = getReviews(this.redivivus);
     const vaultItems = getVaultItems(this.vaultService);
 
     let buildTimestamp = '';
-    const buildInfoPath = path.join(this.chassis.chassisDir, 'build-info.json');
+    const buildInfoPath = path.join(this.redivivus.redivivusDir, 'build-info.json');
     if (fs.existsSync(buildInfoPath)) {
       try {
         const buildInfo = JSON.parse(fs.readFileSync(buildInfoPath, 'utf-8'));
@@ -130,9 +130,9 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
       content = renderRetrofitPendingView();
     } else {
       if (!hasBlueprint) {
-        content += `<div class="card primary" data-cmd="chassis.blueprint"><div class="card-icon">📋</div><div class="card-body"><div class="card-title">👋 First: Tell CHASSIS What You're Building</div><div class="card-sub">5 quick questions about your project. Takes about 2 minutes. Do this first.</div></div></div>`;
+        content += `<div class="card primary" data-cmd="redivivus.blueprint"><div class="card-icon">📋</div><div class="card-body"><div class="card-title">👋 First: Tell Redivivus What You're Building</div><div class="card-sub">5 quick questions about your project. Takes about 2 minutes. Do this first.</div></div></div>`;
       }
-      content += `<div class="card" data-cmd="chassis.showSetupProgress"><div class="card-icon">📊</div><div class="card-body"><div class="card-title">Setup Progress</div><div class="card-sub">Track your CHASSIS setup completion</div></div></div>`;
+      content += `<div class="card" data-cmd="redivivus.showSetupProgress"><div class="card-icon">📊</div><div class="card-body"><div class="card-title">Setup Progress</div><div class="card-sub">Track your Redivivus setup completion</div></div></div>`;
       content += `<div class="tabs">
         <button class="tab ${this.state.activeTab === 'work' ? 'active' : ''}" onclick="showTab('work')">Today</button>
         <button class="tab ${this.state.activeTab === 'files' ? 'active' : ''}" onclick="showTab('files')">Project</button>
@@ -141,14 +141,14 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
       </div>`;
       content += renderWorkTab(sessionActive, session, hasBlueprint, this.state.activeTab === 'work');
       content += renderSwitchForm(currentAI);
-      const chassisCfg = vscode.workspace.getConfiguration('chassis');
+      const redivivusCfg = vscode.workspace.getConfiguration('redivivus');
       const aiKeys = {
-        gemini: !!(chassisCfg.get<string>('geminiApiKey') || process.env.GEMINI_API_KEY),
-        claude: !!(chassisCfg.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY),
-        openai: !!(chassisCfg.get<string>('openaiApiKey') || process.env.OPENAI_API_KEY),
-        groq:   !!(chassisCfg.get<string>('groqApiKey')   || process.env.GROQ_API_KEY),
-        xai:    !!(chassisCfg.get<string>('xaiApiKey')    || process.env.XAI_API_KEY),
-        kimi:   !!(chassisCfg.get<string>('kimiApiKey')   || process.env.MOONSHOT_API_KEY),
+        gemini: !!(redivivusCfg.get<string>('geminiApiKey') || process.env.GEMINI_API_KEY),
+        claude: !!(redivivusCfg.get<string>('claudeApiKey') || process.env.ANTHROPIC_API_KEY),
+        openai: !!(redivivusCfg.get<string>('openaiApiKey') || process.env.OPENAI_API_KEY),
+        groq:   !!(redivivusCfg.get<string>('groqApiKey')   || process.env.GROQ_API_KEY),
+        xai:    !!(redivivusCfg.get<string>('xaiApiKey')    || process.env.XAI_API_KEY),
+        kimi:   !!(redivivusCfg.get<string>('kimiApiKey')   || process.env.MOONSHOT_API_KEY),
       };
       content += renderFilesTab(projectName, blueprintLocked, hasBlueprint, config?.blueprint, this.state.activeTab === 'files', aiKeys);
       content += renderHistoryTab(sessions, reviews, this.state.activeTab === 'history');
@@ -158,8 +158,8 @@ export class ChassisWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     return `<!DOCTYPE html><html><head><style>${getStyles()}</style></head><body>
-      <div class="header"><div class="header-left"><h1>C H A S S I S</h1><div class="sub">Your AI coding organizer</div></div><div class="header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><button class="chat-button" data-cmd="chassis.openChatPanel">Open Chat</button><button style="padding:3px 10px;font-size:10px;background:#3a3a3a;color:#ccc;border:none;border-radius:4px;cursor:pointer;" data-cmd="chassis.openSetupHub">⚙️ Setup</button>${buildTimestamp}</div><div class="project">${projectName}</div></div>
-      ${badges}${content}<div class="footer">CHASSIS v0.2.0 &mdash; Built by PapaJoe — ${new Date().toLocaleTimeString()}</div>
+      <div class="header"><div class="header-left"><h1>C H A S S I S</h1><div class="sub">Your AI coding organizer</div></div><div class="header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><button class="chat-button" data-cmd="redivivus.openChatPanel">Open Chat</button><button style="padding:3px 10px;font-size:10px;background:#3a3a3a;color:#ccc;border:none;border-radius:4px;cursor:pointer;" data-cmd="redivivus.openSetupHub">⚙️ Setup</button>${buildTimestamp}</div><div class="project">${projectName}</div></div>
+      ${badges}${content}<div class="footer">Redivivus v0.2.0 &mdash; Built by PapaJoe — ${new Date().toLocaleTimeString()}</div>
       <script>${getScripts()}</script></body></html>`;
   }
 }

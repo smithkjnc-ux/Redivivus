@@ -64,7 +64,7 @@ export function buildProjectAnnotationContext(root: string): string {
         if (deads > 0) { tags.push(`${deads} DEAD`); }
         if (tags.length > 0) { entry += ` [${tags.join(', ')}]`; }
 
-        // [CHASSIS] For small config/data files, include a content preview so the AI knows
+        // [Redivivus] For small config/data files, include a content preview so the AI knows
         // what is ACTUALLY defined — not just what the original blueprint said.
         // Triggers for: files ≤ 80 lines whose name suggests configuration or data.
         const baseName = path.basename(rel).toLowerCase();

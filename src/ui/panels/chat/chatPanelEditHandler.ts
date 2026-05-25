@@ -25,13 +25,13 @@ export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, '
     refresh: deps.refresh,
     logError: deps.logError,
     onBuildFinished: (task: string, builtFiles?: string[]) => {
-      vscode.commands.executeCommand('chassis.resolveFix', task, builtFiles);
+      vscode.commands.executeCommand('redivivus.resolveFix', task, builtFiles);
       const { ChatPanel } = require('./chatPanel.js');
       ChatPanel.onBuildFinished?.(task, builtFiles || []);
     },
-    onBuildFailed: (task, reason) => { vscode.commands.executeCommand('chassis.buildFailed', task, reason); },
+    onBuildFailed: (task, reason) => { vscode.commands.executeCommand('redivivus.buildFailed', task, reason); },
   };
   await runEditFileBuild(ctx);
-  await autoCommitIfEnabled(root, `CHASSIS updated: ${msg.filePath}`);
+  await autoCommitIfEnabled(root, `Redivivus updated: ${msg.filePath}`);
   refreshSetupProgressIfOpen().catch(() => {});
 }

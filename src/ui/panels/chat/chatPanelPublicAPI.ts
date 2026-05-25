@@ -29,16 +29,16 @@ export async function panelResumeBuildTask(panel: any, task: string, projectRoot
   }
   panel.refresh();
   if (projectRoot) {
-    const currentChassisRoot = panel.chassis?.getWorkspaceRoot?.();
+    const currentRedivivusRoot = panel.redivivus?.getWorkspaceRoot?.();
     const validation = logProjectContextSwitch(projectRoot, 'resumeBuildTask', task);
     if (!validation.allowed) {
-      vscode.window.showErrorMessage(`CHASSIS Bug Detected: Attempted to switch from "${currentChassisRoot}" to "${projectRoot}" during build. This should not happen.`, 'OK');
-      console.error('[CHASSIS] Blocked project switch in resumeBuildTask:', validation.reason);
+      vscode.window.showErrorMessage(`Redivivus Bug Detected: Attempted to switch from "${currentRedivivusRoot}" to "${projectRoot}" during build. This should not happen.`, 'OK');
+      console.error('[Redivivus] Blocked project switch in resumeBuildTask:', validation.reason);
       return;
     }
-    panel.chassis = new panel.chassis.constructor(projectRoot);
+    panel.redivivus = new panel.redivivus.constructor(projectRoot);
     panel.loadBlueprintContext();
-    ChatPanel.extensionContext?.globalState.update('chassis.lastActiveProject', projectRoot);
+    ChatPanel.extensionContext?.globalState.update('redivivus.lastActiveProject', projectRoot);
   }
   await panel._handleBuildRequest(task, true, false);
 }
@@ -62,7 +62,7 @@ export function panelSetLastModel(panel: any, model: string): void {
 
 /** Key for persisting conversation. Project-specific so switching workspaces restores the right history. */
 export function chatHistoryKey(root?: string): string {
-  return `chassis.chatHistory.${root || 'global'}`;
+  return `redivivus.chatHistory.${root || 'global'}`;
 }
 
 /** Restore saved conversation from globalState. Call in ChatPanel constructor before refresh(). */
@@ -91,17 +91,17 @@ export function clearPersistedConversation(): void {
 export async function panelRefresh(panel: any): Promise<void> {
   const state = panel.state;
   const usageTracker = panel.usageTracker;
-  const headerInfo = buildHeaderInfo(panel.chassis, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
+  const headerInfo = buildHeaderInfo(panel.redivivus, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
   const _panel = panel._panel;
   const _initialized = panel._initialized;
   if (!_initialized) {
     let progress;
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (headerInfo.isInitialized && root && state.conversation.length === 0) {
-      try { progress = await new SetupProgressService(panel.chassis, root).getProgress(); } catch {}
+      try { progress = await new SetupProgressService(panel.redivivus, root).getProgress(); } catch {}
     }
-    if (root && (headerInfo as any).workspaceHasChassis && !(headerInfo as any).workspaceIsAssistMode && state.conversation.length === 0) {
-      try { const config = panel.chassis.isInitialized() ? panel.chassis.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
+    if (root && (headerInfo as any).workspaceHasRedivivus && !(headerInfo as any).workspaceIsAssistMode && state.conversation.length === 0) {
+      try { const config = panel.redivivus.isInitialized() ? panel.redivivus.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
     }
     _panel.webview.html = buildChatHtml(state.conversation, headerInfo, progress);
     panel._initialized = true;
@@ -116,10 +116,10 @@ export async function panelRefresh(panel: any): Promise<void> {
     let progress;
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (headerInfo.isInitialized && root) {
-      try { progress = await new SetupProgressService(panel.chassis, root).getProgress(); } catch {}
+      try { progress = await new SetupProgressService(panel.redivivus, root).getProgress(); } catch {}
     }
-    if (root && (headerInfo as any).workspaceHasChassis && !(headerInfo as any).workspaceIsAssistMode) {
-      try { const config = panel.chassis.isInitialized() ? panel.chassis.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
+    if (root && (headerInfo as any).workspaceHasRedivivus && !(headerInfo as any).workspaceIsAssistMode) {
+      try { const config = panel.redivivus.isInitialized() ? panel.redivivus.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
     }
     const { buildEmptyStateHtml } = await import('./chatPanelEmptyState.js');
     htmlToInject = buildEmptyStateHtml(headerInfo, progress);
@@ -138,10 +138,15 @@ function saveConversation(state: any, root?: string): void {
   } catch {}
 }
 
+export function postToChatWebview(msg: unknown): void {
+  const inst = ChatPanel.currentPanel;
+  if (inst) { (inst as any)._panel.webview.postMessage(msg); }
+}
+
 export function panelBuildFromVaultPrefill(panel: any): { task?: string; targetFile?: string } {
   const state = panel.state;
   const msgs = state.conversation.filter((m: ChatMessage) => m.role === 'user');
-  const config = panel.chassis.isInitialized() ? panel.chassis.loadConfig() : null;
+  const config = panel.redivivus.isInitialized() ? panel.redivivus.loadConfig() : null;
   const task = (msgs.length > 0 ? msgs[msgs.length - 1].content.trim() : '') || config?.blueprint?.what || undefined;
   const where = (config?.blueprint?.where || '').toLowerCase();
   const ext = where.includes('python') ? '.py' : where.includes('react') || where.includes('tsx') ? '.tsx' : where.includes('javascript') || where.includes('node') ? '.js' : '.ts';

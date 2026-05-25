@@ -13,34 +13,34 @@ import { deriveFileBase } from '../build/chatPanelBuildInference';
 export async function runAgentMode(userText: string, deps: MessageHandlerDeps, conversation: ChatMessage[], refresh: () => void): Promise<void> {
   const { executeAgentTask } = await import('../../services/ai/agentService.js');
   let rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-  let config = deps.chassis.isInitialized() ? deps.chassis.loadConfig() : null;
+  let config = deps.redivivus.isInitialized() ? deps.redivivus.loadConfig() : null;
   let blueprintCtx = config?.blueprint ? JSON.stringify(config.blueprint) : '';
 
-  // [CHASSIS] Auto-create project directory if no workspace is open — prevents files being written to extension dir
+  // [Redivivus] Auto-create project directory if no workspace is open — prevents files being written to extension dir
   if (!rootPath) {
     const slug = await deriveFileBase(userText, deps.routing);
-    const projectsDir = vscode.workspace.getConfiguration('chassis')
+    const projectsDir = vscode.workspace.getConfiguration('redivivus')
       .get<string>('projectsDirectory', '~/projects')!
       .replace('~', os.homedir());
     rootPath = path.join(projectsDir, slug);
-    fs.mkdirSync(path.join(rootPath, '.chassis'), { recursive: true });
+    fs.mkdirSync(path.join(rootPath, '.redivivus'), { recursive: true });
     const bp = { what: userText.slice(0, 200), who: '', where: '', when: 'now', why: '' };
     const cfg = { projectName: slug, initialized: true, blueprint: bp };
-    fs.writeFileSync(path.join(rootPath, '.chassis', 'config.json'), JSON.stringify(cfg, null, 2));
-    fs.writeFileSync(path.join(rootPath, '.chassis', 'blueprint.md'), `# ${slug}\n\n**What:** ${bp.what}\n`);
+    fs.writeFileSync(path.join(rootPath, '.redivivus', 'config.json'), JSON.stringify(cfg, null, 2));
+    fs.writeFileSync(path.join(rootPath, '.redivivus', 'blueprint.md'), `# ${slug}\n\n**What:** ${bp.what}\n`);
     blueprintCtx = `Project: ${slug}\nWhat: ${bp.what}`;
     conversation.push({ role: 'assistant', content: `📁 **Auto-created project:** \`${slug}\` at \`${rootPath}\``, timestamp: Date.now() });
     refresh();
   }
 
-  // [CHASSIS] Ensure .chassis/ exists even in an open workspace that isn't initialized
-  if (rootPath && !fs.existsSync(path.join(rootPath, '.chassis'))) {
-    fs.mkdirSync(path.join(rootPath, '.chassis'), { recursive: true });
+  // [Redivivus] Ensure .redivivus/ exists even in an open workspace that isn't initialized
+  if (rootPath && !fs.existsSync(path.join(rootPath, '.redivivus'))) {
+    fs.mkdirSync(path.join(rootPath, '.redivivus'), { recursive: true });
     const bp = { what: userText.slice(0, 200), who: '', where: '', when: 'now', why: '' };
     const slug = path.basename(rootPath);
     const cfg = { projectName: slug, initialized: true, blueprint: bp };
-    fs.writeFileSync(path.join(rootPath, '.chassis', 'config.json'), JSON.stringify(cfg, null, 2));
-    fs.writeFileSync(path.join(rootPath, '.chassis', 'blueprint.md'), `# ${slug}\n\n**What:** ${bp.what}\n`);
+    fs.writeFileSync(path.join(rootPath, '.redivivus', 'config.json'), JSON.stringify(cfg, null, 2));
+    fs.writeFileSync(path.join(rootPath, '.redivivus', 'blueprint.md'), `# ${slug}\n\n**What:** ${bp.what}\n`);
   }
 
   const agentCtx: any = {

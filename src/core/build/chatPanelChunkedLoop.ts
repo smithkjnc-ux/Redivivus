@@ -1,11 +1,11 @@
-// [SCOPE] CHASSIS Chat Panel Chunked Build — per-file build loop (extracted from chatPanelChunked.ts)
+// [SCOPE] Redivivus Chat Panel Chunked Build — per-file build loop (extracted from chatPanelChunked.ts)
 // AI generation extracted to chatPanelChunkedBuildFile.ts (Rule 9 split). Contract enforcement added.
 import * as path from 'path';
 import * as fs from 'fs';
 import type { BuildContext } from './chatPanelBuild';
 import { appendMsg, updateLastMsg } from './chatPanelChunked';
 import { extractAllNarrators, encodeStoryToken } from '../../ui/panels/chat/chatPanelStory';
-import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules';
+import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { generateFileCode } from './chatPanelChunkedBuildFile';
 import { extractContractFromCode, mergeContract, buildContractBlock, detectContractViolations, emptyContract } from '../../services/blueprint/blueprintContract';
 import { formatVaultContext } from '../../services/vault/vaultContextService';
@@ -154,7 +154,7 @@ QUALITY STANDARDS:
       if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
       fs.writeFileSync(writePath, code, 'utf8');
       builtFiles.push(entry.filename);
-      // [CHASSIS] Live preview: open each built file beside chat immediately (preview mode reuses same tab slot).
+      // [Redivivus] Live preview: open each built file beside chat immediately (preview mode reuses same tab slot).
       try { const vscode = await import('vscode'); const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(writePath)); await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch { /* non-blocking */ }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err);

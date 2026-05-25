@@ -1,11 +1,11 @@
 // [SCOPE] Guardian health score computation — computes real-time Blueprint Health Score for status bar display
 // Called by guardianService. No risk scanning or ELI5 logic here.
 
-import type { ChassisService } from '../chassisService.js';
+import type { RedivivusService } from '../redivivusService.js';
 import type { HealthScore } from './guardianTypes.js';
 
-export function computeHealthScore(chassisService: ChassisService): HealthScore {
-  const config = chassisService.loadConfig();
+export function computeHealthScore(redivivusService: RedivivusService): HealthScore {
+  const config = redivivusService.loadConfig();
   const bp = config?.blueprint;
 
   // Blueprint confidence factor
@@ -19,7 +19,7 @@ export function computeHealthScore(chassisService: ChassisService): HealthScore 
 
   // Modularity: penalize if no src/ or tests/ structure exists
   let modularity = 50; // start neutral
-  const root = chassisService.getWorkspaceRoot();
+  const root = redivivusService.getWorkspaceRoot();
   // [TODO] use proper path checks once workspaceRoot is exposed
 
   // Security: start at 80, will drop when scans detect issues

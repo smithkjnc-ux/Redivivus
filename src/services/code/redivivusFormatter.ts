@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Formatter — applies CHASSIS annotation standards to raw vault code on use.
+// [SCOPE] Redivivus Formatter — applies Redivivus annotation standards to raw vault code on use.
 // Called at import-time or customize-time, never at save-time.
 // Adds: // NARRATOR, // [SCOPE], edge-case guards if missing, annotation tags.
 // [WARN] Only rewrites the header block — never touches function body logic.
@@ -11,14 +11,14 @@ function commentFor(lang: string): string {
   return '//';
 }
 
-/** Returns true if the code already has CHASSIS annotations. */
-function hasChassisAnnotations(code: string): boolean {
+/** Returns true if the code already has Redivivus annotations. */
+function hasRedivivusAnnotations(code: string): boolean {
   return /\/\/\s*\[SCOPE\]|#\s*\[SCOPE\]|NARRATOR:/i.test(code);
 }
 
-/** Strips any existing bare import header CHASSIS previously added so we don't double-up. */
+/** Strips any existing bare import header Redivivus previously added so we don't double-up. */
 function stripOldImportHeader(code: string): string {
-  return code.replace(/^\/\/ Imported from CHASSIS Vault[^\n]*\n/, '');
+  return code.replace(/^\/\/ Imported from Redivivus Vault[^\n]*\n/, '');
 }
 
 /** Infers a plain-English description of what the code does from its name and first few lines. */
@@ -36,19 +36,19 @@ function inferDescription(name: string, code: string): string {
     .replace(/^./, c => c.toUpperCase());
 }
 
-/** Applies CHASSIS formatting to raw code before it is used from the vault.
+/** Applies Redivivus formatting to raw code before it is used from the vault.
  *  Idempotent — safe to call multiple times, won't double-add annotations. */
-export function chassisFormat(code: string, name: string, lang = 'typescript'): string {
+export function redivivusFormat(code: string, name: string, lang = 'typescript'): string {
   const cleaned = stripOldImportHeader(code).trim();
 
   // Already formatted — nothing to do
-  if (hasChassisAnnotations(cleaned)) { return cleaned; }
+  if (hasRedivivusAnnotations(cleaned)) { return cleaned; }
 
   const c = commentFor(lang);
   const desc = inferDescription(name, cleaned);
   const humanName = name.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
 
-  // Build the CHASSIS header block
+  // Build the Redivivus header block
   const header = [
     `${c} NARRATOR: This module provides ${desc}.`,
     `${c} [SCOPE] ${humanName} — ${desc}.`,
@@ -58,10 +58,10 @@ export function chassisFormat(code: string, name: string, lang = 'typescript'): 
   return header + cleaned;
 }
 
-/** Builds a Customize This prompt that includes the CHASSIS-formatted code inline,
+/** Builds a Customize This prompt that includes the Redivivus-formatted code inline,
  *  so the AI receives properly annotated code as the base for customization. */
 export function buildCustomizePrompt(name: string, code: string, lang = 'typescript'): string {
-  const formatted = chassisFormat(code, name, lang);
+  const formatted = redivivusFormat(code, name, lang);
   const humanName = name.replace(/[_-]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2');
   return `Based on "${humanName}" from my vault, customize it to: \n\n` +
     `Here is the existing code for reference:\n\`\`\`${lang}\n${formatted}\n\`\`\`\n\n` +

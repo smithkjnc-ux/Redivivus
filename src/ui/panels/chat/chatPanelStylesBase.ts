@@ -27,6 +27,11 @@ export function buildChatCssBase(): string {
       color: var(--c-text);
       display: flex; flex-direction: column; height: 100vh; overflow: hidden;
       font-size: 13px; line-height: 1.5;
+      position: relative;
+    }
+    #preview-view {
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+      display: none; flex-direction: column; background: var(--c-bg); z-index: 10;
     }
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -68,6 +73,7 @@ export function buildChatCssBase(): string {
       transition: all 0.15s;
     }
     .preview-back:hover { background: var(--c-border); color: var(--c-text); }
+    .preview-back.active { background: rgba(137,180,250,0.2); color: #89b4fa; border-color: #89b4fa; }
     .preview-device-group { display: flex; gap: 2px; margin: 0 4px; }
     .preview-device-btn {
       background: none; border: 1px solid transparent; color: var(--c-text-dim);
@@ -75,7 +81,13 @@ export function buildChatCssBase(): string {
     }
     .preview-device-btn:hover { border-color: var(--c-border); color: var(--c-text); }
     .preview-device-btn.active { border-color: var(--c-accent); color: var(--c-accent); }
-    .preview-status { font-size: 11px; color: var(--c-text-dim); margin-left: auto; white-space: nowrap; }
+    .preview-status { font-size: 11px; color: var(--c-text-dim); white-space: nowrap; }
+    .preview-url-bar {
+      flex: 1; min-width: 0;
+      background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text);
+      padding: 3px 8px; border-radius: 4px; font-size: 11px; font-family: monospace; outline: none;
+    }
+    .preview-url-bar:focus { border-color: var(--c-accent); }
     .preview-popout {
       background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text-dim);
       padding: 3px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; font-family: inherit;
@@ -83,8 +95,8 @@ export function buildChatCssBase(): string {
     }
     .preview-popout:hover { background: var(--c-border); color: var(--c-text); }
     .preview-frame-wrap {
-      flex: 1; position: relative; overflow: hidden; display: flex;
-      justify-content: center; background: #fff;
+      flex: 1; min-height: 0; position: relative; overflow: hidden; display: flex;
+      justify-content: center; align-items: stretch; background: #fff;
     }
     .preview-loading {
       position: absolute; inset: 0; display: flex; flex-direction: column;
@@ -97,6 +109,28 @@ export function buildChatCssBase(): string {
       animation: spin 0.8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+    /* ── Preview + inline chat split layout ── */
+    #preview-content { flex: 1; min-height: 0; display: flex; flex-direction: row; overflow: hidden; }
+    #preview-main { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    #preview-chat-strip {
+      flex-shrink: 0; display: flex; flex-direction: column; gap: 6px;
+      padding: 8px 10px; background: var(--c-surface); border-top: 1px solid var(--c-border); height: 110px;
+    }
+    #preview-chat-last {
+      flex: 1; overflow-y: auto; font-size: 11px; color: var(--c-text-dim); line-height: 1.4; min-height: 0;
+    }
+    #preview-chat-input-row { display: flex; gap: 6px; align-items: flex-end; }
+    #preview-chat-input {
+      flex: 1; background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text);
+      padding: 6px 8px; border-radius: 6px; font-size: 12px; font-family: inherit; resize: none; outline: none;
+    }
+    #preview-chat-input:focus { border-color: var(--c-accent); }
+    #preview-chat-send-btn {
+      background: var(--c-purple); border: none; color: #fff; width: 32px; height: 32px;
+      border-radius: 6px; cursor: pointer; font-size: 16px; flex-shrink: 0;
+    }
+    #preview-chat-send-btn:hover { opacity: 0.85; }
+    /* side-by-side layout reserved for future opt-in toggle */
     /* [DEAD] .capabilities-btn removed — replaced by context-sensitive Help button */
     .save-point-btn, .blueprint-btn {
       background: var(--c-accent-lo); border: 1px solid var(--c-accent); color: var(--c-accent);
@@ -120,5 +154,37 @@ export function buildChatCssBase(): string {
     .badge.time { opacity: 0.5; }
     .badge.clickable { cursor: pointer; }
     .badge.clickable:hover { opacity: 0.8; filter: brightness(1.1); }
+    /* ── Inspector overlay ── */
+    #inspector-overlay {
+      position: absolute; bottom: 0; left: 0; right: 0; z-index: 20;
+      background: var(--c-surface); border-top: 2px solid var(--c-purple);
+      padding: 10px 12px; display: none; flex-direction: column; gap: 8px;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
+    }
+    #inspector-el-tag {
+      font-size: 11px; font-family: monospace; color: var(--c-purple);
+      background: rgba(167,139,250,0.1); padding: 3px 8px; border-radius: 4px;
+      border: 1px solid rgba(167,139,250,0.3); display: inline-block; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    #inspector-input {
+      background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text);
+      padding: 7px 10px; border-radius: 6px; font-size: 12px; font-family: inherit;
+      resize: none; outline: none; width: 100%; line-height: 1.4;
+    }
+    #inspector-input:focus { border-color: var(--c-purple); }
+    .inspector-actions { display: flex; gap: 6px; }
+    .inspector-send-btn {
+      background: var(--c-purple); border: none; color: #fff;
+      padding: 5px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+      font-family: inherit; font-weight: 600; transition: opacity 0.15s;
+    }
+    .inspector-send-btn:hover { opacity: 0.85; }
+    .inspector-cancel-btn {
+      background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text-dim);
+      padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 12px;
+      font-family: inherit; transition: all 0.15s;
+    }
+    .inspector-cancel-btn:hover { background: var(--c-border); color: var(--c-text); }
   `;
 }

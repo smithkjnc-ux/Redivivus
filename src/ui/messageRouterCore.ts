@@ -4,13 +4,13 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisService } from '../services/chassisService.js';
+import { RedivivusService } from '../services/redivivusService.js';
 import type { WizardPanelState } from './messageRouterTypes.js';
 import { syncBlueprintMd } from '../services/blueprint/blueprintWriter.js';
 
 export async function handleCoreMessage(
   msg: any,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   state: WizardPanelState,
   refresh: () => void,
   postToWebview?: (msg: any) => void
@@ -52,7 +52,7 @@ export async function handleCoreMessage(
       if (!folder || folder.length === 0) { return true; }
       const folderPath = folder[0].fsPath;
       const folderName = path.basename(folderPath);
-      if (ChassisService.hasChassisSetup(folderPath)) {
+      if (RedivivusService.hasRedivivusSetup(folderPath)) {
         // Already set up — open directly, load normally
         await vscode.commands.executeCommand('vscode.openFolder', folder[0]);
       } else {
@@ -67,7 +67,7 @@ export async function handleCoreMessage(
       return true;
     }
     case 'set-it-up': {
-      // User chose to set up CHASSIS for the folder — switch workspace and trigger wizard
+      // User chose to set up Redivivus for the folder — switch workspace and trigger wizard
       const fp = msg.folderPath;
       if (!fp) { return true; }
       await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(fp));
@@ -75,7 +75,7 @@ export async function handleCoreMessage(
       return true;
     }
     case 'browse-anyway': {
-      // User chose to browse without CHASSIS — switch workspace, set banner
+      // User chose to browse without Redivivus — switch workspace, set banner
       const fp = msg.folderPath;
       if (!fp) { return true; }
       state.browseAnywayBanner = true;
@@ -88,15 +88,15 @@ export async function handleCoreMessage(
       return true;
     }
     case 'initProject':
-      await chassis.initProject(msg.name);
-      vscode.commands.executeCommand('setContext', 'chassis.initialized', true);
+      await redivivus.initProject(msg.name);
+      vscode.commands.executeCommand('setContext', 'redivivus.initialized', true);
       if (vscode.workspace.workspaceFolders?.[0]?.uri.fsPath) {
-        try { await vscode.commands.executeCommand('chassis.generateRules'); } catch {}
+        try { await vscode.commands.executeCommand('redivivus.generateRules'); } catch {}
       }
       refresh();
       return true;
     case 'saveBlueprint': {
-      const cfg = chassis.loadConfig();
+      const cfg = redivivus.loadConfig();
       if (cfg) {
         let confirmed = 0, assumed = 0, unknown = 0;
         for (const key of ['who','what','where','when','why'] as const) {
@@ -116,9 +116,9 @@ export async function handleCoreMessage(
           lockedAt: msg.data.lock ? new Date().toISOString() : undefined,
           version: '1.0',
         };
-        chassis.saveConfig(cfg);
-        syncBlueprintMd(chassis, cfg);
-        chassis.generateRules(cfg.projectName, cfg.blueprint);
+        redivivus.saveConfig(cfg);
+        syncBlueprintMd(redivivus, cfg);
+        redivivus.generateRules(cfg.projectName, cfg.blueprint);
       }
       refresh();
       return true;

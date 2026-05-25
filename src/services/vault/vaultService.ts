@@ -1,5 +1,5 @@
 // [SCOPE] Vault Service — main facade for vault operations
-// Rebuilt to spec: ~/.chassis-vault/{category}/{name}_{hash}.json
+// Rebuilt to spec: ~/.redivivus-vault/{category}/{name}_{hash}.json
 
 import type * as vscode from 'vscode';
 import * as path from 'path';
@@ -8,7 +8,7 @@ import { VAULT_CATEGORIES, VaultCategory, VaultItem } from './vaultTypes.js';
 import { extractFromFile, computeContentHash } from './vaultExtractor.js';
 import { aiCategorize as _aiCategorize, scanCodebase as _scanCodebase } from './vaultScanner.js';
 import { VaultStorage } from './vaultStorage.js';
-import { chassisFormat } from '../code/chassisFormatter.js';
+import { redivivusFormat } from '../code/redivivusFormatter.js';
 import type { RoutingService } from '../ai/routingService.js';
 
 export { VAULT_CATEGORIES, VaultCategory, VaultItem };
@@ -40,7 +40,7 @@ export class VaultService {
   private storage: VaultStorage;
 
   constructor(context: vscode.ExtensionContext) {
-    this.storage = new VaultStorage(); // uses ~/.chassis-vault/ default
+    this.storage = new VaultStorage(); // uses ~/.redivivus-vault/ default
   }
 
   // ── CRUD
@@ -144,8 +144,8 @@ export class VaultService {
       : item.language;
     const filePath = path.join(vaultDir, `${item.name}.${ext}`);
 
-    const formattedCode = chassisFormat(item.code, item.name, item.language || 'typescript');
-    const header = `// Imported from CHASSIS Vault — source: ${item.sourceProject}/${path.basename(item.sourceFile)}\n`;
+    const formattedCode = redivivusFormat(item.code, item.name, item.language || 'typescript');
+    const header = `// Imported from Redivivus Vault — source: ${item.sourceProject}/${path.basename(item.sourceFile)}\n`;
     fs.writeFileSync(filePath, header + formattedCode);
 
     item.importCount++;

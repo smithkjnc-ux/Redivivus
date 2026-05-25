@@ -1,20 +1,20 @@
-// [SCOPE] CHASSIS Logging Commands — work log, dead ends, blueprint viewer
+// [SCOPE] Redivivus Logging Commands — work log, dead ends, blueprint viewer
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerLoggingCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
 ): void {
   // Open Work Log — show inside chat panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.log', async () => {
-      if (!chassis.isInitialized()) { return; }
-      const raw = fs.existsSync(chassis.worklogPath)
-        ? fs.readFileSync(chassis.worklogPath, 'utf-8')
+    vscode.commands.registerCommand('redivivus.log', async () => {
+      if (!redivivus.isInitialized()) { return; }
+      const raw = fs.existsSync(redivivus.worklogPath)
+        ? fs.readFileSync(redivivus.worklogPath, 'utf-8')
         : '*(No work log entries yet.)*';
       const escaped = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const html = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">📋 Work Log</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${escaped}</pre></div>`;
@@ -28,9 +28,9 @@ export function registerLoggingCommands(
 
   // Open Dead End Log — show inside chat panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.deadends', async () => {
-      if (!chassis.isInitialized()) { return; }
-      const deadendPath = chassis.worklogPath.replace('work_log.md', 'dead_ends.md');
+    vscode.commands.registerCommand('redivivus.deadends', async () => {
+      if (!redivivus.isInitialized()) { return; }
+      const deadendPath = redivivus.worklogPath.replace('work_log.md', 'dead_ends.md');
       const raw = fs.existsSync(deadendPath)
         ? fs.readFileSync(deadendPath, 'utf-8')
         : '*(No dead end entries yet.)*';

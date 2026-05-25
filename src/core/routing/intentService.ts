@@ -1,5 +1,5 @@
 // [SCOPE] Intent Service — manages user-confirmed architectural justifications
-// Stores choices in .chassis/intent.json so the Guardian stops nagging about approved complexity.
+// Stores choices in .redivivus/intent.json so the Guardian stops nagging about approved complexity.
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -14,7 +14,7 @@ export class IntentService {
   private data: UserIntent;
 
   constructor(root: string) {
-    this.filePath = path.join(root, '.chassis', 'intent.json');
+    this.filePath = path.join(root, '.redivivus', 'intent.json');
     this.data = this.load();
   }
 
@@ -36,7 +36,7 @@ export class IntentService {
       }
       fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
     } catch (e) {
-      console.error('[CHASSIS] Failed to save intent.json:', e);
+      console.error('[Redivivus] Failed to save intent.json:', e);
     }
   }
 

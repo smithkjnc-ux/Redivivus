@@ -1,4 +1,4 @@
-// [SCOPE] Architecture Map message handler for the CHASSIS dashboard
+// [SCOPE] Architecture Map message handler for the Redivivus dashboard
 // Routes map-specific messages from the Webview back to VS Code commands.
 
 import * as vscode from 'vscode';
@@ -23,16 +23,16 @@ export async function handleMapMessage(
         try {
           const uri = vscode.Uri.file(path.join(root, msg.nodeId));
           await vscode.window.showTextDocument(uri, { preserveFocus: false });
-        } catch { vscode.window.showErrorMessage(`CHASSIS Map: Could not open ${msg.nodeId}`); }
+        } catch { vscode.window.showErrorMessage(`Redivivus Map: Could not open ${msg.nodeId}`); }
       }
       return true;
 
     case 'chatAbout':
       if (msg.nodeId) {
         const node = state.mapData?.nodes?.find((n: any) => n.id === msg.nodeId);
-        // [WARN] Use chassis.mapContextChat — NOT chassis.postToChat. postToChat routes through
+        // [WARN] Use redivivus.mapContextChat — NOT redivivus.postToChat. postToChat routes through
         //        fix-request → build pipeline and can trigger vault modal for Q&A messages.
-        await vscode.commands.executeCommand('chassis.mapContextChat', {
+        await vscode.commands.executeCommand('redivivus.mapContextChat', {
           nodeId: msg.nodeId,
           label: node?.label || '',
           lines: node?.lines ?? 0,
@@ -48,7 +48,7 @@ export async function handleMapMessage(
           const uri = vscode.Uri.file(path.join(root, msg.nodeId));
           await vscode.window.showTextDocument(uri, { preserveFocus: false });
           await vscode.commands.executeCommand(msg.command);
-        } catch { vscode.window.showErrorMessage(`CHASSIS Map: Could not open ${msg.nodeId}`); }
+        } catch { vscode.window.showErrorMessage(`Redivivus Map: Could not open ${msg.nodeId}`); }
       }
       return true;
 
@@ -61,7 +61,7 @@ export async function handleMapMessage(
           : issueType === 'todo'
           ? `Review and implement the TODO markers in ${msg.nodeId}.`
           : `Add a [SCOPE] comment at the top of ${msg.nodeId} explaining what this file does.`;
-        await vscode.commands.executeCommand('chassis.runEditFix', task, msg.nodeId, issueType);
+        await vscode.commands.executeCommand('redivivus.runEditFix', task, msg.nodeId, issueType);
       }
       return true;
 

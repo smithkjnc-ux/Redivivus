@@ -1,4 +1,4 @@
-# CHASSIS Source Reorganization Report
+# Redivivus Source Reorganization Report
 
 **Date:** May 14, 2026
 **Scope:** Domain-based folder restructuring of `src/ui/` and `src/services/`
@@ -13,8 +13,8 @@
 |----------|----------|--------|
 | `src/ui/chatPanel*.ts` (51 files) | `src/ui/chat/*.ts` | Chat panel UI |
 | `src/ui/mapPanel.ts`, `mapScript*.ts`, `mapStyles.ts`, `mapTimelineScript.ts` | `src/ui/map/*.ts` | Architecture map UI |
-| `src/ui/sidebarProvider.ts`, `chassisSidebar.ts` | `src/ui/sidebar/*.ts` | Sidebar UI |
-| `src/ui/blueprintInterview*.ts`, `buildHistoryPanel*.ts`, `buildFromVaultModal.ts`, `chassisWebviewProvider.ts`, `wizardPanel.ts`, `vaultBrowserRenderer.ts`, `statusBar.ts`, `scripts*.ts` | `src/ui/views/*.ts` | General view components |
+| `src/ui/sidebarProvider.ts`, `redivivusSidebar.ts` | `src/ui/sidebar/*.ts` | Sidebar UI |
+| `src/ui/blueprintInterview*.ts`, `buildHistoryPanel*.ts`, `buildFromVaultModal.ts`, `redivivusWebviewProvider.ts`, `wizardPanel.ts`, `vaultBrowserRenderer.ts`, `statusBar.ts`, `scripts*.ts` | `src/ui/views/*.ts` | General view components |
 
 ### Services Layer (148 total files moved)
 
@@ -24,9 +24,9 @@
 | `src/services/vault*.ts`, `buildFromVault*.ts` | `src/services/vault/*.ts` | Vault storage, search, dedup |
 | `src/services/build*.ts`, `changeTracker.ts`, `measureTwiceService.ts` | `src/services/build/*.ts` | Build orchestration, safety |
 | `src/services/blueprint*.ts`, `expandedInterview*.ts` | `src/services/blueprint/*.ts` | Blueprint extraction, interview |
-| `src/services/projectOperations.ts`, `template*.ts`, `setupProgress*.ts`, `chassisInit.ts`, `chassisPaths.ts`, `starterPatterns.ts`, `specTemplates.ts` | `src/services/project/*.ts` | Project ops, templates, setup |
+| `src/services/projectOperations.ts`, `template*.ts`, `setupProgress*.ts`, `redivivusInit.ts`, `redivivusPaths.ts`, `starterPatterns.ts`, `specTemplates.ts` | `src/services/project/*.ts` | Project ops, templates, setup |
 | `src/services/workspaceContext*.ts`, `diagnosticLogger.ts`, `terminalErrorService.ts` | `src/services/workspace/*.ts` | Workspace context, diagnostics |
-| `src/services/codeValidator.ts`, `chassisFormatter.ts`, `duplicateCodeDetection.ts`, `fileSplitService.ts`, `scopeCreepDetection.ts`, `testExecutionService.ts`, `testOutputParsers*.ts` | `src/services/code/*.ts` | Code validation, formatting, testing |
+| `src/services/codeValidator.ts`, `redivivusFormatter.ts`, `duplicateCodeDetection.ts`, `fileSplitService.ts`, `scopeCreepDetection.ts`, `testExecutionService.ts`, `testOutputParsers*.ts` | `src/services/code/*.ts` | Code validation, formatting, testing |
 
 ### Unchanged
 - `src/commands/` — already grouped
@@ -96,6 +96,6 @@ Zero TypeScript compilation errors after all moves and import fixes.
 
 ## 5. Known Limitations / Follow-up
 
-- Some service files remain in `src/services/` root because they did not clearly map to a specific domain (e.g., `analyzer*.ts`, `chassisService.ts`, `retrofit*.ts`, `session*.ts`, `savePointService.ts`, `timelineService.ts`, `usageTracker*.ts`). These can be assigned to future domains (`analysis/`, `session/`, `retrofit/`) if the user expands the target structure.
+- Some service files remain in `src/services/` root because they did not clearly map to a specific domain (e.g., `analyzer*.ts`, `redivivusService.ts`, `retrofit*.ts`, `session*.ts`, `savePointService.ts`, `timelineService.ts`, `usageTracker*.ts`). These can be assigned to future domains (`analysis/`, `session/`, `retrofit/`) if the user expands the target structure.
 - The `commands/` folder has vault-related and build-related commands mixed together. A future pass could split `commands/` into `commands/vault/`, `commands/build/`, etc.
 - No test files were moved per the user's instruction to leave `tests/` as-is.

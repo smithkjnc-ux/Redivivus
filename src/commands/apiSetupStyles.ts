@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS API Setup Styles — CSS template for the API key configuration webview panel
+// [SCOPE] Redivivus API Setup Styles — CSS template for the API key configuration webview panel
 // Extracted from apiSetupHtml.ts to maintain strict < 200 line constraint (Rule 9).
 
 export const API_SETUP_CSS = `

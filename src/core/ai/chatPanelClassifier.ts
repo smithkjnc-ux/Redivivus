@@ -7,24 +7,24 @@ import { checkHardcodedOverrides, fallbackClassify } from './chatPanelClassifier
 
 export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service';
 export type AvailableCommand =
-  | 'chassis.openProject'
-  | 'chassis.wizardRetrofit'
-  | 'chassis.openBlueprint'
-  | 'chassis.showMap'
-  | 'chassis.savePoint'
-  | 'chassis.showBuildHistory'
-  | 'chassis.profileRuntime'
-  | 'chassis.viewUsageInChat'
+  | 'redivivus.openProject'
+  | 'redivivus.wizardRetrofit'
+  | 'redivivus.openBlueprint'
+  | 'redivivus.showMap'
+  | 'redivivus.savePoint'
+  | 'redivivus.showBuildHistory'
+  | 'redivivus.profileRuntime'
+  | 'redivivus.viewUsageInChat'
   | 'workbench.action.closeFolder'
-  | 'chassis.analyze'
-  | 'chassis.openVault'
-  | 'chassis.deadends'
-  | 'chassis.switchAI'
-  | 'chassis.startSession'
-  | 'chassis.endSession'
-  | 'chassis.generateRules'
-  | 'chassis.scanVaultCodebase'
-  | 'chassis.openSettings';
+  | 'redivivus.analyze'
+  | 'redivivus.openVault'
+  | 'redivivus.deadends'
+  | 'redivivus.switchAI'
+  | 'redivivus.startSession'
+  | 'redivivus.endSession'
+  | 'redivivus.generateRules'
+  | 'redivivus.scanVaultCodebase'
+  | 'redivivus.openSettings';
 
 export interface IntentResult {
   type: IntentType;
@@ -43,7 +43,7 @@ export async function classifyIntent(
   if (override) { return override; }
   if (!routing) { return fallbackClassify(text); }
 
-  const systemPrompt = `You are the CHASSIS intent classifier. Given a user message and project context, classify it as ONE of these intents and return ONLY valid JSON, nothing else.
+  const systemPrompt = `You are the Redivivus intent classifier. Given a user message and project context, classify it as ONE of these intents and return ONLY valid JSON, nothing else.
 
 Intents:
 - build: user wants to CREATE something NEW from scratch, OR they want to MODIFY, ADD, or CHANGE a feature in their project. ALSO build when: user asks "how do I add X", "can you make X do Y", or "is there a way to make X more Y". Any feature request or code modification request (even if phrased as a question) is a build. IMPORTANT: Do NOT use 'build' for vague requests about packaging (e.g. "make this a stand alone game", "turn this into an app", "make an executable") — route those to 'question' instead so the AI can clarify.
@@ -53,19 +53,19 @@ Intents:
 - scaffold: user wants a BLANK PROJECT TEMPLATE with NO specific content specified — just the boilerplate for a framework (React app, Flask API, Go service, Express server). ONLY scaffold when NO specific files, functions, or features are named.
 - service: user wants to SET UP or INTEGRATE an EXTERNAL SERVICE (Firebase, Supabase, Stripe, OpenAI API, add auth, add database, add payments)
 - question: user asking a PURELY THEORETICAL or FACTUAL question about coding concepts. ALSO use 'question' if the user makes a vague, non-technical overarching request like "turn this into a real app" or "I want to run it when I click it" so the AI can ask clarifying questions. DO NOT use this if the user is asking to modify specific code (e.g. "how do I add gravity" should be build, NOT question).
-- command: user wants to trigger a CHASSIS action
+- command: user wants to trigger a Redivivus action
 - offtopic: no connection to software development, coding, architecture, databases, APIs, or technical topics
 
 For command intent, return the specific command:
-- chassis.openProject (open or switch to a different project)
+- redivivus.openProject (open or switch to a different project)
 - workbench.action.closeFolder (close/exit/leave the current project or folder)
-- chassis.wizardRetrofit (new project)
-- chassis.openBlueprint (view/edit blueprint)
-- chassis.showMap (architecture map, show map, open map, view map, show architecture, open architecture, map view, dependency map, project structure map)
-- chassis.savePoint (save checkpoint)
-- chassis.showBuildHistory (build history)
-- chassis.profileRuntime (profile project)
-- chassis.viewUsageInChat (usage/tokens spent)
+- redivivus.wizardRetrofit (new project)
+- redivivus.openBlueprint (view/edit blueprint)
+- redivivus.showMap (architecture map, show map, open map, view map, show architecture, open architecture, map view, dependency map, project structure map)
+- redivivus.savePoint (save checkpoint)
+- redivivus.showBuildHistory (build history)
+- redivivus.profileRuntime (profile project)
+- redivivus.viewUsageInChat (usage/tokens spent)
 
 Project context:
 - Project: ${context?.projectName || 'Unknown'}
@@ -75,10 +75,10 @@ Project context:
 User message: ${text}
 
 Examples (follow these exactly):
-"I want to switch over to the rigops project" → {"intent": "command", "command": "chassis.openProject"}
-"can you pull up the map for me" → {"intent": "command", "command": "chassis.showMap"}
-"close doaidream and open chassis" → {"intent": "command", "command": "chassis.openProject"}
-"show me how the project is structured" → {"intent": "command", "command": "chassis.showMap"}
+"I want to switch over to the rigops project" → {"intent": "command", "command": "redivivus.openProject"}
+"can you pull up the map for me" → {"intent": "command", "command": "redivivus.showMap"}
+"close doaidream and open redivivus" → {"intent": "command", "command": "redivivus.openProject"}
+"show me how the project is structured" → {"intent": "command", "command": "redivivus.showMap"}
 "what's the weather today" → {"intent": "offtopic"}
 "tell me a joke" → {"intent": "offtopic"}
 "how does async/await work" → {"intent": "question"}
@@ -132,7 +132,7 @@ Examples (follow these exactly):
 "add Firebase to my project" → {"intent": "service"}
 
 Return ONLY JSON:
-{ "intent": "command", "command": "chassis.openProject" }
+{ "intent": "command", "command": "redivivus.openProject" }
 { "intent": "build" }
 { "intent": "fix" }
 { "intent": "convert" }

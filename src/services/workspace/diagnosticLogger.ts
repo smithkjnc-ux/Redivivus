@@ -1,14 +1,14 @@
-// [SCOPE] CHASSIS Diagnostic Logger — writes timestamped debug entries to .chassis/debug.log
-// Activated automatically when CHASSIS_DEBUG=1 env var is set, or always in dev builds.
+// [SCOPE] Redivivus Diagnostic Logger — writes timestamped debug entries to .redivivus/debug.log
+// Activated automatically when Redivivus_DEBUG=1 env var is set, or always in dev builds.
 // Solves the problem of AI guessing at bugs instead of reading actual trace logs.
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-const LOG_FILE = '.chassis/debug.log';
+const LOG_FILE = '.redivivus/debug.log';
 const MAX_LINES = 500;
 
-/** Writes a timestamped line to .chassis/debug.log. Always active — file is pruned to MAX_LINES. */
+/** Writes a timestamped line to .redivivus/debug.log. Always active — file is pruned to MAX_LINES. */
 export function debugLog(root: string | undefined, tag: string, message: string): void {
   if (!root) { return; }
   try {

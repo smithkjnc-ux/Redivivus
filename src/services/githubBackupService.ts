@@ -1,5 +1,5 @@
 // [SCOPE] GitHub integration — token in VS Code secret storage, manual-only commits (never auto).
-// User connects once in Setup Hub. CHASSIS never commits or pushes without explicit user action.
+// User connects once in Setup Hub. Redivivus never commits or pushes without explicit user action.
 // validateToken(): verifies PAT against GitHub API before saving.
 // commitFiles(): commits specific files only — never git add -A on user's full project.
 
@@ -14,9 +14,9 @@ export interface GitHubConfig {
   private: boolean;
 }
 
-const CFG_KEY = 'chassis.githubConfig';
-const SECRET_KEY = 'chassis.github.token';
-const DEFAULT_GITIGNORE = 'node_modules/\n.env\n*.log\n.chassis/logs/\n';
+const CFG_KEY = 'redivivus.githubConfig';
+const SECRET_KEY = 'redivivus.github.token';
+const DEFAULT_GITIGNORE = 'node_modules/\n.env\n*.log\n.redivivus/logs/\n';
 
 export class GitHubBackupService {
   private _context: vscode.ExtensionContext;
@@ -52,7 +52,7 @@ export class GitHubBackupService {
   async validateToken(token: string): Promise<{ valid: boolean; login?: string; error?: string }> {
     try {
       const res = await fetch('https://api.github.com/user', {
-        headers: { 'Authorization': `token ${token}`, 'User-Agent': 'CHASSIS-Extension' },
+        headers: { 'Authorization': `token ${token}`, 'User-Agent': 'Redivivus-Extension' },
       });
       if (res.ok) {
         const data = await res.json() as { login?: string };
@@ -86,7 +86,7 @@ export class GitHubBackupService {
       }
       const createRes = await fetch('https://api.github.com/user/repos', {
         method: 'POST',
-        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'CHASSIS-Extension' },
+        headers: { 'Authorization': `token ${token}`, 'Content-Type': 'application/json', 'User-Agent': 'Redivivus-Extension' },
         body: JSON.stringify({ name: repoName, private: cfg.private, auto_init: false }),
       });
       if (!createRes.ok && createRes.status !== 422) {
@@ -96,7 +96,7 @@ export class GitHubBackupService {
       const remoteUrl = `https://${cfg.username}:${token}@github.com/${cfg.username}/${repoName}.git`;
       try { execSync('git remote remove origin', { cwd: root, stdio: 'ignore' }); } catch { }
       execSync(`git remote add origin ${remoteUrl}`, { cwd: root, stdio: 'ignore' });
-      await this.commitFiles('Initial CHASSIS commit', []);
+      await this.commitFiles('Initial Redivivus commit', []);
       await this._context.globalState.update(CFG_KEY, { ...cfg, repoName });
       return { success: true, message: `Repo "${repoName}" created on GitHub.` };
     } catch (e) {

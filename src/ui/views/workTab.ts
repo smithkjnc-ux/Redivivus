@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Work tab — session controls, start/end forms, action cards
+// [SCOPE] Redivivus Work tab — session controls, start/end forms, action cards
 
 // [WARN] HTML generation via string concatenation is fragile and hard to maintain. Consider using a templating engine or a UI framework for better maintainability and error handling.
 export function renderWorkTab(
@@ -22,27 +22,27 @@ export function renderWorkTab(
     <div class="cards">
       ${sessionActive
         ? '<div class="card primary" data-action="showEndForm"><div class="card-icon">⏹️</div><div class="card-body"><div class="card-title">Done for Now</div><div class="card-sub">Save your progress and wrap up this session</div></div></div>'
-        : '<div class="card primary" data-action="showStartForm"><div class="card-icon">▶️</div><div class="card-body"><div class="card-title">Start Working</div><div class="card-sub">Tell CHASSIS what you\'re doing today</div></div></div>'
+        : '<div class="card primary" data-action="showStartForm"><div class="card-icon">▶️</div><div class="card-body"><div class="card-title">Start Working</div><div class="card-sub">Tell Redivivus what you\'re doing today</div></div></div>'
       }
     </div>
     <div class="section-title">Tools</div>
     <div class="cards">
-      <div class="card" data-cmd="chassis.checkFileHealth" data-pick="true">
+      <div class="card" data-cmd="redivivus.checkFileHealth" data-pick="true">
         <span class="icon">�</span>
         <div class="card-title">Check File Health</div>
         <div class="card-desc">Count tags, show health report</div>
       </div>
-      <div class="card" data-cmd="chassis.cleanUpFile" data-pick="true">
+      <div class="card" data-cmd="redivivus.cleanUpFile" data-pick="true">
         <div class="card-icon">✨</div><div class="card-body"><div class="card-title">Clean Up File</div><div class="card-sub">Add organization notes to a messy file</div></div>
       </div>
-      <div class="card" data-cmd="chassis.buildFromVault">
+      <div class="card" data-cmd="redivivus.buildFromVault">
         <div class="card-icon">🏗️</div><div class="card-body"><div class="card-title">Build from Vault</div><div class="card-sub">Reuse saved code snippets in this project</div></div>
       </div>
     </div>
     <div class="section-title">Projects</div>
     <div class="cards">
       <div class="card" data-action="startWizard">
-        <div class="card-icon">🚀</div><div class="card-body"><div class="card-title">New Project</div><div class="card-sub">Set up a brand new project with CHASSIS</div></div>
+        <div class="card-icon">🚀</div><div class="card-body"><div class="card-title">New Project</div><div class="card-sub">Set up a brand new project with Redivivus</div></div>
       </div>
       <div class="card" data-action="pickProject">
         <div class="card-icon">📂</div><div class="card-body"><div class="card-title">Open Project</div><div class="card-sub">Switch to a different folder or project</div></div>

@@ -7,7 +7,7 @@ import type { MessageHandlerDeps } from './chatPanelMessages';
 import { applyGapAnswers } from '../../services/blueprint/blueprintGapDetector';
 import { syncBlueprintMd } from '../../services/blueprint/blueprintWriter';
 
-// [CHASSIS] Guided Blueprint Mode — pending build tasks waiting for gap answers (sessionId -> original task)
+// [Redivivus] Guided Blueprint Mode — pending build tasks waiting for gap answers (sessionId -> original task)
 export const _pendingGuidedBuilds = new Map<string, string>();
 
 export async function handleBlueprintGapAnswer(msg: any, deps: MessageHandlerDeps, conversation: ChatMessage[], refresh: () => void): Promise<void> {
@@ -17,11 +17,11 @@ export async function handleBlueprintGapAnswer(msg: any, deps: MessageHandlerDep
   if (!sessionId || !answers || !buildTask) { return; }
   _pendingGuidedBuilds.delete(sessionId);
 
-  const config = deps.chassis.isInitialized() ? deps.chassis.loadConfig() : null;
+  const config = deps.redivivus.isInitialized() ? deps.redivivus.loadConfig() : null;
   if (config) {
     config.blueprint = applyGapAnswers(config.blueprint || {}, answers) as typeof config.blueprint;
-    deps.chassis.saveConfig(config);
-    syncBlueprintMd(deps.chassis, config);
+    deps.redivivus.saveConfig(config);
+    syncBlueprintMd(deps.redivivus, config);
   }
 
   const fields = Object.keys(answers).filter(k => answers[k]?.trim()).map(k => k.toUpperCase()).join(', ');
@@ -65,7 +65,7 @@ export function handleVaultDedupPreview(msg: any, conversation: ChatMessage[], r
 export async function handleVaultDedupMerge(conversation: ChatMessage[], refresh: () => void): Promise<void> {
   conversation.push({ role: 'user', content: 'Merge vault duplicates', timestamp: Date.now() });
   refresh();
-  try { await vscode.commands.executeCommand('chassis.vaultDedup'); } catch { /* ignore */ }
+  try { await vscode.commands.executeCommand('redivivus.vaultDedup'); } catch { /* ignore */ }
 }
 
 export function handleInjectTerminalError(msg: any, conversation: ChatMessage[], refresh: () => void): void {

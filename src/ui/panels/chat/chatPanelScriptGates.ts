@@ -28,7 +28,7 @@ export function buildGatesScript(): string {
       const existing = document.getElementById('gate-modal-overlay'); if(existing) existing.remove();
       const ov=document.createElement('div'); ov.id='gate-modal-overlay'; ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;';
       const cd=document.createElement('div'); cd.style.cssText='background:#1a2035;color:#e8edf8;border-radius:12px;padding:24px 28px;width:420px;max-width:92vw;box-shadow:0 12px 48px rgba(0,0,0,0.7);border:1px solid #2d3a55;font-family:inherit;';
-      const hdr=document.createElement('div'); hdr.style.cssText='font-size:11px;font-weight:700;letter-spacing:1.5px;color:#4d9eff;text-transform:uppercase;margin-bottom:6px;'; hdr.textContent='CHASSIS BUILD ESTIMATE'; cd.appendChild(hdr);
+      const hdr=document.createElement('div'); hdr.style.cssText='font-size:11px;font-weight:700;letter-spacing:1.5px;color:#4d9eff;text-transform:uppercase;margin-bottom:6px;'; hdr.textContent='Redivivus BUILD ESTIMATE'; cd.appendChild(hdr);
       const divider=document.createElement('div'); divider.style.cssText='border-top:1px solid #2d3a55;margin-bottom:16px;'; cd.appendChild(divider);
 
 
@@ -83,7 +83,7 @@ export function buildGatesScript(): string {
       const tt=document.createElement('div'); tt.style.cssText='font-size:17px;font-weight:700;margin-bottom:12px;color:#e8edf8;display:flex;align-items:center;gap:8px;';
       tt.innerHTML = '<span style="font-size:20px">\\uD83D\\uDD12</span> Vault Matches Found'; cd.appendChild(tt);
       const sub=document.createElement('div'); sub.style.cssText='font-size:13px;color:#8899bb;margin-bottom:24px;line-height:1.5;';
-      sub.innerHTML = 'CHASSIS found <strong>' + matchCount + '</strong> components in your Vault that match this request. Using vault components guarantees stability and uses fewer tokens.'; cd.appendChild(sub);
+      sub.innerHTML = 'Redivivus found <strong>' + matchCount + '</strong> components in your Vault that match this request. Using vault components guarantees stability and uses fewer tokens.'; cd.appendChild(sub);
       const btns=document.createElement('div'); btns.style.cssText='display:flex;justify-content:flex-end;gap:12px;';
       const cn=document.createElement('button'); cn.textContent='Cancel'; cn.style.cssText='padding:8px 18px;border:1px solid #2d3a55;border-radius:8px;background:transparent;color:#8899bb;cursor:pointer;font-size:13px;'; cn.addEventListener('click',()=>{ ov.remove(); vscode.postMessage({ type: 'vault-hit-' + resolverId, choice: 'cancel' }); }); btns.appendChild(cn);
       const fr=document.createElement('button'); fr.textContent='Build Fresh'; fr.style.cssText='padding:8px 18px;border:1px solid #4d9eff;border-radius:8px;background:transparent;color:#4d9eff;cursor:pointer;font-size:13px;font-weight:600;'; fr.addEventListener('click',()=>{ ov.remove(); vscode.postMessage({ type: 'vault-hit-' + resolverId, choice: 'build-fresh' }); }); btns.appendChild(fr);
@@ -91,7 +91,7 @@ export function buildGatesScript(): string {
       cd.appendChild(btns); ov.appendChild(cd); document.body.appendChild(ov);
     }
 
-    // [CHASSIS] Adaptive Mode Info Panel
+    // [Redivivus] Adaptive Mode Info Panel
     function showAgentInfoPanel() {
       const existing = document.getElementById('gate-modal-overlay'); if(existing) existing.remove();
       const ov=document.createElement('div'); ov.id='gate-modal-overlay'; ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:9999;';
@@ -105,7 +105,7 @@ export function buildGatesScript(): string {
       hdr.appendChild(icon); hdr.appendChild(titles); cd.appendChild(hdr);
 
       const dsc=document.createElement('div'); dsc.style.cssText='font-size:13px;color:#c8d8f0;margin-bottom:24px;line-height:1.6;';
-      dsc.innerHTML = 'CHASSIS runs silently in Adaptive Mode. Simple tasks are routed to a fast, surgical pipeline. Complex tasks are routed to an autonomous agent loop that can read files and run terminal commands.';
+      dsc.innerHTML = 'Redivivus runs silently in Adaptive Mode. Simple tasks are routed to a fast, surgical pipeline. Complex tasks are routed to an autonomous agent loop that can read files and run terminal commands.';
       cd.appendChild(dsc);
 
       const btns=document.createElement('div'); btns.style.cssText='display:flex;justify-content:flex-end;gap:8px;';

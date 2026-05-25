@@ -62,7 +62,7 @@ export function selectGuardianAI(workerAI: string, keyMap: Record<string, () => 
 
 /** Returns true if Guardian AI review is enabled and possible */
 export function guardianEnabled(keyMap: Record<string, () => string | null>): boolean {
-  const cfg = vscode.workspace.getConfiguration('chassis');
+  const cfg = vscode.workspace.getConfiguration('redivivus');
   if (cfg.get<boolean>('guardianEnabled') === false) { return false; }
   // Any configured AI can act as Guardian — solo mode uses same model as reviewer
   const keysSet = Object.values(keyMap).filter(fn => fn()).length;

@@ -49,7 +49,7 @@ export async function handleMapTimelineMessage(msg: any, ctx: MapMsgCtx): Promis
 
   } else if (msg.type === 'tl-branch-from' && msg.snapshotId) {
     try {
-      const stateFile = path.join(root, '.chassis', 'timeline_state.json');
+      const stateFile = path.join(root, '.redivivus', 'timeline_state.json');
       const dir = path.dirname(stateFile);
       if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
       fs.writeFileSync(stateFile, JSON.stringify({ branchFromId: msg.snapshotId }), 'utf8');

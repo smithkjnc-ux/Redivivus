@@ -41,7 +41,7 @@ export async function handleVaultRecategorizeMessage(
     const clipboardPrompt = `Categorize each code block below into exactly ONE of: ${categories.join(', ')}\n\nRespond with ONLY a JSON array of strings, one per item. Example: ["utility","component","api"]\n\nItems:\n${listStr}`;
     await vscode.env.clipboard.writeText(clipboardPrompt);
     const action = await vscode.window.showWarningMessage(
-      'No API key set. CHASSIS copied a categorization prompt to your clipboard — paste it into your AI chat (Windsurf/Cursor/Claude), then paste the JSON result back here.',
+      'No API key set. Redivivus copied a categorization prompt to your clipboard — paste it into your AI chat (Windsurf/Cursor/Claude), then paste the JSON result back here.',
       'Open AI Chat', 'Dismiss'
     );
     if (action === 'Open AI Chat') {
@@ -51,7 +51,7 @@ export async function handleVaultRecategorizeMessage(
   }
   await vscode.window.withProgress({
     location: vscode.ProgressLocation.Notification,
-    title: `CHASSIS Vault: AI categorizing ${otherItems.length} items tagged "other"...`,
+    title: `Redivivus Vault: AI categorizing ${otherItems.length} items tagged "other"...`,
     cancellable: false,
   }, async () => {
     try {

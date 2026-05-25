@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build Ledger — tracks per-AI token usage and actions during a single build.
+// [SCOPE] Redivivus Build Ledger — tracks per-AI token usage and actions during a single build.
 // Instantiated once per build, passed through the pipeline, summarised for the result card.
 // Imports cost rates from costEstimatorService to avoid duplication.
 

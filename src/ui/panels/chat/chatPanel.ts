@@ -1,10 +1,10 @@
-// [SCOPE] CHASSIS Chat Panel — singleton WebviewPanel shell. Intent + build logic in chatPanelIntent.ts.
+// [SCOPE] Redivivus Chat Panel — singleton WebviewPanel shell. Intent + build logic in chatPanelIntent.ts.
 // Split complete: classifyIntent/isBuildRequest/handleBuildRequest → chatPanelIntent.ts
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { ChassisService } from '../../../services/chassisService';
+import type { RedivivusService } from '../../../services/redivivusService';
 import type { RoutingService } from '../../../services/ai/routingService';
 import type { UsageTracker } from '../../../services/usageTracker';
 import type { VaultService } from '../../../services/vault/vaultService';
@@ -26,7 +26,7 @@ interface ChatPanelState {
   blueprintContext: string;
   lastModel?: string; // Track exact model from last AI response
   buildMode?: 'plan' | 'direct';
-  assistMode?: boolean; // When true: no CHASSIS tags, roadmap, or auto-commit injected
+  assistMode?: boolean; // When true: no Redivivus tags, roadmap, or auto-commit injected
   planInterview?: import('./chatPanelPlanInterview').PlanInterviewState;
 }
 
@@ -54,7 +54,7 @@ export class ChatPanel {
   private usageTracker?: UsageTracker;
   // [WARN] Active build context — held so clarify-submit can resolve the pending promise
   private _activeBuildCtx: BuildContext | undefined;
-  // [CHASSIS] Stores the user's task when they're shown the "simple vs full project" choice
+  // [Redivivus] Stores the user's task when they're shown the "simple vs full project" choice
   private _pendingTask: string | undefined;
   // [WARN] Once true, refresh() uses postMessage instead of replacing webview.html
   // Replacing html after first load causes VS Code to open a duplicate tab
@@ -62,7 +62,7 @@ export class ChatPanel {
 
   private constructor(
     panel: vscode.WebviewPanel,
-    private chassis: ChassisService,
+    private redivivus: RedivivusService,
     private routing: RoutingService,
     usageTracker?: UsageTracker,
     private vault?: VaultService,
@@ -71,20 +71,20 @@ export class ChatPanel {
     this._panel = panel;
     this.loadBlueprintContext();
     restoreConversation(this);
-    if (this.state.conversation.length === 0) { loadLastSessionContext(this.chassis, this.state.conversation); }
+    if (this.state.conversation.length === 0) { loadLastSessionContext(this.redivivus, this.state.conversation); }
     this._panel.webview.options = { enableScripts: true };
     this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('../../../core/routing/chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
     this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
-    // [CHASSIS] Rebuild full HTML when workspace folder changes — clear old conversation so new project starts fresh
+    // [Redivivus] Rebuild full HTML when workspace folder changes — clear old conversation so new project starts fresh
     this._disposables.push(vscode.workspace.onDidChangeWorkspaceFolders(() => { this.state.conversation = []; this._initialized = false; restoreConversation(this); this.refresh(); }));
-    // [CHASSIS] Hot-reload roster when API key settings change
+    // [Redivivus] Hot-reload roster when API key settings change
     this._disposables.push(vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('chassis.geminiApiKey') ||
-          e.affectsConfiguration('chassis.claudeApiKey') ||
-          e.affectsConfiguration('chassis.openaiApiKey') ||
-          e.affectsConfiguration('chassis.groqApiKey') ||
-          e.affectsConfiguration('chassis.xaiApiKey') ||
-          e.affectsConfiguration('chassis.kimiApiKey')) {
+      if (e.affectsConfiguration('redivivus.geminiApiKey') ||
+          e.affectsConfiguration('redivivus.claudeApiKey') ||
+          e.affectsConfiguration('redivivus.openaiApiKey') ||
+          e.affectsConfiguration('redivivus.groqApiKey') ||
+          e.affectsConfiguration('redivivus.xaiApiKey') ||
+          e.affectsConfiguration('redivivus.kimiApiKey')) {
         this.refresh();
       }
     }));
@@ -92,9 +92,9 @@ export class ChatPanel {
     this.refresh();
   }
 
-  public static show(chassis: ChassisService, routing: RoutingService, usageTracker?: UsageTracker, vault?: VaultService): void {
+  public static show(redivivus: RedivivusService, routing: RoutingService, usageTracker?: UsageTracker, vault?: VaultService): void {
     const { doShowChatPanel } = require('./chatPanelShow.js');
-    doShowChatPanel(chassis, routing, usageTracker, vault);
+    doShowChatPanel(redivivus, routing, usageTracker, vault);
   }
 
   public static setUsageTracker(usageTracker: UsageTracker): void {
@@ -103,7 +103,7 @@ export class ChatPanel {
     }
   }
 
-  // [CHASSIS] Called by chassis.showMap to close the chat and give Map the full editor width
+  // [Redivivus] Called by redivivus.showMap to close the chat and give Map the full editor width
   public static close(): void {
     ChatPanel._instance?._panel.dispose();
   }
@@ -116,8 +116,8 @@ export class ChatPanel {
   }
 
   private loadBlueprintContext(): void {
-    if (!this.chassis.isInitialized()) { this.state.blueprintContext = ''; return; }
-    const config = this.chassis.loadConfig();
+    if (!this.redivivus.isInitialized()) { this.state.blueprintContext = ''; return; }
+    const config = this.redivivus.loadConfig();
     if (!config?.blueprint) { this.state.blueprintContext = ''; return; }
     const bp = config.blueprint;
     this.state.blueprintContext = [
@@ -164,7 +164,7 @@ export class ChatPanel {
 
   public getConversation() { return this.state.conversation; }
   public getRouting() { return this.routing; }
-  public getChassisRoot(): string | undefined { return this.chassis.getWorkspaceRoot(); }
+  public getRedivivusRoot(): string | undefined { return this.redivivus.getWorkspaceRoot(); }
   public getPendingTask(): string { return this._pendingTask || ''; }
 
   public showGettingStarted(): void { const { panelShowGettingStarted } = require('./chatPanelPublicAPI.js'); return panelShowGettingStarted(this); }

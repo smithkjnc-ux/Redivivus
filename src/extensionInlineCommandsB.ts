@@ -1,9 +1,9 @@
 // [SCOPE] Extension Inline Commands B — fix/resolve, map, chat, profiler, expanded interview.
-// chassis.runProject + chassis.inspectElement + chassis.injectTerminalError extracted to extensionInlineCommandsC.ts.
+// redivivus.runProject + redivivus.inspectElement + redivivus.injectTerminalError extracted to extensionInlineCommandsC.ts.
 
 import * as vscode from 'vscode';
 import { debugLog } from './services/workspace/diagnosticLogger.js';
-import type { ChassisService } from './services/chassisService.js';
+import type { RedivivusService } from './services/redivivusService.js';
 import type { RoutingService } from './services/ai/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
 import type { VaultService } from './services/vault/vaultService.js';
@@ -21,7 +21,7 @@ import { registerInlineCommandsC } from './extensionInlineCommandsC.js';
 
 export function registerInlineCommandsB(
   context: vscode.ExtensionContext,
-  chassisService: ChassisService,
+  redivivusService: RedivivusService,
   routingService: RoutingService,
   usageTracker: UsageTracker,
   vaultService: VaultService,
@@ -33,7 +33,7 @@ export function registerInlineCommandsB(
 ): void {
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.resolveFix', (task: string, builtFiles?: string[]) => {
+    vscode.commands.registerCommand('redivivus.resolveFix', (task: string, builtFiles?: string[]) => {
       if (RecommendationsPanel.currentPanel) {
         RecommendationsPanel.currentPanel.postMessage({ type: 'buildFinished', task, builtFiles });
       }
@@ -42,12 +42,12 @@ export function registerInlineCommandsB(
         const summary = `Fix complete! The task is done and your project has been updated.${fileList}\n\nYou can re-run **Scan Project** from the Recommendations panel to see your updated progress.`;
         ChatPanel.currentPanel.handleMessage({ type: 'assistant-message', text: summary });
       }
-      vscode.commands.executeCommand('chassis.refreshAll');
+      vscode.commands.executeCommand('redivivus.refreshAll');
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.buildFailed', (task: string, reason: string) => {
+    vscode.commands.registerCommand('redivivus.buildFailed', (task: string, reason: string) => {
       if (RecommendationsPanel.currentPanel) {
         RecommendationsPanel.currentPanel.postMessage({ type: 'buildFailed', task, reason });
       }
@@ -56,10 +56,10 @@ export function registerInlineCommandsB(
 
   // [WARN] Defer close+open to next tick — disposing panel mid-handler can swallow MapPanel.show()
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.showMap', () => {
+    vscode.commands.registerCommand('redivivus.showMap', () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) { vscode.window.showErrorMessage('CHASSIS: No workspace folder open.'); return; }
-      const projectName = chassisService.loadConfig()?.projectName || vscode.workspace.workspaceFolders?.[0]?.name || 'Project';
+      if (!root) { vscode.window.showErrorMessage('Redivivus: No workspace folder open.'); return; }
+      const projectName = redivivusService.loadConfig()?.projectName || vscode.workspace.workspaceFolders?.[0]?.name || 'Project';
       debugLog(root, 'showMap', `fired -- root: ${root}, project: ${projectName}`);
       setTimeout(() => {
         debugLog(root, 'showMap', 'setTimeout fired -- closing chat, opening MapPanel');
@@ -71,35 +71,35 @@ export function registerInlineCommandsB(
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openChat', () => {
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+    vscode.commands.registerCommand('redivivus.openChat', () => {
+      ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
     })
   );
 
 
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.refreshAll', () => { refreshAll(); })
+    vscode.commands.registerCommand('redivivus.refreshAll', () => { refreshAll(); })
   );
 
   try {
-    registerProfileRuntimeCommand(context, chassisService, routingService, usageTracker, vaultService);
+    registerProfileRuntimeCommand(context, redivivusService, routingService, usageTracker, vaultService);
   } catch (e) {
-    console.error('[CHASSIS] Failed to register chassis.profileRuntime', e);
-    vscode.window.showErrorMessage(`CHASSIS: profileRuntime registration failed: ${e instanceof Error ? e.message : String(e)}`);
+    console.error('[Redivivus] Failed to register redivivus.profileRuntime', e);
+    vscode.window.showErrorMessage(`Redivivus: profileRuntime registration failed: ${e instanceof Error ? e.message : String(e)}`);
   }
 
   try {
-    registerStartRuntimeAnalysisCommand(context, chassisService, routingService, usageTracker, vaultService);
-  } catch (e) { console.error('[CHASSIS] Failed to register chassis.startRuntimeAnalysis', e); }
+    registerStartRuntimeAnalysisCommand(context, redivivusService, routingService, usageTracker, vaultService);
+  } catch (e) { console.error('[Redivivus] Failed to register redivivus.startRuntimeAnalysis', e); }
 
-  // [DONE] chassis.startExpandedInterview — opens ChatPanel and triggers 5W interview form.
+  // [DONE] redivivus.startExpandedInterview — opens ChatPanel and triggers 5W interview form.
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.startExpandedInterview', async () => {
-      const panel = ChatPanel.currentPanel || await vscode.commands.executeCommand<any>('chassis.openChat');
+    vscode.commands.registerCommand('redivivus.startExpandedInterview', async () => {
+      const panel = ChatPanel.currentPanel || await vscode.commands.executeCommand<any>('redivivus.openChat');
       if (ChatPanel.currentPanel) {
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        const config = root && chassisService?.isInitialized?.() ? chassisService.loadConfig?.() : null;
+        const config = root && redivivusService?.isInitialized?.() ? redivivusService.loadConfig?.() : null;
         const prefillTask = config?.blueprint?.what || '';
         (ChatPanel.currentPanel as any)._panel?.webview?.postMessage({ type: 'show-panel', panelType: 'expanded-interview', prefillTask, complexity: null });
         (ChatPanel.currentPanel as any)._panel?.reveal?.();
@@ -109,9 +109,9 @@ export function registerInlineCommandsB(
 
   // [DONE] User Profile panel -- shows global user memory, editable preferences
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openProfile', async () => {
+    vscode.commands.registerCommand('redivivus.openProfile', async () => {
       if (!ChatPanel.currentPanel) {
-        ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+        ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
         await new Promise(resolve => setTimeout(resolve, 600));
       }
       const { getMemoryForDisplay } = await import('./services/userMemoryService.js');
@@ -136,14 +136,14 @@ export function registerInlineCommandsB(
 
   // [DONE] Web Search -- opens chat and prompts for a search query
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.webSearch', async () => {
+    vscode.commands.registerCommand('redivivus.webSearch', async () => {
       const query = await vscode.window.showInputBox({ prompt: 'Search the web', placeHolder: 'e.g. react hooks documentation' });
       if (query) {
-        if (!ChatPanel.currentPanel) { ChatPanel.show(chassisService, routingService, usageTracker, vaultService); }
+        if (!ChatPanel.currentPanel) { ChatPanel.show(redivivusService, routingService, usageTracker, vaultService); }
         setTimeout(() => { ChatPanel.currentPanel?.handleMessage({ type: 'send-message', text: `search for ${query}` }); }, 500);
       }
     })
   );
 
-  registerInlineCommandsC(context, chassisService, routingService, usageTracker, vaultService);
+  registerInlineCommandsC(context, redivivusService, routingService, usageTracker, vaultService);
 }

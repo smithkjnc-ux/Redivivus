@@ -3,11 +3,11 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 // [WARN] Never mangle VS Code extension source — if the workspace IS a vscode extension,
-// src/ and out/ are skipped to prevent CHASSIS from corrupting its own regex/string literals.
+// src/ and out/ are skipped to prevent Redivivus from corrupting its own regex/string literals.
 export function getCodeFiles(root: string): string[] {
   const files: string[] = [];
   const skipDirs = new Set([
-    'node_modules', '.git', '.chassis', '__pycache__', '.vscode',
+    'node_modules', '.git', '.redivivus', '__pycache__', '.vscode',
     'venv', '.venv', 'dist', 'out', 'build', '.cache',
     'venv_ryppel', 'LivePortrait', 'avatar', 'old files',
   ]);

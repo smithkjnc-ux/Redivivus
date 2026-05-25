@@ -2,13 +2,13 @@
 // Handles: pendingBuildTask, pendingVaultBuild, pendingNewProjectMode.
 
 import * as vscode from 'vscode';
-import type { ChassisService } from './services/chassisService.js';
+import type { RedivivusService } from './services/redivivusService.js';
 import type { RoutingService } from './services/ai/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
 import type { VaultService } from './services/vault/vaultService.js';
 import { ChatPanel } from './ui/panels/chat/chatPanel';
 
-type ShowArgs = [ChassisService, RoutingService, UsageTracker | undefined, VaultService];
+type ShowArgs = [RedivivusService, RoutingService, UsageTracker | undefined, VaultService];
 
 async function openPanel(args: ShowArgs, delayMs = 800, innerDelayMs = 400): Promise<void> {
   await new Promise(r => setTimeout(r, delayMs));
@@ -22,18 +22,18 @@ export function resumePendingState(
 ): void {
   // ── resume build task after extension reload (updateWorkspaceFolders 0→1 folder causes restart) ──
   // [FIX] Saved by onNewProject BEFORE updateWorkspaceFolders so the task survives the reload.
-  const pendingResumeRaw = context.globalState.get<string>('chassis.pendingResumeTask');
+  const pendingResumeRaw = context.globalState.get<string>('redivivus.pendingResumeTask');
   if (pendingResumeRaw) {
-    context.globalState.update('chassis.pendingResumeTask', undefined);
+    context.globalState.update('redivivus.pendingResumeTask', undefined);
     try {
       const { task, projectRoot } = JSON.parse(pendingResumeRaw);
       (async () => {
         await openPanel(showArgs, 100, 400);
         if (ChatPanel.currentPanel) {
           // [FIX] Restore chat history wiped by the window reload
-          const rescuedConv = context.globalState.get<any[]>('chassis.pendingRescueConversation');
+          const rescuedConv = context.globalState.get<any[]>('redivivus.pendingRescueConversation');
           if (rescuedConv && rescuedConv.length > 0) {
-             context.globalState.update('chassis.pendingRescueConversation', undefined);
+             context.globalState.update('redivivus.pendingRescueConversation', undefined);
              const conv = ChatPanel.currentPanel.getConversation();
              conv.splice(0, conv.length, ...rescuedConv);
              (ChatPanel.currentPanel as any).refresh();
@@ -50,9 +50,9 @@ export function resumePendingState(
   // Restore the chat history and stop — do NOT call resumeBuildTask / handleBuildRequest.
   // [FIX] Use short delay (100ms) so rescue fires BEFORE the 500ms auto-open timer, preventing
   // a window where the timer creates an empty panel that the user sees before conversation is restored.
-  const rescueOnly = context.globalState.get<any[]>('chassis.pendingRescueConversation');
+  const rescueOnly = context.globalState.get<any[]>('redivivus.pendingRescueConversation');
   if (rescueOnly && rescueOnly.length > 0) {
-    context.globalState.update('chassis.pendingRescueConversation', undefined);
+    context.globalState.update('redivivus.pendingRescueConversation', undefined);
     (async () => {
       await openPanel(showArgs, 100, 250);
       if (ChatPanel.currentPanel) {
@@ -65,9 +65,9 @@ export function resumePendingState(
   }
 
   // ── resume build task (wizard path — shows new-project panel) ──
-  const pendingBuildTask = context.globalState.get<string>('chassis.pendingBuildTask');
+  const pendingBuildTask = context.globalState.get<string>('redivivus.pendingBuildTask');
   if (pendingBuildTask) {
-    context.globalState.update('chassis.pendingBuildTask', undefined);
+    context.globalState.update('redivivus.pendingBuildTask', undefined);
     (async () => {
       await openPanel(showArgs);
       if (ChatPanel.currentPanel) {
@@ -77,16 +77,16 @@ export function resumePendingState(
   }
 
   // ── resume vault build ──
-  const pendingVaultBuild = context.globalState.get<boolean>('chassis.pendingVaultBuild');
+  const pendingVaultBuild = context.globalState.get<boolean>('redivivus.pendingVaultBuild');
   if (pendingVaultBuild) {
-    context.globalState.update('chassis.pendingVaultBuild', undefined);
-    setTimeout(() => { vscode.commands.executeCommand('chassis.buildFromVault'); }, 800);
+    context.globalState.update('redivivus.pendingVaultBuild', undefined);
+    setTimeout(() => { vscode.commands.executeCommand('redivivus.buildFromVault'); }, 800);
   }
 
   // ── show vault build summary after folder reload ──
-  const pendingVaultSummary = context.globalState.get<string>('chassis.pendingVaultSummary');
+  const pendingVaultSummary = context.globalState.get<string>('redivivus.pendingVaultSummary');
   if (pendingVaultSummary) {
-    context.globalState.update('chassis.pendingVaultSummary', undefined);
+    context.globalState.update('redivivus.pendingVaultSummary', undefined);
     (async () => {
       await openPanel(showArgs);
       const cp = ChatPanel.currentPanel;
@@ -98,6 +98,6 @@ export function resumePendingState(
   }
 
   // ── clear stale flags from old code paths ──
-  context.globalState.update('chassis.pendingNewProjectMode', undefined);
-  context.globalState.update('chassis.pendingNewProjectTask', undefined);
+  context.globalState.update('redivivus.pendingNewProjectMode', undefined);
+  context.globalState.update('redivivus.pendingNewProjectTask', undefined);
 }

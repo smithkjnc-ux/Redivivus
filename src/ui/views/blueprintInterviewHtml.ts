@@ -56,7 +56,7 @@ export function buildBlueprintViewHtml(content: string, nonce: string): string {
     <span style="font-size:24px;">🏗️</span>
     <div>
       <div style="font-size:18px;font-weight:700;">Your Blueprint</div>
-      <div style="font-size:12px;color:var(--vscode-descriptionForeground);">Saved to .chassis/blueprint.md</div>
+      <div style="font-size:12px;color:var(--vscode-descriptionForeground);">Saved to .redivivus/blueprint.md</div>
     </div>
   </div>
   <button id="redo-btn">Redo Interview &rarr;</button>

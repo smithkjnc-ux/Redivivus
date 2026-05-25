@@ -5,7 +5,7 @@ export const RECOMMENDATIONS_SCRIPT_HEAD = `
 <script>
 (function() {
   const vscode = acquireVsCodeApi();
-  if (!vscode) { console.error('CHASSIS: Failed to acquire VS Code API'); }
+  if (!vscode) { console.error('Redivivus: Failed to acquire VS Code API'); }
 
   const toast = document.getElementById('toast');
   let toastTimer;

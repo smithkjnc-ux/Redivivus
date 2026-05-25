@@ -1,5 +1,5 @@
-// [SCOPE] Vault seeder — pulls curated patterns from GitHub and ships starter patterns with CHASSIS.
-// Runs on first install and on "CHASSIS: Refresh Knowledge Base" command.
+// [SCOPE] Vault seeder — pulls curated patterns from GitHub and ships starter patterns with Redivivus.
+// Runs on first install and on "Redivivus: Refresh Knowledge Base" command.
 // [WARN] GitHub unauthenticated API: 60 req/hr. With token: 5000 req/hr.
 // Only pulls MIT/Apache/BSD licensed code. Never overwrites user vault items.
 
@@ -43,7 +43,7 @@ function makeVaultItem(
     language,
     category,
     description,
-    sourceProject: 'chassis-seeded',
+    sourceProject: 'redivivus-seeded',
     sourceFile: source,
     tags,
     lineCount: code.split('\n').length,
@@ -79,7 +79,7 @@ async function searchGitHub(
 ): Promise<Array<{ name: string; content: string; repoLicense: string; htmlUrl: string }>> {
   const headers: Record<string, string> = {
     'Accept': 'application/vnd.github.v3+json',
-    'User-Agent': 'CHASSIS-VSCode-Extension',
+    'User-Agent': 'Redivivus-VSCode-Extension',
   };
   if (token) { headers['Authorization'] = `token ${token}`; }
 

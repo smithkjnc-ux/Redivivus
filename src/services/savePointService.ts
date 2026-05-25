@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Save Points — git-based checkpoints with plain-English messages
+// [SCOPE] Redivivus Save Points — git-based checkpoints with plain-English messages
 
 import * as vscode from 'vscode';
 import * as path from 'path';

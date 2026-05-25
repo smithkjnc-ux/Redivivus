@@ -1,19 +1,19 @@
-// [SCOPE] Registers VS Code commands related to CHASSIS retrofit operations, including initiating, confirming, and reverting project retrofits.
+// [SCOPE] Registers VS Code commands related to Redivivus retrofit operations, including initiating, confirming, and reverting project retrofits.
 import * as vscode from 'vscode';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { RetrofitService } from '../core/retrofit/retrofitService';
 
 export function registerRetrofitCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   retrofitService: RetrofitService,
   refreshAll: () => void
 ): void {
   // Retrofit Project
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.retrofit', async () => {
-      if (!chassis.isInitialized()) {
-        vscode.window.showErrorMessage('Run "CHASSIS: Initialize Project" first.');
+    vscode.commands.registerCommand('redivivus.retrofit', async () => {
+      if (!redivivus.isInitialized()) {
+        vscode.window.showErrorMessage('Run "Redivivus: Initialize Project" first.');
         return;
       }
       await retrofitService.runRetrofit();
@@ -23,7 +23,7 @@ export function registerRetrofitCommands(
 
   // Confirm Retrofit
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.confirmRetrofit', async () => {
+    vscode.commands.registerCommand('redivivus.confirmRetrofit', async () => {
       await retrofitService.confirmRetrofit();
       refreshAll();
     })
@@ -31,7 +31,7 @@ export function registerRetrofitCommands(
 
   // Revert Retrofit
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.revertRetrofit', async () => {
+    vscode.commands.registerCommand('redivivus.revertRetrofit', async () => {
       await retrofitService.revertRetrofit();
       refreshAll();
     })

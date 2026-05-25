@@ -11,6 +11,6 @@ export async function executeRunCommand(msg: any, ctx: MapMsgCtx): Promise<void>
       const uri = vscode.Uri.file(path.join(root, msg.nodeId));
       await vscode.window.showTextDocument(uri, { preserveFocus: false });
       await vscode.commands.executeCommand(msg.command);
-    } catch { vscode.window.showErrorMessage(`CHASSIS Map: Could not open ${msg.nodeId}`); }
+    } catch { vscode.window.showErrorMessage(`Redivivus Map: Could not open ${msg.nodeId}`); }
   }
 }

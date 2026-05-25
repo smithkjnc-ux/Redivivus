@@ -55,8 +55,8 @@ export function writeLearnedEntries(filePath: string, entries: LearnedEntry[]): 
   const recent = entries.filter(e => !e.permanent && !e.neverDo);
   const neverDo = entries.filter(e => e.neverDo);
 
-  let out = '# CHASSIS Learned Memory\n';
-  out += '> Auto-managed by CHASSIS. Do not edit manually.\n\n';
+  let out = '# Redivivus Learned Memory\n';
+  out += '> Auto-managed by Redivivus. Do not edit manually.\n\n';
   out += '## Permanent\n';
   out += '> Architectural decisions, user preferences, project facts. Never deleted.\n';
   permanent.forEach(e => { out += `- [${e.date}] ${e.text}\n`; });

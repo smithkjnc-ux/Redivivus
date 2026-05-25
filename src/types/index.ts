@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS type definitions — Phase 1 core types only
+// [SCOPE] Redivivus type definitions — Phase 1 core types only
 
 export interface Blueprint {
   who: string;
@@ -50,7 +50,7 @@ export interface ExitInterview {
   nextSessionStart: string;
 }
 
-export interface ChassisConfig {
+export interface RedivivusConfig {
   projectName: string;
   createdAt: string;
   version: string;

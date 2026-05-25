@@ -59,7 +59,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     }
   } else {
     editPrompt =
-      `Add CHASSIS annotation comments to \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
+      `Add Redivivus annotation comments to \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
       `TASK: ${task}${bpSection}\n` +
       `RULES:\n- Return ONLY the complete updated file (no fences, no explanation)\n` +
       `- Add \`// [SCOPE]\` at line 1 describing what this file does in one sentence\n` +
@@ -110,7 +110,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
 
   let tempOrigPath: string | undefined;
   try {
-    tempOrigPath = path.join(os.tmpdir(), `chassis-orig-${Date.now()}-${path.basename(absPath)}`);
+    tempOrigPath = path.join(os.tmpdir(), `redivivus-orig-${Date.now()}-${path.basename(absPath)}`);
     fs.writeFileSync(tempOrigPath, originalContent, 'utf-8');
     fs.writeFileSync(absPath, newContent, 'utf-8');
   } catch (err) {
@@ -127,7 +127,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   const diffSummary = `(+${added} / -${removed} lines)`;
 
   if (tempOrigPath) {
-    vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempOrigPath), vscode.Uri.file(absPath), `CHASSIS Edit: ${path.basename(filePath)} ${diffSummary}`).then(undefined, () => {});
+    vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempOrigPath), vscode.Uri.file(absPath), `Redivivus Edit: ${path.basename(filePath)} ${diffSummary}`).then(undefined, () => {});
   }
 
   let vaultMsg = '';

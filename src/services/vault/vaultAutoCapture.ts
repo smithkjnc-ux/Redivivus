@@ -57,12 +57,12 @@ export async function autoCaptureFile(
         result.skippedDupes++;
         continue;
       }
-      // [CHASSIS] Pre-filter: never save deprecated, dead-end, or stub code
+      // [Redivivus] Pre-filter: never save deprecated, dead-end, or stub code
       if (/\[(WARN|DEAD)\].*deprecated|stub|placeholder|TODO.*implement|not yet implemented/i.test(item.code.slice(0, 300))) {
         result.skippedDupes++;
         continue;
       }
-      // [CHASSIS] AI quality gate — evaluate before saving
+      // [Redivivus] AI quality gate — evaluate before saving
       const verdict = await evaluateQuality(item.name, item.code, item.language, callAI);
       if (!verdict.reusable || verdict.qualityScore < 3) {
         result.skippedDupes++; // Count as filtered
@@ -74,12 +74,12 @@ export async function autoCaptureFile(
       (item as any).useCase = verdict.useCase;
       (item as any).qualityScore = verdict.qualityScore;
       (item as any).reusable = verdict.reusable;
-      // [CHASSIS] Tags from AI verdict + prompt + code — all three sources for best retrieval coverage
+      // [Redivivus] Tags from AI verdict + prompt + code — all three sources for best retrieval coverage
       const itemTags = tagsFromPromptAndCode(buildPrompt, item.code);
       const aiTags: string[] = (verdict as any).tags || [];
       item.tags = [...new Set([...item.tags, ...aiTags, ...itemTags])];
 
-      // [CHASSIS] Replace if better: if a semantically similar item exists with a lower quality score,
+      // [Redivivus] Replace if better: if a semantically similar item exists with a lower quality score,
       // remove it so the vault always keeps the best version of each concept.
       const similar = vault.findSimilar(item.name, 0.75);
       if (similar.length > 0) {
@@ -98,8 +98,8 @@ export async function autoCaptureFile(
       result.savedNames.push(item.name);
       try {
         const logLine = `[vault-capture] ${new Date().toISOString()} | ${absPath} | fn:${item.name} | score:${verdict.qualityScore} | tags:${item.tags.join(',')}`;
-        const wsRoot = absPath.includes('.chassis') ? absPath.split('.chassis')[0] : nodePath.dirname(absPath);
-        const logPath = nodePath.join(wsRoot, '.chassis', 'build_errors.log');
+        const wsRoot = absPath.includes('.redivivus') ? absPath.split('.redivivus')[0] : nodePath.dirname(absPath);
+        const logPath = nodePath.join(wsRoot, '.redivivus', 'build_errors.log');
         fs.appendFileSync(logPath, logLine + '\n');
       } catch { /* log failure is non-fatal */ }
     }

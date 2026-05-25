@@ -11,7 +11,7 @@ import * as Review from './chatPanelBuildReview';
 import * as Worker from './chatPanelBuildWorker';
 import * as Writer from './chatPanelBuildWriter';
 import { extractNarrator } from '../../ui/panels/chat/chatPanelStory';
-import { logFileChange } from '../../services/logging/chassisLogger';
+import { logFileChange } from '../../services/logging/redivivusLogger';
 import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel';
 import { autoCommitIfEnabled } from '../../services/gitAutoCommitService';
 import { writeProjectRoadmapEntry } from '../routing/chatPanelMsgFixUtils';
@@ -145,7 +145,7 @@ export async function runPostBuildActions(opts: {
     ]);
   }
   ctx.onBuildFinished?.(task, [relPath]);
-  if (!ctx.assistMode) { await autoCommitIfEnabled(root, `CHASSIS added: ${task.slice(0, 80)}`, allFiles); }
+  if (!ctx.assistMode) { await autoCommitIfEnabled(root, `Redivivus added: ${task.slice(0, 80)}`, allFiles); }
   const wsf = vscode.workspace.workspaceFolders ?? [];
   if (!wsf.some(f => f.uri.fsPath === root)) {
     if (wsf.length > 0) {
@@ -157,7 +157,7 @@ export async function runPostBuildActions(opts: {
     } else {
       try {
         const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
-        if (CP?.extensionContext) { CP.extensionContext.globalState.update('chassis.pendingRescueConversation', ctx.conversation); }
+        if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); }
       } catch {}
       vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root));
     }

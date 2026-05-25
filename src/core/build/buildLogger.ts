@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS BUILD Domain Logger
+// [SCOPE] Redivivus BUILD Domain Logger
 import { masterLog } from '../../core/logging/masterLogger.js';
 
 const DOMAIN = 'BUILD';

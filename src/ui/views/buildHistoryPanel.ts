@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build History Panel — every build snapshotted; user can revert to any point.
+// [SCOPE] Redivivus Build History Panel — every build snapshotted; user can revert to any point.
 // [FIX] Removed Save Points tab — snapshots ARE the save points. Git handles major milestones.
 // [WARN] Panel posts undo-build message which calls SnapshotService.restore(), falling through to archive if needed.
 
@@ -19,7 +19,7 @@ export function showBuildHistoryPanel(context: vscode.ExtensionContext): void {
   if (_panel) { _panel.reveal(vscode.ViewColumn.Beside); _panel.webview.postMessage({ type: 'refresh' }); return; }
 
   _panel = vscode.window.createWebviewPanel(
-    'chassisBuildHistory', 'Build History',
+    'redivivusBuildHistory', 'Build History',
     { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
     { enableScripts: true, retainContextWhenHidden: true }
   );
@@ -42,7 +42,7 @@ export function showBuildHistoryPanel(context: vscode.ExtensionContext): void {
       const content = snap.getSnapshotFileContent(msg.snapshotId, relPath);
       if (content === null) { vscode.window.showWarningMessage('Snapshot file content not found.'); return; }
       const currentPath = path.join(root, relPath);
-      const tempPath = path.join(os.tmpdir(), `chassis_snap_${msg.snapshotId.slice(-8)}_${path.basename(relPath)}`);
+      const tempPath = path.join(os.tmpdir(), `redivivus_snap_${msg.snapshotId.slice(-8)}_${path.basename(relPath)}`);
       fs.writeFileSync(tempPath, content, 'utf8');
       const label = meta.task.slice(0, 50);
       vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempPath), vscode.Uri.file(currentPath), `${path.basename(relPath)}: "${label}" vs Current`);

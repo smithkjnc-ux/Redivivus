@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import type { RoutingService } from '../../services/ai/routingService';
 import type { VaultService } from '../../services/vault/vaultService';
-import type { ChassisService } from '../../services/chassisService';
+import type { RedivivusService } from '../../services/redivivusService';
 import type { BuildContext } from '../build/chatPanelBuild';
 import { runSingleFileBuild, runChunkedBuild, isChunkedBuildRequest, runVaultAssemblyBuild, registerVaultHitResolver, resolveVaultHit } from '../build/chatPanelBuild';
 import type { VaultSearchResult } from '../../services/vault/buildFromVaultSearch';
@@ -24,10 +24,10 @@ import { estimateBuild } from './costEstimatorService';
 import { checkBuildPlacement } from '../../services/build/buildPlacementCheck';
 import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor';
 
-// [CHASSIS] Pending build-confirm resolvers — keyed by buildId. Resolved by confirm-build / cancel-build messages.
+// [Redivivus] Pending build-confirm resolvers — keyed by buildId. Resolved by confirm-build / cancel-build messages.
 export const _pendingBuildConfirms = new Map<string, (confirmed: boolean) => void>();
 
-// [CHASSIS] Pending placement resolvers — keyed by placementId. Resolved by placement-* messages.
+// [Redivivus] Pending placement resolvers — keyed by placementId. Resolved by placement-* messages.
 export const _pendingPlacements = new Map<string, (choice: 'here' | 'new-project' | 'cancel') => void>();
 
 /** Called by the message handler when the user responds to the placement modal. */
@@ -47,7 +47,7 @@ import { awaitPlacementConfirmation, awaitCostConfirmation } from '../../ui/pane
 
 
 export interface BuildRequestDeps {
-  chassis: ChassisService;
+  redivivus: RedivivusService;
   routing: RoutingService;
   vault?: VaultService;
   conversation: ChatMessage[];
@@ -83,7 +83,7 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
   //        (that's a resumed build that already went through the wizard).
   // Direct mode: skip scope clarification entirely (auto-approve scope)
   // Initialized projects: skip scope clarification — user is modifying, not starting fresh
-  if (!skipComplex && deps.buildMode !== 'direct' && !deps.chassis?.isInitialized?.() && await isVagueProjectRequest(task, deps.routing)) {
+  if (!skipComplex && deps.buildMode !== 'direct' && !deps.redivivus?.isInitialized?.() && await isVagueProjectRequest(task, deps.routing)) {
     const scopeAnswer = await askScopeQuestions(task, deps.postToWebview);
     if (scopeAnswer) {
       const { enrichedTask } = await parseScopeAnswer(scopeAnswer, deps.routing);
@@ -152,7 +152,7 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
             return;
           }
         }
-        const ctx = { task, root: vaultRoot!, blueprintContext: vaultBlueprintContext, vault: deps.vault, chassis: deps.chassis, routing: deps.routing, conversation: deps.conversation, refresh: deps.refresh, logError: deps.logError, postToWebview: deps.postToWebview };
+        const ctx = { task, root: vaultRoot!, blueprintContext: vaultBlueprintContext, vault: deps.vault, redivivus: deps.redivivus, routing: deps.routing, conversation: deps.conversation, refresh: deps.refresh, logError: deps.logError, postToWebview: deps.postToWebview };
         await runVaultAssemblyBuild(ctx, relevantItems);
         if (autoCreated && vaultRoot) {
           // [DEAD] Was: showInformationMessage -- users expect auto-open
@@ -175,14 +175,14 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
 
   // ── Plan mode: check blueprint completeness before building ──
   if (deps.buildMode === 'plan' && !skipComplex) {
-    const config = deps.chassis?.isInitialized?.() ? deps.chassis.loadConfig() : null;
+    const config = deps.redivivus?.isInitialized?.() ? deps.redivivus.loadConfig() : null;
     const bp = config?.blueprint;
     const hasCompleteBlueprint = bp && ['who','what','where','when','why'].every((k: string) => (bp as any)[k] && (bp as any)[k].trim().length > 0);
     if (!hasCompleteBlueprint) {
       deps.postToWebview({ type: 'set-status', status: 'ready' });
       deps.postToWebview({ type: 'assistant-message', text: '📋 **Plan Mode Active** — Let\'s complete your project blueprint first. I\'m starting the 5 W\'s interview...' });
       // Trigger blueprint interview via command; after completion user can re-submit the build request
-      await vscode.commands.executeCommand('chassis.blueprintInterview');
+      await vscode.commands.executeCommand('redivivus.blueprintInterview');
       return;
     }
   }

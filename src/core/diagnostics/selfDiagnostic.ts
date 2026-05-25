@@ -1,10 +1,10 @@
-// [SCOPE] CHASSIS Self-Diagnostic — main runner, output channel, and check orchestration
-// Register via: vscode.commands.registerCommand('chassis.selfDiagnostic', () => runDiagnostic(context, chassis))
+// [SCOPE] Redivivus Self-Diagnostic — main runner, output channel, and check orchestration
+// Register via: vscode.commands.registerCommand('redivivus.selfDiagnostic', () => runDiagnostic(context, redivivus))
 // Checks split into: selfDiagnosticChecks.ts (workspace/AI) and selfDiagnosticBuildChecks.ts (commands/build/vault)
 
 import * as vscode from 'vscode';
 import type { DiagResult} from './selfDiagnosticChecks';
-import { checkWorkspace, checkChassisDir, checkConfigFile, checkServiceExists, checkInitState, checkApiKey, checkProviderReachable, checkSystemPrompt } from './selfDiagnosticChecks';
+import { checkWorkspace, checkRedivivusDir, checkConfigFile, checkServiceExists, checkInitState, checkApiKey, checkProviderReachable, checkSystemPrompt } from './selfDiagnosticChecks';
 import { checkCommandRegistered, checkExtensionResources, checkOutDir, checkVaultDir, checkRoutingService, checkGuardianService, checkBuildFreshness } from './selfDiagnosticBuildChecks';
 
 export { checkAllCommandsRegistered } from './selfDiagnosticBuildChecks';
@@ -14,43 +14,43 @@ type DiagCheck = () => Promise<DiagResult> | DiagResult;
 
 let outputChannel: vscode.OutputChannel | null = null;
 function getChannel(): vscode.OutputChannel {
-  if (!outputChannel) { outputChannel = vscode.window.createOutputChannel('CHASSIS Diagnostic'); }
+  if (!outputChannel) { outputChannel = vscode.window.createOutputChannel('Redivivus Diagnostic'); }
   return outputChannel;
 }
 
 export async function runDiagnostic(
   context: vscode.ExtensionContext,
-  chassis?: any
+  redivivus?: any
 ): Promise<DiagResult[]> {
   const ch = getChannel();
   ch.clear(); ch.show(true);
   ch.appendLine('============================================');
-  ch.appendLine('  CHASSIS Self-Diagnostic');
+  ch.appendLine('  Redivivus Self-Diagnostic');
   ch.appendLine(`  ${new Date().toISOString()}`);
   ch.appendLine('============================================');
   ch.appendLine('');
 
   const checks: DiagCheck[] = [
     () => checkWorkspace(),
-    () => checkChassisDir(),
+    () => checkRedivivusDir(),
     () => checkConfigFile(),
-    () => checkServiceExists(chassis, 'ChassisService', 'isInitialized'),
-    () => checkServiceExists(chassis, 'ChassisService', 'loadConfig'),
-    () => checkInitState(chassis),
-    () => checkApiKey('Gemini', 'chassis.geminiApiKey'),
-    () => checkApiKey('Kimi (Moonshot)', 'chassis.kimiApiKey'),
-    () => checkApiKey('Groq', 'chassis.groqApiKey'),
+    () => checkServiceExists(redivivus, 'RedivivusService', 'isInitialized'),
+    () => checkServiceExists(redivivus, 'RedivivusService', 'loadConfig'),
+    () => checkInitState(redivivus),
+    () => checkApiKey('Gemini', 'redivivus.geminiApiKey'),
+    () => checkApiKey('Kimi (Moonshot)', 'redivivus.kimiApiKey'),
+    () => checkApiKey('Groq', 'redivivus.groqApiKey'),
     () => checkProviderReachable('Gemini'),
     () => checkProviderReachable('Kimi'),
     () => checkProviderReachable('Groq'),
-    () => checkSystemPrompt(chassis),
-    () => checkCommandRegistered('chassis.openChat'),
-    () => checkCommandRegistered('chassis.init'),
-    () => checkCommandRegistered('chassis.createFile'),
-    () => checkCommandRegistered('chassis.saveAllFiles'),
-    () => checkCommandRegistered('chassis.openProject'),
-    () => checkCommandRegistered('chassis.vaultBrowser'),
-    () => checkCommandRegistered('chassis.selfDiagnostic'),
+    () => checkSystemPrompt(redivivus),
+    () => checkCommandRegistered('redivivus.openChat'),
+    () => checkCommandRegistered('redivivus.init'),
+    () => checkCommandRegistered('redivivus.createFile'),
+    () => checkCommandRegistered('redivivus.saveAllFiles'),
+    () => checkCommandRegistered('redivivus.openProject'),
+    () => checkCommandRegistered('redivivus.vaultBrowser'),
+    () => checkCommandRegistered('redivivus.selfDiagnostic'),
     () => checkExtensionResources(context),
     () => checkOutDir(),
     () => checkVaultDir(),
@@ -92,7 +92,7 @@ export async function runDiagnostic(
     ch.appendLine(`  ${fails} FAILED -- ${passes} passed, ${warns} warning(s), ${skips} skipped`);
     ch.appendLine('');
     ch.appendLine('== PASTE TO AI ==');
-    ch.appendLine(`CHASSIS diagnostic: ${fails} errors, ${warns} warnings.`);
+    ch.appendLine(`Redivivus diagnostic: ${fails} errors, ${warns} warnings.`);
     for (const r of results.filter(r => r.status === 'fail')) {
       ch.appendLine(`[FAIL] ${r.name}: ${r.message}${r.detail ? ' -- ' + r.detail : ''}`);
     }
@@ -104,9 +104,9 @@ export async function runDiagnostic(
   ch.appendLine('============================================');
 
   if (fails > 0) {
-    vscode.window.showWarningMessage(`CHASSIS Diagnostic: ${fails} issue(s) found. See Output -> CHASSIS Diagnostic.`);
+    vscode.window.showWarningMessage(`Redivivus Diagnostic: ${fails} issue(s) found. See Output -> Redivivus Diagnostic.`);
   } else {
-    vscode.window.showInformationMessage(`CHASSIS Diagnostic: All clear! ${passes} checks passed.`);
+    vscode.window.showInformationMessage(`Redivivus Diagnostic: All clear! ${passes} checks passed.`);
   }
   return results;
 }

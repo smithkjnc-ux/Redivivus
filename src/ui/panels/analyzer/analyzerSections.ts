@@ -52,7 +52,7 @@ export function buildLargeFilesSection(result: AnalysisResult): string {
       `Each new file should handle one responsibility and be under 200 lines.\n` +
       `Keep all existing behavior — just reorganize the code.\n` +
       `Add a // [SCOPE] comment at the top of each new file explaining what it does.\n` +
-      `Reference .chassis/rules.md for annotation standards.\n` +
+      `Reference .redivivus/rules.md for annotation standards.\n` +
       `After splitting, make sure the project still compiles with: npm run compile`;
     allPrompts.push(prompt);
     return `<div class="item-row">` +
@@ -84,7 +84,7 @@ export function buildTodosSection(result: AnalysisResult, projectName: string): 
       const prompt =
         `Look at ${file} line ${lineNum}.\n` +
         `There's a marker that says: "${todoText}"\n` +
-        `Implement this following the project rules in .chassis/rules.md.\n` +
+        `Implement this following the project rules in .redivivus/rules.md.\n` +
         `Project: ${projectName}\nAfter making changes, verify the project still compiles.`;
       allPrompts.push(prompt);
       return `<div class="todo-line-row"><span class="todo-line">${esc(l)}</span>${fixBtn(prompt, 'Fix This', file, 'todo')}</div>`;
@@ -111,7 +111,7 @@ export function buildUncommentedSection(result: AnalysisResult, projectName: str
       `Add a // [SCOPE] comment at the very top of ${f.relativePath} explaining what this file does, ` +
       `what it connects to, and why it exists.\n` +
       `Also add // [WARN] to any fragile or unclear sections.\n` +
-      `Reference .chassis/rules.md for the annotation format.\n` +
+      `Reference .redivivus/rules.md for the annotation format.\n` +
       `Project: ${projectName}\nDo not change any existing code — comments only.`;
     allPrompts.push(prompt);
     return `<div class="item-row">` +
@@ -135,27 +135,27 @@ export function buildNextStepsSection(result: AnalysisResult, projectName: strin
   if (result.largeFiles.length > 0) {
     steps.push({
       text: `Split the ${result.largeFiles.length} large file${result.largeFiles.length > 1 ? 's' : ''} listed above — aim for one responsibility per file, under 200 lines each.`,
-      prompt: `List every file in ${projectName} that is over 200 lines. For each one, suggest how to split it by responsibility into smaller files under 200 lines each. Reference .chassis/rules.md for annotation standards.`,
+      prompt: `List every file in ${projectName} that is over 200 lines. For each one, suggest how to split it by responsibility into smaller files under 200 lines each. Reference .redivivus/rules.md for annotation standards.`,
       label: 'Do This'
     });
   }
   if (result.todoItems.length > 0) {
     steps.push({
       text: `Address the ${result.todoItems.length} remaining marker items listed above.`,
-      prompt: `In ${projectName}, there are ${result.todoItems.length} items marked as incomplete. Start with the highest-risk ones. Reference .chassis/rules.md for standards. After each fix, verify the project still compiles.`,
+      prompt: `In ${projectName}, there are ${result.todoItems.length} items marked as incomplete. Start with the highest-risk ones. Reference .redivivus/rules.md for standards. After each fix, verify the project still compiles.`,
       label: 'Do This'
     });
   }
   if (result.uncommentedFiles.length > 0) {
     steps.push({
       text: `Add a // [SCOPE] comment to the ${result.uncommentedFiles.length} uncommented files.`,
-      prompt: `Add a // [SCOPE] comment at the top of each of the following files in ${projectName}, describing what each one does. Do not change any code. Reference .chassis/rules.md.\nFiles:\n${result.uncommentedFiles.slice(0, 20).map(f => '- ' + f.relativePath).join('\n')}`,
+      prompt: `Add a // [SCOPE] comment at the top of each of the following files in ${projectName}, describing what each one does. Do not change any code. Reference .redivivus/rules.md.\nFiles:\n${result.uncommentedFiles.slice(0, 20).map(f => '- ' + f.relativePath).join('\n')}`,
       label: 'Do This'
     });
   }
   steps.push({
-    text: 'Run <strong>Retrofit Project</strong> to have CHASSIS annotate all pending files automatically using AI.',
-    prompt: `Run CHASSIS Retrofit on ${projectName} to add [SCOPE], [TODO], [WARN], and [NEXT] annotations to all unannotated files. Follow the rules in .chassis/rules.md.`,
+    text: 'Run <strong>Retrofit Project</strong> to have Redivivus annotate all pending files automatically using AI.',
+    prompt: `Run Redivivus Retrofit on ${projectName} to add [SCOPE], [TODO], [WARN], and [NEXT] annotations to all unannotated files. Follow the rules in .redivivus/rules.md.`,
     label: 'Do This'
   });
   return `

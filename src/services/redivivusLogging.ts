@@ -1,17 +1,17 @@
-// [SCOPE] CHASSIS logging operations — gitignore update, work log append, roadmap append, dead end append
-// Called by chassisInit and chassisService. No config, rules, or path logic here.
+// [SCOPE] Redivivus logging operations — gitignore update, work log append, roadmap append, dead end append
+// Called by redivivusInit and redivivusService. No config, rules, or path logic here.
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisPaths } from './project/chassisPaths.js';
+import type { RedivivusPaths } from './project/redivivusPaths.js';
 
 export async function updateGitignore(root: string): Promise<void> {
   const gitignorePath = path.join(root, '.gitignore');
-  const entry = '\n# CHASSIS session data (blueprints and logs are tracked)\n.chassis/sessions/\n';
+  const entry = '\n# Redivivus session data (blueprints and logs are tracked)\n.redivivus/sessions/\n';
 
   if (fs.existsSync(gitignorePath)) {
     const content = fs.readFileSync(gitignorePath, 'utf-8');
-    if (!content.includes('.chassis/sessions/')) {
+    if (!content.includes('.redivivus/sessions/')) {
       fs.appendFileSync(gitignorePath, entry);
     }
   } else {
@@ -19,14 +19,14 @@ export async function updateGitignore(root: string): Promise<void> {
   }
 }
 
-export function appendWorkLog(paths: ChassisPaths, text: string): void {
+export function appendWorkLog(paths: RedivivusPaths, text: string): void {
   if (!fs.existsSync(paths.worklogPath)) { return; }
   const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
   const entry = `## [${timestamp}]\n${text}\n\n`;
   fs.appendFileSync(paths.worklogPath, entry);
 }
 
-export function appendRoadmap(paths: ChassisPaths, sessionGoal: string, completed: string[], inProgress: string[], nextStart: string): void {
+export function appendRoadmap(paths: RedivivusPaths, sessionGoal: string, completed: string[], inProgress: string[], nextStart: string): void {
   const roadmap = paths.roadmapPath;
   if (!fs.existsSync(roadmap)) { return; }
   const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
@@ -54,7 +54,7 @@ export function appendRoadmap(paths: ChassisPaths, sessionGoal: string, complete
   fs.writeFileSync(roadmap, content);
 }
 
-export function appendDeadEnd(paths: ChassisPaths, attempted: string, failedBecause: string, lesson: string): void {
+export function appendDeadEnd(paths: RedivivusPaths, attempted: string, failedBecause: string, lesson: string): void {
   if (!fs.existsSync(paths.deadendsPath)) { return; }
   const timestamp = new Date().toISOString().replace('T', ' ').split('.')[0];
   const entry = `## [${timestamp}] — Dead End\n- **Attempted:** ${attempted}\n- **Failed because:** ${failedBecause}\n- **Lesson:** ${lesson}\n\n`;

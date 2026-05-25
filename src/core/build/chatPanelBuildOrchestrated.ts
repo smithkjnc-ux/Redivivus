@@ -138,7 +138,7 @@ export async function runOrchestratedPhaseBuild(
     });
     deps.refresh();
 
-    const result = await executeStep(step, phaseTask, assembledCode, callAI);
+    const result = await executeStep(step, phaseTask, assembledCode, callAI, planSteps);
     assembledCode = result.code || assembledCode;
     totalTokens += result.tokens;
   }

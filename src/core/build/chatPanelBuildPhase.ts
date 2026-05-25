@@ -19,7 +19,7 @@ export function createBuildContext(task: string, deps: OrchestratorDeps): BuildC
     task, root,
     blueprintContext: deps.blueprintContext,
     vault: deps.vault,
-    chassis: deps.chassis,
+    redivivus: deps.redivivus,
     routing: deps.routing,
     conversation: deps.conversation,
     refresh: deps.refresh,

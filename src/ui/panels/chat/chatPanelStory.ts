@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Chat Panel Story Mode — extract narrator lines from AI code, build result cards
+// [SCOPE] Redivivus Chat Panel Story Mode — extract narrator lines from AI code, build result cards
 
 /** Extract the first NARRATOR: line from generated code (any comment style).
  *  Supports: // NARRATOR: (JS/TS)  # NARRATOR: (Python/Ruby/bash)  -- NARRATOR: (SQL/Lua)
@@ -75,15 +75,15 @@ export function buildResultCard(
 
   const feedbackToken = feedbackId ? `\n__BUILD_FEEDBACK__${feedbackId}|||END_FEEDBACK__` : '';
   
-  // [CHASSIS] Determine if we should show the Open Workspace button
+  // [Redivivus] Determine if we should show the Open Workspace button
   const openWorkspaceToken = (() => {
     try {
       const vscode = require('vscode');
       const currentRoots = (vscode.workspace.workspaceFolders || []).map((f: any) => f.uri.fsPath);
-      // [FIX] Use projectRoot if provided (actual build output dir) — getChassisRoot() returns stale activation root
+      // [FIX] Use projectRoot if provided (actual build output dir) — getRedivivusRoot() returns stale activation root
       const root = projectRoot || (() => {
         const CP = require('./chatPanel.js').ChatPanel;
-        return (CP && CP.currentPanel && typeof CP.currentPanel.getChassisRoot === 'function') ? CP.currentPanel.getChassisRoot() : undefined;
+        return (CP && CP.currentPanel && typeof CP.currentPanel.getRedivivusRoot === 'function') ? CP.currentPanel.getRedivivusRoot() : undefined;
       })();
       if (root && !currentRoots.includes(root)) {
         return `\n__OPEN_WORKSPACE__${root}|||END_OPEN__`;
@@ -95,7 +95,7 @@ export function buildResultCard(
   // Show "Edit Visually" button when built files include HTML or CSS
   const editVisuallyToken = (() => {
     const hasVisual = files.some(f => /\.(html|css)$/i.test(f));
-    const root = projectRoot || (() => { try { const CP = require('./chatPanel.js').ChatPanel; return CP?.currentPanel?.getChassisRoot?.() || ''; } catch { return ''; } })();
+    const root = projectRoot || (() => { try { const CP = require('./chatPanel.js').ChatPanel; return CP?.currentPanel?.getRedivivusRoot?.() || ''; } catch { return ''; } })();
     return (hasVisual && root) ? `\n__EDIT_VISUALLY__${root}|||END_EDIT_VISUALLY__` : '';
   })();
 

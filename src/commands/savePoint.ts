@@ -5,15 +5,15 @@ import * as vscode from 'vscode';
 import { showBuildHistoryPanel } from '../ui/views/buildHistoryPanel.js';
 
 export function registerSavePointCommand(context: vscode.ExtensionContext) {
-  // chassis.savePoint — toolbar button; opens the panel
+  // redivivus.savePoint — toolbar button; opens the panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.savePoint', () => {
+    vscode.commands.registerCommand('redivivus.savePoint', () => {
       showBuildHistoryPanel(context);
     })
   );
-  // chassis.showBuildHistory — alias, same panel
+  // redivivus.showBuildHistory — alias, same panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.showBuildHistory', () => {
+    vscode.commands.registerCommand('redivivus.showBuildHistory', () => {
       showBuildHistoryPanel(context);
     })
   );

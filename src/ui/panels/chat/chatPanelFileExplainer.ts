@@ -1,17 +1,17 @@
 // [SCOPE] File explainer — explains project files in plain English for non-tech users.
-// Groups files by purpose: Your Code, CHASSIS Tools, Editor Rules, Version Control.
+// Groups files by purpose: Your Code, Redivivus Tools, Editor Rules, Version Control.
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-const CHASSIS_FILES: Record<string, string> = {
-  '.chassis': 'CHASSIS private workspace — tracks your project history, saves progress, stores your blueprint. You never need to edit anything here.',
+const Redivivus_FILES: Record<string, string> = {
+  '.redivivus': 'Redivivus private workspace — tracks your project history, saves progress, stores your blueprint. You never need to edit anything here.',
   'blueprint.md': 'Your project blueprint — answers to the 5 W\'s that keep the AI on task.',
   'build_history.json': 'A log of every file the AI has built or changed. Powers the Undo Build button.',
-  'config.json': 'CHASSIS settings for this project — blueprint data, scan results, session info.',
+  'config.json': 'Redivivus settings for this project — blueprint data, scan results, session info.',
   'debug.log': 'Error logs. Only useful when something goes wrong.',
-  'learned.md': 'Things CHASSIS learned about your preferences — colors, patterns, code style.',
-  'project_map.md': 'A map of your codebase. CHASSIS updates this when it scans your project.',
+  'learned.md': 'Things Redivivus learned about your preferences — colors, patterns, code style.',
+  'project_map.md': 'A map of your codebase. Redivivus updates this when it scans your project.',
   'recommendations.md': 'The AI\'s list of suggested improvements from the last scan.',
   'rules.md': 'Rules the AI must follow in this project. You can add your own here.',
   'fix-snapshots': 'Backup copies of files before the AI edits them. Used for Undo.',
@@ -49,13 +49,13 @@ export async function explainProjectFiles(root: string): Promise<string> {
   try { entries = fs.readdirSync(root); } catch { return 'Could not read project folder.'; }
 
   const yourCode: string[] = [];
-  const chassisTools: string[] = [];
+  const redivivusTools: string[] = [];
   const editorRules: string[] = [];
   const versionControl: string[] = [];
 
   for (const entry of entries) {
     const lower = entry.toLowerCase();
-    if (CHASSIS_FILES[entry]) { chassisTools.push(`- **\`${entry}\`** — ${CHASSIS_FILES[entry]}`); continue; }
+    if (Redivivus_FILES[entry]) { redivivusTools.push(`- **\`${entry}\`** — ${Redivivus_FILES[entry]}`); continue; }
     if (EDITOR_RULES[entry]) { editorRules.push(`- **\`${entry}\`** — ${EDITOR_RULES[entry]}`); continue; }
     if (GIT_FILES[entry]) { versionControl.push(`- **\`${entry}\`** — ${GIT_FILES[entry]}`); continue; }
     if (entry === 'node_modules') { versionControl.push(`- **\`node_modules/\`** — Auto-downloaded code packages. Never edit these. Safe to ignore.`); continue; }
@@ -75,9 +75,9 @@ export async function explainProjectFiles(root: string): Promise<string> {
     sections.push(...yourCode);
     sections.push('');
   }
-  if (chassisTools.length) {
-    sections.push('**CHASSIS tools** (AI assistant workspace — you can ignore these):');
-    sections.push(...chassisTools);
+  if (redivivusTools.length) {
+    sections.push('**Redivivus tools** (AI assistant workspace — you can ignore these):');
+    sections.push(...redivivusTools);
     sections.push('');
   }
   if (editorRules.length) {

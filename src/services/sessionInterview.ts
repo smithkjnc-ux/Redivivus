@@ -7,7 +7,7 @@ import type { ExitInterview } from '../types/index.js';
 export async function runExitInterview(): Promise<ExitInterview | null> {
   // [WARN] User interaction point, can be canceled.
   const completed = await vscode.window.showInputBox({
-    title: 'CHASSIS Exit Interview (1/4)',
+    title: 'Redivivus Exit Interview (1/4)',
     prompt: 'What was completed this session?',
     placeHolder: 'e.g., WebSocket bridge connected, mouth sync working',
     ignoreFocusOut: true,
@@ -16,7 +16,7 @@ export async function runExitInterview(): Promise<ExitInterview | null> {
 
   // [WARN] User interaction point, can be canceled.
   const inProgress = await vscode.window.showInputBox({
-    title: 'CHASSIS Exit Interview (2/4)',
+    title: 'Redivivus Exit Interview (2/4)',
     prompt: 'What\'s still in progress?',
     placeHolder: 'e.g., Eye calibration not finalized, chat API not wired',
     ignoreFocusOut: true,
@@ -25,7 +25,7 @@ export async function runExitInterview(): Promise<ExitInterview | null> {
 
   // [WARN] User interaction point, can be canceled.
   const risks = await vscode.window.showInputBox({
-    title: 'CHASSIS Exit Interview (3/4)',
+    title: 'Redivivus Exit Interview (3/4)',
     prompt: 'Any new risks or concerns?',
     placeHolder: 'e.g., Edge TTS rate limited, model file too large',
     ignoreFocusOut: true,
@@ -34,7 +34,7 @@ export async function runExitInterview(): Promise<ExitInterview | null> {
 
   // [WARN] User interaction point, can be canceled.
   const nextStart = await vscode.window.showInputBox({
-    title: 'CHASSIS Exit Interview (4/4)',
+    title: 'Redivivus Exit Interview (4/4)',
     prompt: 'What should the next session start with?',
     placeHolder: 'e.g., Calibrate eye positions, then wire dashboard',
     ignoreFocusOut: true,

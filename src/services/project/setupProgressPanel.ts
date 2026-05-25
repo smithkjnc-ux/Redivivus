@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Setup Progress Panel — webview panel showing 10-step setup checklist
+// [SCOPE] Redivivus Setup Progress Panel — webview panel showing 10-step setup checklist
 // HTML builder -> setupProgressPanelHtml.ts
 
 import * as vscode from 'vscode';
@@ -21,8 +21,8 @@ export async function refreshSetupProgressIfOpen(): Promise<void> {
 
 export function showSetupProgressPanel(progress: SetupProgress, onRefresh?: () => Promise<SetupProgress>): void {
   const panel = vscode.window.createWebviewPanel(
-    'chassisSetupProgress',
-    'CHASSIS Setup Progress',
+    'redivivusSetupProgress',
+    'Redivivus Setup Progress',
     vscode.ViewColumn.Beside,
     { enableScripts: true, retainContextWhenHidden: true }
   );
@@ -51,7 +51,7 @@ export function showSetupProgressPanel(progress: SetupProgress, onRefresh?: () =
 function persistManualStepDone(stepId: number): void {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { return; }
-  const cfgPath = path.join(root, '.chassis', 'config.json');
+  const cfgPath = path.join(root, '.redivivus', 'config.json');
   try {
     const cfg = fs.existsSync(cfgPath) ? JSON.parse(fs.readFileSync(cfgPath, 'utf-8')) : {};
     cfg.manualCompletedSteps = Array.from(new Set([...(cfg.manualCompletedSteps || []), stepId]));
@@ -64,23 +64,23 @@ async function handleAction(actionId: number, panel: vscode.WebviewPanel): Promi
     panel.webview.postMessage({ type: 'actionStarted', actionId });
 
     switch (actionId) {
-      case 1: await vscode.commands.executeCommand('chassis.wizardRetrofit'); break;
-      case 2: await vscode.commands.executeCommand('chassis.blueprint'); break;
+      case 1: await vscode.commands.executeCommand('redivivus.wizardRetrofit'); break;
+      case 2: await vscode.commands.executeCommand('redivivus.blueprint'); break;
       case 3:
-        await vscode.commands.executeCommand('chassis.lockBlueprint');
+        await vscode.commands.executeCommand('redivivus.lockBlueprint');
         setTimeout(() => panel.webview.postMessage({ type: 'refreshProgress' }), 600);
         break;
       case 4:
         try {
-          await vscode.commands.executeCommand('chassis.generateRules');
+          await vscode.commands.executeCommand('redivivus.generateRules');
         } catch (e) {
           const { RulesService } = require('../rulesService.js');
-          const { ChassisService } = require('../chassisService.js');
-          const chassisService = new ChassisService();
-          const rulesService = new RulesService(chassisService);
+          const { RedivivusService } = require('../redivivusService.js');
+          const redivivusService = new RedivivusService();
+          const rulesService = new RulesService(redivivusService);
           const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
           if (root) {
-            const config = chassisService.loadConfig();
+            const config = redivivusService.loadConfig();
             rulesService.generateAll(root, config?.projectName || 'Project');
           }
         }
@@ -89,11 +89,11 @@ async function handleAction(actionId: number, panel: vscode.WebviewPanel): Promi
       case 6:
       case 7:
       case 8:
-        await vscode.commands.executeCommand(actionId === 6 ? 'chassis.splitFiles' : 'chassis.analyze');
+        await vscode.commands.executeCommand(actionId === 6 ? 'redivivus.splitFiles' : 'redivivus.analyze');
         setTimeout(() => panel.webview.postMessage({ type: 'refreshProgress' }), 2000);
         break;
-      case 9: await vscode.commands.executeCommand('chassis.startSession'); break;
-      case 10: await vscode.commands.executeCommand('chassis.savePoint'); break;
+      case 9: await vscode.commands.executeCommand('redivivus.startSession'); break;
+      case 10: await vscode.commands.executeCommand('redivivus.savePoint'); break;
     }
 
     panel.webview.postMessage({ type: 'actionComplete', actionId });

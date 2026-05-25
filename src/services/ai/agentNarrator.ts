@@ -37,7 +37,7 @@ export function narrateTool(toolName: string, args: Record<string, any>, iterati
       const isNew = !content.includes('// [DONE]');
       const verb = isNew ? 'Creating' : 'Updating';
       const ext = fp.split('.').pop()?.toLowerCase() || '';
-      // [CHASSIS] Show actual code in the chat — truncate at 30 lines for readability
+      // [Redivivus] Show actual code in the chat — truncate at 30 lines for readability
       const previewLines = content.split('\n').slice(0, 30);
       const truncated = lineCount > 30 ? `\n... (${lineCount - 30} more lines)` : '';
       const codeBlock = '```' + ext + '\n' + previewLines.join('\n') + truncated + '\n```';

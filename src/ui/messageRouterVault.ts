@@ -75,7 +75,7 @@ export async function handleVaultMessage(
       refresh();
       return true;
     case 'vaultSaveFromProject':
-      await vscode.commands.executeCommand('chassis.saveToVault');
+      await vscode.commands.executeCommand('redivivus.saveToVault');
       refresh();
       return true;
     default:

@@ -3,7 +3,7 @@
 // [WARN] All handler modules share the same state object — mutations must be coordinated.
 
 import type * as vscode from 'vscode';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { SessionService } from '../services/sessionService.js';
 import type { VaultService } from '../services/vault/vaultService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
@@ -22,7 +22,7 @@ import { handleMapMessage } from './messageRouterMap.js';
 
 export function attachMessageRouter(
   webview: vscode.Webview,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   sessions: SessionService,
   vaultService: VaultService,
   context: vscode.ExtensionContext | undefined,
@@ -37,9 +37,9 @@ export function attachMessageRouter(
 
     const postToWebview = (m: any) => webview.postMessage(m);
     const handled =
-      await handleCoreMessage(msg, chassis, state, refresh, postToWebview) ||
+      await handleCoreMessage(msg, redivivus, state, refresh, postToWebview) ||
       await handleSessionMessage(msg, sessions, refresh) ||
-      await handleWizardMessage(msg, chassis, state, context, refresh) ||
+      await handleWizardMessage(msg, redivivus, state, context, refresh) ||
       await handleVaultMessage(msg, vaultService, state, refresh) ||
       await handleVaultScanMessage(msg, vaultService, routingService, state, refresh) ||
       await handleVaultRecategorizeMessage(msg, vaultService, routingService, state, refresh) ||

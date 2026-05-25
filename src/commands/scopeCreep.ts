@@ -1,18 +1,18 @@
-// [SCOPE] CHASSIS Scope Creep Detection Command — warn when project drifts from blueprint
+// [SCOPE] Redivivus Scope Creep Detection Command — warn when project drifts from blueprint
 
 import * as vscode from 'vscode';
 import { ScopeCreepDetectionService } from '../services/code/scopeCreepDetection.js';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerScopeCreepCommand(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routing: RoutingService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.detectScopeCreep', async () => {
+    vscode.commands.registerCommand('redivivus.detectScopeCreep', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
         vscode.window.showErrorMessage('No workspace open.');
@@ -31,7 +31,7 @@ export function registerScopeCreepCommand(
         });
         (panel as any).refresh();
 
-        const service = new ScopeCreepDetectionService(root, chassis, routing);
+        const service = new ScopeCreepDetectionService(root, redivivus, routing);
         const issues = await service.detectScopeCreep();
         const markdown = service.formatMarkdown(issues);
 

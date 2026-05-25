@@ -1,5 +1,5 @@
-// [SCOPE] CHASSIS Unified Logger — tracks ALL AI operations, file changes, and system events
-// Logs are written to .chassis/logs/ with session-based files and daily rotation
+// [SCOPE] Redivivus Unified Logger — tracks ALL AI operations, file changes, and system events
+// Logs are written to .redivivus/logs/ with session-based files and daily rotation
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -25,18 +25,18 @@ let logBuffer: string[] = [];
 let flushTimer: NodeJS.Timeout | null = null;
 let projectRoot: string | null = null;
 
-/** Initialize logging for a CHASSIS session */
-export function initChassisLogger(root: string): string {
+/** Initialize logging for a Redivivus session */
+export function initRedivivusLogger(root: string): string {
   projectRoot = root;
   currentSessionId = generateSessionId();
   
-  const logsDir = path.join(root, '.chassis', 'logs');
+  const logsDir = path.join(root, '.redivivus', 'logs');
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
   
   const dateStr = new Date().toISOString().split('T')[0];
-  currentLogFile = path.join(logsDir, `chassis-session-${dateStr}-${currentSessionId}.log`);
+  currentLogFile = path.join(logsDir, `redivivus-session-${dateStr}-${currentSessionId}.log`);
   
   // Write header
   const header = {
@@ -44,22 +44,22 @@ export function initChassisLogger(root: string): string {
     sessionId: currentSessionId,
     timestamp: new Date().toISOString(),
     project: root,
-    chassisVersion: '0.3.6'
+    redivivusVersion: '0.3.6'
   };
   
   fs.writeFileSync(currentLogFile, JSON.stringify(header) + '\n', 'utf-8');
   
-  // Don't call chassisLog here - it would be a circular call during init
-  console.log('[CHASSIS] Logging initialized:', currentLogFile);
+  // Don't call redivivusLog here - it would be a circular call during init
+  console.log('[Redivivus] Logging initialized:', currentLogFile);
   
   return currentSessionId;
 }
 
-/** Main logging function - use this for all CHASSIS operations */
-export function chassisLog(entry: Omit<LogEntry, 'timestamp' | 'sessionId'>): void {
+/** Main logging function - use this for all Redivivus operations */
+export function redivivusLog(entry: Omit<LogEntry, 'timestamp' | 'sessionId'>): void {
   if (!currentSessionId || !currentLogFile) {
     // Fallback: try to log to console if file logging not initialized
-    console.log('[CHASSIS LOG]', entry);
+    console.log('[Redivivus LOG]', entry);
     return;
   }
   
@@ -73,21 +73,21 @@ export function chassisLog(entry: Omit<LogEntry, 'timestamp' | 'sessionId'>): vo
   
   // Flush immediately for errors, otherwise batch
   if (entry.error || entry.success === false || entry.operation === 'system') {
-    flushChassisLog();
+    flushRedivivusLog();
   } else if (!flushTimer) {
-    flushTimer = setTimeout(flushChassisLog, 50);
+    flushTimer = setTimeout(flushRedivivusLog, 50);
   }
 }
 
 /** Flush buffered logs to disk */
-function flushChassisLog(): void {
+function flushRedivivusLog(): void {
   if (!currentLogFile || logBuffer.length === 0) {return;}
   
   try {
     fs.appendFileSync(currentLogFile, logBuffer.map(l => l + '\n').join(''), 'utf-8');
     logBuffer = [];
   } catch (e) {
-    console.error('[CHASSIS] Failed to write log:', e);
+    console.error('[Redivivus] Failed to write log:', e);
   }
   
   if (flushTimer) {
@@ -106,7 +106,7 @@ export function logAIInteraction(
   responsePreview: string,
   data?: Record<string, unknown>
 ): void {
-  chassisLog({
+  redivivusLog({
     operation,
     aiRole: role,
     aiModel: model,
@@ -129,7 +129,7 @@ export function logFileChange(
   aiRole?: string,
   data?: Record<string, unknown>
 ): void {
-  chassisLog({
+  redivivusLog({
     operation: 'edit',
     aiRole: aiRole as LogEntry['aiRole'],
     message: `File ${operation}: ${path.basename(filePath)}`,
@@ -139,14 +139,14 @@ export function logFileChange(
 }
 
 /** Finalize the current logging session */
-export function finalizeChassisLogger(success: boolean = true): void {
-  chassisLog({
+export function finalizeRedivivusLogger(success: boolean = true): void {
+  redivivusLog({
     operation: 'system',
-    message: success ? 'CHASSIS session completed successfully' : 'CHASSIS session ended with errors',
+    message: success ? 'Redivivus session completed successfully' : 'Redivivus session ended with errors',
     success
   });
   
-  flushChassisLog();
+  flushRedivivusLog();
   
   // Write footer
   if (currentLogFile) {
@@ -177,4 +177,4 @@ function generateSessionId(): string {
   return `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
-export { listChassisLogs, readLogFile, logBuildOperation, logFixOperation, logAnalysisOperation, logChatOperation } from './chassisLoggerOps.js';
+export { listRedivivusLogs, readLogFile, logBuildOperation, logFixOperation, logAnalysisOperation, logChatOperation } from './redivivusLoggerOps.js';

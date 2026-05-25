@@ -12,7 +12,7 @@ export function registerVaultBrowseCommand(
   vaultService: VaultService
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openVault', (scrollToItem?: string) => {
+    vscode.commands.registerCommand('redivivus.openVault', (scrollToItem?: string) => {
       if (_vaultPanel) {
         _vaultPanel.reveal(vscode.ViewColumn.One);
         _vaultPanel.webview.html = buildVaultHtml(vaultService, scrollToItem);
@@ -20,7 +20,7 @@ export function registerVaultBrowseCommand(
       }
 
       _vaultPanel = vscode.window.createWebviewPanel(
-        'chassisVault', '💾 Vault Browser',
+        'redivivusVault', '💾 Vault Browser',
         vscode.ViewColumn.One,
         { enableScripts: true, retainContextWhenHidden: true }
       );

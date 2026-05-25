@@ -12,6 +12,7 @@ import { buildExpandedInterviewScript } from './chatPanelScriptExpandedInterview
 import { buildImageScript } from './chatPanelScriptImage';
 import { buildListenerScript } from './chatPanelScriptListener';
 import { buildPreviewScript } from './chatPanelPreviewScript';
+import { buildVEScript } from './chatPanelVisualEditorScript';
 
 export function buildChatScript(): string {
   return `
@@ -23,13 +24,13 @@ export function buildChatScript(): string {
     input.focus();
     function autoGrow() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px'; }
     input.addEventListener('input', autoGrow);
-    // [CHASSIS] Build mode: 'plan' | 'direct' | undefined. Set by user via toggle or popover.
+    // [Redivivus] Build mode: 'plan' | 'direct' | undefined. Set by user via toggle or popover.
     window._buildMode = window._buildMode || undefined;
     var _pendingSendText = null;
     function setInputBusy(busy) {
       if (busy) {
         input.disabled = true; input.style.opacity = '0.5';
-        if (sendBtn) { sendBtn.disabled = true; sendBtn.style.opacity = '0.4'; sendBtn.style.cursor = 'not-allowed'; sendBtn.dataset.icon = sendBtn.innerHTML; sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: chassisSpin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>'; }
+        if (sendBtn) { sendBtn.disabled = true; sendBtn.style.opacity = '0.4'; sendBtn.style.cursor = 'not-allowed'; sendBtn.dataset.icon = sendBtn.innerHTML; sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: redivivusSpin 1s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>'; }
       } else {
         input.disabled = false; input.style.opacity = '1'; input.focus();
         if (sendBtn) { sendBtn.disabled = false; sendBtn.style.opacity = '1'; sendBtn.style.cursor = 'pointer'; sendBtn.innerHTML = sendBtn.dataset.icon || '&#9654;'; }
@@ -52,7 +53,7 @@ export function buildChatScript(): string {
       const existing = document.getElementById('mode-popover'); if (existing) existing.remove();
       const wrap = document.createElement('div'); wrap.id = 'mode-popover'; wrap.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--vscode-editor-background);color:var(--vscode-foreground);border:1px solid var(--vscode-focusBorder);border-radius:8px;padding:16px 20px;box-shadow:0 8px 32px rgba(0,0,0,0.35);z-index:9999;font-family:sans-serif;min-width:280px;text-align:center;';
       const title = document.createElement('div'); title.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:12px;'; title.textContent = 'Choose your build approach'; wrap.appendChild(title);
-      const sub = document.createElement('div'); sub.style.cssText = 'font-size:12px;color:var(--vscode-descriptionForeground);margin-bottom:16px;'; sub.textContent = 'CHASSIS needs to know how you want to work.'; wrap.appendChild(sub);
+      const sub = document.createElement('div'); sub.style.cssText = 'font-size:12px;color:var(--vscode-descriptionForeground);margin-bottom:16px;'; sub.textContent = 'Redivivus needs to know how you want to work.'; wrap.appendChild(sub);
       const btns = document.createElement('div'); btns.style.cssText = 'display:flex;gap:10px;justify-content:center;';
       const planBtn = document.createElement('button'); planBtn.textContent = '📋 Plan It Out'; planBtn.style.cssText = 'padding:8px 16px;border:1px solid var(--vscode-input-border);border-radius:6px;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);cursor:pointer;font-size:13px;font-weight:600;';
       planBtn.addEventListener('click', () => { wrap.remove(); window._buildMode = 'plan'; vscode.postMessage({ type: 'set-mode', mode: 'plan' }); if (_pendingSendText) { vscode.postMessage({ type: 'send-message', text: _pendingSendText, mode: 'plan' }); _pendingSendText = null; input.value = ''; input.style.height = 'auto'; } });
@@ -125,7 +126,7 @@ export function buildChatScript(): string {
       if (document.getElementById('getting-started')) return;
       const header = document.querySelector('.header');
       if (!header) return;
-      header.insertAdjacentHTML('afterend', '<div id="getting-started"><div class="gs-header"><span class="gs-title">Getting Started with CHASSIS</span><button class="gs-close" id="gs-close">x</button></div><div class="gs-content"><div class="gs-section"><h3>What is CHASSIS?</h3><p>CHASSIS is your AI coding organizer.</p></div><div class="gs-section"><h3>Quick Start</h3><ol><li><strong>New Project:</strong> Click New Project in the sidebar</li><li><strong>Blueprint:</strong> Answer questions to create your project blueprint</li></ol></div></div></div>');
+      header.insertAdjacentHTML('afterend', '<div id="getting-started"><div class="gs-header"><span class="gs-title">Getting Started with Redivivus</span><button class="gs-close" id="gs-close">x</button></div><div class="gs-content"><div class="gs-section"><h3>What is Redivivus?</h3><p>Redivivus is your AI coding organizer.</p></div><div class="gs-section"><h3>Quick Start</h3><ol><li><strong>New Project:</strong> Click New Project in the sidebar</li><li><strong>Blueprint:</strong> Answer questions to create your project blueprint</li></ol></div></div></div>');
       const gsClose = document.getElementById('gs-close');
       if (gsClose) gsClose.addEventListener('click', () => document.getElementById('getting-started')?.remove());
     }
@@ -150,13 +151,14 @@ export function buildChatScript(): string {
     var _phraseInterval = null;
     var _phrases = ['torquing bolts...','checking clearances...','aligning tolerances...','reading the blueprint...','pressure testing...','calibrating sensors...','welding joints...','inspecting welds...','routing wiring...','load testing frame...'];
     function startPhraseTicker() {
-      stopPhraseTicker(); const statusEl = document.getElementById('chassis-status'); if (!statusEl) return;
+      stopPhraseTicker(); const statusEl = document.getElementById('redivivus-status'); if (!statusEl) return;
       _phraseInterval = setInterval(() => {
         statusEl.textContent = ' ' + _phrases[Math.floor(Math.random()*_phrases.length)];
       }, 2800);
     }
     function stopPhraseTicker() { if(_phraseInterval){ clearInterval(_phraseInterval); _phraseInterval=null; } }
 
+    ${buildVEScript()}
     ${buildListenerScript()}
     ${buildPreviewScript()}
 

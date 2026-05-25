@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build Pipeline Runner — compiles/packages generated code into executables via VS Code terminal
+// [SCOPE] Redivivus Build Pipeline Runner — compiles/packages generated code into executables via VS Code terminal
 // Supports: Python (PyInstaller), Rust (cargo/rustc), Go, C (gcc), C++ (g++)
 // Entry points: maybeAutoCompile() called after each build, runSavedPipeline() for the action card button.
 
@@ -13,7 +13,7 @@ export interface CompilePipeline {
   outputPath: string;  // relative path to expected binary
 }
 
-// Module-level store — set after every compilable build so chassis.compileProject always has context
+// Module-level store — set after every compilable build so redivivus.compileProject always has context
 export let _lastCompileTarget: { root: string; relPath: string; pipeline: CompilePipeline } | undefined;
 
 /** [RULE 18] AI decides if the task wants a standalone compiled executable. */
@@ -72,16 +72,16 @@ export function getCompilePipeline(relPath: string, root: string): CompilePipeli
 
 /** Opens a visible VS Code terminal and runs the compile steps. User can watch progress. */
 export function runCompilePipeline(pipeline: CompilePipeline, root: string): void {
-  const term = vscode.window.createTerminal({ name: `CHASSIS: ${pipeline.label}`, cwd: root });
+  const term = vscode.window.createTerminal({ name: `Redivivus: ${pipeline.label}`, cwd: root });
   term.show();
   for (const step of pipeline.steps) { term.sendText(step); }
-  term.sendText(`echo "--- CHASSIS: Compile done. Binary: ${pipeline.outputPath} ---"`);
+  term.sendText(`echo "--- Redivivus: Compile done. Binary: ${pipeline.outputPath} ---"`);
 }
 
 /** Returns the "Package as Executable" action card button for compilable file types. Empty string otherwise. */
 export function appendCompileAction(relPath: string): string {
   return ['.py', '.rs', '.go', '.c', '.cpp'].includes(path.extname(relPath).toLowerCase())
-    ? `\n__ACTION_CARD__chassis.compileProject|||&#x1F4E6; Package as Executable|||END__`
+    ? `\n__ACTION_CARD__redivivus.compileProject|||&#x1F4E6; Package as Executable|||END__`
     : '';
 }
 

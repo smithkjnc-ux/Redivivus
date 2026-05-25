@@ -33,7 +33,7 @@ export async function awaitCostConfirmation(task: string, deps: BuildRequestDeps
   const supervisorModel = roster?.supervisor !== (deps.routing.getAvailableAI().ai || 'gemini') ? roster?.supervisor : undefined;
   const guardianModel = roster?.guardian || undefined;
   const estimate = estimateBuild(task, model, supervisorModel, guardianModel);
-  // [CHASSIS] Fast-path: single-phase micro tasks (1-step snippets) auto-approve — no need to gate.
+  // [Redivivus] Fast-path: single-phase micro tasks (1-step snippets) auto-approve — no need to gate.
   // Everything else shows the estimate slip so the user sees what will be built before we start.
   if (estimate.phases <= 1) { return true; }
   const buildId = `build-${Date.now()}`;

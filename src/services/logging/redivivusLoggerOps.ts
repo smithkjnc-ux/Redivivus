@@ -1,10 +1,10 @@
-// [SCOPE] CHASSIS Logger convenience wrappers and log reader — extracted from chassisLogger.ts (Rule 9 split)
-// All operation-specific log helpers + filesystem reader live here. Core init/flush stays in chassisLogger.ts.
+// [SCOPE] Redivivus Logger convenience wrappers and log reader — extracted from redivivusLogger.ts (Rule 9 split)
+// All operation-specific log helpers + filesystem reader live here. Core init/flush stays in redivivusLogger.ts.
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { LogEntry } from './chassisLogger.js';
-import { chassisLog } from './chassisLogger.js';
+import type { LogEntry } from './redivivusLogger.js';
+import { redivivusLog } from './redivivusLogger.js';
 
 /** Log build operation */
 export function logBuildOperation(
@@ -13,7 +13,7 @@ export function logBuildOperation(
   files?: string[],
   data?: Record<string, unknown>
 ): void {
-  chassisLog({ operation: 'build', phase, message, files, data });
+  redivivusLog({ operation: 'build', phase, message, files, data });
 }
 
 /** Log fix operation */
@@ -24,7 +24,7 @@ export function logFixOperation(
   aiRole?: LogEntry['aiRole'],
   data?: Record<string, unknown>
 ): void {
-  chassisLog({ operation: 'fix', phase, aiRole, aiModel, message, data });
+  redivivusLog({ operation: 'fix', phase, aiRole, aiModel, message, data });
 }
 
 /** Log analysis operation */
@@ -34,22 +34,22 @@ export function logAnalysisOperation(
   files?: string[],
   data?: Record<string, unknown>
 ): void {
-  chassisLog({ operation: 'analyze', phase, message, files, data });
+  redivivusLog({ operation: 'analyze', phase, message, files, data });
 }
 
 /** Log chat interaction */
 export function logChatOperation(message: string, data?: Record<string, unknown>): void {
-  chassisLog({ operation: 'chat', message, data });
+  redivivusLog({ operation: 'chat', message, data });
 }
 
-/** List all CHASSIS logs for a project */
-export function listChassisLogs(root: string): { date: string; sessionId: string; path: string; size: number }[] {
-  const logsDir = path.join(root, '.chassis', 'logs');
+/** List all Redivivus logs for a project */
+export function listRedivivusLogs(root: string): { date: string; sessionId: string; path: string; size: number }[] {
+  const logsDir = path.join(root, '.redivivus', 'logs');
   if (!fs.existsSync(logsDir)) { return []; }
   return fs.readdirSync(logsDir)
-    .filter(f => f.startsWith('chassis-session-') && f.endsWith('.log'))
+    .filter(f => f.startsWith('redivivus-session-') && f.endsWith('.log'))
     .map(f => {
-      const parts = f.replace('chassis-session-', '').replace('.log', '').split('-');
+      const parts = f.replace('redivivus-session-', '').replace('.log', '').split('-');
       const date = parts.slice(0, 3).join('-');
       const sessionId = parts.slice(3).join('-');
       const filePath = path.join(logsDir, f);

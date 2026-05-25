@@ -23,7 +23,7 @@ export async function executeAnalyzeFile(msg: any, ctx: MapMsgCtx): Promise<void
         : `Critically review \`${msg.nodeId}\` and suggest concrete improvements. Look for simpler architecture, missing error handling, performance issues. Be specific.`,
     };
     const displayLabels: Record<string, string> = { trace: 'Trace logic of', test: 'Test plan for', improve: 'Improve' };
-    await vscode.commands.executeCommand('chassis.mapContextChat', {
+    await vscode.commands.executeCommand('redivivus.mapContextChat', {
       nodeId: msg.nodeId, label: msg.label || node?.label || '',
       lines: msg.lines || node?.lines || 0, health: msg.health || node?.health || 'neutral',
       todos: msg.todos || node?.todos || 0,

@@ -1,22 +1,22 @@
-// [SCOPE] CHASSIS Restructure command — AI adds CHASSIS annotations to current file
+// [SCOPE] Redivivus Restructure command — AI adds Redivivus annotations to current file
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import type { MeasureTwiceService } from '../services/build/measureTwiceService.js';
 import type { ChangeTracker } from '../services/build/changeTracker.js';
 
 export function registerRestructureCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routingService: RoutingService,
   measureTwice: MeasureTwiceService,
   changeTracker: ChangeTracker,
   refreshAll: () => void
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.cleanUpFile', async (pickedPath?: string) => {
+    vscode.commands.registerCommand('redivivus.cleanUpFile', async (pickedPath?: string) => {
       let doc: vscode.TextDocument;
       let filePath: string;
       if (pickedPath) {
@@ -35,17 +35,17 @@ export function registerRestructureCommands(
       }
 
       // [WARN] Relies on external configuration or environment variable for critical API access.
-      const hasKey = !!(vscode.workspace.getConfiguration('chassis').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY);
+      const hasKey = !!(vscode.workspace.getConfiguration('redivivus').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY);
       if (!hasKey) {
         vscode.window.showInformationMessage(
-          'Clean Up File requires a Gemini API key. Set it in CHASSIS settings or the GEMINI_API_KEY env variable.',
+          'Clean Up File requires a Gemini API key. Set it in Redivivus settings or the GEMINI_API_KEY env variable.',
           'Open Settings'
         );
         return;
       }
 
       const lineCount = doc.getText().split('\n').length;
-      let msg = 'CHASSIS will read through ' + filePath + ' and add notes about what each section does, flag anything risky, and mark work that still needs doing.';
+      let msg = 'Redivivus will read through ' + filePath + ' and add notes about what each section does, flag anything risky, and mark work that still needs doing.';
       if (lineCount > 500) {
         msg += '\n\n⚠️ This file is ' + lineCount + ' lines — AI processing may take a while.';
       }
@@ -58,7 +58,7 @@ export function registerRestructureCommands(
 
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: 'CHASSIS: Restructuring ' + filePath,
+        title: 'Redivivus: Restructuring ' + filePath,
         cancellable: true,
       }, async (progress, token) => {
         progress.report({ message: 'Sending to AI...' });
@@ -68,19 +68,19 @@ export function registerRestructureCommands(
         // [WARN] This is the core AI API call. Its success is critical for the command to function, and its output directly modifies user code.
         const result = await routingService.analyzeFile(
           filePath, content,
-          'Add CHASSIS annotations to this file. Add [SCOPE] at top, convert TODOs, flag warnings.',
+          'Add Redivivus annotations to this file. Add [SCOPE] at top, convert TODOs, flag warnings.',
           token
         );
         progress.report({ message: 'Processing response...' });
 
         if (!result.success) {
-          vscode.window.showErrorMessage('CHASSIS routing error: ' + result.error);
+          vscode.window.showErrorMessage('Redivivus routing error: ' + result.error);
           return;
         }
 
         // show diff in a new tab
         const original = doc.uri;
-        const modified = vscode.Uri.parse('untitled:' + filePath + '.chassis-restructured');
+        const modified = vscode.Uri.parse('untitled:' + filePath + '.redivivus-restructured');
         const newDoc = await vscode.workspace.openTextDocument({ content: result.text, language: doc.languageId });
         await vscode.window.showTextDocument(newDoc, { preview: false });
 
@@ -121,7 +121,7 @@ export function registerRestructureCommands(
 
           const changeSummary = changeTracker.summarize(filePath, content, result.text, result.model, 'Restructure File');
           changeTracker.log(changeSummary);
-          vscode.window.showInformationMessage('CHASSIS: ' + changeTracker.formatNotification(changeSummary));
+          vscode.window.showInformationMessage('Redivivus: ' + changeTracker.formatNotification(changeSummary));
           refreshAll();
           const nextAction = await vscode.window.showInformationMessage(
           filePath + ' has been cleaned up and saved.\n\n' +
@@ -132,9 +132,9 @@ export function registerRestructureCommands(
           'Check the File', 'AI Review', 'Done'
         );
         if (nextAction === 'Check the File') {
-          await vscode.commands.executeCommand('chassis.analyzeFile');
+          await vscode.commands.executeCommand('redivivus.analyzeFile');
         } else if (nextAction === 'AI Review') {
-          await vscode.commands.executeCommand('chassis.reviewFile');
+          await vscode.commands.executeCommand('redivivus.reviewFile');
         }
         }
       });

@@ -7,13 +7,13 @@ import * as path from 'path';
 import type { ChatMessage } from './chatPanelHtml';
 import type { RoutingService } from '../../../services/ai/routingService';
 
-// [CHASSIS] Architect review text store — keyed by reviewId, used by action handlers
+// [Redivivus] Architect review text store — keyed by reviewId, used by action handlers
 export const _architectReviews = new Map<string, string>();
-// [CHASSIS] Fix-one-at-a-time state — keyed by reviewId
+// [Redivivus] Fix-one-at-a-time state — keyed by reviewId
 export const _architectFixState = new Map<string, { issues: string[]; index: number }>();
 
 export interface ArchitectAction { file: string; action: 'fix' | 'delete' | 'create'; label: string; description: string; }
-// [CHASSIS] Per-action buttons — populated by chatPanelMsgMapContext when AI returns ACTIONS_JSON
+// [Redivivus] Per-action buttons — populated by chatPanelMsgMapContext when AI returns ACTIONS_JSON
 export const _architectActions = new Map<string, ArchitectAction[]>();
 
 export async function handleArchitectPerAction(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
@@ -42,9 +42,9 @@ export async function handleArchitectActionConfirm(msg: any, conversation: ChatM
       conversation.push({ role: 'assistant', content: `❌ Delete failed: ${err instanceof Error ? err.message : String(err)}`, timestamp: Date.now() });
     }
   } else if (act.action === 'fix') {
-    await vscode.commands.executeCommand('chassis.runEditFix', act.description, act.file, 'refactor');
+    await vscode.commands.executeCommand('redivivus.runEditFix', act.description, act.file, 'refactor');
   } else {
-    await vscode.commands.executeCommand('chassis.postToChat', act.description);
+    await vscode.commands.executeCommand('redivivus.postToChat', act.description);
   }
   refresh();
 }
@@ -71,7 +71,7 @@ export function handleArchitectAddTodos(msg: any, conversation: ChatMessage[], r
   if (!reviewText) { return; }
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { conversation.push({ role: 'assistant', content: '⚠️ No project folder is open. Open a project first, then try again.', timestamp: Date.now() }); refresh(); return; }
-  const bpPath = path.join(root, '.chassis', 'blueprint.md');
+  const bpPath = path.join(root, '.redivivus', 'blueprint.md');
   const dateStr = new Date().toISOString().slice(0, 10);
   const lines = reviewText.split('\n').filter(l => l.trim().startsWith('-') || /^\d+\./.test(l.trim()) || /^\*\*/.test(l.trim()));
   const todoLines = lines.slice(0, 20).map(l => '- [ ] ' + l.replace(/^[-*]+\s*/, '').replace(/^\d+\.\s*/, '').replace(/^\*\*([^*]+)\*\*:?/, '$1:').trim());
@@ -80,10 +80,10 @@ export function handleArchitectAddTodos(msg: any, conversation: ChatMessage[], r
     if (fs.existsSync(bpPath)) {
       fs.appendFileSync(bpPath, section, 'utf8');
     } else {
-      fs.mkdirSync(path.join(root, '.chassis'), { recursive: true });
+      fs.mkdirSync(path.join(root, '.redivivus'), { recursive: true });
       fs.writeFileSync(bpPath, '# Blueprint\n' + section, 'utf8');
     }
-    conversation.push({ role: 'assistant', content: '✅ Added ' + todoLines.length + ' to-do items to your blueprint. Open `.chassis/blueprint.md` to see them.', timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: '✅ Added ' + todoLines.length + ' to-do items to your blueprint. Open `.redivivus/blueprint.md` to see them.', timestamp: Date.now() });
   } catch (err) {
     conversation.push({ role: 'assistant', content: '❌ Could not save to-do items — please try again.', timestamp: Date.now() });
   }
@@ -118,7 +118,7 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
     const f = existingFiles[i];
     const task = 'Fix issues identified in architect review for ' + f + ': address health problems, reduce complexity, and improve code quality.';
     try {
-      await vscode.commands.executeCommand('chassis.runEditFix', task, f, 'refactor');
+      await vscode.commands.executeCommand('redivivus.runEditFix', task, f, 'refactor');
       const progress = conversation[conversation.length - 1];
       if (progress && progress.content.startsWith('Fixing ')) { progress.content = 'Fixing ' + existingFiles.length + ' files: ' + (i + 1) + ' done...'; refresh(); }
     } catch { /* continue on individual failures */ }
@@ -160,7 +160,7 @@ export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[
   const currentFile = state.issues[state.index];
   if (msg.action === 'apply') {
     const task = 'Fix issues identified in architect review for ' + currentFile + ': address health problems, reduce complexity, and improve code quality.';
-    await vscode.commands.executeCommand('chassis.runEditFix', task, currentFile, 'refactor');
+    await vscode.commands.executeCommand('redivivus.runEditFix', task, currentFile, 'refactor');
   }
   const nextFile = state.issues[state.index];
   conversation.push({

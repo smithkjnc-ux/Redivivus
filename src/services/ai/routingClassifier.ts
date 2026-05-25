@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS AI Task Complexity Classifier — routes tasks to free vs paid AI based on complexity
+// [SCOPE] Redivivus AI Task Complexity Classifier — routes tasks to free vs paid AI based on complexity
 
 /** Classify a user task as 'simple' (free AI) or 'complex' (suggest paid AI).
  *  Simple: explain, describe, summarize, list, count, search, short Q&A

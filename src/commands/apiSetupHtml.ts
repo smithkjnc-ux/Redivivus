@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS API Setup — HTML template for the API key configuration webview panel
+// [SCOPE] Redivivus API Setup — HTML template for the API key configuration webview panel
 // Imported by ApiSetupPanel._getHtml() in apiSetup.ts.
 
 import * as vscode from 'vscode';
@@ -7,7 +7,7 @@ import { API_SETUP_CSS } from './apiSetupStyles.js';
 import { buildProviderCards } from './apiSetupHtmlCards.js';
 
 export function getApiSetupHtml(): string {
-  const config = vscode.workspace.getConfiguration('chassis');
+  const config = vscode.workspace.getConfiguration('redivivus');
   const geminiKey = config.get<string>('geminiApiKey') || '';
   const claudeKey  = config.get<string>('claudeApiKey') || '';
   const openaiKey  = config.get<string>('openaiApiKey') || '';
@@ -70,7 +70,7 @@ export function getApiSetupHtml(): string {
   <style>
     ${API_SETUP_CSS}
   </style></head><body>
-  <h1>&#x1F510; CHASSIS API Setup</h1>
+  <h1>&#x1F510; Redivivus API Setup</h1>
   <div class="subtitle">Configure your AI provider API keys -- you only need ONE to get started.</div>
   <div class="free-tip">&#x1F4A1; <strong>Free options:</strong> Gemini (Google) and Groq both have free tiers -- no credit card needed. Start with either one and add others later.</div>
   ${providerCards}
@@ -79,7 +79,7 @@ export function getApiSetupHtml(): string {
     <button id="vscode-settings-btn" class="secondary">&#x2699;&#xFE0F; Open VS Code Settings</button>
   </div>
   <div id="apply-feedback" class="apply-feedback">
-    &#x2705; <strong>Keys applied!</strong> CHASSIS will use your configured provider automatically.<br>
+    &#x2705; <strong>Keys applied!</strong> Redivivus will use your configured provider automatically.<br>
     <span id="apply-time" style="font-size:11px;opacity:0.7;"></span>
   </div>
   <div class="tip">
@@ -139,7 +139,7 @@ export function getApiSetupHtml(): string {
             setTimeout(() => { fb.classList.remove('show'); fb.style.borderLeft = '4px solid #4ec959'; }, 8000);
         } else {
             const fb = document.getElementById('apply-feedback');
-            fb.innerHTML = '&#x2705; <strong>Keys verified and applied!</strong> CHASSIS is ready to build.<br><span id="apply-time" style="font-size:11px;opacity:0.7;">' + 'Applied at ' + e.data.timestamp + '</span>';
+            fb.innerHTML = '&#x2705; <strong>Keys verified and applied!</strong> Redivivus is ready to build.<br><span id="apply-time" style="font-size:11px;opacity:0.7;">' + 'Applied at ' + e.data.timestamp + '</span>';
             fb.classList.add('show');
             setTimeout(() => fb.classList.remove('show'), 5000);
         }

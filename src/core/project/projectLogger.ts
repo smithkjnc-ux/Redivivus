@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS PROJECT Domain Logger
+// [SCOPE] Redivivus PROJECT Domain Logger
 import { masterLog } from '../../core/logging/masterLogger.js';
 
 const DOMAIN = 'PROJECT';

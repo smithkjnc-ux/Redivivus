@@ -1,4 +1,4 @@
-// [SCOPE] CSS styles for the CHASSIS Architecture Map webview panel
+// [SCOPE] CSS styles for the Redivivus Architecture Map webview panel
 /* [WARN] All selectors are scoped to this panel — no global leakage */
 
 export const MAP_STYLES = `

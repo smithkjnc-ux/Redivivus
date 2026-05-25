@@ -18,13 +18,13 @@ export async function handleBuildIntent(
   const { panel } = deps;
   if (!deps.buildMode) {
     if (!vscode.workspace.workspaceFolders?.length) { await deps.handleBuildRequest(routedText); return; }
-    if (deps.chassis?.isInitialized?.()) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
+    if (deps.redivivus?.isInitialized?.()) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
     panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
     return;
   }
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (root) {
-    const config = deps.chassis?.isInitialized?.() ? deps.chassis?.loadConfig?.() : null;
+    const config = deps.redivivus?.isInitialized?.() ? deps.redivivus?.loadConfig?.() : null;
     const gapResult = detectBlueprintGaps(config?.blueprint);
     if (gapResult.hasGaps) {
       _pendingGuidedBuilds.set(gapResult.sessionId, userText);
@@ -32,11 +32,11 @@ export async function handleBuildIntent(
       refresh(); return;
     }
   }
-  if (deps.buildMode === 'plan' && !deps.chassis?.isInitialized?.()) {
+  if (deps.buildMode === 'plan' && !deps.redivivus?.isInitialized?.()) {
     const wiz = await runTemplateWizard(userText, (m) => panel.webview.postMessage(m), deps.routing);
     if (wiz.handled && wiz.customizationPrompt) { await deps.handleBuildRequest(wiz.customizationPrompt); return; }
   }
-  await (deps.chassis?.isInitialized?.()
+  await (deps.redivivus?.isInitialized?.()
     ? handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType)
     : deps.handleBuildRequest(routedText));
 }

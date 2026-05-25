@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Test Utility - HTTP Interceptor Setup using Nock
+// [SCOPE] Redivivus Test Utility - HTTP Interceptor Setup using Nock
 import * as fs from 'fs';
 import * as path from 'path';
 import nock from 'nock';
@@ -25,7 +25,7 @@ export function setupNockMock(domain: string, endpoint: string, responseFixtureN
 
   const responseData = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
 
-  // Assuming Google Gemini endpoint format since CHASSIS uses Gemini
+  // Assuming Google Gemini endpoint format since Redivivus uses Gemini
   nock('https://generativelanguage.googleapis.com')
     .post(endpoint)
     .reply(200, responseData);

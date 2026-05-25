@@ -1,5 +1,5 @@
 #!/bin/bash
-# CHASSIS Self-Test v2.0 — Deep logic, wiring, and feature checks
+# Redivivus Self-Test v2.0 — Deep logic, wiring, and feature checks
 # Usage: bash scripts/self-test-v2.sh
 # Outputs Windsurf-ready error report at bottom
 
@@ -19,7 +19,7 @@ log_warn() {
 }
 
 echo "═══════════════════════════════════════════"
-echo "  CHASSIS Self-Test v2.0 (Deep Scan)"
+echo "  Redivivus Self-Test v2.0 (Deep Scan)"
 echo "═══════════════════════════════════════════"
 echo ""
 
@@ -34,7 +34,7 @@ while IFS= read -r cmd; do
   # Check if command handler exists anywhere in src/
   if ! grep -rq "registerCommand\|commands\.register.*['\"]${cmd}['\"]" src/ --include="*.ts" 2>/dev/null; then
     # Also check for shorthand registration
-    CMD_SHORT="${cmd#chassis.}"
+    CMD_SHORT="${cmd#redivivus.}"
     if ! grep -rq "'${cmd}'\|\"${cmd}\"" src/ --include="*.ts" 2>/dev/null; then
       log_error "Command '${cmd}' in package.json but no handler found in src/"
       CMD_FAIL=$((CMD_FAIL + 1))
@@ -60,7 +60,7 @@ while IFS= read -r viewId; do
     log_error "View '${viewId}' in package.json but not referenced in code"
     PROV_OK=0
   fi
-done < <(grep -oP '"id"\s*:\s*"\K[^"]+' package.json 2>/dev/null | grep -i "chassis\|sidebar\|chat\|vault" | sort -u)
+done < <(grep -oP '"id"\s*:\s*"\K[^"]+' package.json 2>/dev/null | grep -i "redivivus\|sidebar\|chat\|vault" | sort -u)
 [ $PROV_OK -eq 1 ] && echo "  ✅ All view providers wired"
 echo ""
 
@@ -87,13 +87,13 @@ echo ""
 
 # ═══════════════════════════════════════════
 # 4. SYSTEM PROMPT / IDENTITY CHECK
-# Does the chat system actually inject CHASSIS identity?
+# Does the chat system actually inject Redivivus identity?
 # ═══════════════════════════════════════════
 echo "▸ [4/10] Chat system prompt / identity check..."
 SP_OK=1
 # Look for system prompt, identity, or role injection
-if ! grep -rq "system.*prompt\|systemPrompt\|system.*message\|CHASSIS.*assistant\|you are CHASSIS\|role.*system" src/ --include="*.ts" 2>/dev/null; then
-  log_error "No system prompt / CHASSIS identity injection found in codebase"
+if ! grep -rq "system.*prompt\|systemPrompt\|system.*message\|Redivivus.*assistant\|you are Redivivus\|role.*system" src/ --include="*.ts" 2>/dev/null; then
+  log_error "No system prompt / Redivivus identity injection found in codebase"
   SP_OK=0
 fi
 # Check if system prompt references capabilities
@@ -104,7 +104,7 @@ else
   log_warn "Could not locate system prompt builder file"
   SP_OK=0
 fi
-[ $SP_OK -eq 1 ] && echo "  ✅ CHASSIS identity injection present"
+[ $SP_OK -eq 1 ] && echo "  ✅ Redivivus identity injection present"
 echo ""
 
 # ═══════════════════════════════════════════
@@ -114,9 +114,9 @@ echo ""
 echo "▸ [5/10] Configuration key consistency..."
 CFG_OK=1
 # Extract config keys from package.json
-PKG_CONFIGS=$(grep -oP '"chassis\.[^"]+' package.json 2>/dev/null | tr -d '"' | sort -u)
+PKG_CONFIGS=$(grep -oP '"redivivus\.[^"]+' package.json 2>/dev/null | tr -d '"' | sort -u)
 # Extract config keys used in code
-CODE_CONFIGS=$(grep -roP "getConfiguration\(['\"][^'\"]*['\"]\)\|get\(['\"]chassis\.[^'\"]*['\"]\)" src/ --include="*.ts" 2>/dev/null | grep -oP "chassis\.[^'\"]*" | sort -u)
+CODE_CONFIGS=$(grep -roP "getConfiguration\(['\"][^'\"]*['\"]\)\|get\(['\"]redivivus\.[^'\"]*['\"]\)" src/ --include="*.ts" 2>/dev/null | grep -oP "redivivus\.[^'\"]*" | sort -u)
 # Find configs used in code but not in package.json
 for cfg in $CODE_CONFIGS; do
   if ! echo "$PKG_CONFIGS" | grep -qF "$cfg"; then
@@ -134,8 +134,8 @@ echo "▸ [6/10] Dead export scan (sampling top files)..."
 DEAD=0
 # Sample: check key service files for unused exports
 SAMPLE_FILES=(
-  "src/services/chassisService.ts"
-  "src/services/project/chassisInit.ts"
+  "src/services/redivivusService.ts"
+  "src/services/project/redivivusInit.ts"
   "src/services/ai/routingService.ts"
   "src/ui/chat/chatPanel.ts"
 )
@@ -164,7 +164,7 @@ echo ""
 echo "▸ [7/10] Circular dependency spot-check..."
 CIRC=0
 # Check if any file imports from a file that imports back
-for f in src/services/chassisService.ts src/extension.ts src/ui/chat/chatPanel.ts; do
+for f in src/services/redivivusService.ts src/extension.ts src/ui/chat/chatPanel.ts; do
   [ ! -f "$f" ] && continue
   # Get files this file imports
   IMPORTS=$(grep -oP "from ['\"](\./[^'\"]+)['\"]" "$f" 2>/dev/null | grep -oP "\./[^'\"]+")
@@ -257,7 +257,7 @@ if [ $ERRORS -gt 0 ] || [ $WARNS -gt 0 ]; then
   echo ""
   echo "══ WINDSURF PASTE (copy everything below) ══"
   echo ""
-  echo "CHASSIS self-test v2 found $ERRORS errors and $WARNS warnings."
+  echo "Redivivus self-test v2 found $ERRORS errors and $WARNS warnings."
   echo ""
   if [ -n "$ERROR_LOG" ]; then
     echo "ERRORS (must fix):"

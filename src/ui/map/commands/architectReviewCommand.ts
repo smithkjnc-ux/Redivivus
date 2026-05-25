@@ -8,8 +8,8 @@ export async function executeArchitectReview(msg: any, ctx: MapMsgCtx): Promise<
   const { root, map } = ctx;
 
   if (msg.type === 'architectReview' && msg.prompt) {
-    // [WARN] Must NOT use chassis.postToChat here — routes through fix-request -> build pipeline -> vault modal.
-    //        chassis.mapContextChat routes through map-context -> direct AI call, no build pipeline.
+    // [WARN] Must NOT use redivivus.postToChat here — routes through fix-request -> build pipeline -> vault modal.
+    //        redivivus.mapContextChat routes through map-context -> direct AI call, no build pipeline.
     // [FIX] Enrich with actual file content server-side. Webview only has topology metadata (connections,
     //       line counts, health). Single-file projects have 0 graph edges — Claude refuses a code review
     //       with no code. Read top 5 files (health-prioritized) and append real content to the prompt.
@@ -31,9 +31,9 @@ export async function executeArchitectReview(msg: any, ctx: MapMsgCtx): Promise<
     }
     // Request structured actions so per-action fix buttons can be rendered in chat
     enrichedPrompt += '\n\nAt the very end of your response output one line exactly like this (no explanation after):\n'
-      + 'ACTIONS_JSON:[{"file":"relative/path","action":"fix|delete|create","label":"Short label (max 4 words)","description":"Specific instruction for CHASSIS to execute"}]\n'
+      + 'ACTIONS_JSON:[{"file":"relative/path","action":"fix|delete|create","label":"Short label (max 4 words)","description":"Specific instruction for Redivivus to execute"}]\n'
       + 'One entry per concrete quick-win from your review. Relative file paths only.';
-    await vscode.commands.executeCommand('chassis.mapContextChat', {
+    await vscode.commands.executeCommand('redivivus.mapContextChat', {
       nodeId: '', label: '', lines: 0, health: 'neutral', todos: 0,
       _explainPrompt: enrichedPrompt, _displayLabel: 'Architect Review',
     });

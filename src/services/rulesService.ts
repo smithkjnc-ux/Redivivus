@@ -3,12 +3,12 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisService } from './chassisService.js';
+import type { RedivivusService } from './redivivusService.js';
 import { buildRules } from './rulesContent.js';
 import { wrapForClaude, wrapForGemini } from './rulesWrappers.js';
 
 export class RulesService {
-  constructor(private chassis: ChassisService) {}
+  constructor(private redivivus: RedivivusService) {}
 
   // ── generate all rule files (orchestrator-only — delegates to content and wrappers)
 
@@ -38,7 +38,7 @@ export class RulesService {
       created.push(t.file);
     }
 
-    this.chassis.appendWorkLog(
+    this.redivivus.appendWorkLog(
       '- Action: Generated AI editor rules\n' +
       '- Files created: ' + created.join(', ')
     );

@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build History Panel — HTML template string
+// [SCOPE] Redivivus Build History Panel — HTML template string
 // Extracted from buildHistoryPanel.ts to keep source file under 200 lines.
 // [FIX] Removed Save Points tab — snapshots ARE the save points now. Git handles major milestones.
 
@@ -59,7 +59,7 @@ export function buildHistoryHtml(): string {
   function renderHistory(history) {
     const el = document.getElementById('bh-list');
     if (!history || !history.length) {
-      el.innerHTML = '<div class="empty">No builds yet.<br><small>Every time CHASSIS builds or modifies a file, it appears here.</small></div>';
+      el.innerHTML = '<div class="empty">No builds yet.<br><small>Every time Redivivus builds or modifies a file, it appears here.</small></div>';
       return;
     }
     el.innerHTML = history.map(e => {

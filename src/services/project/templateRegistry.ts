@@ -1,6 +1,6 @@
-// [SCOPE] Template Registry — fetches project templates from the remote CHASSIS registry on GitHub.
+// [SCOPE] Template Registry — fetches project templates from the remote Redivivus registry on GitHub.
 // Templates are NOT bundled with the extension — pulled on demand to keep extension lean.
-// Registry URL: https://raw.githubusercontent.com/smithkjnc-ux/chassis-templates/main/
+// Registry URL: https://raw.githubusercontent.com/smithkjnc-ux/redivivus-templates/main/
 // [WARN] Network calls here — always wrap in try/catch, never block builds on failure.
 // [NEXT] Add more categories as templates are added to the registry repo.
 // Category data + interfaces -> templateRegistryData.ts
@@ -13,8 +13,8 @@ export { TemplateCategory, TemplateDef, WizardQuestion, TEMPLATE_CATEGORIES } fr
 import type { TemplateCategory, TemplateDef} from './templateRegistryData.js';
 import { TEMPLATE_CATEGORIES } from './templateRegistryData.js';
 
-const log = vscode.window.createOutputChannel('CHASSIS Templates');
-const REGISTRY_BASE = 'https://raw.githubusercontent.com/smithkjnc-ux/chassis-templates/main';
+const log = vscode.window.createOutputChannel('Redivivus Templates');
+const REGISTRY_BASE = 'https://raw.githubusercontent.com/smithkjnc-ux/redivivus-templates/main';
 
 /** Detect if a user's task sounds like a template request. Returns matching category + template if found. */
 export function matchTaskToTemplate(task: string): { category: TemplateCategory; template: TemplateDef } | null {
@@ -31,7 +31,7 @@ export function matchTaskToTemplate(task: string): { category: TemplateCategory;
 
 /** Fetch a template file from the remote registry. Returns raw content or null on failure. */
 export async function fetchTemplate(registryPath: string): Promise<string | null> {
-  const localRepoPath = path.join(os.homedir(), 'projects', 'chassis-templates');
+  const localRepoPath = path.join(os.homedir(), 'projects', 'redivivus-templates');
   const localFilePath = path.join(localRepoPath, registryPath);
 
   try {
@@ -48,7 +48,7 @@ export async function fetchTemplate(registryPath: string): Promise<string | null
   const url = `${REGISTRY_BASE}/${registryPath}`;
   log.appendLine(`[FETCH] [REMOTE] Attempting: ${url}`);
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'CHASSIS-VSCode-Extension' } });
+    const res = await fetch(url, { headers: { 'User-Agent': 'Redivivus-VSCode-Extension' } });
     if (!res.ok) {
       log.appendLine(`[FETCH] [REMOTE] Failed (${res.status}): ${url}`);
       return null;

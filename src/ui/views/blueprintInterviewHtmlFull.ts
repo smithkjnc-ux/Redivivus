@@ -104,7 +104,7 @@ export function buildInterviewHtmlFull(layersJson: string, nonce: string): strin
     }
     if (e.data.type === 'bi-done') {
       const body = document.getElementById('bi-body');
-      if (body) body.innerHTML = '<div style="text-align:center;padding:60px 20px;"><div style="font-size:48px;margin-bottom:16px;">&#x2705;</div><div style="font-size:20px;font-weight:700;margin-bottom:8px;">Blueprint Complete!</div><div style="font-size:14px;color:var(--vscode-descriptionForeground);">Your blueprint has been saved. Switch back to CHASSIS Chat to start building.</div></div>';
+      if (body) body.innerHTML = '<div style="text-align:center;padding:60px 20px;"><div style="font-size:48px;margin-bottom:16px;">&#x2705;</div><div style="font-size:20px;font-weight:700;margin-bottom:8px;">Blueprint Complete!</div><div style="font-size:14px;color:var(--vscode-descriptionForeground);">Your blueprint has been saved. Switch back to Redivivus Chat to start building.</div></div>';
       const footer = document.getElementById('bi-footer');
       if (footer) footer.style.display = 'none';
     }

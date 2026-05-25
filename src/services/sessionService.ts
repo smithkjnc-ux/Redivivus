@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 import type { SessionInfo, ExitInterview } from '../types/index.js';
-import type { ChassisService } from './chassisService.js';
+import type { RedivivusService } from './redivivusService.js';
 import { runExitInterview } from './sessionInterview.js';
 import { generateId } from './sessionStorage.js';
 import { finalizeSession, parseEndSessionData } from './sessionServiceFinalize.js';
@@ -11,7 +11,7 @@ import { finalizeSession, parseEndSessionData } from './sessionServiceFinalize.j
 export class SessionService {
   private currentSession: SessionInfo | null = null;
 
-  constructor(private chassis: ChassisService) {}
+  constructor(private redivivus: RedivivusService) {}
 
   get isActive(): boolean {
     return this.currentSession !== null;
@@ -40,7 +40,7 @@ export class SessionService {
     if (!goal) {
       // [WARN] User interaction point, can lead to session not starting if canceled or empty.
       goal = await vscode.window.showInputBox({
-        title: 'CHASSIS — Start Session',
+        title: 'Redivivus — Start Session',
         prompt: 'What\'s the goal for this session?',
         placeHolder: 'e.g., Wire WebSocket bridge to avatar, Fix auth',
         ignoreFocusOut: true,
@@ -66,7 +66,7 @@ export class SessionService {
     };
 
     // [WARN] Appending to work log involves file I/O.
-    this.chassis.appendWorkLog(
+    this.redivivus.appendWorkLog(
       `- **Session Start** — ID: ${id}\n` +
       `- AI: ${this.currentSession.ai}\n` +
       `- Goal: ${goal}`
@@ -74,21 +74,21 @@ export class SessionService {
 
     // update config
     // [WARN] Loading and saving config involves file I/O, potential for errors.
-    const config = this.chassis.loadConfig();
+    const config = this.redivivus.loadConfig();
     if (config) {
       config.sessions.push(id);
-      this.chassis.saveConfig(config);
+      this.redivivus.saveConfig(config);
     }
 
     // [WARN] Directly manipulating VS Code UI context.
-    vscode.commands.executeCommand('setContext', 'chassis.sessionActive', true);
+    vscode.commands.executeCommand('setContext', 'redivivus.sessionActive', true);
 
-    vscode.window.showInformationMessage(`CHASSIS session started: ${goal}`);
+    vscode.window.showInformationMessage(`Redivivus session started: ${goal}`);
     return this.currentSession;
   }
 
   /** Start a session WITHOUT user prompts — used for auto-session on first message */
-  startSessionSilent(goal: string, ai: string = 'CHASSIS'): SessionInfo {
+  startSessionSilent(goal: string, ai: string = 'Redivivus'): SessionInfo {
     if (this.currentSession) { return this.currentSession; }
     const id = generateId();
     this.currentSession = {
@@ -98,17 +98,17 @@ export class SessionService {
       goal,
       changes: [],
     };
-    this.chassis.appendWorkLog(
+    this.redivivus.appendWorkLog(
       `- **Session Start** — ID: ${id}\n` +
       `- AI: ${ai}\n` +
       `- Goal: ${goal}`
     );
-    const config = this.chassis.loadConfig();
+    const config = this.redivivus.loadConfig();
     if (config) {
       config.sessions.push(id);
-      this.chassis.saveConfig(config);
+      this.redivivus.saveConfig(config);
     }
-    vscode.commands.executeCommand('setContext', 'chassis.sessionActive', true);
+    vscode.commands.executeCommand('setContext', 'redivivus.sessionActive', true);
     return this.currentSession;
   }
 
@@ -142,7 +142,7 @@ export class SessionService {
 
     this.currentSession = null;
     // [WARN] Directly manipulating VS Code UI context.
-    vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
+    vscode.commands.executeCommand('setContext', 'redivivus.sessionActive', false);
 
     // Tier 3 memory: extract learned facts from this session's chat history
     try {
@@ -165,18 +165,18 @@ export class SessionService {
       }
     } catch { /* never block session end */ }
 
-    vscode.window.showInformationMessage('CHASSIS session ended. Roadmap updated.');
+    vscode.window.showInformationMessage('Redivivus session ended. Roadmap updated.');
   }
 
   async endSessionWithData(data: any): Promise<void> {
     if (!this.currentSession) { return; }
-    finalizeSession(this.currentSession, this.chassis, parseEndSessionData(data));
+    finalizeSession(this.currentSession, this.redivivus, parseEndSessionData(data));
     this.currentSession = null;
-    vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
-    vscode.window.showInformationMessage('CHASSIS session ended. Roadmap updated.');
+    vscode.commands.executeCommand('setContext', 'redivivus.sessionActive', false);
+    vscode.window.showInformationMessage('Redivivus session ended. Roadmap updated.');
   }
 
   private doFinalizeSession(interview: ExitInterview): void {
-    finalizeSession(this.currentSession!, this.chassis, interview);
+    finalizeSession(this.currentSession!, this.redivivus, interview);
   }
 }

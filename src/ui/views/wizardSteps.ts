@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS New Project Wizard — step-by-step project setup flow
+// [SCOPE] Redivivus New Project Wizard — step-by-step project setup flow
 
 import * as os from 'os';
 import * as fs from 'fs';
@@ -105,7 +105,7 @@ function renderCreating(data: WizardData): string {
         <div>📁 docs/</div>
         <div>📄 README.md</div>
         <div>⚙️ .gitignore</div>
-        <div>🔧 .chassis/rules.md</div>
+        <div>🔧 .redivivus/rules.md</div>
         <div>🔗 .cursorrules / .windsurfrules / CLAUDE.md</div>
       </div>
     </div>`;

@@ -10,7 +10,7 @@ function esc(s: string): string { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'
 
 function cssLabel(propName: string, selectorCtx: string): string {
   const token = selectorCtx.replace(/[^a-zA-Z0-9-_]/g, ' ').trim().split(/\s+/)
-    .filter(w => w.length > 2 && !['root', 'html', 'body', 'main', 'after', 'before', 'hover'].includes(w))[0] || '';
+    .filter(w => w.length > 2 && !['root', 'html', 'after', 'before', 'hover'].includes(w))[0] || '';
   const prop = propName.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   return token ? `${token.charAt(0).toUpperCase()}${token.slice(1)} ${prop}` : prop;
 }
@@ -29,34 +29,105 @@ function selectorAt(content: string, target: number): string {
   return sel;
 }
 
-function addCssProps(css: string, fileName: string, out: VisualProperty[]): void {
-  const seenVals = new Set<string>();
-  // Colors
-  const colorRe = /(background(?:-color)?|(?:^|\W)color|border(?:-color)?|fill|outline-color)\s*:\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))/gi;
+function findHiddenSelectors(css: string): Set<string> {
+  const h = new Set<string>(); const re = /([^\n\r{}]+)\{([^}]+)\}/g; let m: RegExpExecArray | null;
+  while ((m = re.exec(css)) !== null) { if (/display\s*:\s*none/i.test(m[2])) { h.add(m[1].trim()); } }
+  return h;
+}
+
+function addJsColors(script: string, fileName: string, out: VisualProperty[]): void {
+  let m: RegExpExecArray | null; let count = 0;
+  // Named constants: const COLOR_BIRD = '#FFD700'
+  const constRe = /(?:const|let|var)\s+(\w+)\s*=\s*['"](\#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))['"]/gi;
+  while ((m = constRe.exec(script)) !== null && count < 12) {
+    const name = m[1]; const val = m[2].toLowerCase();
+    if (out.some(p => p.value === val && p.category === 'colors')) { count++; continue; }
+    const label = name.replace(/^(color_|clr_)/i, '').replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+    out.push({ id: uid('jsc'), label: label.charAt(0).toUpperCase() + label.slice(1).toLowerCase(),
+      type: 'color', value: val, file: fileName, category: 'colors', proOnly: false, selectorCtx: name,
+      findRegex: `((?:const|let|var)\\s+${esc(name)}\\s*=\\s*['"])(${esc(m[2])})(['"])`, findGroup: 2 });
+    count++;
+  }
+  // Inline canvas colors identified by a preceding comment: // Eye\n ctx.fillStyle = '#333'
+  const fillRe = /\/\/\s*([A-Za-z][A-Za-z ]+)\s*\n\s*ctx\.(?:fillStyle|strokeStyle)\s*=\s*['"](\#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))['"]/gi;
+  while ((m = fillRe.exec(script)) !== null && count < 18) {
+    const lbl = m[1].trim(); const val = m[2].toLowerCase();
+    if (out.some(p => p.value === val && p.category === 'colors')) { count++; continue; }
+    out.push({ id: uid('jsc'), label: lbl + ' Color', type: 'color', value: val, file: fileName,
+      category: 'colors', proOnly: false, selectorCtx: 'canvas',
+      findRegex: `(\\/\\/\\s*${esc(lbl)}[^\\n]*\\n\\s*ctx\\.(?:fillStyle|strokeStyle)\\s*=\\s*['"])(${esc(m[2])})(['"])`,
+      findGroup: 2 });
+    count++;
+  }
+}
+
+function addJsNumbers(script: string, fileName: string, out: VisualProperty[]): void {
+  const numRe = /(?:const|let|var)\s+([\w]+)\s*=\s*(-?[0-9]+(?:\.[0-9]+)?)\s*[;\/\n]/gi;
+  let m: RegExpExecArray | null; let count = 0;
+  while ((m = numRe.exec(script)) !== null && count < 12) {
+    const name = m[1]; const val = m[2];
+    if (/CANVAS|MAX_|MIN_|DISTANCE|SPAWN/i.test(name)) { count++; continue; }
+    const label = name.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    const cat: PropCategory = /gravity|speed|flap|friction|strength/i.test(name) ? 'effects' : 'layout';
+    out.push({ id: uid('jsn'), label, type: 'text', value: val, file: fileName,
+      category: cat, proOnly: true, selectorCtx: name,
+      findRegex: `((?:const|let|var)\\s+${esc(name)}\\s*=\\s*)(-?[0-9]+(?:\\.[0-9]+)?)`,
+      findGroup: 2 });
+    count++;
+  }
+}
+
+// Gradient stops and border shorthand — hex values NOT immediately after colon
+function addComplexCssColors(css: string, fileName: string, out: VisualProperty[], seen: Set<string>, hiddenCtxs: Set<string>): void {
   let m: RegExpExecArray | null;
+  const re = /(background(?:-color)?|border(?:-[a-z]+)?)\s*:\s*[^;#\n]*?(#[0-9a-fA-F]{3,8})/gi;
+  while ((m = re.exec(css)) !== null) {
+    const prop = m[1].toLowerCase(); const val = m[2].toLowerCase();
+    const ctx = selectorAt(css, m.index);
+    if (seen.has(ctx + '|' + prop)) { continue; }  // simpler version already captured
+    if (out.some(p => p.value === val && p.category === 'colors')) { continue; }  // already in list
+    const key = ctx + '|cplx|' + val;
+    if (seen.has(key)) { continue; }
+    seen.add(key);
+    const dispProp = prop.startsWith('border') ? 'border-color' : prop;
+    const label = cssLabel(dispProp, ctx) + (hiddenCtxs.has(ctx) ? ' (hidden)' : '');
+    const fr = ctx
+      ? `(${esc(ctx)}\\s*\\{[^}]*?${esc(prop)}\\s*:[^;#\\n]*?)(${esc(m[2])})`
+      : `(${esc(prop)}\\s*:[^;#\\n]*?)(${esc(m[2])})`;
+    out.push({ id: uid('clr'), label, type: 'color', value: val, file: fileName, category: 'colors', proOnly: false, selectorCtx: ctx, findRegex: fr, findGroup: 2 });
+    if (out.filter(p => p.category === 'colors').length >= 24) { break; }
+  }
+}
+
+function addCssProps(css: string, fileName: string, out: VisualProperty[]): void {
+  const seen = new Set<string>(); const hiddenCtxs = findHiddenSelectors(css);
+  let m: RegExpExecArray | null;
+  const colorRe = /(background(?:-color)?|(?:^|\W)color|border(?:-color)?|fill|outline-color)\s*:\s*(#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))/gi;
   while ((m = colorRe.exec(css)) !== null) {
     const prop = m[1].replace(/^\W/, '').trim(); const val = m[2].toLowerCase();
-    if (seenVals.has(prop + val)) { continue; }
-    seenVals.add(prop + val);
     const ctx = selectorAt(css, m.index);
-    out.push({ id: uid('clr'), label: cssLabel(prop, ctx), type: 'color', value: val,
-      file: fileName, category: 'colors', proOnly: false, selectorCtx: ctx,
-      findRegex: `(${esc(m[1])}\\s*:\\s*)(${esc(m[2])})`, findGroup: 2 });
-    if (out.filter(p => p.category === 'colors').length >= 14) { break; }
+    if (seen.has(ctx + '|' + prop)) { continue; }
+    seen.add(ctx + '|' + prop);
+    const propPat = prop === 'color' ? '(?<![a-z-])color' : esc(prop);
+    const fr = ctx ? `(${esc(ctx)}\\s*\\{[^}]*?${propPat}\\s*:\\s*)([^;\\n}]+)` : `(${propPat}\\s*:\\s*)(${esc(m[2])})`;
+    const label = cssLabel(prop, ctx) + (hiddenCtxs.has(ctx) ? ' (hidden)' : '');
+    out.push({ id: uid('clr'), label, type: 'color', value: val,
+      file: fileName, category: 'colors', proOnly: false, selectorCtx: ctx, findRegex: fr, findGroup: 2 });
+    if (out.filter(p => p.category === 'colors').length >= 18) { break; }
   }
-  // Numbers: font-size, border-radius, padding, gap, max-width
   const numRe = /(font-size|border-radius|padding(?:-(?:top|bottom|left|right))?|gap|max-width|letter-spacing)\s*:\s*([0-9.]+)(px|em|rem|%|vw|vh)/gi;
   while ((m = numRe.exec(css)) !== null) {
     const prop = m[1]; const val = m[2]; const unit = m[3];
-    if (seenVals.has(prop + val + unit)) { continue; }
-    seenVals.add(prop + val + unit);
     const ctx = selectorAt(css, m.index);
+    if (seen.has(ctx + '|' + prop)) { continue; }
+    seen.add(ctx + '|' + prop);
     const cat: PropCategory = /font-size|letter/.test(prop) ? 'text' : /padding|gap|max/.test(prop) ? 'layout' : 'effects';
-    out.push({ id: uid('num'), label: cssLabel(prop, ctx), type: 'number', value: val, unit,
-      file: fileName, category: cat, proOnly: /gap|max|letter/.test(prop),
-      selectorCtx: ctx,
-      findRegex: `(${esc(prop)}\\s*:\\s*)(${esc(val)})(${esc(unit)})`, findGroup: 2 });
+    const fr = ctx ? `(${esc(ctx)}\\s*\\{[^}]*?${esc(prop)}\\s*:\\s*)([0-9.]+)(${esc(unit)})` : `(${esc(prop)}\\s*:\\s*)(${esc(val)})(${esc(unit)})`;
+    const label = cssLabel(prop, ctx) + (hiddenCtxs.has(ctx) ? ' (hidden)' : '');
+    out.push({ id: uid('num'), label, type: 'number', value: val, unit,
+      file: fileName, category: cat, proOnly: /gap|max|letter/.test(prop), selectorCtx: ctx, findRegex: fr, findGroup: 2 });
   }
+  addComplexCssColors(css, fileName, out, seen, hiddenCtxs);
 }
 
 function addHtmlText(html: string, fileName: string, out: VisualProperty[]): void {
@@ -88,6 +159,9 @@ function addHtmlText(html: string, fileName: string, out: VisualProperty[]): voi
   // Inline <style> blocks
   const sRe = /<style[^>]*>([\s\S]*?)<\/style>/gi;
   while ((m = sRe.exec(html)) !== null) { addCssProps(m[1], fileName, out); }
+  // Inline <script> blocks — extract named color constants (e.g. const COLOR_BIRD = '#FFD700')
+  const scRe = /<script[^>]*>([\s\S]*?)<\/script>/gi;
+  while ((m = scRe.exec(html)) !== null) { addJsColors(m[1], fileName, out); addJsNumbers(m[1], fileName, out); }
 }
 
 function extractSections(html: string, fileName: string): VisualSection[] {

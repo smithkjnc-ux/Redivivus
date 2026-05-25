@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS File Split Assistant — detects files >200 lines, suggests AI-powered splits
+// [SCOPE] Redivivus File Split Assistant — detects files >200 lines, suggests AI-powered splits
 
 import * as fs from 'fs';
 import * as path from 'path';

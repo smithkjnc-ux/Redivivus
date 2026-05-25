@@ -1,4 +1,4 @@
-// [SCOPE] Chat Panel Code Structurer — applies CHASSIS rules to AI-generated code AFTER it works
+// [SCOPE] Chat Panel Code Structurer — applies Redivivus rules to AI-generated code AFTER it works
 // Generate first, structure after. Keep under 200 lines.
 
 import * as path from 'path';
@@ -16,8 +16,8 @@ const COMMENT_MAP: Record<string, { line?: string; block?: [string, string] }> =
   sql: { line: '--' },  md: { block: ['<!--', '-->'] },
 };
 
-/** Apply CHASSIS structural rules to generated code */
-export function applyChassisStructure(code: string, filename: string): string {
+/** Apply Redivivus structural rules to generated code */
+export function applyRedivivusStructure(code: string, filename: string): string {
   const ext = path.extname(filename).slice(1).toLowerCase();
   const syntax = COMMENT_MAP[ext];
   if (!syntax) { return code; } // Unknown extension, return as-is

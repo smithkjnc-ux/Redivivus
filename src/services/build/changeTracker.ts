@@ -1,7 +1,7 @@
-// [SCOPE] Change Tracker — auto-summarizes every modification CHASSIS makes
+// [SCOPE] Change Tracker — auto-summarizes every modification Redivivus makes
 
 import * as fs from 'fs';
-import type { ChassisService } from '../chassisService.js';
+import type { RedivivusService } from '../redivivusService.js';
 
 interface ChangeSummary {
   file: string;
@@ -17,7 +17,7 @@ interface ChangeSummary {
 }
 
 export class ChangeTracker {
-  constructor(private chassis: ChassisService) {}
+  constructor(private redivivus: RedivivusService) {}
 
   summarize(filePath: string, before: string, after: string, ai: string, action: string): ChangeSummary {
     const beforeLines = before.split('\n');
@@ -75,7 +75,7 @@ export class ChangeTracker {
       entry += '- \u26a0\ufe0f Warnings: ' + summary.warnings.join(', ') + '\n';
     }
 
-    this.chassis.appendWorkLog(entry);
+    this.redivivus.appendWorkLog(entry);
   }
 
   formatNotification(summary: ChangeSummary): string {

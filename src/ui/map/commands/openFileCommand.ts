@@ -32,11 +32,11 @@ export async function executeOpenFile(msg: any, ctx: MapMsgCtx): Promise<void> {
           }
         }
       }
-    } catch { vscode.window.showErrorMessage(`CHASSIS Map: Could not open ${msg.nodeId}`); }
+    } catch { vscode.window.showErrorMessage(`Redivivus Map: Could not open ${msg.nodeId}`); }
   } else if (msg.type === 'openFile' && msg.nodeId) {
     try {
       const uri = vscode.Uri.file(path.join(root, msg.nodeId));
       await vscode.window.showTextDocument(uri, { preserveFocus: false });
-    } catch { vscode.window.showErrorMessage(`CHASSIS Map: Could not open ${msg.nodeId}`); }
+    } catch { vscode.window.showErrorMessage(`Redivivus Map: Could not open ${msg.nodeId}`); }
   }
 }

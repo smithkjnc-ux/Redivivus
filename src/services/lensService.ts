@@ -68,12 +68,12 @@ export class LensService {
     vscode.window.showTextDocument(vscode.Uri.file(sourceRef.filePath), { preview: true, selection: new vscode.Range(Math.max(0, sourceRef.line - 1), 0, sourceRef.line, 0) });
   }
 
-  /** High-level entry: capture → translate → inject. Called by chassis.inspectElement command. */
+  /** High-level entry: capture → translate → inject. Called by redivivus.inspectElement command. */
   async inspectAndInject(metadata: ElementMetadata): Promise<void> {
     await this.captureElement(metadata);
     const ref = await this.translateToSource(metadata);
     if (!ref) {
-      vscode.window.showWarningMessage(`CHASSIS: Could not find source for "${metadata.description || metadata.className || metadata.id || metadata.tagName}"`);
+      vscode.window.showWarningMessage(`Redivivus: Could not find source for "${metadata.description || metadata.className || metadata.id || metadata.tagName}"`);
       return;
     }
     await this.injectContext(ref.snippet, ref);
@@ -82,7 +82,7 @@ export class LensService {
 
 async function searchProjectFiles(root: string, term: string): Promise<SourceRef | null> {
   const exts = ['.tsx', '.jsx', '.ts', '.js', '.html', '.vue', '.svelte'];
-  const skipDirs = new Set(['node_modules', '.chassis', 'out', 'dist', '.git']);
+  const skipDirs = new Set(['node_modules', '.redivivus', 'out', 'dist', '.git']);
   try {
     for await (const filePath of walkDir(root, exts, skipDirs)) {
       const lines = fs.readFileSync(filePath, 'utf-8').split('\n');

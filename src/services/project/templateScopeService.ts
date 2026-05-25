@@ -5,7 +5,7 @@
 
 // [WARN] One pending scope resolver at a time — cleared on reply or timeout
 let _pendingScopeResolve: ((answer: string | null) => void) | null = null;
-// [CHASSIS] Timestamp when the scope question was posted — used to age out stale questions
+// [Redivivus] Timestamp when the scope question was posted — used to age out stale questions
 let _scopeQuestionTimestamp = 0;
 
 /**

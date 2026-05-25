@@ -1,5 +1,5 @@
-// [SCOPE] CHASSIS Build History Service — persists every successful build to
-// .chassis/build_history.json. Provides read/write/prune API used by the
+// [SCOPE] Redivivus Build History Service — persists every successful build to
+// .redivivus/build_history.json. Provides read/write/prune API used by the
 // Build History panel and the ChatPanel restart-restore flow.
 // Max 50 entries — oldest pruned automatically on record().
 
@@ -7,7 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { buildResultCard } from '../../ui/panels/chat/chatPanelStory';
 
-const HISTORY_FILE = '.chassis/build_history.json';
+const HISTORY_FILE = '.redivivus/build_history.json';
 const MAX_ENTRIES = 50;
 
 export interface BuildHistoryEntry {

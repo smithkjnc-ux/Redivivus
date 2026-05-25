@@ -1,5 +1,5 @@
 // [SCOPE] Pipeline Tracer — singleton debug service that logs every AI pipeline step
-// to the "CHASSIS Pipeline Trace" VS Code Output Channel. Stores last 20 traces in memory.
+// to the "Redivivus Pipeline Trace" VS Code Output Channel. Stores last 20 traces in memory.
 // [WARN] Output channel is created lazily — safe to import from any file, no activation cost.
 
 import * as vscode from 'vscode';
@@ -27,7 +27,7 @@ class PipelineTracerSvc {
   private count = 0;
 
   private ch(): vscode.OutputChannel {
-    if (!this._ch) {this._ch = vscode.window.createOutputChannel('CHASSIS Pipeline Trace');}
+    if (!this._ch) {this._ch = vscode.window.createOutputChannel('Redivivus Pipeline Trace');}
     return this._ch;
   }
 

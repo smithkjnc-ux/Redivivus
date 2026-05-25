@@ -1,10 +1,10 @@
-// [SCOPE] CHASSIS Build Orchestrator — prompt generation helpers.
+// [SCOPE] Redivivus Build Orchestrator — prompt generation helpers.
 // Extracted from buildOrchestrator.ts to keep source files under 200 lines.
 
 import type { BuildOrchestrator, BuildPhase } from './buildOrchestrator.js';
 import { BuildPlan, PhaseDefinition } from './buildOrchestrator.js';
 import { BUILD_PHASES } from './buildPhaseDefinitions.js';
-import { CHASSIS_WORKER_RULES } from '../ai/chassisWorkerRules.js';
+import { Redivivus_WORKER_RULES } from '../ai/redivivusWorkerRules.js';
 
   export function getPlanSummaryImpl(orch: BuildOrchestrator, planId: string): string {
     const plan = (orch as any).plans.get(planId);
@@ -66,6 +66,6 @@ import { CHASSIS_WORKER_RULES } from '../ai/chassisWorkerRules.js';
     }
     prompt += `\n6. NO placeholders — generate working code\n`;
     prompt += `7. NO markdown fences in response\n`;
-    prompt += `\n${CHASSIS_WORKER_RULES}\n`;
+    prompt += `\n${Redivivus_WORKER_RULES}\n`;
     return prompt;
   }

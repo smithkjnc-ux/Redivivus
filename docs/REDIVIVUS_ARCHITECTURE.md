@@ -1,6 +1,6 @@
-# CHASSIS — Architecture & Pre-Release Checklist
+# Redivivus — Architecture & Pre-Release Checklist
 > [SCOPE] Source file map, design rules, known issues, and pre-release checklist.
-> See CHASSIS_ROADMAP.md for the index.
+> See REDIVIVUS_ROADMAP.md for the index.
 
 ---
 
@@ -10,21 +10,21 @@
 
 ## Project Info
 - **Version:** 0.3.4
-- **Extension ID:** papajoe.chassis
+- **Extension ID:** papajoe.redivivus
 - **Engine compat:** `vscode ^1.70.0` (for Windsurf compatibility)
-- **GitHub:** `https://github.com/smithkjnc-ux/CHASSIS.git` (private)
+- **GitHub:** `https://github.com/smithkjnc-ux/Redivivus.git` (private)
 - **Dogfood project:** `~/projects/doaidream/`
 
 ## Deployment (VSCodium ONLY)
 ```bash
 # Compile
-cd ~/projects/chassis && npm run compile
+cd ~/projects/redivivus && npm run compile
 
 # Deploy to VSCodium
-cp -r ~/projects/chassis/out/* ~/.vscode-oss/extensions/papajoe.chassis-0.3.4/out/
+cp -r ~/projects/redivivus/out/* ~/.vscode-oss/extensions/papajoe.redivivus-0.3.4/out/
 
 # If package.json changed (new commands):
-cp ~/projects/chassis/package.json ~/.vscode-oss/extensions/papajoe.chassis-0.3.4/package.json
+cp ~/projects/redivivus/package.json ~/.vscode-oss/extensions/papajoe.redivivus-0.3.4/package.json
 
 # Reload: Ctrl+Shift+P → Developer: Restart Extension Host
 ```
@@ -66,7 +66,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 | `src/services/chassisService.ts` | Core init, config load/save, paths |
 | `src/services/routingService.ts` | Multi-AI routing, Supervisor/Worker/Guardian chain |
 | `src/services/vaultService.ts` | Vault CRUD, categorization, duplicate detection |
-| `src/services/vaultStorage.ts` | Vault file I/O — reads/writes `~/.chassis-vault/` ONLY |
+| `src/services/vaultStorage.ts` | Vault file I/O — reads/writes `~/.redivivus-vault/` ONLY |
 | `src/services/vaultScanner.ts` | Codebase scanner — extracts functions into vault items |
 | `src/services/vaultAutoCapture.ts` | Auto-captures built files into vault after every build |
 | `src/services/vaultContextService.ts` | Vault context injection for build prompts |
@@ -74,7 +74,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 | `src/services/blueprintService.ts` | Five W interview |
 | `src/services/analyzerService.ts` | Project scanner — generates `project_map.md` |
 | `src/services/guardianService.ts` | Health scoring, risk scanning, ELI5 translation |
-| `src/services/learnedMemoryService.ts` | Permanent facts stored to `.chassis/learned.md` |
+| `src/services/learnedMemoryService.ts` | Permanent facts stored to `.redivivus/learned.md` |
 | `src/services/snapshotService.ts` | File snapshots before every build (Undo Everything) |
 | `src/services/buildLedgerService.ts` | Per-AI token/cost tracking for result card breakdown |
 | `src/services/savePointService.ts` | Git-backed save point create/restore |
@@ -83,13 +83,13 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 ### Data Files
 | File | Purpose |
 |------|---------|
-| `.chassis/config.json` | Project config (name, blueprint, session state) |
-| `.chassis/work_log.md` | Session history, AI actions |
-| `.chassis/dead_ends.md` | Failed approaches — don't repeat |
-| `.chassis/learned.md` | AI-extracted permanent user preferences/facts |
-| `.chassis/rules.md` | Universal Project Protocol master rules |
-| `.chassis/build_errors.log` | Build error log with full details |
-| `~/.chassis-vault/` | Global vault — shared across all projects |
+| `.redivivus/config.json` | Project config (name, blueprint, session state) |
+| `.redivivus/work_log.md` | Session history, AI actions |
+| `.redivivus/dead_ends.md` | Failed approaches — don't repeat |
+| `.redivivus/learned.md` | AI-extracted permanent user preferences/facts |
+| `.redivivus/rules.md` | Universal Project Protocol master rules |
+| `.redivivus/build_errors.log` | Build error log with full details |
+| `~/.redivivus-vault/` | Global vault — shared across all projects |
 
 ---
 
@@ -102,7 +102,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 6. **No Unicode in WebView injected scripts** — ASCII only (Rule 13)
 7. **Map panel has 45KB `document.write()` hard limit** — serve JS files via `asWebviewUri()` (Rule 16)
 8. **Never modify `mapScriptEngine.ts` IIFE** — new views use `window.setLayoutMode()` bridge only (Rule 14)
-9. **Vault only reads from `~/.chassis-vault/`** — never from Windsurf globalStorage or system paths
+9. **Vault only reads from `~/.redivivus-vault/`** — never from Windsurf globalStorage or system paths
 10. **Intent classifier hardcoded overrides run first** — never let AI misroute common commands
 
 ---
@@ -122,7 +122,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 - [x] File picker commands (Check a File / AI Review / Clean Up File)
 - [x] Vault tab — empty state, scan, save, browse
 - [x] Scan Project — analyzerService works, generates `project_map.md` + `recommendations.md`
-- [x] CHASSIS Chat panel — WebView chat, context badges, build pipeline
+- [x] Redivivus Chat panel — WebView chat, context badges, build pipeline
 - [x] Intent detection — build verbs → builder, questions → Q&A, commands → hardcoded overrides
 - [x] Supervisor/Worker AI orchestration — highest AI plans+reviews, next-best executes
 - [x] Vault-hit gate before builds — high-confidence match modal
@@ -134,17 +134,17 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 - [x] Save Points — git-backed checkpoints
 - [x] Learned memory — AI-extracted permanent facts
 - [x] Close project — uses `updateWorkspaceFolders()`, no file picker
-- [x] Vault — reads only from `~/.chassis-vault/`, never from Windsurf globalStorage
+- [x] Vault — reads only from `~/.redivivus-vault/`, never from Windsurf globalStorage
 
 ---
 
-## Pre-Release Checklist — CHASSIS IDE v1.0
+## Pre-Release Checklist — Redivivus IDE v1.0
 
 ### MUST PASS — Blocks Release
 
 #### Installation & First Launch
 - [ ] Extension installs from `.vsix` without errors
-- [ ] CHASSIS status bar appears on first launch
+- [ ] Redivivus status bar appears on first launch
 - [ ] Chat panel opens via Ctrl+L
 - [ ] No error notifications on fresh workspace
 
@@ -161,7 +161,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 - [ ] Build error logging works
 
 #### Vault Flywheel
-- [ ] Auto-capture after build saves to `~/.chassis-vault/`
+- [ ] Auto-capture after build saves to `~/.redivivus-vault/`
 - [ ] Vault browser shows saved items
 - [ ] Vault-hit modal fires on high-confidence match
 - [ ] "Use Vault" builds without AI (cost: $0)
@@ -193,7 +193,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 
 #### Open Existing Project
 - [ ] Folder picker opens
-- [ ] CHASSIS-initialized project loads dashboard directly
+- [ ] Redivivus-initialized project loads dashboard directly
 - [ ] Non-initialized project shows Set It Up / Just Browse choice
 
 #### Error Handling
@@ -221,7 +221,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 ### SMOKE TEST SEQUENCE
 1. Install extension → open VSCodium → confirm status bar shows
 2. No workspace → type "countdown timer" → confirm build runs
-3. Open existing CHASSIS project → confirm chat shows project context
+3. Open existing Redivivus project → confirm chat shows project context
 4. Type "close the current project" → confirm closes without file picker
 5. Type "open the vault" → confirm vault browser opens (no file picker)
 6. Scan a project folder → confirm results shown → Save to Vault → confirm items saved

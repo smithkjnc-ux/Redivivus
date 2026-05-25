@@ -6,7 +6,7 @@ import * as path from 'path';
 
 /** Walk workspace to find a file by name, skipping build/vendor dirs. */
 export function findFileByName(root: string, name: string): string | null {
-  const skipDirs = new Set(['node_modules', '.git', 'out', 'dist', '.chassis']);
+  const skipDirs = new Set(['node_modules', '.git', 'out', 'dist', '.redivivus']);
   function walk(dir: string): string | null {
     let entries: string[];
     try { entries = fs.readdirSync(dir); } catch { return null; }

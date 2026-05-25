@@ -1,23 +1,23 @@
-// [SCOPE] CHASSIS Selection Commands — explain/improve selected code
+// [SCOPE] Redivivus Selection Commands — explain/improve selected code
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import type { UsageTracker } from '../services/usageTracker.js';
 import type { VaultService } from '../services/vault/vaultService.js';
 
 export function registerSelectionCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routing: RoutingService,
   usageTracker: UsageTracker,
   vaultService: VaultService,
 ): void {
   // Save Selection to Vault — saves selected code as a vault item
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.saveSelectionToVault', async () => {
+    vscode.commands.registerCommand('redivivus.saveSelectionToVault', async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
       const selection = editor.selection;
@@ -58,36 +58,36 @@ export function registerSelectionCommands(
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.explainSelection', async () => {
+    vscode.commands.registerCommand('redivivus.explainSelection', async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
       const selection = editor.document.getText(editor.selection).trim();
       if (!selection) { vscode.window.showWarningMessage('No text selected.'); return; }
       const prompt = `Explain this code in plain English:\n\n\`\`\`\n${selection}\n\`\`\``;
-      await sendToChat(chassis, routing, usageTracker, vaultService, prompt);
+      await sendToChat(redivivus, routing, usageTracker, vaultService, prompt);
     })
   );
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.improveSelection', async () => {
+    vscode.commands.registerCommand('redivivus.improveSelection', async () => {
       const editor = vscode.window.activeTextEditor;
       if (!editor) { return; }
       const selection = editor.document.getText(editor.selection).trim();
       if (!selection) { vscode.window.showWarningMessage('No text selected.'); return; }
       const prompt = `Improve this code — keep the same behavior but make it cleaner, more efficient, and better documented:\n\n\`\`\`\n${selection}\n\`\`\``;
-      await sendToChat(chassis, routing, usageTracker, vaultService, prompt);
+      await sendToChat(redivivus, routing, usageTracker, vaultService, prompt);
     })
   );
 }
 
 async function sendToChat(
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routing: RoutingService,
   usageTracker: UsageTracker,
   vault: VaultService,
   text: string,
 ): Promise<void> {
-  ChatPanel.show(chassis, routing, usageTracker, vault);
+  ChatPanel.show(redivivus, routing, usageTracker, vault);
   // Give the panel a moment to initialize, then inject the message
   setTimeout(() => {
     const panel = ChatPanel.currentPanel;

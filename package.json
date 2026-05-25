@@ -1,15 +1,15 @@
 {
-  "name": "chassis",
-  "displayName": "CHASSIS",
+  "name": "redivivus",
+  "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
   "version": "0.3.6",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/smithkjnc-ux/CHASSIS.git"
+    "url": "https://github.com/smithkjnc-ux/Redivivus.git"
   },
-  "icon": "resources/chassis-icon-128.png",
+  "icon": "resources/redivivus-icon-128.png",
   "engines": {
     "vscode": "^1.110.0"
   },
@@ -24,349 +24,349 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "chassisView",
-          "title": "CHASSIS",
-          "icon": "resources/chassis-icon.svg"
+          "id": "redivivusView",
+          "title": "Redivivus",
+          "icon": "resources/redivivus-icon.svg"
         }
       ]
     },
     "views": {
-      "chassisView": [
+      "redivivusView": [
         {
-          "id": "chassisSidebar",
-          "name": "CHASSIS",
+          "id": "redivivusSidebar",
+          "name": "Redivivus",
           "type": "webview",
-          "icon": "resources/chassis-icon.svg"
+          "icon": "resources/redivivus-icon.svg"
         }
       ]
     },
     "commands": [
       {
-        "command": "chassis.init",
-        "title": "CHASSIS: Initialize Project"
+        "command": "redivivus.init",
+        "title": "Redivivus: Initialize Project"
       },
       {
-        "command": "chassis.startSession",
-        "title": "CHASSIS: Start Session"
+        "command": "redivivus.startSession",
+        "title": "Redivivus: Start Session"
       },
       {
-        "command": "chassis.endSession",
-        "title": "CHASSIS: End Session"
+        "command": "redivivus.endSession",
+        "title": "Redivivus: End Session"
       },
       {
-        "command": "chassis.blueprint",
-        "title": "CHASSIS: Run Blueprint Interview"
+        "command": "redivivus.blueprint",
+        "title": "Redivivus: Run Blueprint Interview"
       },
       {
-        "command": "chassis.progress",
-        "title": "CHASSIS: Show Progress Map"
+        "command": "redivivus.progress",
+        "title": "Redivivus: Show Progress Map"
       },
       {
-        "command": "chassis.log",
-        "title": "CHASSIS: Open Work Log"
+        "command": "redivivus.log",
+        "title": "Redivivus: Open Work Log"
       },
       {
-        "command": "chassis.deadends",
-        "title": "CHASSIS: Open Dead End Log"
+        "command": "redivivus.deadends",
+        "title": "Redivivus: Open Dead End Log"
       },
       {
-        "command": "chassis.openBlueprint",
-        "title": "CHASSIS: Open Blueprint"
+        "command": "redivivus.openBlueprint",
+        "title": "Redivivus: Open Blueprint"
       },
       {
-        "command": "chassis.lockBlueprint",
-        "title": "CHASSIS: Lock Blueprint"
+        "command": "redivivus.lockBlueprint",
+        "title": "Redivivus: Lock Blueprint"
       },
       {
-        "command": "chassis.openChatPanel",
-        "title": "CHASSIS: Open Chat Panel"
+        "command": "redivivus.openChatPanel",
+        "title": "Redivivus: Open Chat Panel"
       },
       {
-        "command": "chassis.checkFileHealth",
-        "title": "CHASSIS: Check File Health"
+        "command": "redivivus.checkFileHealth",
+        "title": "Redivivus: Check File Health"
       },
       {
-        "command": "chassis.analyze",
-        "title": "CHASSIS: Analyze Project"
+        "command": "redivivus.analyze",
+        "title": "Redivivus: Analyze Project"
       },
       {
-        "command": "chassis.guide",
-        "title": "CHASSIS: Getting Started Guide"
+        "command": "redivivus.guide",
+        "title": "Redivivus: Getting Started Guide"
       },
       {
-        "command": "chassis.cleanUpFile",
-        "title": "CHASSIS: Clean Up File"
+        "command": "redivivus.cleanUpFile",
+        "title": "Redivivus: Clean Up File"
       },
       {
-        "command": "chassis.reviewFile",
-        "title": "CHASSIS: Review Current File"
+        "command": "redivivus.reviewFile",
+        "title": "Redivivus: Review Current File"
       },
       {
-        "command": "chassis.retrofit",
-        "title": "CHASSIS: Retrofit Project"
+        "command": "redivivus.retrofit",
+        "title": "Redivivus: Retrofit Project"
       },
       {
-        "command": "chassis.confirmRetrofit",
-        "title": "CHASSIS: Confirm Retrofit"
+        "command": "redivivus.confirmRetrofit",
+        "title": "Redivivus: Confirm Retrofit"
       },
       {
-        "command": "chassis.revertRetrofit",
-        "title": "CHASSIS: Revert Retrofit"
+        "command": "redivivus.revertRetrofit",
+        "title": "Redivivus: Revert Retrofit"
       },
       {
-        "command": "chassis.wizard",
-        "title": "CHASSIS: Wizard"
+        "command": "redivivus.wizard",
+        "title": "Redivivus: Wizard"
       },
       {
-        "command": "chassis.wizardRetrofit",
-        "title": "CHASSIS: Wizard — Retrofit Existing Project"
+        "command": "redivivus.wizardRetrofit",
+        "title": "Redivivus: Wizard — Retrofit Existing Project"
       },
       {
-        "command": "chassis.switchAI",
-        "title": "CHASSIS: Switch AI"
+        "command": "redivivus.switchAI",
+        "title": "Redivivus: Switch AI"
       },
       {
-        "command": "chassis.generateRules",
-        "title": "CHASSIS: Generate AI Editor Rules"
+        "command": "redivivus.generateRules",
+        "title": "Redivivus: Generate AI Editor Rules"
       },
       {
-        "command": "chassis.autoCommit",
-        "title": "CHASSIS: Auto-commit (build checkpoint)"
+        "command": "redivivus.autoCommit",
+        "title": "Redivivus: Auto-commit (build checkpoint)"
       },
       {
-        "command": "chassis.saveToVault",
-        "title": "CHASSIS: Save to Vault"
+        "command": "redivivus.saveToVault",
+        "title": "Redivivus: Save to Vault"
       },
       {
-        "command": "chassis.scanVaultCodebase",
-        "title": "CHASSIS: Scan Codebase to Vault"
+        "command": "redivivus.scanVaultCodebase",
+        "title": "Redivivus: Scan Codebase to Vault"
       },
       {
-        "command": "chassis.buildFromVault",
-        "title": "CHASSIS: Build from Vault"
+        "command": "redivivus.buildFromVault",
+        "title": "Redivivus: Build from Vault"
       },
       {
-        "command": "chassis.openVault",
-        "title": "CHASSIS: Open Vault"
+        "command": "redivivus.openVault",
+        "title": "Redivivus: Open Vault"
       },
       {
-        "command": "chassis.validateVault",
-        "title": "CHASSIS: Validate Vault Categories"
+        "command": "redivivus.validateVault",
+        "title": "Redivivus: Validate Vault Categories"
       },
       {
-        "command": "chassis.refreshKnowledgeBase",
-        "title": "CHASSIS: Refresh Knowledge Base (GitHub + Starter Patterns)"
+        "command": "redivivus.refreshKnowledgeBase",
+        "title": "Redivivus: Refresh Knowledge Base (GitHub + Starter Patterns)"
       },
       {
-        "command": "chassis.vaultCleanupSystemPaths",
-        "title": "CHASSIS: Vault - Remove System/Pip Path Items"
+        "command": "redivivus.vaultCleanupSystemPaths",
+        "title": "Redivivus: Vault - Remove System/Pip Path Items"
       },
       {
-        "command": "chassis.vault.enrich",
-        "title": "CHASSIS: Vault - Enrich Items with AI Descriptions"
+        "command": "redivivus.vault.enrich",
+        "title": "Redivivus: Vault - Enrich Items with AI Descriptions"
       },
       {
-        "command": "chassis.showChatGettingStarted",
-        "title": "CHASSIS: Show Getting Started"
+        "command": "redivivus.showChatGettingStarted",
+        "title": "Redivivus: Show Getting Started"
       },
       {
-        "command": "chassis.openSettings",
-        "title": "CHASSIS: AI API Setup"
+        "command": "redivivus.openSettings",
+        "title": "Redivivus: AI API Setup"
       },
       {
-        "command": "chassis.apiSetup",
-        "title": "CHASSIS: AI API Setup (alias)"
+        "command": "redivivus.apiSetup",
+        "title": "Redivivus: AI API Setup (alias)"
       },
       {
-        "command": "chassis.injectTerminalError",
-        "title": "CHASSIS: Fix Last Terminal Error"
+        "command": "redivivus.injectTerminalError",
+        "title": "Redivivus: Fix Last Terminal Error"
       },
       {
-        "command": "chassis.inspectElement",
-        "title": "CHASSIS: Inspect UI Element - Find Source Code"
+        "command": "redivivus.inspectElement",
+        "title": "Redivivus: Inspect UI Element - Find Source Code"
       },
       {
-        "command": "chassis.openVisualEditor",
-        "title": "CHASSIS: Open Visual Editor"
+        "command": "redivivus.openVisualEditor",
+        "title": "Redivivus: Open Visual Editor"
       },
       {
-        "command": "chassis.vaultDedup",
-        "title": "CHASSIS: Vault - Find and Remove Duplicates"
+        "command": "redivivus.vaultDedup",
+        "title": "Redivivus: Vault - Find and Remove Duplicates"
       },
       {
-        "command": "chassis.vaultTranslate",
-        "title": "CHASSIS: Vault - Translate Item to Another Language"
+        "command": "redivivus.vaultTranslate",
+        "title": "Redivivus: Vault - Translate Item to Another Language"
       },
       {
-        "command": "chassis.openSettingsInChat",
-        "title": "CHASSIS: AI API Setup in Chat"
+        "command": "redivivus.openSettingsInChat",
+        "title": "Redivivus: AI API Setup in Chat"
       },
       {
-        "command": "chassis.viewUsage",
-        "title": "CHASSIS: View Usage Report"
+        "command": "redivivus.viewUsage",
+        "title": "Redivivus: View Usage Report"
       },
       {
-        "command": "chassis.viewUsageInChat",
+        "command": "redivivus.viewUsageInChat",
         "title": "View Usage Stats in Chat"
       },
       {
-        "command": "chassis.openSetupHub",
-        "title": "CHASSIS: Open Setup Hub",
-        "category": "CHASSIS"
+        "command": "redivivus.openSetupHub",
+        "title": "Redivivus: Open Setup Hub",
+        "category": "Redivivus"
       },
       {
-        "command": "chassis.configureGitHubBackup",
-        "title": "CHASSIS: Configure GitHub Backup",
-        "category": "CHASSIS"
+        "command": "redivivus.configureGitHubBackup",
+        "title": "Redivivus: Configure GitHub Backup",
+        "category": "Redivivus"
       },
       {
-        "command": "chassis.backupNow",
-        "title": "CHASSIS: Backup to GitHub Now",
-        "category": "CHASSIS"
+        "command": "redivivus.backupNow",
+        "title": "Redivivus: Backup to GitHub Now",
+        "category": "Redivivus"
       },
       {
-        "command": "chassis.toggleGitHubBackup",
-        "title": "CHASSIS: Toggle GitHub Auto-Backup",
-        "category": "CHASSIS"
+        "command": "redivivus.toggleGitHubBackup",
+        "title": "Redivivus: Toggle GitHub Auto-Backup",
+        "category": "Redivivus"
       },
       {
-        "command": "chassis.showSetupProgress",
+        "command": "redivivus.showSetupProgress",
         "title": "Show Setup Progress"
       },
       {
-        "command": "chassis.resetSessionUsage",
-        "title": "CHASSIS: Reset Session Usage"
+        "command": "redivivus.resetSessionUsage",
+        "title": "Redivivus: Reset Session Usage"
       },
       {
-        "command": "chassis.resetDayUsage",
-        "title": "CHASSIS: Reset Day Usage"
+        "command": "redivivus.resetDayUsage",
+        "title": "Redivivus: Reset Day Usage"
       },
       {
-        "command": "chassis.resetWeekUsage",
-        "title": "CHASSIS: Reset Week Usage"
+        "command": "redivivus.resetWeekUsage",
+        "title": "Redivivus: Reset Week Usage"
       },
       {
-        "command": "chassis.resetMonthUsage",
-        "title": "CHASSIS: Reset Month Usage"
+        "command": "redivivus.resetMonthUsage",
+        "title": "Redivivus: Reset Month Usage"
       },
       {
-        "command": "chassis.resetAllUsage",
-        "title": "CHASSIS: Reset All Usage (Keep Lifetime)"
+        "command": "redivivus.resetAllUsage",
+        "title": "Redivivus: Reset All Usage (Keep Lifetime)"
       },
       {
-        "command": "chassis.explainSelection",
-        "title": "CHASSIS: Explain Selection"
+        "command": "redivivus.explainSelection",
+        "title": "Redivivus: Explain Selection"
       },
       {
-        "command": "chassis.improveSelection",
-        "title": "CHASSIS: Improve Selection"
+        "command": "redivivus.improveSelection",
+        "title": "Redivivus: Improve Selection"
       },
       {
-        "command": "chassis.viewTimeline",
-        "title": "CHASSIS: View Project Timeline"
+        "command": "redivivus.viewTimeline",
+        "title": "Redivivus: View Project Timeline"
       },
       {
-        "command": "chassis.showBuildHistory",
-        "title": "CHASSIS: Show Build History"
+        "command": "redivivus.showBuildHistory",
+        "title": "Redivivus: Show Build History"
       },
       {
-        "command": "chassis.profileRuntime",
-        "title": "CHASSIS: Profile Runtime"
+        "command": "redivivus.profileRuntime",
+        "title": "Redivivus: Profile Runtime"
       },
       {
-        "command": "chassis.runProject",
-        "title": "CHASSIS: Run Project"
+        "command": "redivivus.runProject",
+        "title": "Redivivus: Run Project"
       },
       {
-        "command": "chassis.savePoint",
-        "title": "CHASSIS: Create Save Point"
+        "command": "redivivus.savePoint",
+        "title": "Redivivus: Create Save Point"
       },
       {
-        "command": "chassis.restoreSavePoint",
-        "title": "CHASSIS: Restore Save Point"
+        "command": "redivivus.restoreSavePoint",
+        "title": "Redivivus: Restore Save Point"
       },
       {
-        "command": "chassis.splitFiles",
-        "title": "CHASSIS: Split Large Files"
+        "command": "redivivus.splitFiles",
+        "title": "Redivivus: Split Large Files"
       },
       {
-        "command": "chassis.retrofitBlueprint",
-        "title": "CHASSIS: Retrofit Blueprint from Scan"
+        "command": "redivivus.retrofitBlueprint",
+        "title": "Redivivus: Retrofit Blueprint from Scan"
       },
       {
-        "command": "chassis.detectScopeCreep",
-        "title": "CHASSIS: Detect Scope Creep"
+        "command": "redivivus.detectScopeCreep",
+        "title": "Redivivus: Detect Scope Creep"
       },
       {
-        "command": "chassis.detectDuplicates",
-        "title": "CHASSIS: Detect Duplicate Code"
+        "command": "redivivus.detectDuplicates",
+        "title": "Redivivus: Detect Duplicate Code"
       },
       {
-        "command": "chassis.saveSelectionToVault",
-        "title": "CHASSIS: Save Selection to Vault"
+        "command": "redivivus.saveSelectionToVault",
+        "title": "Redivivus: Save Selection to Vault"
       },
       {
-        "command": "chassis.showMap",
-        "title": "CHASSIS: Show Architecture Map 🗺"
+        "command": "redivivus.showMap",
+        "title": "Redivivus: Show Architecture Map 🗺"
       },
       {
-        "command": "chassis.selfDiagnostic",
-        "title": "CHASSIS: Run Self-Diagnostic",
-        "category": "CHASSIS"
+        "command": "redivivus.selfDiagnostic",
+        "title": "Redivivus: Run Self-Diagnostic",
+        "category": "Redivivus"
       },
       {
-        "command": "chassis.showPipelineTrace",
-        "title": "CHASSIS: Show Pipeline Trace",
-        "category": "CHASSIS"
+        "command": "redivivus.showPipelineTrace",
+        "title": "Redivivus: Show Pipeline Trace",
+        "category": "Redivivus"
       },
       {
-        "command": "chassis.openProfile",
-        "title": "CHASSIS: Open User Profile"
+        "command": "redivivus.openProfile",
+        "title": "Redivivus: Open User Profile"
       },
       {
-        "command": "chassis.webSearch",
-        "title": "CHASSIS: Web Search"
+        "command": "redivivus.webSearch",
+        "title": "Redivivus: Web Search"
       }
     ],
     "viewsWelcome": [
       {
-        "view": "chassisPanel",
-        "contents": "Welcome to CHASSIS\n\n[Open CHASSIS Dashboard](command:chassis.wizard)\n\n[Initialize Project](command:chassis.init)",
-        "when": "!chassis.initialized"
+        "view": "redivivusPanel",
+        "contents": "Welcome to Redivivus\n\n[Open Redivivus Dashboard](command:redivivus.wizard)\n\n[Initialize Project](command:redivivus.init)",
+        "when": "!redivivus.initialized"
       },
       {
-        "view": "chassisPanel",
-        "contents": "[Open CHASSIS Dashboard](command:chassis.wizard)",
-        "when": "chassis.initialized"
+        "view": "redivivusPanel",
+        "contents": "[Open Redivivus Dashboard](command:redivivus.wizard)",
+        "when": "redivivus.initialized"
       }
     ],
     "keybindings": [
       {
-        "command": "chassis.openChatPanel",
+        "command": "redivivus.openChatPanel",
         "key": "ctrl+l",
         "mac": "cmd+l",
         "when": "editorTextFocus || terminalFocus"
       },
       {
-        "command": "chassis.wizard",
+        "command": "redivivus.wizard",
         "key": "ctrl+shift+c",
         "mac": "cmd+shift+c",
         "when": "editorTextFocus || terminalFocus"
       },
       {
-        "command": "chassis.buildFromVault",
+        "command": "redivivus.buildFromVault",
         "key": "ctrl+shift+b",
         "mac": "cmd+shift+b",
         "when": "editorTextFocus || terminalFocus"
       },
       {
-        "command": "chassis.savePoint",
+        "command": "redivivus.savePoint",
         "key": "ctrl+shift+s",
         "mac": "cmd+shift+s",
         "when": "editorTextFocus || terminalFocus"
       },
       {
-        "command": "chassis.injectTerminalError",
+        "command": "redivivus.injectTerminalError",
         "key": "ctrl+shift+e",
         "mac": "cmd+shift+e",
         "when": "terminalFocus || editorTextFocus"
@@ -375,124 +375,124 @@
     "menus": {
       "commandPalette": [
         {
-          "command": "chassis.init",
-          "when": "!chassis.initialized"
+          "command": "redivivus.init",
+          "when": "!redivivus.initialized"
         },
         {
-          "command": "chassis.startSession",
-          "when": "chassis.initialized"
+          "command": "redivivus.startSession",
+          "when": "redivivus.initialized"
         },
         {
-          "command": "chassis.endSession",
-          "when": "chassis.sessionActive"
+          "command": "redivivus.endSession",
+          "when": "redivivus.sessionActive"
         },
         {
-          "command": "chassis.blueprint",
-          "when": "chassis.initialized"
+          "command": "redivivus.blueprint",
+          "when": "redivivus.initialized"
         },
         {
-          "command": "chassis.progress",
-          "when": "chassis.initialized"
+          "command": "redivivus.progress",
+          "when": "redivivus.initialized"
         },
         {
-          "command": "chassis.log",
-          "when": "chassis.initialized"
+          "command": "redivivus.log",
+          "when": "redivivus.initialized"
         },
         {
-          "command": "chassis.deadends",
-          "when": "chassis.initialized"
+          "command": "redivivus.deadends",
+          "when": "redivivus.initialized"
         },
         {
-          "command": "chassis.openBlueprint",
-          "when": "chassis.initialized"
+          "command": "redivivus.openBlueprint",
+          "when": "redivivus.initialized"
         },
         {
-          "command": "chassis.wizard",
-          "when": "chassis.initialized"
+          "command": "redivivus.wizard",
+          "when": "redivivus.initialized"
         },
         {
-          "command": "chassis.buildFromVault",
-          "when": "chassis.initialized"
+          "command": "redivivus.buildFromVault",
+          "when": "redivivus.initialized"
         }
       ],
       "editor/context": [
         {
-          "submenu": "chassis.editor",
-          "group": "9_chassis@1"
+          "submenu": "redivivus.editor",
+          "group": "9_redivivus@1"
         }
       ],
       "explorer/context": [
         {
-          "submenu": "chassis.explorer",
-          "group": "9_chassis@1"
+          "submenu": "redivivus.explorer",
+          "group": "9_redivivus@1"
         }
       ],
-      "chassis.editor": [
+      "redivivus.editor": [
         {
-          "command": "chassis.reviewFile",
-          "group": "chassis@1"
+          "command": "redivivus.reviewFile",
+          "group": "redivivus@1"
         },
         {
-          "command": "chassis.cleanUpFile",
-          "group": "chassis@2"
+          "command": "redivivus.cleanUpFile",
+          "group": "redivivus@2"
         },
         {
-          "command": "chassis.checkFileHealth",
-          "group": "chassis@3"
+          "command": "redivivus.checkFileHealth",
+          "group": "redivivus@3"
         },
         {
-          "command": "chassis.explainSelection",
-          "group": "chassis@4",
+          "command": "redivivus.explainSelection",
+          "group": "redivivus@4",
           "when": "editorHasSelection"
         },
         {
-          "command": "chassis.improveSelection",
-          "group": "chassis@5",
+          "command": "redivivus.improveSelection",
+          "group": "redivivus@5",
           "when": "editorHasSelection"
         },
         {
-          "command": "chassis.saveSelectionToVault",
-          "group": "chassis@6",
+          "command": "redivivus.saveSelectionToVault",
+          "group": "redivivus@6",
           "when": "editorHasSelection"
         },
         {
-          "command": "chassis.saveToVault",
-          "group": "chassis@7"
+          "command": "redivivus.saveToVault",
+          "group": "redivivus@7"
         }
       ],
-      "chassis.explorer": [
+      "redivivus.explorer": [
         {
-          "command": "chassis.reviewFile",
-          "group": "chassis@1"
+          "command": "redivivus.reviewFile",
+          "group": "redivivus@1"
         },
         {
-          "command": "chassis.cleanUpFile",
-          "group": "chassis@2"
+          "command": "redivivus.cleanUpFile",
+          "group": "redivivus@2"
         },
         {
-          "command": "chassis.checkFileHealth",
-          "group": "chassis@3"
+          "command": "redivivus.checkFileHealth",
+          "group": "redivivus@3"
         },
         {
-          "command": "chassis.saveToVault",
-          "group": "chassis@4"
+          "command": "redivivus.saveToVault",
+          "group": "redivivus@4"
         }
       ]
     },
     "submenus": [
       {
-        "id": "chassis.editor",
-        "label": "CHASSIS"
+        "id": "redivivus.editor",
+        "label": "Redivivus"
       },
       {
-        "id": "chassis.explorer",
-        "label": "CHASSIS"
+        "id": "redivivus.explorer",
+        "label": "Redivivus"
       }
     ],
     "configuration": {
-      "title": "CHASSIS",
+      "title": "Redivivus",
       "properties": {
-        "chassis.defaultAI": {
+        "redivivus.defaultAI": {
           "type": "string",
           "default": "gemini",
           "enum": [
@@ -511,49 +511,49 @@
             "xAI Grok (paid)",
             "Moonshot Kimi (paid)"
           ],
-          "description": "Which AI provider to use for CHASSIS operations"
+          "description": "Which AI provider to use for Redivivus operations"
         },
-        "chassis.projectsDirectory": {
+        "redivivus.projectsDirectory": {
           "type": "string",
           "default": "~/projects",
-          "description": "Directory containing all CHASSIS projects for project listing and switching"
+          "description": "Directory containing all Redivivus projects for project listing and switching"
         },
-        "chassis.geminiApiKey": {
+        "redivivus.geminiApiKey": {
           "type": "string",
           "default": "",
           "description": "Google Gemini API key — free at aistudio.google.com (or set GEMINI_API_KEY env var)"
         },
-        "chassis.claudeApiKey": {
+        "redivivus.claudeApiKey": {
           "type": "string",
           "default": "",
           "description": "Anthropic Claude API key — console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
         },
-        "chassis.openaiApiKey": {
+        "redivivus.openaiApiKey": {
           "type": "string",
           "default": "",
           "description": "OpenAI API key for GPT-4o — platform.openai.com (or set OPENAI_API_KEY env var)"
         },
-        "chassis.groqApiKey": {
+        "redivivus.groqApiKey": {
           "type": "string",
           "default": "",
           "description": "Groq API key — free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
         },
-        "chassis.xaiApiKey": {
+        "redivivus.xaiApiKey": {
           "type": "string",
           "default": "",
           "description": "xAI Grok API key — console.x.ai (or set XAI_API_KEY env var)"
         },
-        "chassis.kimiApiKey": {
+        "redivivus.kimiApiKey": {
           "type": "string",
           "default": "",
           "description": "Moonshot Kimi API key — platform.moonshot.cn (or set MOONSHOT_API_KEY env var)"
         },
-        "chassis.guardianEnabled": {
+        "redivivus.guardianEnabled": {
           "type": "boolean",
           "default": true,
           "description": "Guardian AI — when 2+ AI keys are configured, the higher-ranked AI silently reviews and corrects the worker AI's responses before they reach you. Disable to skip the review step."
         },
-        "chassis.startupBehavior": {
+        "redivivus.startupBehavior": {
           "type": "string",
           "default": "launcher",
           "enum": [
@@ -562,11 +562,11 @@
           ],
           "enumDescriptions": [
             "Show the Welcome launcher screen with Start New / Open Existing / Recent Projects options",
-            "Automatically reopen the most recent CHASSIS project (falls back to launcher if none exists)"
+            "Automatically reopen the most recent Redivivus project (falls back to launcher if none exists)"
           ],
-          "description": "What CHASSIS should do when launched without a specific folder open"
+          "description": "What Redivivus should do when launched without a specific folder open"
         },
-        "chassis.disabledProviders": {
+        "redivivus.disabledProviders": {
           "type": "array",
           "items": {
             "type": "string"

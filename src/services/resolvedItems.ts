@@ -1,5 +1,5 @@
 // [SCOPE] Persists resolved/dismissed items from the Recommendations panel across re-scans
-// Resolved items are stored in .chassis/resolved.json as a set of file paths + issue types.
+// Resolved items are stored in .redivivus/resolved.json as a set of file paths + issue types.
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
@@ -13,7 +13,7 @@ export interface ResolvedItem {
 function resolvedPath(): string | null {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { return null; }
-  return path.join(root, '.chassis', 'resolved.json');
+  return path.join(root, '.redivivus', 'resolved.json');
 }
 
 export function loadResolved(): ResolvedItem[] {
@@ -29,7 +29,7 @@ export function saveResolved(items: ResolvedItem[]): void {
   if (!p) { return; }
   try {
     fs.writeFileSync(p, JSON.stringify(items, null, 2), 'utf-8');
-  } catch (e) { console.error('[CHASSIS] Failed to save resolved.json:', e); }
+  } catch (e) { console.error('[Redivivus] Failed to save resolved.json:', e); }
 }
 
 export function markResolved(filePath: string, issueType: string): void {

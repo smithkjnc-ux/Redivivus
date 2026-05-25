@@ -163,7 +163,7 @@ export function buildPostBuildGuidance(root: string, builtFiles: string[]): stri
   lines.push('');
   lines.push('**If something goes wrong:** paste the error message here and I\'ll fix it.');
   lines.push('');
-  lines.push('> **Your program is the file(s) listed above.** The `.chassis/` folder is CHASSIS\'s internal workbench — it\'s invisible to your users and adds nothing to your app.');
+  lines.push('> **Your program is the file(s) listed above.** The `.redivivus/` folder is Redivivus\'s internal workbench — it\'s invisible to your users and adds nothing to your app.');
   return lines.join('\n');
 }
 

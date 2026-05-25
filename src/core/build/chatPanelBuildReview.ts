@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build Pipeline — Code Review (Guardian & Static Validation)
+// [SCOPE] Redivivus Build Pipeline — Code Review (Guardian & Static Validation)
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import type { BuildContext } from './chatPanelBuild';

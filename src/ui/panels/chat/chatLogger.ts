@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS CHAT Domain Logger
+// [SCOPE] Redivivus CHAT Domain Logger
 import { masterLog } from '../../../core/logging/masterLogger.js';
 
 const DOMAIN = 'CHAT';

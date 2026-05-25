@@ -7,13 +7,14 @@ import { ChatPanel } from '../../ui/panels/chat/chatPanel';
 import { handleEditRequest } from '../ai/chatPanelIntent';
 import { handleInterviewMessage } from '../../ui/views/blueprintInterviewPanel';
 import { panelVaultOnlyBuild } from '../build/chatPanelBuildUtils';
+import { handlePreviewMessages } from './chatPanelMessageRouterPreview';
 
 export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<boolean> {
   const state = (panel as any).state;
   const _panel = (panel as any)._panel;
   const _activeBuildCtx = (panel as any)._activeBuildCtx;
   const _pendingTask = (panel as any)._pendingTask;
-  const chassis = (panel as any).chassis;
+  const redivivus = (panel as any).redivivus;
   const routing = (panel as any).routing;
 
   if (msg.type === 'clarify-submit') {
@@ -25,7 +26,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
   if (msg.type?.startsWith('bi-')) {
     if (msg.type === 'bi-start') { _panel.reveal(vscode.ViewColumn.One, false); }
-    await handleInterviewMessage(msg, _panel.webview, chassis, routing);
+    await handleInterviewMessage(msg, _panel.webview, redivivus, routing);
     return true;
   }
 
@@ -77,24 +78,13 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     return true;
   }
 
-  if (msg.type === 'open-visual-editor' && msg.root) {
-    // Call panel directly — bypasses VS Code command registry
-    try {
-      const { openVisualContractPanel } = require('../../services/../ui/panels/visualContract/visualContractPanel.js');
-      const { BuildHistoryService } = require('../../services/build/buildHistoryService.js');
-      let builtFiles: string[] = [];
-      try { const h = new BuildHistoryService(msg.root); const last = h.list()[0]; builtFiles = last?.files ?? []; } catch {}
-      openVisualContractPanel(ChatPanel.extensionContext, msg.root, builtFiles, (panel as any).routing);
-    } catch (e) { vscode.window.showErrorMessage(`CHASSIS: Could not open Visual Editor: ${e instanceof Error ? e.message : String(e)}`); }
-    return true;
-  }
 
   if (msg.type === 'open-workspace-btn' && msg.path) {
     // [FIX] Save conversation right before the intentional reload so extensionResumeState can restore it.
     // This is the only place that should save pendingRescueConversation — NOT the build-finish callback.
     const _ctx = require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext;
     if (_ctx && panel) {
-      _ctx.globalState.update('chassis.pendingRescueConversation', (panel as any).state?.conversation ?? []);
+      _ctx.globalState.update('redivivus.pendingRescueConversation', (panel as any).state?.conversation ?? []);
     }
     vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(msg.path));
     return true;
@@ -122,7 +112,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
   if (msg.type === 'edit-request' && msg.filePath) {
     await handleEditRequest(msg, {
-      chassis, routing, vault: (panel as any).vault,
+      redivivus, routing, vault: (panel as any).vault,
       blueprintContext: state.blueprintContext,
       conversation: state.conversation,
       refresh: () => panel.refresh(),
@@ -179,48 +169,20 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
   }
 
   if (msg.type === 'retrofit-project') {
-    vscode.commands.executeCommand('chassis.retrofitBlueprint');
+    vscode.commands.executeCommand('redivivus.retrofitBlueprint');
     return true;
   }
 
-  // [CHASSIS] Quick Start Template — scaffold from launcher pill
   if (msg.type === 'scaffold-quickstart') {
-    const tplNames: Record<string, string> = { react: 'React', flask: 'Python Flask', go: 'Go API', express: 'Node Express' };
-    const label = tplNames[msg.template] || msg.template;
+    const label = ({ react: 'React', flask: 'Python Flask', go: 'Go API', express: 'Node Express' } as any)[msg.template] || msg.template;
     state.buildMode = 'direct';
     state.conversation.push({ role: 'user', content: `Scaffold a new ${label} project`, timestamp: Date.now() });
     state.conversation.push({ role: 'assistant', content: `🚀 Scaffolding ${label} project...`, timestamp: Date.now() });
-    panel.refresh();
-    await (panel as any)._handleBuildRequest(`scaffold a new ${label} project`, true, false);
+    panel.refresh(); await (panel as any)._handleBuildRequest(`scaffold a new ${label} project`, true, false);
     return true;
   }
-
-  if (msg.type === 'start-preview') {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) {
-      _panel.webview.postMessage({ type: 'preview-error', message: 'No project folder open.' });
-      return true;
-    }
-    const { detectDevServer, startPreviewServer, waitForPort } = await import('../../ui/panels/chat/chatPanelPreview.js');
-    const info = detectDevServer(root);
-    if (!info) {
-      _panel.webview.postMessage({ type: 'preview-error', message: 'Nothing to preview — build a project first, then click Preview.' });
-      return true;
-    }
-    const { port } = await startPreviewServer(root, info);
-    const timeout = info.type === 'static' ? 2_000 : 30_000;
-    const ready = await waitForPort(port, timeout);
-    if (ready) {
-      _panel.webview.postMessage({ type: 'preview-ready', port });
-    } else {
-      _panel.webview.postMessage({ type: 'preview-error', message: `Server didn't start on port ${port}. Check the CHASSIS Preview terminal for errors.` });
-    }
-    return true;
-  }
-
-  if (msg.type === 'popout-preview') {
-    vscode.commands.executeCommand('simpleBrowser.show', `http://localhost:${msg.port}`);
-    return true;
+  if (msg.type === 'start-preview' || msg.type === 'popout-preview' || msg.type === 'open-in-browser' || msg.type === 've-open-request' || msg.type === 'visual-apply-all' || msg.type === 'rearrange-start' || msg.type === 'redivivus-drag-drop' || msg.type === 'rearrange-finish' || msg.type === 'rearrange-undo') {
+    return handlePreviewMessages(panel, msg);
   }
 
   return false;

@@ -17,7 +17,7 @@ export async function handleVaultScanMessage(
     case 'vaultScanCodebase':
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: 'CHASSIS Vault: Scanning codebase...',
+        title: 'Redivivus Vault: Scanning codebase...',
         cancellable: true,
       }, async (progress, token) => {
         const scanRoot = msg.root || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -43,11 +43,11 @@ export async function handleVaultScanMessage(
           try {
             categorized = await vaultService.aiCategorize(newItems, routingService);
           } catch (e) {
-            console.warn('[CHASSIS] AI categorization failed:', e);
+            console.warn('[Redivivus] AI categorization failed:', e);
           }
         } else if (newItems.length > 0) {
           vscode.window.showWarningMessage(
-            `CHASSIS found ${newItems.length} vault items but no AI key is set — all saved as "other". Add an API key in Files & AI → API Keys, then use Fix Categories.`
+            `Redivivus found ${newItems.length} vault items but no AI key is set — all saved as "other". Add an API key in Files & AI → API Keys, then use Fix Categories.`
           );
         }
 

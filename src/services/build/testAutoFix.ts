@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Test Auto-Fix — runs tests after every build, parses failures,
+// [SCOPE] Redivivus Test Auto-Fix — runs tests after every build, parses failures,
 // calls AI to fix implementation files, re-runs. Up to 3 loops. Same pattern as compileAutoFix.ts.
 
 import * as fs from 'fs';

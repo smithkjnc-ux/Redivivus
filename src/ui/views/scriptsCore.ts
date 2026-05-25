@@ -51,13 +51,13 @@ export function getCoreScripts(): string {
         cd.innerHTML =
           '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:20px 20px 0;">' +
             '<div>' +
-              '<div style="font-size:16px;font-weight:700;margin-bottom:5px;">This project hasn\'t been set up with CHASSIS yet</div>' +
+              '<div style="font-size:16px;font-weight:700;margin-bottom:5px;">This project hasn\'t been set up with Redivivus yet</div>' +
               '<div style="font-size:12px;color:var(--vscode-descriptionForeground,#888);font-family:monospace;word-break:break-all;">' + folderName + '</div>' +
             '</div>' +
             '<button id="ppm-close" style="background:none;border:none;color:var(--vscode-descriptionForeground,#888);cursor:pointer;font-size:20px;padding:0 4px;line-height:1;flex-shrink:0;">&#x2715;</button>' +
           '</div>' +
           '<div style="padding:16px 20px 8px;font-size:13px;color:var(--vscode-descriptionForeground,#999);line-height:1.5;">' +
-            'CHASSIS tracks your blueprint, sessions, vault, and history. Set it up now for the full experience, or browse the folder without setup.' +
+            'Redivivus tracks your blueprint, sessions, vault, and history. Set it up now for the full experience, or browse the folder without setup.' +
           '</div>' +
           '<div style="display:flex;gap:10px;padding:12px 20px 20px;justify-content:flex-end;">' +
             '<button id="ppm-browse" style="padding:9px 20px;border:1px solid var(--vscode-input-border,#555);background:transparent;color:var(--vscode-descriptionForeground,#aaa);border-radius:8px;cursor:pointer;font-size:13px;font-family:inherit;">Browse Anyway</button>' +

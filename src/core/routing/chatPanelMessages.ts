@@ -1,10 +1,10 @@
-// [SCOPE] CHASSIS Chat Panel message handler — thin router, delegates to handler sub-modules
+// [SCOPE] Redivivus Chat Panel message handler — thin router, delegates to handler sub-modules
 // Sub-modules: chatPanelMsgSendMessage, chatPanelMsgFileOps, chatPanelMsgProjectOps, chatPanelMsgArchitect, chatPanelMsgSpecial
 
 import type * as vscode from 'vscode';
 import type { RoutingService } from '../../services/ai/routingService';
 import type { UsageTracker } from '../../services/usageTracker';
-import type { ChassisService } from '../../services/chassisService';
+import type { RedivivusService } from '../../services/redivivusService';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import { resolveBuildConfirm, resolvePlacement } from '../ai/chatPanelIntent';
 import { resolveVaultHit } from '../build/chatPanelBuild';
@@ -17,7 +17,7 @@ import { handleMapContext } from '../../ui/panels/chat/chatPanelMsgMapContext';
 import { handleExpandedInterviewSubmit } from '../../ui/panels/chat/chatPanelMsgExpandedInterview';
 
 export interface MessageHandlerDeps {
-  chassis: ChassisService;
+  redivivus: RedivivusService;
   routing: RoutingService;
   usageTracker?: UsageTracker;
   conversation: ChatMessage[];
@@ -41,7 +41,7 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   const { routing, conversation, panel, refresh } = deps;
 
   if (msg.type === 'send-message') {
-    // [CHASSIS] Plan mode: if interview is active (including project-name step), route to handler
+    // [Redivivus] Plan mode: if interview is active (including project-name step), route to handler
     if (deps.buildMode === 'plan' && deps.planInterview && (deps.planInterview.step < 8 || deps.planInterview.needsProjectName)) {
       const { handlePlanInterviewAnswer } = await import('../../ui/panels/chat/chatPanelPlanInterview.js');
       await handlePlanInterviewAnswer(msg, deps);
@@ -195,6 +195,6 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   } else if (msg.type === 'github-commit') {
     let files: string[] = [], commitMsg = '';
     try { const d = JSON.parse(Buffer.from(msg.payload || '', 'base64').toString('utf-8')); files = d.files || []; commitMsg = d.message || ''; } catch {}
-    (require('vscode') as typeof import('vscode')).commands.executeCommand('chassis.githubCommitFiles', files, commitMsg, panel.webview);
+    (require('vscode') as typeof import('vscode')).commands.executeCommand('redivivus.githubCommitFiles', files, commitMsg, panel.webview);
   }
 }

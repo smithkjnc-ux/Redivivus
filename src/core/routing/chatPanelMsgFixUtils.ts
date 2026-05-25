@@ -3,10 +3,10 @@
 //         readProjectRules, writeProjectRoadmapEntry.
 // Extracted from chatPanelMsgFix.ts (200-line split).
 // parseFixResponse filters to allowedRels only -- prevents Worker from creating phantom files.
-// Dead-end helpers read/write <project>/.chassis/dead_ends.md so the Supervisor never repeats
+// Dead-end helpers read/write <project>/.redivivus/dead_ends.md so the Supervisor never repeats
 // approaches that have already been tried and failed in this project.
 // getRecentBuildContext implements Rule 17: causation-first debugging via build_history.json.
-// writeProjectRoadmapEntry logs AI-made file changes to the project's CHASSIS_ROADMAP.md.
+// writeProjectRoadmapEntry logs AI-made file changes to the project's REDIVIVUS_ROADMAP.md.
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -90,7 +90,7 @@ export function collectSourceFiles(root: string, userText?: string): { rel: stri
   const importers = all.filter(f => !mentionedSet.has(f.rel) && !srcSet.has(f.rel) && mentioned.some(m => f.content.includes(path.basename(m.rel, path.extname(m.rel)))));
   const importersSet = new Set(importers.map(f => f.rel));
 
-  // [CHASSIS CORE] Prioritize files with ANNOTATIONS - they have [SCOPE]/[ANNOTATION] tags
+  // [Redivivus CORE] Prioritize files with ANNOTATIONS - they have [SCOPE]/[ANNOTATION] tags
   const hasAnnotations = (f: {content: string}) => /\[?(?:SCOPE|ANNOTATION|TODO|WARN|DONE)\]?\s*[:\-]/.test(f.content);
   const annotatedFiles = all.filter(f => !mentionedSet.has(f.rel) && !srcSet.has(f.rel) && !contentMatchedSet.has(f.rel) && !importersSet.has(f.rel) && hasAnnotations(f));
 
@@ -100,7 +100,7 @@ export function collectSourceFiles(root: string, userText?: string): { rel: stri
   return [...selected, ...rest].slice(0, 12);
 }
 
-const DEAD_ENDS_PATH = (root: string) => path.join(root, '.chassis', 'dead_ends.md');
+const DEAD_ENDS_PATH = (root: string) => path.join(root, '.redivivus', 'dead_ends.md');
 const DEAD_ENDS_HEADER = '# Dead End Log\nApproaches tried and failed in this project. Read before suggesting a fix.\n\n---\n\n';
 const MAX_DEAD_ENDS_BYTES = 8_000;
 
@@ -118,13 +118,13 @@ export function readProjectDeadEnds(root: string): string {
 const MAX_RULES_BYTES = 4_000;
 
 /**
- * Pre-flight Rule 4 — Read .chassis/rules.md before generating or fixing code.
+ * Pre-flight Rule 4 — Read .redivivus/rules.md before generating or fixing code.
  * Returns the project's rules content (truncated), or empty string if absent.
  * Supervisors use this to avoid proposing approaches that violate project constraints.
  */
 export function readProjectRules(root: string): string {
   try {
-    const p = path.join(root, '.chassis', 'rules.md');
+    const p = path.join(root, '.redivivus', 'rules.md');
     if (!fs.existsSync(p)) { return ''; }
     let text = fs.readFileSync(p, 'utf-8');
     if (text.length > MAX_RULES_BYTES) { text = text.slice(0, MAX_RULES_BYTES) + '\n// (truncated)'; }
@@ -156,7 +156,7 @@ export function getRecentBuildContext(root: string, sourceFiles: { rel: string }
       lines.push(`- ${touched.join(', ')} -- last written by build: "${entry.task.slice(0, 80)}" (${ageStr}, AI: ${aiStr})`);
     }
     if (lines.length === 0) { return ''; }
-    const buildCtx = `CAUSATION-FIRST (Rule 17): These source files were recently written by CHASSIS builds.\n` +
+    const buildCtx = `CAUSATION-FIRST (Rule 17): These source files were recently written by Redivivus builds.\n` +
       `Check whether the bug was INTRODUCED by a build before assuming it is a pre-existing issue.\n` +
       `If the reported symptom appeared AFTER a build, that build is the most likely cause.\n` +
       lines.join('\n');
@@ -182,7 +182,7 @@ export function getRecentBuildsContext(root: string): string {
   } catch { return ''; }
 }
 
-/** Appends a dead-end entry to the project's .chassis/dead_ends.md. Best-effort. */
+/** Appends a dead-end entry to the project's .redivivus/dead_ends.md. Best-effort. */
 export function appendProjectDeadEnd(root: string, patternName: string, triedWhat: string, whyFails: string, doInstead: string): void {
   try {
     const p = DEAD_ENDS_PATH(root);

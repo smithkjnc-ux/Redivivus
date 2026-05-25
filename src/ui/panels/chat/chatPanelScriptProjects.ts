@@ -52,7 +52,7 @@ export function buildProjectsScript(): string {
         const ov=document.createElement('div'); ov.id='np-modal-overlay'; ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center;z-index:9999;';
         const cd=document.createElement('div'); cd.style.cssText='background:#1e2740;color:#e8edf8;border-radius:12px;padding:28px 32px;width:520px;max-width:90vw;box-shadow:0 12px 48px rgba(0,0,0,0.6);border:1px solid #2d3a55;font-family:inherit;';
         const tt=document.createElement('div'); tt.style.cssText='font-size:17px;font-weight:700;margin-bottom:6px;color:#e8edf8;'; tt.textContent= vaultOnly ? 'Build & Save to Vault' : 'Confirm Build Task'; cd.appendChild(tt);
-        const sub=document.createElement('div'); sub.style.cssText='font-size:12px;color:#8899bb;margin-bottom:16px;'; sub.textContent= vaultOnly ? 'This looks like a standalone function. CHASSIS will build it and save it directly to your Vault -- no project folder needed.' : 'Review and edit your request before building. Add any extra detail that will help.'; cd.appendChild(sub);
+        const sub=document.createElement('div'); sub.style.cssText='font-size:12px;color:#8899bb;margin-bottom:16px;'; sub.textContent= vaultOnly ? 'This looks like a standalone function. Redivivus will build it and save it directly to your Vault -- no project folder needed.' : 'Review and edit your request before building. Add any extra detail that will help.'; cd.appendChild(sub);
         const ta=document.createElement('textarea'); ta.rows=4; ta.value=prefillTask; ta.style.cssText='width:100%;box-sizing:border-box;padding:10px;border:1px solid #2d3a55;border-radius:8px;font-size:13px;resize:vertical;font-family:inherit;color:#e8edf8;background:#1a2035;outline:none;'; cd.appendChild(ta);
         setTimeout(()=>{ta.focus();ta.setSelectionRange(ta.value.length,ta.value.length);},30);
         const btns=document.createElement('div'); btns.style.cssText='display:flex;justify-content:flex-end;gap:10px;margin-top:18px;';
@@ -71,7 +71,7 @@ export function buildProjectsScript(): string {
       overlay.appendChild(card); document.body.appendChild(overlay);
       function renderStep() {
         card.innerHTML = '';
-        const title = document.createElement('div'); title.style.cssText = 'font-size:17px;font-weight:700;color:#e8edf8;margin-bottom:6px;'; title.textContent = 'CHASSIS \u2014 New Project Setup'; card.appendChild(title);
+        const title = document.createElement('div'); title.style.cssText = 'font-size:17px;font-weight:700;color:#e8edf8;margin-bottom:6px;'; title.textContent = 'Redivivus \u2014 New Project Setup'; card.appendChild(title);
         const counter = document.createElement('div'); counter.style.cssText = 'font-size:12px;color:#8899bb;margin-bottom:18px;';
         counter.textContent = step < questions.length ? 'Question ' + (step+1) + ' of ' + (questions.length || 1) + (questions.length < 5 ? ' \u2014 ' + (5 - questions.length) + ' pre-filled by AI' : '') : 'Final step';
         card.appendChild(counter);
@@ -116,11 +116,11 @@ export function buildProjectsScript(): string {
       const ov = document.createElement('div'); ov.id='projects-modal-overlay'; ov.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;z-index:9999;';
       const cd = document.createElement('div'); cd.style.cssText='background:var(--vscode-editor-background);color:var(--vscode-foreground);border-radius:8px;width:560px;max-width:90vw;max-height:70vh;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(0,0,0,0.45);border:1px solid var(--vscode-editorGroup-border);overflow:hidden;';
       const hdr = document.createElement('div'); hdr.style.cssText='display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--vscode-editorGroup-border);flex-shrink:0;';
-      const title = document.createElement('div'); title.style.cssText='font-size:15px;font-weight:700;'; title.textContent='\\uD83D\\uDCC1 CHASSIS Projects'; hdr.appendChild(title);
+      const title = document.createElement('div'); title.style.cssText='font-size:15px;font-weight:700;'; title.textContent='\\uD83D\\uDCC1 Redivivus Projects'; hdr.appendChild(title);
       const closeBtn = document.createElement('button'); closeBtn.textContent='\\u00D7'; closeBtn.style.cssText='background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:20px;padding:0 4px;line-height:1;'; closeBtn.onclick=()=>ov.remove(); hdr.appendChild(closeBtn); cd.appendChild(hdr);
       const list = document.createElement('div'); list.style.cssText='overflow-y:auto;padding:8px 0;flex:1;';
       if (projects.length === 0) {
-        const empty = document.createElement('div'); empty.style.cssText='padding:24px 20px;text-align:center;color:var(--vscode-descriptionForeground);font-size:13px;'; empty.textContent='No CHASSIS projects found.'; list.appendChild(empty);
+        const empty = document.createElement('div'); empty.style.cssText='padding:24px 20px;text-align:center;color:var(--vscode-descriptionForeground);font-size:13px;'; empty.textContent='No Redivivus projects found.'; list.appendChild(empty);
       } else {
         projects.forEach((p) => {
           const row = document.createElement('div'); row.style.cssText='display:flex;align-items:center;padding:10px 20px;cursor:pointer;gap:12px;transition:background 0.1s;'; row.onmouseenter=()=>{row.style.background='var(--vscode-list-hoverBackground)';}; row.onmouseleave=()=>{row.style.background='';};

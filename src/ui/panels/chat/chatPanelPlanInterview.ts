@@ -91,9 +91,9 @@ export async function handlePlanInterviewAnswer(msg: any, deps: any): Promise<vo
       interview.step = 8;
       const task = buildTaskFromAnswers(interview.answers, interview.followupAnswers, interview.followupQuestions);
       interview.originalTask = task;
-      // [FIX] Use live workspace check — deps.chassis.isInitialized() can be stale after project switches
+      // [FIX] Use live workspace check — deps.redivivus.isInitialized() can be stale after project switches
       const wsRoot = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath;
-      const hasProject = !!(wsRoot && require('fs').existsSync(require('path').join(wsRoot, '.chassis')));
+      const hasProject = !!(wsRoot && require('fs').existsSync(require('path').join(wsRoot, '.redivivus')));
       if (hasProject) {
         // Project open — save blueprint then build directly.
         // [FIX] skipComplex=true: plan interview replaces all gates (scope, vault, cost, blueprint checks).

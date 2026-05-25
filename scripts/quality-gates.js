@@ -96,8 +96,8 @@ try {
   const modifiedFiles = statusOutput.split('\n').map(line => line.slice(3).trim());
   
   if (modifiedFiles.includes('package.json')) {
-    if (!modifiedFiles.includes('CHASSIS_ROADMAP.md')) {
-      console.warn('\x1b[31m%s\x1b[0m', '\n[CHASSIS WARNING] package.json was modified but CHASSIS_ROADMAP.md was NOT updated!');
+    if (!modifiedFiles.includes('REDIVIVUS_ROADMAP.md')) {
+      console.warn('\x1b[31m%s\x1b[0m', '\n[Redivivus WARNING] package.json was modified but REDIVIVUS_ROADMAP.md was NOT updated!');
       console.warn('Every dependency change MUST be logged in the roadmap per Rule 9 / Project Rules.');
     } else {
       console.log('Dependencies changed and roadmap was correctly updated.');

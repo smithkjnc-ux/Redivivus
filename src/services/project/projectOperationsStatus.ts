@@ -9,7 +9,7 @@ import { homedir } from 'os';
 export interface ProjectInfo {
   name: string;
   path: string;
-  isChassis: boolean;
+  isRedivivus: boolean;
   version?: string;
   blueprintStatus?: string;
   lastSession?: string;
@@ -18,7 +18,7 @@ export interface ProjectInfo {
 }
 
 export function getProjectsDir(): string {
-  const config = vscode.workspace.getConfiguration('chassis');
+  const config = vscode.workspace.getConfiguration('redivivus');
   const projectsDir = config.get<string>('projectsDirectory') || '~/projects';
   return projectsDir.replace('~', homedir());
 }
@@ -32,9 +32,9 @@ export async function getProjectStatus(projectName: string): Promise<string | nu
     return `Project not found: ${projectName}`;
   }
 
-  const configPath = path.join(projectPath, '.chassis', 'config.json');
+  const configPath = path.join(projectPath, '.redivivus', 'config.json');
   if (!fs.existsSync(configPath)) {
-    return `${projectName} is not a CHASSIS project`;
+    return `${projectName} is not a Redivivus project`;
   }
 
   try {
@@ -56,7 +56,7 @@ export async function getProjectStatus(projectName: string): Promise<string | nu
       if (lastSession.goal) { status += `**Goal:** ${lastSession.goal}\n`; }
     }
 
-    const workLogPath = path.join(projectPath, '.chassis', 'work_log.md');
+    const workLogPath = path.join(projectPath, '.redivivus', 'work_log.md');
     if (fs.existsSync(workLogPath)) {
       const workLog = fs.readFileSync(workLogPath, 'utf-8');
       const lines = workLog.split('\n').filter(l => l.trim());
@@ -74,8 +74,8 @@ export function getCurrentProjectInfo(): string | null {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { return 'No project open'; }
 
-  const configPath = path.join(root, '.chassis', 'config.json');
-  if (!fs.existsSync(configPath)) { return 'Current workspace is not a CHASSIS project'; }
+  const configPath = path.join(root, '.redivivus', 'config.json');
+  if (!fs.existsSync(configPath)) { return 'Current workspace is not a Redivivus project'; }
 
   try {
     const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));

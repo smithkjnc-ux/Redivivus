@@ -1,5 +1,5 @@
-// [SCOPE] CHASSIS Delegation CodeLens — "Fix this" and "Ask CHASSIS" buttons above [TODO] and [WARN] tags
-// Appears inline in the editor above any annotated line. Routes through chassis.postToChat.
+// [SCOPE] Redivivus Delegation CodeLens — "Fix this" and "Ask Redivivus" buttons above [TODO] and [WARN] tags
+// Appears inline in the editor above any annotated line. Routes through redivivus.postToChat.
 
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -24,14 +24,14 @@ export class DelegationCodeLensProvider implements vscode.CodeLensProvider {
 
       if (tag === 'TODO') {
         lenses.push(new vscode.CodeLens(range, {
-          title: '$(tools) Fix this with CHASSIS',
-          command: 'chassis.postToChat',
+          title: '$(tools) Fix this with Redivivus',
+          command: 'redivivus.postToChat',
           arguments: [`Fix the task at line ${i + 1} in \`${relPath}\`: ${tagText || 'complete the TODO'}`],
         }));
       } else if (tag === 'WARN') {
         lenses.push(new vscode.CodeLens(range, {
-          title: '$(warning) Ask CHASSIS about this',
-          command: 'chassis.postToChat',
+          title: '$(warning) Ask Redivivus about this',
+          command: 'redivivus.postToChat',
           arguments: [`There is a warning flag at line ${i + 1} in \`${relPath}\`: ${tagText || 'review this section'} — can you explain what could go wrong and suggest a fix?`],
         }));
       }

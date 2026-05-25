@@ -1,14 +1,14 @@
 // [SCOPE] Python instrumentation script generator for Runtime Analysis Engine.
-// Produces chassis_trace.py — a sys.settrace() wrapper written to the project root.
+// Produces redivivus_trace.py — a sys.settrace() wrapper written to the project root.
 // TEMPORARY — must be deleted after analysis (try/finally in caller).
 // No vscode dependency.
 
-/** Returns the content of chassis_trace.py as a string. */
+/** Returns the content of redivivus_trace.py as a string. */
 export function buildPythonTraceScript(traceOutputPath: string, durationSeconds: number): string {
   // [WARN] All strings here are ASCII-only — this content is written to disk,
   //        not injected into a WebView, but keep it clean for consistency.
   const escapedPath = traceOutputPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return `# chassis_trace.py -- CHASSIS Runtime Analysis instrumentation
+  return `# redivivus_trace.py -- Redivivus Runtime Analysis instrumentation
 # AUTO-GENERATED. DO NOT EDIT. Deleted automatically after analysis.
 import sys
 import os

@@ -51,12 +51,12 @@ export async function handleBuildOutput(args: OutputArgs): Promise<void> {
   if (!fsSync.existsSync(dirPath)) { fsSync.mkdirSync(dirPath, { recursive: true }); }
   fsSync.writeFileSync(picked.fsPath, code);
 
-  // Pre-init CHASSIS so plan interview does NOT trigger on folder open
-  const chassisDir = path.join(dirPath, '.chassis');
-  if (!fsSync.existsSync(chassisDir)) {
-    fsSync.mkdirSync(chassisDir, { recursive: true });
+  // Pre-init Redivivus so plan interview does NOT trigger on folder open
+  const redivivusDir = path.join(dirPath, '.redivivus');
+  if (!fsSync.existsSync(redivivusDir)) {
+    fsSync.mkdirSync(redivivusDir, { recursive: true });
     const cfg = { projectName, createdAt: new Date().toISOString(), version: '0.3.6', blueprint: { who: '', what: task, where: '', when: 'vault build', why: 'built from vault', health: { confirmed: 1, assumed: 3, unknown: 1, confidence: 'medium' }, locked: false, version: '1.0' }, sessions: [] };
-    fsSync.writeFileSync(path.join(chassisDir, 'config.json'), JSON.stringify(cfg, null, 2));
+    fsSync.writeFileSync(path.join(redivivusDir, 'config.json'), JSON.stringify(cfg, null, 2));
   }
 
   // Persist summary through window reload
@@ -64,8 +64,8 @@ export async function handleBuildOutput(args: OutputArgs): Promise<void> {
     const { ChatPanel } = require('../../ui/chat/chatPanel.js');
     const ctx = ChatPanel.extensionContext;
     if (ctx) {
-      await ctx.globalState.update('chassis.pendingVaultSummary', summary + `\n\nSaved to: \`${picked.fsPath}\``);
-      await ctx.globalState.update('chassis.suppressAutoOpen', dirPath);
+      await ctx.globalState.update('redivivus.pendingVaultSummary', summary + `\n\nSaved to: \`${picked.fsPath}\``);
+      await ctx.globalState.update('redivivus.suppressAutoOpen', dirPath);
     }
   } catch { /* not available */ }
   await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dirPath), false);

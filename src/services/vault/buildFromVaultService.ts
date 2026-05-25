@@ -30,7 +30,7 @@ export class BuildFromVaultService {
 
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
-      title: 'CHASSIS: Building from Vault...',
+      title: 'Redivivus: Building from Vault...',
       cancellable: true,
     }, async (progress, token) => {
 
@@ -52,7 +52,7 @@ export class BuildFromVaultService {
         return `- [${item.category}] ${item.name} (${item.language}) — ${path.basename(item.sourceFile)}`;
       }).join('\n');
 
-      const planPrompt = `You are CHASSIS, an AI code assembly assistant.
+      const planPrompt = `You are Redivivus, an AI code assembly assistant.
 
 TASK: "${task}"
 ${targetFile ? `TARGET FILE: ${targetFile}` : 'TARGET: New file'}
@@ -71,7 +71,7 @@ Only include vault items that are genuinely useful for this task. Be honest abou
 
       const planResponse = await this.routingService.prompt(planPrompt);
       if (!planResponse.success || token.isCancellationRequested) {
-        vscode.window.showErrorMessage('CHASSIS: Planning step failed — ' + (planResponse.error || 'cancelled'));
+        vscode.window.showErrorMessage('Redivivus: Planning step failed — ' + (planResponse.error || 'cancelled'));
         return;
       }
 
@@ -83,7 +83,7 @@ Only include vault items that are genuinely useful for this task. Be honest abou
         if (objMatch) { raw = objMatch[0]; }
         plan = JSON.parse(raw);
       } catch {
-        vscode.window.showErrorMessage('CHASSIS: Could not parse build plan. Try again.');
+        vscode.window.showErrorMessage('Redivivus: Could not parse build plan. Try again.');
         return;
       }
 
@@ -99,7 +99,7 @@ Only include vault items that are genuinely useful for this task. Be honest abou
       const detail = `Plan: ${plan.plan}\n\nFrom vault (${selectedItems.length}):\n${vaultLines}\n\nNeeds new code (${plan.gaps.length}):\n${gapLines}`;
 
       const confirm = await vscode.window.showInformationMessage(
-        `CHASSIS Build Plan — "${task}"`,
+        `Redivivus Build Plan — "${task}"`,
         { modal: true, detail },
         'Build It', 'Cancel'
       );
@@ -116,7 +116,7 @@ Only include vault items that are genuinely useful for this task. Be honest abou
         ? `Write code for the file: ${targetFile}\n`
         : 'Write a new standalone module.\n';
 
-      const assemblePrompt = `You are CHASSIS. Assemble production-ready code for this task.
+      const assemblePrompt = `You are Redivivus. Assemble production-ready code for this task.
 
 TASK: "${task}"
 ${fileContext}
@@ -129,14 +129,14 @@ ${plan.gaps.map(g => '- ' + g).join('\n') || '(none)'}
 Rules:
 - Use the vault code directly — reference it, import it, or include it as-is
 - Only write NEW code for the listed gaps
-- Add CHASSIS [SCOPE] comment at the top explaining what this module does
+- Add Redivivus [SCOPE] comment at the top explaining what this module does
 - Add [TODO] markers where the user needs to wire things up (e.g. call this function, add to router)
 - Keep it clean, typed, and consistent with the vault code style
 - Return ONLY the code, no markdown fences, no explanation`;
 
       const assembleResponse = await this.routingService.prompt(assemblePrompt);
       if (!assembleResponse.success || token.isCancellationRequested) {
-        vscode.window.showErrorMessage('CHASSIS: Assembly failed — ' + (assembleResponse.error || 'cancelled'));
+        vscode.window.showErrorMessage('Redivivus: Assembly failed — ' + (assembleResponse.error || 'cancelled'));
         return;
       }
 

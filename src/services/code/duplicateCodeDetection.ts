@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Duplicate Code Detection — finds repeated patterns across files
+// [SCOPE] Redivivus Duplicate Code Detection — finds repeated patterns across files
 
 import * as fs from 'fs';
 import * as path from 'path';

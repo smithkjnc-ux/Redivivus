@@ -1,5 +1,5 @@
 // [SCOPE] Fix Pipeline Logger — writes structured logs to disk for debugging
-// Logs are written to .chassis/logs/fix-pipeline-YYYY-MM-DD-HHMMSS.log
+// Logs are written to .redivivus/logs/fix-pipeline-YYYY-MM-DD-HHMMSS.log
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,7 +10,7 @@ let flushTimer: NodeJS.Timeout | null = null;
 
 /** Initialize a new log file for this fix session */
 export function initFixLogger(root: string): void {
-  const logsDir = path.join(root, '.chassis', 'logs');
+  const logsDir = path.join(root, '.redivivus', 'logs');
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
@@ -18,7 +18,7 @@ export function initFixLogger(root: string): void {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
   currentLogFile = path.join(logsDir, `fix-pipeline-${timestamp}.log`);
   
-  logBuffer = [`=== CHASSIS Fix Pipeline Log ===\n`, `Started: ${new Date().toISOString()}\n`, `Project: ${root}\n`, `---\n\n`];
+  logBuffer = [`=== Redivivus Fix Pipeline Log ===\n`, `Started: ${new Date().toISOString()}\n`, `Project: ${root}\n`, `---\n\n`];
   flushLog();
 }
 
@@ -44,7 +44,7 @@ function flushLog(): void {
     fs.appendFileSync(currentLogFile, logBuffer.join(''), 'utf-8');
     logBuffer = [];
   } catch (e) {
-    console.error('[CHASSIS] Failed to write fix log:', e);
+    console.error('[Redivivus] Failed to write fix log:', e);
   }
   
   if (flushTimer) {
@@ -71,7 +71,7 @@ export function getCurrentLogPath(): string | null {
 
 /** List all fix pipeline logs for this project */
 export function listFixLogs(root: string): string[] {
-  const logsDir = path.join(root, '.chassis', 'logs');
+  const logsDir = path.join(root, '.redivivus', 'logs');
   if (!fs.existsSync(logsDir)) {return [];}
   
   return fs.readdirSync(logsDir)

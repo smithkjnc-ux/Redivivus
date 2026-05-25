@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Setup Hub — single entry point showing all global setup status.
+// [SCOPE] Redivivus Setup Hub — single entry point showing all global setup status.
 // Shown on first install and accessible via command. HTML -> setupHubHtml.ts.
 // GitHub token validated against GitHub API before storing in VS Code SecretStorage.
 
@@ -10,27 +10,27 @@ let _panel: vscode.WebviewPanel | undefined;
 
 export function registerSetupHubCommand(context: vscode.ExtensionContext, githubBackupService: GitHubBackupService): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openSetupHub', () => {
+    vscode.commands.registerCommand('redivivus.openSetupHub', () => {
       showSetupHub(context, githubBackupService);
     })
   );
-  const shown = context.globalState.get<boolean>('chassis.setupHubShown');
+  const shown = context.globalState.get<boolean>('redivivus.setupHubShown');
   if (!shown) {
-    context.globalState.update('chassis.setupHubShown', true);
+    context.globalState.update('redivivus.setupHubShown', true);
     setTimeout(() => showSetupHub(context, githubBackupService), 1500);
   }
 }
 
 async function refreshPanel(context: vscode.ExtensionContext, githubBackupService: GitHubBackupService): Promise<void> {
   if (!_panel) { return; }
-  const cfg2 = vscode.workspace.getConfiguration('chassis');
+  const cfg2 = vscode.workspace.getConfiguration('redivivus');
   const g = cfg2.get<string>('geminiApiKey') || '';
   const o = cfg2.get<string>('openaiApiKey') || '';
   const a = cfg2.get<string>('anthropicApiKey') || '';
   const k = cfg2.get<string>('kimiApiKey') || '';
   const ghCfg = githubBackupService.getConfig();
   const ghConnected = await githubBackupService.isConnected();
-  const vaultEnabled = context.globalState.get<boolean>('chassis.vaultEnabled', true) !== false;
+  const vaultEnabled = context.globalState.get<boolean>('redivivus.vaultEnabled', true) !== false;
   _panel.webview.html = getHubHtml(!!(g||o||a||k), g, o, a, k, ghConnected, ghCfg.username, ghCfg.repoName, false, 'none', 'none', true, vaultEnabled);
 }
 
@@ -38,12 +38,12 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
   if (_panel) { _panel.reveal(); return; }
 
   _panel = vscode.window.createWebviewPanel(
-    'chassisSetupHub', 'CHASSIS Setup', vscode.ViewColumn.One,
+    'redivivusSetupHub', 'Redivivus Setup', vscode.ViewColumn.One,
     { enableScripts: true, retainContextWhenHidden: true }
   );
   _panel.onDidDispose(() => { _panel = undefined; });
 
-  const cfg = vscode.workspace.getConfiguration('chassis');
+  const cfg = vscode.workspace.getConfiguration('redivivus');
   const geminiKey    = cfg.get<string>('geminiApiKey') || '';
   const openaiKey    = cfg.get<string>('openaiApiKey') || '';
   const anthropicKey = cfg.get<string>('anthropicApiKey') || '';
@@ -58,13 +58,13 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
   const workerAI = tmpRouting.getAvailableAI().ai;
   const guardianAI = guardianActive ? (tmpRouting.getGuardianFor(workerAI) || 'none') : 'none';
   const guardianCfg = cfg.get<boolean>('guardianEnabled') !== false;
-  const vaultEnabled = context.globalState.get<boolean>('chassis.vaultEnabled', true) !== false;
+  const vaultEnabled = context.globalState.get<boolean>('redivivus.vaultEnabled', true) !== false;
 
   _panel.webview.html = getHubHtml(hasAI, geminiKey, openaiKey, anthropicKey, kimiKey, hasGitHub, githubCfg.username, githubCfg.repoName, guardianActive, guardianAI, workerAI, guardianCfg, vaultEnabled);
 
   _panel.webview.onDidReceiveMessage(async (msg) => {
     if (msg.type === 'open-api-setup') {
-      vscode.commands.executeCommand('chassis.openSettings');
+      vscode.commands.executeCommand('redivivus.openSettings');
     } else if (msg.type === 'openExternal') {
       vscode.env.openExternal(vscode.Uri.parse(msg.url));
     } else if (msg.type === 'save-github') {
@@ -97,16 +97,16 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
         });
       }
     } else if (msg.type === 'toggle-guardian') {
-      await vscode.workspace.getConfiguration('chassis').update('guardianEnabled', !!msg.enabled, true);
+      await vscode.workspace.getConfiguration('redivivus').update('guardianEnabled', !!msg.enabled, true);
     } else if (msg.type === 'toggle-vault') {
-      await context.globalState.update('chassis.vaultEnabled', msg.enabled !== false);
+      await context.globalState.update('redivivus.vaultEnabled', msg.enabled !== false);
       await refreshPanel(context, githubBackupService);
     } else if (msg.type === 'open-project-setup') {
-      vscode.commands.executeCommand('chassis.showSetupProgress');
+      vscode.commands.executeCommand('redivivus.showSetupProgress');
     } else if (msg.type === 'open-chat') {
-      vscode.commands.executeCommand('chassis.openChatPanel');
+      vscode.commands.executeCommand('redivivus.openChatPanel');
     } else if (msg.type === 'open-blueprint') {
-      vscode.commands.executeCommand('chassis.wizardRetrofit');
+      vscode.commands.executeCommand('redivivus.wizardRetrofit');
     }
   });
 }

@@ -22,11 +22,11 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
   const extracted = await extractBlueprintFromPrompt(task, deps.routing);
   const slug = extracted.suggestedName || await deriveFileBase(task, deps.routing);
 
-  const projectsDir = vscode.workspace.getConfiguration('chassis')
+  const projectsDir = vscode.workspace.getConfiguration('redivivus')
     .get<string>('projectsDirectory', '~/projects')!
     .replace('~', os.homedir());
   const dir = path.join(projectsDir, slug);
-  fs.mkdirSync(path.join(dir, '.chassis'), { recursive: true });
+  fs.mkdirSync(path.join(dir, '.redivivus'), { recursive: true });
 
   const bp = {
     what:  extracted.what  || task.slice(0, 200),
@@ -36,7 +36,7 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
     why:   extracted.why   || '',
   };
   const config = { projectName: slug, initialized: true, blueprint: bp };
-  fs.writeFileSync(path.join(dir, '.chassis', 'config.json'), JSON.stringify(config, null, 2));
+  fs.writeFileSync(path.join(dir, '.redivivus', 'config.json'), JSON.stringify(config, null, 2));
 
   const bpLines = [`# ${slug}`, '', `**What:** ${bp.what}`,
     bp.who   ? `**Who:** ${bp.who}`   : '',
@@ -44,7 +44,7 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
     bp.when  ? `**When:** ${bp.when}`  : '',
     bp.why   ? `**Why:** ${bp.why}`   : '',
   ].filter(Boolean).join('\n');
-  fs.writeFileSync(path.join(dir, '.chassis', 'blueprint.md'), bpLines + '\n');
+  fs.writeFileSync(path.join(dir, '.redivivus', 'blueprint.md'), bpLines + '\n');
 
   const blueprintContext = [
     `Project: ${slug}`,

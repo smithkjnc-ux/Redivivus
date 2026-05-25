@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS API Setup — webview panel AND chat panel for configuring AI API keys
+// [SCOPE] Redivivus API Setup — webview panel AND chat panel for configuring AI API keys
 // Chat panel shows read-only status, webview panel allows editing with Apply button.
 // HTML template -> apiSetupHtml.ts
 
@@ -9,14 +9,14 @@ import { checkProviderReachable } from '../core/diagnostics/selfDiagnosticChecks
 
 export function registerApiSetupCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openSettings', async () => {
+    vscode.commands.registerCommand('redivivus.openSettings', async () => {
       ApiSetupPanel.createOrShow(context);
     })
   );
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openSettingsInChat', async () => {
+    vscode.commands.registerCommand('redivivus.openSettingsInChat', async () => {
       if (!ChatPanel.currentPanel) {
-        await vscode.commands.executeCommand('chassis.openChatPanel');
+        await vscode.commands.executeCommand('redivivus.openChatPanel');
         setTimeout(() => showApiStatusInChat(), 300);
       } else {
         showApiStatusInChat();
@@ -26,7 +26,7 @@ export function registerApiSetupCommand(context: vscode.ExtensionContext): void 
 }
 
 function showApiStatusInChat(): void {
-  const config = vscode.workspace.getConfiguration('chassis');
+  const config = vscode.workspace.getConfiguration('redivivus');
   const providers = [
     { name: 'Gemini',  key: config.get<string>('geminiApiKey'),   icon: '&#x1F916;' },
     { name: 'Claude',  key: config.get<string>('claudeApiKey'),    icon: '&#x1F9E0;' },
@@ -42,7 +42,7 @@ function showApiStatusInChat(): void {
     const border = isSet ? '#4ec959' : '#ff534f';
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;margin-bottom:8px;background:${bg};border-left:3px solid ${border};border-radius:0 4px 4px 0;"><span><strong>${p.icon} ${p.name}</strong></span><span style="font-size:12px;">${status}</span></div>`;
   }).join('');
-  const content = `<div style="font-size:13px;"><p style="margin-bottom:16px;">Configure your AI provider API keys to use CHASSIS with different AI models:</p>${providerHtml}<div style="margin-top:16px;padding:12px;background:var(--vscode-input-background);border-radius:6px;font-size:12px;"><strong>&#x1F4A1; How to configure:</strong><br>Click "Open Full Settings" below to enter your API keys, or use VS Code settings directly.</div><button data-cmd="chassis.openSettings" style="margin-top:12px;padding:8px 16px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:4px;cursor:pointer;">&#x2699;&#xFE0F; Open Full Settings</button></div>`;
+  const content = `<div style="font-size:13px;"><p style="margin-bottom:16px;">Configure your AI provider API keys to use Redivivus with different AI models:</p>${providerHtml}<div style="margin-top:16px;padding:12px;background:var(--vscode-input-background);border-radius:6px;font-size:12px;"><strong>&#x1F4A1; How to configure:</strong><br>Click "Open Full Settings" below to enter your API keys, or use VS Code settings directly.</div><button data-cmd="redivivus.openSettings" style="margin-top:12px;padding:8px 16px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:4px;cursor:pointer;">&#x2699;&#xFE0F; Open Full Settings</button></div>`;
   ChatPanel.currentPanel?.showPanel('api-status', '&#x1F510; API Setup', content);
 }
 
@@ -56,7 +56,7 @@ class ApiSetupPanel {
     this._panel.webview.html = getApiSetupHtml();
     this._panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'save-keys') {
-        const config = vscode.workspace.getConfiguration('chassis');
+        const config = vscode.workspace.getConfiguration('redivivus');
         const toCheck: { id: string, name: string, key: string }[] = [];
 
         if (msg.geminiKey !== undefined) { await config.update('geminiApiKey', msg.geminiKey || undefined, true); if (msg.geminiKey) {toCheck.push({id: 'gemini', name: 'Gemini', key: msg.geminiKey});} }
@@ -88,12 +88,12 @@ class ApiSetupPanel {
         this._panel.webview.postMessage({ type: 'saved', timestamp: new Date().toLocaleTimeString(), errors });
         
         if (errors.length > 0) {
-            vscode.window.showWarningMessage('CHASSIS API keys saved, but some failed verification. Please check the setup panel.');
+            vscode.window.showWarningMessage('Redivivus API keys saved, but some failed verification. Please check the setup panel.');
         } else {
-            vscode.window.showInformationMessage('CHASSIS API keys applied and verified successfully!');
+            vscode.window.showInformationMessage('Redivivus API keys applied and verified successfully!');
         }
       } else if (msg.type === 'toggle-provider') {
-        const config = vscode.workspace.getConfiguration('chassis');
+        const config = vscode.workspace.getConfiguration('redivivus');
         const disabled = config.get<string[]>('disabledProviders') || [];
         const index = disabled.indexOf(msg.providerId);
         const newDisabled = [...disabled];
@@ -106,9 +106,9 @@ class ApiSetupPanel {
         
         // Refresh HTML to update disabled labels and team roles dynamically
         this._panel.webview.html = getApiSetupHtml();
-        vscode.window.showInformationMessage(`CHASSIS: ${msg.providerId.toUpperCase()} has been ${index > -1 ? 'enabled' : 'disabled'}!`);
+        vscode.window.showInformationMessage(`Redivivus: ${msg.providerId.toUpperCase()} has been ${index > -1 ? 'enabled' : 'disabled'}!`);
       } else if (msg.type === 'open-vscode-settings') {
-        await vscode.commands.executeCommand('workbench.action.openSettings', 'chassis');
+        await vscode.commands.executeCommand('workbench.action.openSettings', 'redivivus');
       }
     }, null, this._disposables);
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
@@ -117,7 +117,7 @@ class ApiSetupPanel {
   public static createOrShow(context: vscode.ExtensionContext): void {
     if (ApiSetupPanel.currentPanel) { ApiSetupPanel.currentPanel._panel.reveal(vscode.ViewColumn.One); return; }
     const panel = vscode.window.createWebviewPanel(
-      'chassisApiSetup', 'CHASSIS API Setup', vscode.ViewColumn.One,
+      'redivivusApiSetup', 'Redivivus API Setup', vscode.ViewColumn.One,
       { enableScripts: true, retainContextWhenHidden: true }
     );
     ApiSetupPanel.currentPanel = new ApiSetupPanel(panel, context);

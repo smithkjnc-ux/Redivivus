@@ -2,22 +2,22 @@
 // Split from 202-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import type { ChassisService } from './chassisService.js';
+import type { RedivivusService } from './redivivusService.js';
 import type { SessionService } from './sessionService.js';
 import { buildGuide } from './guideContent.js';
 import { mdToHtml } from './guideMarkdown.js';
 
 export class GuideService {
   constructor(
-    private chassis: ChassisService,
+    private redivivus: RedivivusService,
     private sessions: SessionService
   ) {}
 
   async showGuide(): Promise<void> {
     const content = buildGuide();
     const panel = vscode.window.createWebviewPanel(
-      'chassisGuide',
-      'What is CHASSIS?',
+      'redivivusGuide',
+      'What is Redivivus?',
       vscode.ViewColumn.Two,
       { enableScripts: false }
     );

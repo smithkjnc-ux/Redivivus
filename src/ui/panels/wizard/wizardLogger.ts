@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS WIZARD Domain Logger
+// [SCOPE] Redivivus WIZARD Domain Logger
 import { masterLog } from '../../../core/logging/masterLogger.js';
 
 const DOMAIN = 'WIZARD';

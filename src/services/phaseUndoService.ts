@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const PHASE_SNAPSHOTS_DIR = '.chassis/phase_snapshots';
+const PHASE_SNAPSHOTS_DIR = '.redivivus/phase_snapshots';
 export const MAX_PHASE_HISTORY = 20;
 
 export interface PhaseSnapshot {

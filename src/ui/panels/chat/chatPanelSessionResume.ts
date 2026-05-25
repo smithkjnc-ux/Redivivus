@@ -7,9 +7,9 @@ import type { ChatMessage } from './chatPanelHtml';
 
 const MAX_AGE_HOURS = 48;
 
-export function loadLastSessionContext(chassis: any, conversation: ChatMessage[]): void {
-  if (!chassis?.isInitialized?.()) { return; }
-  const sessionsDir = chassis.sessionsDir;
+export function loadLastSessionContext(redivivus: any, conversation: ChatMessage[]): void {
+  if (!redivivus?.isInitialized?.()) { return; }
+  const sessionsDir = redivivus.sessionsDir;
   if (!sessionsDir || !fs.existsSync(sessionsDir)) { return; }
 
   // Find the most recently modified session file

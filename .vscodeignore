@@ -10,8 +10,8 @@ vsc-extension-quickstart.md
 **/*.map
 **/*.ts
 **/.vscode-test.*
-CHASSIS_ROADMAP.md
-.chassis/**
+Redivivus_ROADMAP.md
+.redivivus/**
 *.vsix
 scripts/**
 # Dev-only AI editor rules (not needed in distributed extension)
@@ -25,9 +25,9 @@ GEMINI.md
 .windsurf/**
 .github/**
 # Dev-only spec and report files
-CHASSIS-SPEC.md
-CHASSIS_CHAT_SPEC.md
-CHASSIS_UX_VISION.md
+Redivivus-SPEC.md
+Redivivus_CHAT_SPEC.md
+Redivivus_UX_VISION.md
 REORGANIZATION_REPORT.md
 test_map.js
 docs/**

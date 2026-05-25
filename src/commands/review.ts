@@ -1,20 +1,20 @@
-// [SCOPE] This file registers the 'chassis.reviewFile' command, which sends the content of the active VS Code file to an AI for review, displays the AI's feedback, and provides options for subsequent actions.
+// [SCOPE] This file registers the 'redivivus.reviewFile' command, which sends the content of the active VS Code file to an AI for review, displays the AI's feedback, and provides options for subsequent actions.
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import type { ChangeTracker } from '../services/build/changeTracker.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerReviewCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routingService: RoutingService,
   changeTracker: ChangeTracker
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.reviewFile', async (pickedPath?: string) => {
+    vscode.commands.registerCommand('redivivus.reviewFile', async (pickedPath?: string) => {
       let doc: vscode.TextDocument;
       let filePath: string;
       let content: string;
@@ -36,10 +36,10 @@ export function registerReviewCommands(
       }
 
       // stub AI review if no API key configured
-      const hasKey = !!(vscode.workspace.getConfiguration('chassis').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY);
+      const hasKey = !!(vscode.workspace.getConfiguration('redivivus').get<string>('geminiApiKey') || process.env.GEMINI_API_KEY);
       if (!hasKey) {
         vscode.window.showInformationMessage(
-          'AI review requires a Gemini API key. Set it in CHASSIS settings or the GEMINI_API_KEY env variable.',
+          'AI review requires a Gemini API key. Set it in Redivivus settings or the GEMINI_API_KEY env variable.',
           'Open Settings'
         );
         return;
@@ -47,7 +47,7 @@ export function registerReviewCommands(
 
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: 'CHASSIS: Reviewing ' + filePath,
+        title: 'Redivivus: Reviewing ' + filePath,
         cancellable: true,
       }, async (progress, token) => {
         const lineCount = content.split('\n').length;
@@ -61,20 +61,20 @@ export function registerReviewCommands(
         progress.report({ message: 'Processing response...' });
 
         if (!result.success) {
-          vscode.window.showErrorMessage('CHASSIS routing error: ' + result.error);
+          vscode.window.showErrorMessage('Redivivus routing error: ' + result.error);
           return;
         }
 
-        // Save review to .chassis/reviews/
+        // Save review to .redivivus/reviews/
         // [WARN] File system operations can fail due to permissions, disk space, or invalid paths.
-        const reviewsDir = chassis.chassisDir + '/reviews';
+        const reviewsDir = redivivus.redivivusDir + '/reviews';
         if (!require('fs').existsSync(reviewsDir)) {
           require('fs').mkdirSync(reviewsDir, { recursive: true });
         }
         // [WARN] Filename sanitization might not cover all edge cases for different OS file system rules.
         const safeFileName = require('path').basename(filePath).replace(/\./g, '_');
         const reviewPath = reviewsDir + '/' + safeFileName + '_review.md';
-        const reviewContent = '# CHASSIS Review - ' + filePath + '\n\n*AI: ' + result.model + '*\n\n---\n\n' + result.text;
+        const reviewContent = '# Redivivus Review - ' + filePath + '\n\n*AI: ' + result.model + '*\n\n---\n\n' + result.text;
         // [WARN] File system operations can fail due to permissions, disk space, or invalid paths.
         require('fs').writeFileSync(reviewPath, reviewContent);
         // Show review inside chat panel
@@ -82,7 +82,7 @@ export function registerReviewCommands(
         const reviewEscaped = reviewRaw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const reviewHtml = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">🔍 AI Review — ${path.basename(filePath)}</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${reviewEscaped}</pre></div>`;
         if (!ChatPanel.currentPanel) {
-          vscode.commands.executeCommand('chassis.openChatPanel');
+          vscode.commands.executeCommand('redivivus.openChatPanel');
           setTimeout(() => ChatPanel.currentPanel?.showPanel('review', '🔍 AI Review', reviewHtml), 300);
         } else {
           ChatPanel.currentPanel.showPanel('review', '🔍 AI Review', reviewHtml);
@@ -93,13 +93,13 @@ export function registerReviewCommands(
           'Clean Up File', 'Check Another File', 'Done'
         );
         if (next === 'Clean Up File') {
-          await vscode.commands.executeCommand('chassis.cleanUpFile');
+          await vscode.commands.executeCommand('redivivus.cleanUpFile');
         } else if (next === 'Check Another File') {
-          await vscode.commands.executeCommand('chassis.analyzeFile');
+          await vscode.commands.executeCommand('redivivus.analyzeFile');
         }
 
         // [WARN] File system operations for logging can fail due to permissions or disk space.
-        chassis.appendWorkLog(
+        redivivus.appendWorkLog(
           '- Action: AI Review\n' +
           '- File: ' + filePath + '\n' +
           '- AI: ' + result.model

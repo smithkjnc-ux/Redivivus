@@ -20,35 +20,35 @@ export async function handleOpenProject(msg: any): Promise<void> {
   const folderName = path.basename(folderPath);
   const ctx = ChatPanel.extensionContext;
   if (ctx) {
-    const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('chassis.recentProjects', []);
+    const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('redivivus.recentProjects', []);
     const existing = recent.findIndex((p: { path: string }) => p.path === folderPath);
     if (existing >= 0) { recent.splice(existing, 1); }
     recent.unshift({ path: folderPath, name: folderName, timestamp: Date.now() });
-    ctx.globalState.update('chassis.recentProjects', recent.slice(0, 10));
+    ctx.globalState.update('redivivus.recentProjects', recent.slice(0, 10));
   }
-  // Open the folder directly; CHASSIS auto-initializes via onDidChangeWorkspaceFolders
+  // Open the folder directly; Redivivus auto-initializes via onDidChangeWorkspaceFolders
   await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), false);
 }
 
 export async function handleOpenExistingProject(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
-  require('fs').appendFileSync(require('os').homedir() + '/chassis_debug.log', '[open-existing-project] handler entered\n');
+  require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', '[open-existing-project] handler entered\n');
   const picked = await vscode.window.showOpenDialog({
     canSelectMany: false, canSelectFolders: true, canSelectFiles: false,
     openLabel: 'Open Project Folder', defaultUri: vscode.Uri.file(os.homedir()),
   });
-  require('fs').appendFileSync(require('os').homedir() + '/chassis_debug.log', `[open-existing-project] picked=${JSON.stringify(picked?.map(u => u.fsPath))}\n`);
+  require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[open-existing-project] picked=${JSON.stringify(picked?.map(u => u.fsPath))}\n`);
   if (!picked || picked.length === 0) { return; }
   const folderPath = picked[0].fsPath;
   const folderName = path.basename(folderPath);
-  const chassisDir = path.join(folderPath, '.chassis');
-  if (!fs.existsSync(chassisDir)) {
+  const redivivusDir = path.join(folderPath, '.redivivus');
+  if (!fs.existsSync(redivivusDir)) {
     const choice = await vscode.window.showInformationMessage(
-      `"${folderName}" doesn't have CHASSIS initialized. Initialize it now?`,
+      `"${folderName}" doesn't have Redivivus initialized. Initialize it now?`,
       'Yes, Initialize', 'Open Anyway'
     );
-    require('fs').appendFileSync(require('os').homedir() + '/chassis_debug.log', `[open-existing-project] non-chassis choice=${choice}\n`);
+    require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[open-existing-project] non-redivivus choice=${choice}\n`);
     if (choice === 'Yes, Initialize') {
-      conversation.push({ role: 'assistant', content: `Opening "${folderName}" and initializing CHASSIS...`, timestamp: Date.now() });
+      conversation.push({ role: 'assistant', content: `Opening "${folderName}" and initializing Redivivus...`, timestamp: Date.now() });
       refresh();
     } else if (choice === 'Open Anyway') {
       conversation.push({ role: 'assistant', content: `Opening "${folderName}"...`, timestamp: Date.now() });
@@ -62,17 +62,17 @@ export async function handleOpenExistingProject(msg: any, conversation: ChatMess
   }
   const ctx = ChatPanel.extensionContext;
   if (ctx) {
-    const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('chassis.recentProjects', []);
+    const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('redivivus.recentProjects', []);
     const existing = recent.findIndex((p: { path: string }) => p.path === folderPath);
     if (existing >= 0) { recent.splice(existing, 1); }
     recent.unshift({ path: folderPath, name: folderName, timestamp: Date.now() });
-    ctx.globalState.update('chassis.recentProjects', recent.slice(0, 10));
+    ctx.globalState.update('redivivus.recentProjects', recent.slice(0, 10));
   }
   const wsFile = path.join(folderPath, `${folderName}.code-workspace`);
   if (!fs.existsSync(wsFile)) {
     try { fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { }
   }
-  require('fs').appendFileSync(require('os').homedir() + '/chassis_debug.log', `[open-existing-project] opening wsFile=${wsFile}\n`);
+  require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[open-existing-project] opening wsFile=${wsFile}\n`);
   vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), false);
 }
 
@@ -82,19 +82,19 @@ export async function handleOpenRecentProject(msg: any, conversation: ChatMessag
     refresh();
     const ctx = ChatPanel.extensionContext;
     if (ctx && msg.folderPath) {
-      const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('chassis.recentProjects', []);
-      ctx.globalState.update('chassis.recentProjects', recent.filter((p: { path: string }) => p.path !== msg.folderPath));
+      const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('redivivus.recentProjects', []);
+      ctx.globalState.update('redivivus.recentProjects', recent.filter((p: { path: string }) => p.path !== msg.folderPath));
     }
     return;
   }
   const folderPath = msg.folderPath;
-  fs.appendFileSync(require('os').homedir() + '/chassis_debug.log', `[open-recent] folderPath=${folderPath} exists=${fs.existsSync(folderPath)}\n`);
+  fs.appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[open-recent] folderPath=${folderPath} exists=${fs.existsSync(folderPath)}\n`);
   const ctx = ChatPanel.extensionContext;
   if (ctx) {
-    const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('chassis.recentProjects', []);
+    const recent = ctx.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('redivivus.recentProjects', []);
     const existing = recent.findIndex((p: { path: string }) => p.path === folderPath);
     if (existing >= 0) { const item = recent.splice(existing, 1)[0]; item.timestamp = Date.now(); recent.unshift(item); }
-    ctx.globalState.update('chassis.recentProjects', recent.slice(0, 10));
+    ctx.globalState.update('redivivus.recentProjects', recent.slice(0, 10));
   }
   // [FIX] Use vscode.openFolder — vscode.openWorkspace requires .code-workspace files and silently fails
   vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), false);
@@ -102,9 +102,9 @@ export async function handleOpenRecentProject(msg: any, conversation: ChatMessag
 
 export async function handleToggleSetting(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
   if (msg.setting === 'startupBehavior' && msg.value) {
-    await vscode.workspace.getConfiguration('chassis').update('startupBehavior', msg.value, true);
+    await vscode.workspace.getConfiguration('redivivus').update('startupBehavior', msg.value, true);
     const behaviorText = msg.value === 'lastProject' ? 'always open your last project' : 'show the launcher screen';
-    conversation.push({ role: 'assistant', content: `Setting saved: CHASSIS will ${behaviorText} on startup.`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `Setting saved: Redivivus will ${behaviorText} on startup.`, timestamp: Date.now() });
     refresh();
   }
 }
@@ -120,8 +120,8 @@ export async function handleStartNewProject(msg: any, deps: MessageHandlerDeps):
     const validation = logProjectContextSwitch(currentRoot || '', 'handleStartNewProject', pendingTask);
     if (!validation.allowed) {
       vscode.window.showErrorMessage(
-        `CHASSIS Bug Detected: Tried to start new project "${msg.name || 'unknown'}" while working on "${currentRoot}". ` +
-        `This happened because CHASSIS misinterpreted your request as "create new project" instead of "edit current project". ` +
+        `Redivivus Bug Detected: Tried to start new project "${msg.name || 'unknown'}" while working on "${currentRoot}". ` +
+        `This happened because Redivivus misinterpreted your request as "create new project" instead of "edit current project". ` +
         `Please try again with more specific language like "add speed control to the flappy bird game".`,
         'OK'
       );

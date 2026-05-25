@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Architecture Map panel — singleton WebviewPanel shell
+// [SCOPE] Redivivus Architecture Map panel — singleton WebviewPanel shell
 // Nodes = files (colored by health), edges = import relationships. Click a node to inspect and fix.
 // [WARN] Singleton — use MapPanel.show(), never call constructor directly.
 // [DEAD] DO NOT inline large JS strings (>~400 lines) into webview HTML via template literals.
@@ -6,7 +6,7 @@
 //        causes: SyntaxError: Failed to execute 'write' on 'Document': Unexpected string
 //        at index.html:1058:23 — regardless of content (no bad chars, no </script, no surrogates).
 //        Fix: write script to disk, serve via webview.asWebviewUri(), load with <script src>.
-//        See mapPanelHtml.ts for the correct pattern. See CHASSIS_ROADMAP.md May 8 2026 for full history.
+//        See mapPanelHtml.ts for the correct pattern. See REDIVIVUS_ROADMAP.md May 8 2026 for full history.
 // HTML assembly -> mapPanelHtml.ts | Message handlers -> mapPanelMessages.ts + mapPanelTimelineMessages.ts
 
 import * as vscode from 'vscode';
@@ -52,7 +52,7 @@ export class MapPanel {
     }
     const extensionUri = vscode.Uri.file(path.join(__dirname, '..', '..'));
     const panel = vscode.window.createWebviewPanel(
-      'chassisMap', title,
+      'redivivusMap', title,
       { viewColumn: vscode.ViewColumn.One, preserveFocus: false },
       { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [extensionUri] }
     );
@@ -74,7 +74,7 @@ export class MapPanel {
     try {
       this._map = buildProjectMap(root);
     } catch (e) {
-      console.error('[CHASSIS] mapBuilderService failed:', e);
+      console.error('[Redivivus] mapBuilderService failed:', e);
       this._map = { nodes: [], edges: [] };
     }
     this._panel.webview.html = buildFullMapHtml(
@@ -101,7 +101,7 @@ export class MapPanel {
         }));
       const branchFromId = (() => {
         try {
-          const f = path.join(this._root, '.chassis', 'timeline_state.json');
+          const f = path.join(this._root, '.redivivus', 'timeline_state.json');
           if (fs.existsSync(f)) { return JSON.parse(fs.readFileSync(f, 'utf8')).branchFromId || null; }
         } catch { /* ignore */ }
         return null;

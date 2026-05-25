@@ -11,7 +11,7 @@ export const MAP_SCRIPT_ACTIONS = `
   const sidePanel = document.getElementById('side-panel');
   const toast = document.getElementById('toast');
 
-  if (!canvas || !sidePanel) { console.error('[CHASSIS Map] ABORT: canvas or sidePanel not found'); return; }
+  if (!canvas || !sidePanel) { console.error('[Redivivus Map] ABORT: canvas or sidePanel not found'); return; }
 
   const ctx = canvas.getContext('2d');
   const COLORS = { good: '#4ec959', warn: '#f0a500', bad: '#e05555', neutral: '#7f849c' };

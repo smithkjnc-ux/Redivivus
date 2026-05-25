@@ -1,20 +1,20 @@
-// [SCOPE] CHASSIS Setup Progress Command — shows the 10-step setup checklist
+// [SCOPE] Redivivus Setup Progress Command — shows the 10-step setup checklist
 import * as vscode from 'vscode';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import { SetupProgressService } from '../services/project/setupProgressService.js';
 import { showSetupProgressPanel } from '../services/project/setupProgressPanel.js';
 
-export function registerSetupProgressCommand(context: vscode.ExtensionContext, chassis: ChassisService): void {
+export function registerSetupProgressCommand(context: vscode.ExtensionContext, redivivus: RedivivusService): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.showSetupProgress', async () => {
+    vscode.commands.registerCommand('redivivus.showSetupProgress', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
         vscode.window.showWarningMessage('⚠️ No workspace open — you need a project folder first.');
         return;
       }
-      const progressService = new SetupProgressService(chassis, root);
+      const progressService = new SetupProgressService(redivivus, root);
       const progress = await progressService.getProgress();
-      // [CHASSIS] Pass onRefresh so the panel can re-render in-place after actions complete
+      // [Redivivus] Pass onRefresh so the panel can re-render in-place after actions complete
       showSetupProgressPanel(progress, () => progressService.getProgress());
     })
   );

@@ -1,4 +1,4 @@
-// [SCOPE] Usage HTML template — full webview HTML for CHASSIS usage report
+// [SCOPE] Usage HTML template — full webview HTML for Redivivus usage report
 // CSS extracted to usageHtmlStyles.ts. Imported by usageCommands.ts.
 
 import type { UsageReport, UsageEntry } from '../services/usageTracker.js';
@@ -50,7 +50,7 @@ export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; l
   <style>${getUsageCss()}</style>
 </head>
 <body>
-  <h1>&#x1F4CA; CHASSIS Usage Report</h1>
+  <h1>&#x1F4CA; Redivivus Usage Report</h1>
   <div class="subtitle">AI token usage and cost breakdown</div>
   <div class="period-grid">
     <div class="period-card">

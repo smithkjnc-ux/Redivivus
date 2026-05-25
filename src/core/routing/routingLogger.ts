@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS ROUTING Domain Logger
+// [SCOPE] Redivivus ROUTING Domain Logger
 import { masterLog } from '../../core/logging/masterLogger.js';
 
 const DOMAIN = 'ROUTING';

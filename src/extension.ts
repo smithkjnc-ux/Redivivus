@@ -1,9 +1,9 @@
-// [SCOPE] CHASSIS entry point — thin orchestrator
+// [SCOPE] Redivivus entry point — thin orchestrator
 
 import * as vscode from 'vscode';
-import { ChassisSidebarProvider } from './ui/sidebar/chassisSidebar.js';
+import { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
 import { seedVault } from './services/vault/vaultSeeder.js';
-import { ChassisService } from './services/chassisService.js';
+import { RedivivusService } from './services/redivivusService.js';
 import { BlueprintService } from './services/blueprint/blueprintService.js';
 import { SessionService } from './services/sessionService.js';
 import { RulesService } from './services/rulesService.js';
@@ -28,7 +28,7 @@ import { runDiagnostic } from './core/diagnostics/selfDiagnostic';
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
 import { resumePendingState } from './extensionResumeState.js';
-import { initChassisLogger, chassisLog, finalizeChassisLogger } from './services/logging/chassisLogger.js';
+import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
 import { initProjectContextLogger } from './services/logging/projectContextLogger.js';
 import { initMasterLogger } from './core/logging/masterLogger.js';
 
@@ -37,65 +37,65 @@ import { initMasterLogger } from './core/logging/masterLogger.js';
 let _suppressNextFolderAdd = false;
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log('[CHASSIS] Activating...');
+  console.log('[Redivivus] Activating...');
   ChatPanel.extensionContext = context;
 
   // ── init services ──
   // [WARN] This block initializes all core services. The order and dependencies are critical for the extension's functionality.
-  const chassisService = new ChassisService();
-  const blueprintService = new BlueprintService(chassisService);
-  const sessionService = new SessionService(chassisService);
+  const redivivusService = new RedivivusService();
+  const blueprintService = new BlueprintService(redivivusService);
+  const sessionService = new SessionService(redivivusService);
   const annotationService = new AnnotationService();
-  const analyzerService = new AnalyzerService(chassisService);
-  const guideService = new GuideService(chassisService, sessionService);
+  const analyzerService = new AnalyzerService(redivivusService);
+  const guideService = new GuideService(redivivusService, sessionService);
   const routingService = new RoutingService();
   const measureTwice = new MeasureTwiceService();
-  const changeTracker = new ChangeTracker(chassisService);
-  const rulesService = new RulesService(chassisService);
+  const changeTracker = new ChangeTracker(redivivusService);
+  const rulesService = new RulesService(redivivusService);
   const vaultService = new VaultService(context);
   const vaultContextService = new VaultContextService(vaultService);
   routingService.setVaultContextService(vaultContextService);
   const buildFromVaultService = new BuildFromVaultService(vaultService, routingService);
-  const retrofitService = new RetrofitService(chassisService, routingService, measureTwice, changeTracker, analyzerService);
-  const wizardService = new WizardService(chassisService, sessionService);
+  const retrofitService = new RetrofitService(redivivusService, routingService, measureTwice, changeTracker, analyzerService);
+  const wizardService = new WizardService(redivivusService, sessionService);
   const usageTracker = new UsageTracker(context);
-  const guardianService = new GuardianService(chassisService);
-  const statusBar = new StatusBar(chassisService, sessionService, usageTracker);
+  const guardianService = new GuardianService(redivivusService);
+  const statusBar = new StatusBar(redivivusService, sessionService, usageTracker);
 
   // ── Vault seeding — runs on first install, seeds starter patterns ──
-  const seededKey = 'chassis.vaultSeeded.v1';
+  const seededKey = 'redivivus.vaultSeeded.v1';
   if (!context.globalState.get(seededKey)) {
     setTimeout(async () => {
       try {
         const result = await seedVault(vaultService, { useGitHub: false });
         if (result.added > 0) {
-          vscode.window.showInformationMessage(`CHASSIS: Loaded ${result.added} starter patterns into your vault.`);
+          vscode.window.showInformationMessage(`Redivivus: Loaded ${result.added} starter patterns into your vault.`);
         }
         context.globalState.update(seededKey, true);
       } catch { /* never block extension over seeding failure */ }
     }, 3000);
   }
 
-  // [CHASSIS] Initialize comprehensive logging and project context tracking
+  // [Redivivus] Initialize comprehensive logging and project context tracking
   const initialRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (initialRoot) {
     try {
-      const sessionId = initChassisLogger(initialRoot);
-      chassisLog({ operation: 'system', message: 'CHASSIS extension activated', data: { root: initialRoot, sessionId } });
+      const sessionId = initRedivivusLogger(initialRoot);
+      redivivusLog({ operation: 'system', message: 'Redivivus extension activated', data: { root: initialRoot, sessionId } });
       initMasterLogger(initialRoot);
     } catch (e) {
-      console.error('[CHASSIS] Logger init failed:', e);
+      console.error('[Redivivus] Logger init failed:', e);
     }
     try {
       initProjectContextLogger(initialRoot);
     } catch (e) {
-      console.error('[CHASSIS] Project context logger init failed:', e);
+      console.error('[Redivivus] Project context logger init failed:', e);
     }
   }
 
   // ── set initial context ──
-  vscode.commands.executeCommand('setContext', 'chassis.initialized', chassisService.isInitialized());
-  vscode.commands.executeCommand('setContext', 'chassis.sessionActive', false);
+  vscode.commands.executeCommand('setContext', 'redivivus.initialized', redivivusService.isInitialized());
+  vscode.commands.executeCommand('setContext', 'redivivus.sessionActive', false);
 
   // ── activate subsystems ──
   annotationService.activate(context);
@@ -107,63 +107,63 @@ export function activate(context: vscode.ExtensionContext) {
       if (e.removed.length > 0 && e.added.length === 0) {
         // Only close if the removed folder was the panel's active project (not stale startup cleanup)
         const removedPath = e.removed[0]?.uri.fsPath;
-        const panelRoot = ChatPanel.currentPanel?.getChassisRoot?.();
+        const panelRoot = ChatPanel.currentPanel?.getRedivivusRoot?.();
         if (removedPath && panelRoot && removedPath === panelRoot) {
           ChatPanel.close();
         }
         // [LOG] Finalize logging when workspace closes
-        finalizeChassisLogger(true);
+        finalizeRedivivusLogger(true);
       } else if (e.added.length > 0) {
         // New folder added externally (not by onNewProject) — trigger init
         // onNewProject handles its own init inline; this only fires for external folder additions
         // [WARN] Check synchronous flag FIRST — globalState.update is async and loses the race
         if (_suppressNextFolderAdd) {
           _suppressNextFolderAdd = false;
-          context.globalState.update('chassis.suppressAutoOpen', undefined);
+          context.globalState.update('redivivus.suppressAutoOpen', undefined);
         } else {
-          const suppressPath = context.globalState.get<string>('chassis.suppressAutoOpen');
+          const suppressPath = context.globalState.get<string>('redivivus.suppressAutoOpen');
           if (!suppressPath) {
-            setTimeout(() => runAutoInit(context, chassisService, () => statusBar.update()), 300);
+            setTimeout(() => runAutoInit(context, redivivusService, () => statusBar.update()), 300);
           } else {
-            context.globalState.update('chassis.suppressAutoOpen', undefined);
+            context.globalState.update('redivivus.suppressAutoOpen', undefined);
           }
         }
         // [LOG] Initialize logging for new workspace
         const addedRoot = e.added[0]?.uri.fsPath;
         if (addedRoot) {
-          const sessionId = initChassisLogger(addedRoot);
-          chassisLog({ operation: 'system', message: 'Workspace opened', data: { root: addedRoot, sessionId } });
+          const sessionId = initRedivivusLogger(addedRoot);
+          redivivusLog({ operation: 'system', message: 'Workspace opened', data: { root: addedRoot, sessionId } });
         }
       }
     })
   );
 
   // ── resume state after folder close/reload (build task, vault build, new project) ──
-  resumePendingState(context, [chassisService, routingService, usageTracker, vaultService]);
+  resumePendingState(context, [redivivusService, routingService, usageTracker, vaultService]);
 
   // ── chat panel command ──
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.openChatPanel', () => ChatPanel.show(chassisService, routingService, usageTracker, vaultService)));
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.openChatPanel', () => ChatPanel.show(redivivusService, routingService, usageTracker, vaultService)));
 
-  // ── sidebar view with CHASSIS functions ──
-  const sidebarProvider = new (ChassisSidebarProvider as any)(chassisService, sessionService);
-  context.subscriptions.push(vscode.window.registerWebviewViewProvider(ChassisSidebarProvider.viewType, sidebarProvider));
+  // ── sidebar view with Redivivus functions ──
+  const sidebarProvider = new (RedivivusSidebarProvider as any)(redivivusService, sessionService);
+  context.subscriptions.push(vscode.window.registerWebviewViewProvider(RedivivusSidebarProvider.viewType, sidebarProvider));
 
   // ── auto-open chat panel on startup (first activation only) ──
-  // Guard: skip if pendingChassisInit is queued — runAutoInit poll will create the panel at the right time
+  // Guard: skip if pendingRedivivusInit is queued — runAutoInit poll will create the panel at the right time
   // Guard: skip if a panel is already open — prevents re-spawn after close-project or folder-swap
   // [WARN] suppressAutoOpen set to currentRoot means this folder was JUST added by a build — don't re-open.
   //        Do NOT require pendingInit to also match — that's a new-project-only condition.
   setTimeout(() => {
     const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const suppressPath = context.globalState.get<string>('chassis.suppressAutoOpen');
+    const suppressPath = context.globalState.get<string>('redivivus.suppressAutoOpen');
     // Suppress if suppressPath matches current root (covers both new-project AND post-build folder add)
     const suppressed = !!(suppressPath && currentRoot && suppressPath === currentRoot);
     if (suppressed) {
-      context.globalState.update('chassis.suppressAutoOpen', undefined);
+      context.globalState.update('redivivus.suppressAutoOpen', undefined);
     }
-    require('fs').appendFileSync(require('os').homedir()+'/chassis_debug.log', `[auto-open-timer] currentPanel=${!!ChatPanel.currentPanel} suppressed=${suppressed} currentRoot=${currentRoot}\n`);
+    require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[auto-open-timer] currentPanel=${!!ChatPanel.currentPanel} suppressed=${suppressed} currentRoot=${currentRoot}\n`);
     if (!ChatPanel.currentPanel && !suppressed) {
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+      ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
     }
   }, 500);
 
@@ -175,25 +175,25 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── auto-init after folder-picker reload ──
   // [WARN] This function handles critical auto-initialization logic, especially important after VS Code reloads or workspace changes.
-  runAutoInit(context, chassisService, refreshAll);
+  runAutoInit(context, redivivusService, refreshAll);
 
   // ── always-live onNewProject handler — covers wizard opened via placement modal or any other path ──
   registerOnNewProject(context);
 
   // ── self-diagnostic command ──
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.selfDiagnostic', () => runDiagnostic(context, chassisService)));
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.selfDiagnostic', () => runDiagnostic(context, redivivusService)));
 
   // ── pipeline trace viewer ──
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.showPipelineTrace', async () => {
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.showPipelineTrace', async () => {
     const { tracer } = await import('./services/pipelineTracer.js');
     tracer.show();
   }));
 
   // ── register all commands ──
   const githubBackupService = new GitHubBackupService(context);
-  registerAllCommands(context, chassisService, routingService, usageTracker, vaultService, measureTwice, changeTracker, analyzerService, rulesService, retrofitService, sessionService, guideService, blueprintService, statusBar, sidebarProvider, refreshAll, githubBackupService, guardianService, { value: _suppressNextFolderAdd });
+  registerAllCommands(context, redivivusService, routingService, usageTracker, vaultService, measureTwice, changeTracker, analyzerService, rulesService, retrofitService, sessionService, guideService, blueprintService, statusBar, sidebarProvider, refreshAll, githubBackupService, guardianService, { value: _suppressNextFolderAdd });
 }
 
 export function deactivate() {
-  console.log('[CHASSIS] Deactivated');
+  console.log('[Redivivus] Deactivated');
 }

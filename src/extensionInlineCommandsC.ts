@@ -1,8 +1,8 @@
-// [SCOPE] Extension Inline Commands C — chassis.runProject, chassis.inspectElement, chassis.injectTerminalError, chassis.openVisualEditor.
+// [SCOPE] Extension Inline Commands C — redivivus.runProject, redivivus.inspectElement, redivivus.injectTerminalError, redivivus.openVisualEditor.
 // Extracted from extensionInlineCommandsB.ts to keep it under 200 lines.
 
 import * as vscode from 'vscode';
-import type { ChassisService } from './services/chassisService.js';
+import type { RedivivusService } from './services/redivivusService.js';
 import type { RoutingService } from './services/ai/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
 import type { VaultService } from './services/vault/vaultService.js';
@@ -12,16 +12,16 @@ import { detectPostBuildInfo } from './core/build/chatPanelPostBuild';
 import { BuildHistoryService } from './services/build/buildHistoryService.js';
 export function registerInlineCommandsC(
   context: vscode.ExtensionContext,
-  chassisService: ChassisService,
+  redivivusService: RedivivusService,
   routingService: RoutingService,
   usageTracker: UsageTracker,
   vaultService: VaultService,
 ): void {
 
-  // [CHASSIS] Run Project — detects runnable entry point from build history and opens a terminal
+  // [Redivivus] Run Project — detects runnable entry point from build history and opens a terminal
   // [FIX] Auto-captures terminal errors and offers to fix them in chat
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.runProject', async () => {
+    vscode.commands.registerCommand('redivivus.runProject', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) { vscode.window.showWarningMessage('No project folder open.'); return; }
       const recentFiles = new BuildHistoryService(root).list().filter(e => !e.undone).slice(0, 1).flatMap(e => e.files);
@@ -33,7 +33,7 @@ export function registerInlineCommandsC(
         return;
       }
 
-      const term = vscode.window.createTerminal({ name: 'CHASSIS: Run', cwd: root });
+      const term = vscode.window.createTerminal({ name: 'Redivivus: Run', cwd: root });
       term.show();
       if (info.needsDeps && info.depsCmd) {
         term.sendText(info.depsCmd + ' && ' + (info.runCmd || ''));
@@ -51,7 +51,7 @@ export function registerInlineCommandsC(
             ChatPanel.currentPanel.handleMessage({ type: 'inject-terminal-error', error: err });
             ChatPanel.currentPanel['_panel']?.reveal(undefined, false);
           } else {
-            vscode.commands.executeCommand('chassis.openChat');
+            vscode.commands.executeCommand('redivivus.openChat');
             setTimeout(() => {
               ChatPanel.currentPanel?.handleMessage({ type: 'inject-terminal-error', error: err });
             }, 600);
@@ -61,9 +61,9 @@ export function registerInlineCommandsC(
     })
   );
 
-  // [CHASSIS] UI Inspector — describe a UI element to find its source code and inject into chat
+  // [Redivivus] UI Inspector — describe a UI element to find its source code and inject into chat
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.inspectElement', async () => {
+    vscode.commands.registerCommand('redivivus.inspectElement', async () => {
       const input = await vscode.window.showInputBox({ prompt: 'Describe the UI element (class name, id, or description)', placeHolder: 'e.g., .submit-button, #navbar, the login form' });
       if (!input) { return; }
       const { LensService } = await import('./services/lensService.js');
@@ -74,24 +74,24 @@ export function registerInlineCommandsC(
 
   registerTerminalErrorService(context);
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.injectTerminalError', () => {
+    vscode.commands.registerCommand('redivivus.injectTerminalError', () => {
       const err = getLastTerminalError();
-      if (!err) { vscode.window.showInformationMessage('CHASSIS: No terminal error detected. Run your project first.'); return; }
+      if (!err) { vscode.window.showInformationMessage('Redivivus: No terminal error detected. Run your project first.'); return; }
       if (ChatPanel.currentPanel) {
         ChatPanel.currentPanel.handleMessage({ type: 'inject-terminal-error', error: err });
         ChatPanel.currentPanel['_panel']?.reveal(undefined, false);
       } else {
-        ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+        ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
         setTimeout(() => { ChatPanel.currentPanel?.handleMessage({ type: 'inject-terminal-error', error: err }); }, 600);
       }
     })
   );
 
-  // chassis.openVisualEditor — opens the Visual Contract Editor panel for a project root
+  // redivivus.openVisualEditor — opens the Visual Contract Editor panel for a project root
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openVisualEditor', async (projectRoot?: string) => {
+    vscode.commands.registerCommand('redivivus.openVisualEditor', async (projectRoot?: string) => {
       const root = projectRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) { vscode.window.showWarningMessage('CHASSIS: Open a project folder first.'); return; }
+      if (!root) { vscode.window.showWarningMessage('Redivivus: Open a project folder first.'); return; }
       // Collect built files from the build history; fall back to scanning for HTML/CSS
       let builtFiles: string[] = [];
       try {

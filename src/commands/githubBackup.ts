@@ -6,8 +6,8 @@ import type { GitHubBackupService } from '../services/githubBackupService.js';
 
 export function registerGitHubBackupCommands(context: vscode.ExtensionContext, backupService: GitHubBackupService): void {
 
-  // chassis.configureGitHubBackup — token entry + validation
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.configureGitHubBackup', async () => {
+  // redivivus.configureGitHubBackup — token entry + validation
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.configureGitHubBackup', async () => {
     const token = await vscode.window.showInputBox({
       prompt: 'GitHub Personal Access Token (needs repo scope)',
       password: true,
@@ -55,12 +55,12 @@ export function registerGitHubBackupCommands(context: vscode.ExtensionContext, b
     });
   }));
 
-  // chassis.backupNow — manual commit + push of all project changes
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.backupNow', async () => {
+  // redivivus.backupNow — manual commit + push of all project changes
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.backupNow', async () => {
     const connected = await backupService.isConnected();
     if (!connected) {
       const go = await vscode.window.showInformationMessage('GitHub not connected.', 'Connect now');
-      if (go) { vscode.commands.executeCommand('chassis.configureGitHubBackup'); }
+      if (go) { vscode.commands.executeCommand('redivivus.configureGitHubBackup'); }
       return;
     }
     const msg = await vscode.window.showInputBox({
@@ -75,12 +75,12 @@ export function registerGitHubBackupCommands(context: vscode.ExtensionContext, b
     });
   }));
 
-  // chassis.setupGitHubRepo — per-project repo creation
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.setupGitHubRepo', async () => {
+  // redivivus.setupGitHubRepo — per-project repo creation
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.setupGitHubRepo', async () => {
     const connected = await backupService.isConnected();
     if (!connected) {
       const go = await vscode.window.showInformationMessage('Connect GitHub first.', 'Connect');
-      if (go) { vscode.commands.executeCommand('chassis.configureGitHubBackup'); }
+      if (go) { vscode.commands.executeCommand('redivivus.configureGitHubBackup'); }
       return;
     }
     vscode.window.withProgress({ location: vscode.ProgressLocation.Notification, title: 'Creating GitHub repo...', cancellable: false }, async () => {
@@ -89,17 +89,17 @@ export function registerGitHubBackupCommands(context: vscode.ExtensionContext, b
     });
   }));
 
-  // chassis.githubCommitFiles — called by commit button in fix/build result cards
-  // files: string[] of relative paths written by CHASSIS; message: commit summary; webview: to post result back
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.githubCommitFiles', async (files: string[], message: string, webview?: vscode.Webview) => {
+  // redivivus.githubCommitFiles — called by commit button in fix/build result cards
+  // files: string[] of relative paths written by Redivivus; message: commit summary; webview: to post result back
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.githubCommitFiles', async (files: string[], message: string, webview?: vscode.Webview) => {
     const connected = await backupService.isConnected();
     if (!connected) {
       const go = await vscode.window.showInformationMessage('GitHub not connected. Connect now?', 'Connect');
-      if (go) { vscode.commands.executeCommand('chassis.configureGitHubBackup'); }
+      if (go) { vscode.commands.executeCommand('redivivus.configureGitHubBackup'); }
       webview?.postMessage({ type: 'github-commit-result', success: false, message: 'GitHub not connected.' });
       return;
     }
-    const result = await backupService.commitFiles(message || 'CHASSIS fix', files || []);
+    const result = await backupService.commitFiles(message || 'Redivivus fix', files || []);
     webview?.postMessage({ type: 'github-commit-result', success: result.success, message: result.message });
     if (!webview) { vscode.window.showInformationMessage(result.message); }
   }));

@@ -11,7 +11,7 @@ export function registerVaultTranslateCommand(
   routing: RoutingService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.vaultTranslate', async (preselectedId?: string) => {
+    vscode.commands.registerCommand('redivivus.vaultTranslate', async (preselectedId?: string) => {
       const items = vaultService.listItems();
       if (items.length === 0) {
         vscode.window.showInformationMessage('Your vault is empty — scan a project first to populate it.');
@@ -71,7 +71,7 @@ export function registerVaultTranslateCommand(
             'View in Vault', 'Dismiss'
           );
           if (action === 'View in Vault') {
-            vscode.commands.executeCommand('chassis.vaultBrowse');
+            vscode.commands.executeCommand('redivivus.vaultBrowse');
           }
         }
       );

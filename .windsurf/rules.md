@@ -1,4 +1,4 @@
-# CHASSIS Enforcement Rules — Windsurf
+# Redivivus Enforcement Rules — Windsurf
 > This file is auto-loaded by Windsurf at session start. These rules are NOT optional.
 > They apply to every file touch in this project, no exceptions, no shortcuts.
 
@@ -9,10 +9,10 @@
 You are not allowed to modify any file in this project until you have completed ALL of the following steps in order. This is not a suggestion. This is a precondition.
 
 ### Pre-Flight Checklist (complete every item, every session)
-- [ ] Read `CHASSIS_ROADMAP.md` in full — not skimmed, read.
-- [ ] Read `.chassis/rules.md` in full.
-- [ ] Read `.chassis/blueprint.md` to confirm your change fits the project scope.
-- [ ] Read `.chassis/dead_ends.md` — check if your approach has already been tried and failed.
+- [ ] Read `REDIVIVUS_ROADMAP.md` in full — not skimmed, read.
+- [ ] Read `.redivivus/rules.md` in full.
+- [ ] Read `.redivivus/blueprint.md` to confirm your change fits the project scope.
+- [ ] Read `.redivivus/dead_ends.md` — check if your approach has already been tried and failed.
 - [ ] Read the `[SCOPE]` tag at the top of every file you plan to touch.
 - [ ] Read every `[WARN]` tag in or near the code you plan to change.
 - [ ] **CHECK FILE SIZE**: Check line count of every file you plan to edit (`wc -l <file>`). If over 200 lines, **split the file first** before adding any new code.
@@ -25,7 +25,7 @@ If you cannot confirm all seven steps, **stop and do them first.**
 
 After touching any file — one line, one comment, one variable rename — you must:
 
-1. Open `CHASSIS_ROADMAP.md`
+1. Open `REDIVIVUS_ROADMAP.md`
 2. Add an entry under "Recent Fixes" that includes:
    - **File changed:** exact filename
    - **What changed:** specific description of the change
@@ -44,7 +44,7 @@ If any file you are editing is already at or over 200 lines:
 - Split it by responsibility BEFORE making your change
 - Each new file needs a `[SCOPE]` tag at line 1
 - Compile and verify before moving on
-- Log the split in `CHASSIS_ROADMAP.md`
+- Log the split in `REDIVIVUS_ROADMAP.md`
 
 **`[NEXT]` is NOT a deferral pass.** It is a violation notice. It means the split is overdue and must happen at the START of the next session — not pushed further. Any AI that adds to a file already over 200 lines is violating this rule regardless of how small the addition is.
 
@@ -85,8 +85,8 @@ The correct sequence:
 
 You will corrupt the project history chain. Every future AI and every future human working on this project depends on the roadmap and annotations being accurate and complete. Skipping even one step degrades that chain for everyone who comes after you.
 
-CHASSIS exists specifically to prevent this. You are working inside a CHASSIS project. Follow the rules.
+Redivivus exists specifically to prevent this. You are working inside a Redivivus project. Follow the rules.
 
 ---
 
-*Removing or editing this file does not remove the rules. They exist in `CLAUDE.md`, `.chassis/rules.md`, and the project memory system.*
+*Removing or editing this file does not remove the rules. They exist in `CLAUDE.md`, `.redivivus/rules.md`, and the project memory system.*

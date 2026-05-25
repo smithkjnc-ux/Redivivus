@@ -1,21 +1,21 @@
-// [SCOPE] Defines and registers VSCode commands for CHASSIS Blueprint operations, including running the interview process and opening the blueprint file.
+// [SCOPE] Defines and registers VSCode commands for Redivivus Blueprint operations, including running the interview process and opening the blueprint file.
 import * as vscode from 'vscode';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { BlueprintService } from '../services/blueprint/blueprintService.js';
 import { syncBlueprintMd } from '../services/blueprint/blueprintWriter.js';
 
 export function registerBlueprintCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   blueprintService: BlueprintService,
   refreshAll: () => void
 ): void {
   // Blueprint Interview
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.blueprint', async () => {
-      // [WARN] Fragile: This command relies on `chassis.isInitialized()`. If not initialized, it shows an error message.
-      if (!chassis.isInitialized()) {
-        vscode.window.showErrorMessage('Run "CHASSIS: Initialize Project" first.');
+    vscode.commands.registerCommand('redivivus.blueprint', async () => {
+      // [WARN] Fragile: This command relies on `redivivus.isInitialized()`. If not initialized, it shows an error message.
+      if (!redivivus.isInitialized()) {
+        vscode.window.showErrorMessage('Run "Redivivus: Initialize Project" first.');
         return;
       }
       // [WARN] Fragile: `blueprintService.runInterview()` could be cancelled or encounter an error.
@@ -23,8 +23,8 @@ export function registerBlueprintCommands(
       if (bp) {
         // [WARN] Fragile: `refreshAll()` is an external callback. Its success and side effects depend on the caller's implementation.
         refreshAll();
-        // [WARN] Fragile: `vscode.workspace.openTextDocument` and `vscode.window.showTextDocument` could fail if `chassis.blueprintPath` is invalid or inaccessible.
-        const doc = await vscode.workspace.openTextDocument(chassis.blueprintPath);
+        // [WARN] Fragile: `vscode.workspace.openTextDocument` and `vscode.window.showTextDocument` could fail if `redivivus.blueprintPath` is invalid or inaccessible.
+        const doc = await vscode.workspace.openTextDocument(redivivus.blueprintPath);
         vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
       }
     })
@@ -32,21 +32,21 @@ export function registerBlueprintCommands(
 
   // Open Blueprint
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.openBlueprint', async () => {
-      // [WARN] Fragile: This command relies on `chassis.isInitialized()` but fails silently if not initialized, providing no user feedback.
-      if (!chassis.isInitialized()) { return; }
-      // [WARN] Fragile: `vscode.workspace.openTextDocument` and `vscode.window.showTextDocument` could fail if `chassis.blueprintPath` is invalid or inaccessible.
-      const doc = await vscode.workspace.openTextDocument(chassis.blueprintPath);
+    vscode.commands.registerCommand('redivivus.openBlueprint', async () => {
+      // [WARN] Fragile: This command relies on `redivivus.isInitialized()` but fails silently if not initialized, providing no user feedback.
+      if (!redivivus.isInitialized()) { return; }
+      // [WARN] Fragile: `vscode.workspace.openTextDocument` and `vscode.window.showTextDocument` could fail if `redivivus.blueprintPath` is invalid or inaccessible.
+      const doc = await vscode.workspace.openTextDocument(redivivus.blueprintPath);
       vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
     })
   );
 
   // Lock Blueprint
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.lockBlueprint', async () => {
-      if (!chassis.isInitialized()) { return; }
+    vscode.commands.registerCommand('redivivus.lockBlueprint', async () => {
+      if (!redivivus.isInitialized()) { return; }
       
-      const config = chassis.loadConfig();
+      const config = redivivus.loadConfig();
       if (!config || !config.blueprint) {
         vscode.window.showErrorMessage('No blueprint found. Run the blueprint interview first.');
         return;
@@ -58,7 +58,7 @@ export function registerBlueprintCommands(
       }
 
       // Open the blueprint file so the user can verify it
-      const doc = await vscode.workspace.openTextDocument(chassis.blueprintPath);
+      const doc = await vscode.workspace.openTextDocument(redivivus.blueprintPath);
       await vscode.window.showTextDocument(doc, vscode.ViewColumn.One);
 
       // Ask for confirmation to lock
@@ -73,8 +73,8 @@ export function registerBlueprintCommands(
 
       if (choice === lockOption) {
         config.blueprint.locked = true;
-        chassis.saveConfig(config);
-        syncBlueprintMd(chassis, config);
+        redivivus.saveConfig(config);
+        syncBlueprintMd(redivivus, config);
         vscode.window.showInformationMessage('Blueprint successfully locked.');
         try { refreshAll(); } catch { /* never block the lock on a refresh error */ }
       }

@@ -3,20 +3,20 @@
 
 import * as vscode from 'vscode';
 import type { Blueprint } from '../../types/index.js';
-import type { ChassisService } from '../chassisService.js';
+import type { RedivivusService } from '../redivivusService.js';
 import { QUESTIONS } from './blueprintQuestions.js';
 import { calculateHealth } from './blueprintHealth.js';
 import { writeBlueprintMd } from './blueprintWriter.js';
 
 export class BlueprintService {
-  constructor(private chassis: ChassisService) {}
+  constructor(private redivivus: RedivivusService) {}
 
   async runInterview(): Promise<Blueprint | null> {
     const blueprint: Partial<Blueprint> = {};
 
     // show intro
     const proceed = await vscode.window.showInformationMessage(
-      'CHASSIS Blueprint Interview — 5 questions that shape everything. Ready?',
+      'Redivivus Blueprint Interview — 5 questions that shape everything. Ready?',
       { modal: true },
       'Let\'s go'
     );
@@ -37,7 +37,7 @@ export class BlueprintService {
 
       // get answer
       const answer = await vscode.window.showInputBox({
-        title: `CHASSIS Blueprint — ${q.key.toUpperCase()}`,
+        title: `Redivivus Blueprint — ${q.key.toUpperCase()}`,
         prompt: q.prompt,
         placeHolder: q.placeholder,
         ignoreFocusOut: true,
@@ -91,17 +91,17 @@ export class BlueprintService {
     }
 
     // save to config
-    const config = this.chassis.loadConfig();
+    const config = this.redivivus.loadConfig();
     if (config) {
       config.blueprint = fullBlueprint;
-      this.chassis.saveConfig(config);
+      this.redivivus.saveConfig(config);
     }
 
     // write blueprint.md (delegated to writer module)
-    writeBlueprintMd(fullBlueprint, this.chassis.blueprintPath, config?.projectName || 'Unknown');
+    writeBlueprintMd(fullBlueprint, this.redivivus.blueprintPath, config?.projectName || 'Unknown');
 
     // log it
-    this.chassis.appendWorkLog(
+    this.redivivus.appendWorkLog(
       `- Action: Blueprint Interview completed\n` +
       `- Health: ✅ ${health.confirmed} · 🔶 ${health.assumed} · ❓ ${health.unknown}\n` +
       `- Confidence: ${health.confidence}\n` +

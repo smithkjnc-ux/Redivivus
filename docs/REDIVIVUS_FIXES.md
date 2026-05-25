@@ -1,6 +1,6 @@
-# CHASSIS — Fix Log & Session History
+# Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
-> See CHASSIS_ROADMAP.md for the index. See CHASSIS_FEATURES.md for planned work.
+> See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
 ---
@@ -11,7 +11,7 @@
 
 ## May 24, 2026 — Session 11AX (Extension Activation Fix + Complexity Reduction)
 
-**Activation bug:** `registerTerminalErrorService` accessed `(vscode.window as any).onDidWriteTerminalData` — a proposed VS Code API. In VS Code 1.110+, accessing a proposed API property throws even with `as any` cast, because the throw comes from a property getter on the extension host proxy object, not from calling the result. The existing `?.()` optional chaining only prevents errors from calling `undefined`; it cannot catch a getter throw. The throw propagated up through `registerInlineCommandsC`, causing all command registrations after line 75 (`chassis.injectTerminalError`, `chassis.openVisualEditor`) to silently not register.
+**Activation bug:** `registerTerminalErrorService` accessed `(vscode.window as any).onDidWriteTerminalData` — a proposed VS Code API. In VS Code 1.110+, accessing a proposed API property throws even with `as any` cast, because the throw comes from a property getter on the extension host proxy object, not from calling the result. The existing `?.()` optional chaining only prevents errors from calling `undefined`; it cannot catch a getter throw. The throw propagated up through `registerInlineCommandsC`, causing all command registrations after line 75 (`redivivus.injectTerminalError`, `redivivus.openVisualEditor`) to silently not register.
 
 **Fix:** wrapped the property access in try/catch. Terminal output buffering degrades to `null` returns from `getLastTerminalError()` when the API is unavailable — all callers already handled this.
 
@@ -33,7 +33,7 @@
 | `src/services/logging/chassisLoggerOps.ts` | `chassisLogger.ts` (277→193 lines) | `logBuildOperation`, `logFixOperation`, `logAnalysisOperation`, `logChatOperation`, `listChassisLogs`, `readLogFile` |
 | `src/services/ai/guardianAIPrompt.ts` | `guardianAI.ts` (218→122 lines) | `buildGuardianPrompt` — 96-line review prompt string builder |
 | `src/core/routing/chatPanelMsgFixRoadmap.ts` | `chatPanelMsgFixUtils.ts` (221→196 lines) | `writeProjectRoadmapEntry` |
-| `src/core/project/chatPanelMsgRunCommand.ts` | `chatPanelMsgProjectOps.ts` (273→154 lines) | `handleRunCommand` — `chassis.runProject`, `chassis.listProjects`, `chassis.openVisualEditor` inline handlers |
+| `src/core/project/chatPanelMsgRunCommand.ts` | `chatPanelMsgProjectOps.ts` (273→154 lines) | `handleRunCommand` — `redivivus.runProject`, `redivivus.listProjects`, `redivivus.openVisualEditor` inline handlers |
 | `src/services/mcpServiceTypes.ts` | `mcpService.ts` (205→178 lines) | `McpServerConfig`, `McpTool`, `McpResource`, `McpCallResult` interfaces |
 | `src/services/ai/routingServiceAnalyze.ts` | `routingService.ts` (226→195 lines) | `analyzeFileImpl` — standalone version of `RoutingService.analyzeFile`; class method now delegates |
 | `src/services/userMemoryServiceProfile.ts` | `userMemoryService.ts` (225→182 lines) | `buildPromptInjection`, `getMemoryForDisplay`, `updateMemoryField`, `removeExplicit` |
@@ -69,7 +69,7 @@ Session 11AG added `set-status: 'ready'` on the orchestrator early-return path. 
 **Bug 2 — Explorer not auto-opening (root causes: wrong root + no non-destructive add path):**
 
 Two issues compounded:
-1. `buildResultCard` computed the `__OPEN_WORKSPACE__` token using `ChatPanel.currentPanel.getChassisRoot()` → `chassis.getWorkspaceRoot()` → `ChassisPaths.workspaceRoot` (set at extension activation). This is the extension's activation root, not the directory where the new project was actually written. When both paths matched the existing workspace folder, `alreadyInWs` was `true` and no button was generated.
+1. `buildResultCard` computed the `__OPEN_WORKSPACE__` token using `ChatPanel.currentPanel.getChassisRoot()` → `redivivus.getWorkspaceRoot()` → `ChassisPaths.workspaceRoot` (set at extension activation). This is the extension's activation root, not the directory where the new project was actually written. When both paths matched the existing workspace folder, `alreadyInWs` was `true` and no button was generated.
 2. In the "≥1 existing folder" case, there was no non-destructive auto-add path at all. `extensionInlineCommands.ts` only saved `pendingRescueConversation` / `pendingResumeTask` to globalState (designed for the reload-then-restore flow), but never called `updateWorkspaceFolders`.
 
 **Bonus fix — save-point logic silently dropped:**
@@ -89,13 +89,13 @@ Two issues compounded:
 
 1. **Ghost session creation** — `startSessionSilent` fired unconditionally at line 36 before any intent classification. Typing "done for now" in the chat box created a session with goal "done for now" before the code had any chance to recognize it as a session command.
 
-2. **Direct-mode bypass ignores session commands** — At line 85, `buildMode === 'direct'` short-circuits the entire classifier (including the hardcoded overrides at line 113). "done for now" doesn't match the fix-keyword exclusion regex, so it bypassed the override that maps it to `chassis.endSession` and went directly to `handleBuildRequest("done for now")` — restarting the build pipeline.
+2. **Direct-mode bypass ignores session commands** — At line 85, `buildMode === 'direct'` short-circuits the entire classifier (including the hardcoded overrides at line 113). "done for now" doesn't match the fix-keyword exclusion regex, so it bypassed the override that maps it to `redivivus.endSession` and went directly to `handleBuildRequest("done for now")` — restarting the build pipeline.
 
-**Investigation note:** The `endSession` message handler in `messageRouterSession.ts` (where the semaphore was added in 11AE) is in the `ChassisWebviewProvider` / `attachMessageRouter` path. That view type (`chassisPanel`) is NOT registered in `package.json` — only `chassisSidebar` is. The active sidebar uses `ChassisSidebarProvider` which dispatches `chassis.endSession` as a VS Code command directly, bypassing the webview message path entirely. The semaphore fix was in dead code.
+**Investigation note:** The `endSession` message handler in `messageRouterSession.ts` (where the semaphore was added in 11AE) is in the `ChassisWebviewProvider` / `attachMessageRouter` path. That view type (`chassisPanel`) is NOT registered in `package.json` — only `chassisSidebar` is. The active sidebar uses `ChassisSidebarProvider` which dispatches `redivivus.endSession` as a VS Code command directly, bypassing the webview message path entirely. The semaphore fix was in dead code.
 
 **Fix — `src/core/routing/chatPanelMsgSendMessage.ts`:**
 - `startSessionSilent` block: wrapped in `if (!/\bdone\s+for\s+(now|today)\b|\bend\s+(the\s+)?session\b|\bstart\s+(a\s+)?session\b/i.test(userText))` guard. Session management phrases skip session creation entirely.
-- Direct-mode bypass regex: extended to also exclude the same session phrases. "done for now" now falls through to the hardcoded overrides check at line 113, which correctly routes it to `chassis.endSession`.
+- Direct-mode bypass regex: extended to also exclude the same session phrases. "done for now" now falls through to the hardcoded overrides check at line 113, which correctly routes it to `redivivus.endSession`.
 - File stays at 198 lines (Rule 9 compliant).
 
 ---
@@ -125,7 +125,7 @@ Two issues compounded:
 
 ## May 22, 2026 — Session 11AD (Post-Compile Auto-Deploy)
 
-- **Infra: Auto-deploy on every compile** — `scripts/postcompile.js`: Added `rsync -a --delete` step that mirrors `out/` to `~/projects/chassis-build/.../chassis/out/` immediately after every `npm run compile`. Uses `--delete` so stale files (e.g. `out/ui/chat/` zombie outputs from the old directory structure) are pruned from the baked extension automatically. Non-fatal: logs `ℹ Baked extension not found — skipping deploy` if the path doesn't exist. This is the structural fix that prevents any future source fix from compiling correctly but silently failing to reach the running build.
+- **Infra: Auto-deploy on every compile** — `scripts/postcompile.js`: Added `rsync -a --delete` step that mirrors `out/` to `~/projects/redivivus-build/.../redivivus/out/` immediately after every `npm run compile`. Uses `--delete` so stale files (e.g. `out/ui/chat/` zombie outputs from the old directory structure) are pruned from the baked extension automatically. Non-fatal: logs `ℹ Baked extension not found — skipping deploy` if the path doesn't exist. This is the structural fix that prevents any future source fix from compiling correctly but silently failing to reach the running build.
 
 ---
 
@@ -139,7 +139,7 @@ Two issues compounded:
 
 ## May 20, 2026 — Session 32 (Agent Mode UX: Enhance Agent Mode Context and Features)
 
-- **Feature: Agent Mode Result Cards** — `src/ui/chat/chatPanelMsgSendMessage.ts` & `src/services/ai/agentService.ts`: Surfaced the standard CHASSIS Result Card UI in Agent Mode by injecting a `BuildLedger` to track total tokens across ReAct loop iterations and wiring it into `buildResultCard`.
+- **Feature: Agent Mode Result Cards** — `src/ui/chat/chatPanelMsgSendMessage.ts` & `src/services/ai/agentService.ts`: Surfaced the standard Redivivus Result Card UI in Agent Mode by injecting a `BuildLedger` to track total tokens across ReAct loop iterations and wiring it into `buildResultCard`.
 - **Fix: Missing Build History** — `src/services/ai/agentTools.ts` & `src/ui/chat/chatPanelMsgSendMessage.ts`: Added `SnapshotManager` triggers to the `write_file` agent tool so the first modification creates a save point, and wired the resulting snapshot to `BuildHistoryService` so Agent Mode builds appear in the History panel.
 - **Fix: Path Hallucination and Aggressive Instructions** — `src/services/ai/agentService.ts` & `src/ui/chat/chatPanelMsgSendMessage.ts`: Added aggressive "ZERO MANUAL INSTRUCTIONS" and "NO HALLUCINATIONS" constraints to the system prompt to force the agent to use `run_command` instead of writing fallback text tutorials. Additionally, injected a `vscode.workspace.findFiles` tree into `projectContext` so the Agent knows the exact file structure and stops guessing incorrect paths (e.g., `src/renderer.js` instead of `rendering.js`).
 
@@ -155,7 +155,7 @@ Two issues compounded:
 
 ## May 20, 2026 — Session 30 (Surgical Edits & UX: Fix Surgical Edit Fallback and Vague Intent Routing)
 
-- **Fix: Surgical Edit Fallback Data Corruption** — `src/ui/chat/chatPanelBuild.ts` & `src/services/build/surgicalEditService.ts`: When the Worker AI generated `<<<SEARCH...REPLACE>>>` blocks without a `## Edit: filename` header, the parser failed to find any edits. Consequently, `usedSurgical` evaluated to false. The catastrophic bug was that CHASSIS then fell back to a full-file write, but the code payload it wrote was the literal, unparsed `<<<SEARCH...REPLACE>>>` tags, completely destroying the user's file.
+- **Fix: Surgical Edit Fallback Data Corruption** — `src/ui/chat/chatPanelBuild.ts` & `src/services/build/surgicalEditService.ts`: When the Worker AI generated `<<<SEARCH...REPLACE>>>` blocks without a `## Edit: filename` header, the parser failed to find any edits. Consequently, `usedSurgical` evaluated to false. The catastrophic bug was that Redivivus then fell back to a full-file write, but the code payload it wrote was the literal, unparsed `<<<SEARCH...REPLACE>>>` tags, completely destroying the user's file.
   - **Resolution 1:** Updated `parseSurgicalEdits` to assign headerless blocks to the default target file.
   - **Resolution 2:** Added a strict safety guard in `chatPanelBuild.ts`. If surgical edits are detected but fail to apply, it now throws a graceful error (`Surgical edit failed`) instead of writing the raw tags.
 - **Fix: Vague Intent Classification** — `src/ui/chat/chatPanelClassifier.ts`: Vague, non-technical overarching requests (like "make it a real app" or "I want to run it when I click it") were being incorrectly routed to the `run` pipeline (which just opens the browser). I updated the system prompt to explicitly route these ambiguous non-code requests to the `question` intent. This allows the AI to fall back to conversational Q&A, clarify the user's goal (e.g., "Do you want an Electron desktop app?"), and explain the process before building.
@@ -213,8 +213,8 @@ Two issues compounded:
 ## May 20, 2026 — Session 22 (Profile View: Restore User Profile to custom sidebar and auto-open chat)
 
 
-- **Feature: Restored User Profile section to the custom sidebar** — `src/ui/sidebar/chassisSidebar.ts`: Replaced the commented-out `[NEXT]` placeholder for the Profile section with an active collapsible `-- PROFILE` section, rendering `User Profile` (triggers `chassis.openProfile`) and `Web Search` (triggers `chassis.webSearch`) buttons directly in the custom sidebar.
-- **UX: Auto-open chat panel on Profile request** — `src/extensionInlineCommandsB.ts`: Modified the `chassis.openProfile` command handler so that if the chat panel is not open, it automatically calls `ChatPanel.show(...)` and waits briefly for the panel to initialize before rendering the user memory profile. This gives a highly responsive, premium UX.
+- **Feature: Restored User Profile section to the custom sidebar** — `src/ui/sidebar/chassisSidebar.ts`: Replaced the commented-out `[NEXT]` placeholder for the Profile section with an active collapsible `-- PROFILE` section, rendering `User Profile` (triggers `redivivus.openProfile`) and `Web Search` (triggers `redivivus.webSearch`) buttons directly in the custom sidebar.
+- **UX: Auto-open chat panel on Profile request** — `src/extensionInlineCommandsB.ts`: Modified the `redivivus.openProfile` command handler so that if the chat panel is not open, it automatically calls `ChatPanel.show(...)` and waits briefly for the panel to initialize before rendering the user memory profile. This gives a highly responsive, premium UX.
 
 ---
 
@@ -223,13 +223,13 @@ Two issues compounded:
 
 - **Fix: profileRuntime command fails to find at runtime with "command not found" toast** — Converted static top-level imports of `ChatPanel` into dynamic inline imports inside `src/commands/profileRuntime.ts`, `src/commands/startRuntimeAnalysis.ts`, and `src/commands/startRuntimeAnalysisHelpers.ts`. This breaks the circular dependency chain (`extensionCommands` -> `profileRuntime` -> `ChatPanel` -> `extensionInlineCommands` -> `extensionInlineCommandsB` -> `profileRuntime`) that caused command registration to fail or be skipped at load time, while maintaining signature compatibility.
 
-- **Fix: Extension activation crashed entirely on startup** — Found that `chassis.showBuildHistory` was being registered in both `src/commands/savePoint.ts` and `src/extensionInlineCommandsB.ts`. Because it was registered twice, the VS Code extension host threw an unhandled duplicate command error on startup which completely halted extension activation, rendering the sidebar non-functional. Removed the duplicate registration from `src/extensionInlineCommandsB.ts` to restore clean activation.
+- **Fix: Extension activation crashed entirely on startup** — Found that `redivivus.showBuildHistory` was being registered in both `src/commands/savePoint.ts` and `src/extensionInlineCommandsB.ts`. Because it was registered twice, the VS Code extension host threw an unhandled duplicate command error on startup which completely halted extension activation, rendering the sidebar non-functional. Removed the duplicate registration from `src/extensionInlineCommandsB.ts` to restore clean activation.
 
 ---
 
 ## May 20, 2026 — Session 20X (API Setup: Disable switches, active team sorting, glowing highlights, and split styles)
 
-- **Feature: Persistent ability to disable any configured AI provider** — `package.json`: Added `chassis.disabledProviders` setting schema to store array of user-disabled provider IDs. `src/services/ai/routingKeys.ts`: Intercepted all provider API key getters (`getGeminiKey()`, `getClaudeKey()`, etc.) to return `null` if the provider's ID is in the disabled list. This propagates the disabled state flawlessly across all supervisors, worker planners, and guardians.
+- **Feature: Persistent ability to disable any configured AI provider** — `package.json`: Added `redivivus.disabledProviders` setting schema to store array of user-disabled provider IDs. `src/services/ai/routingKeys.ts`: Intercepted all provider API key getters (`getGeminiKey()`, `getClaudeKey()`, etc.) to return `null` if the provider's ID is in the disabled list. This propagates the disabled state flawlessly across all supervisors, worker planners, and guardians.
 
 - **Feature: Interactive enable/disable actions in the UI** — `src/commands/apiSetup.ts`: Implemented `toggle-provider` message handler which receives the ID, toggles its state in settings, and reloads the HTML instantly to keep the UI perfectly updated.
 
@@ -253,7 +253,7 @@ Two issues compounded:
   2. `src/ui/chat/chatPanelMsgMapContext.ts`: Parses and strips `ACTIONS_JSON:` from the response before rendering. Stores actions in `_architectActions` keyed by `reviewId`
   3. `src/ui/chat/chatPanelRendererArchitect.ts`: `renderArchitectActions()` reads `_architectActions` and renders per-action buttons (blue) above Fix All/Dismiss. New `renderArchitectConfirm()` renders Confirm/Cancel for the in-chat confirmation step
   4. `src/ui/chat/chatPanelRenderer.ts`: Added `__ARCH_CONFIRM__reviewId|||actionIndex|||END_ARCH_CONFIRM__` token → `renderArchitectConfirm()`
-  5. `src/ui/chat/chatPanelMsgArchitect.ts`: Added `ArchitectAction` type, `_architectActions` map, `handleArchitectPerAction()` (shows confirmation in chat: "Delete `file.js`? ... A snapshot is saved automatically. [Confirm] [Cancel]"), `handleArchitectActionConfirm()` (executes: delete via `fs.unlinkSync`, fix via `chassis.runEditFix`, create via `chassis.postToChat`)
+  5. `src/ui/chat/chatPanelMsgArchitect.ts`: Added `ArchitectAction` type, `_architectActions` map, `handleArchitectPerAction()` (shows confirmation in chat: "Delete `file.js`? ... A snapshot is saved automatically. [Confirm] [Cancel]"), `handleArchitectActionConfirm()` (executes: delete via `fs.unlinkSync`, fix via `redivivus.runEditFix`, create via `redivivus.postToChat`)
   6. `src/ui/chat/chatPanelMessages.ts`: Routes `architect-per-action`, `architect-action-confirm`, `architect-action-cancel`. Also removed leftover debug log writing to `~/chassis_debug.log`
   7. `src/ui/chat/chatPanelScriptActions.ts`: Expanded arch click handler; split feedback/toggle/recent to `chatPanelScriptActionsB.ts` (file was at 200-line limit)
   8. `src/ui/chat/chatPanelScriptActionsB.ts`: New file with extracted handlers
@@ -299,31 +299,31 @@ Two issues compounded:
 
 ## May 16, 2026 — Session 14f (Rules Audit #5: Post-Change Roadmap Logging)
 
-- **Feature: All build and fix pipelines now write to the project's CHASSIS_ROADMAP.md after every file change** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `writeProjectRoadmapEntry(root, heading, bullets[])`. Reads the project's `CHASSIS_ROADMAP.md`, inserts a new `## Recent Fixes -- DATE (heading)` entry immediately before the first existing `## ` heading, and updates the `*Last updated*` line. No-ops silently when `CHASSIS_ROADMAP.md` is absent, so non-CHASSIS projects are unaffected. Also moved `modelLabel()` here from `chatPanelMsgFix.ts` (exported) to keep `chatPanelMsgFix.ts` under 200 lines after the additions. `src/ui/chat/chatPanelMsgFix.ts`: Import `modelLabel` and `writeProjectRoadmapEntry`; call `writeProjectRoadmapEntry` after successful file writes with file list + AI attribution. `src/ui/chat/chatPanelBuild.ts`: Import `writeProjectRoadmapEntry`; call after `Writer.writeBuiltFile` with file, AI, tokens, cost. `src/ui/chat/chatPanelChunked.ts`: Import `writeProjectRoadmapEntry`; call after `tracer.end()` with full built file list and supervisor/worker pair. Pipelines were making changes to user project files but never logging those changes to the project's CHASSIS_ROADMAP.md — a direct violation of the rule that every file change must be logged.
+- **Feature: All build and fix pipelines now write to the project's REDIVIVUS_ROADMAP.md after every file change** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `writeProjectRoadmapEntry(root, heading, bullets[])`. Reads the project's `REDIVIVUS_ROADMAP.md`, inserts a new `## Recent Fixes -- DATE (heading)` entry immediately before the first existing `## ` heading, and updates the `*Last updated*` line. No-ops silently when `REDIVIVUS_ROADMAP.md` is absent, so non-Redivivus projects are unaffected. Also moved `modelLabel()` here from `chatPanelMsgFix.ts` (exported) to keep `chatPanelMsgFix.ts` under 200 lines after the additions. `src/ui/chat/chatPanelMsgFix.ts`: Import `modelLabel` and `writeProjectRoadmapEntry`; call `writeProjectRoadmapEntry` after successful file writes with file list + AI attribution. `src/ui/chat/chatPanelBuild.ts`: Import `writeProjectRoadmapEntry`; call after `Writer.writeBuiltFile` with file, AI, tokens, cost. `src/ui/chat/chatPanelChunked.ts`: Import `writeProjectRoadmapEntry`; call after `tracer.end()` with full built file list and supervisor/worker pair. Pipelines were making changes to user project files but never logging those changes to the project's REDIVIVUS_ROADMAP.md — a direct violation of the rule that every file change must be logged.
 
 ---
 
 ## May 16, 2026 — Session 14e (Rules Audit #4: Pre-flight rules.md Injection)
 
-- **Feature: All pipelines now inject .chassis/rules.md into Supervisor prompt** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `readProjectRules(root)`. Reads `.chassis/rules.md`, caps at 4KB, returns empty string when absent. `src/ui/chat/chatPanelMsgFix.ts`: Import `readProjectRules`, call it before Phase 1, inject into Supervisor prompt under "PROJECT RULES (must not violate)". `src/ui/chat/chatPanelBuild.ts`: Reads rules and includes in `blueprintContext` enrichment alongside dead_ends. `src/ui/chat/chatPanelChunked.ts`: Adds `rulesBlock` to `planPrompt` alongside `deadEndsBlock`. `src/ui/chat/chatPanelBuildOrchestrated.ts`: Reads rules once via destructuring to avoid double file reads; injects into `context` passed to `createPlan`. Pre-flight step "Read `.chassis/rules.md`" existed in CLAUDE.md for external editors but was never performed by any internal pipeline. Projects can have custom rules (e.g. "never use AudioContext", "always use WAV blob") that the Supervisor needs before suggesting a fix or planning a build.
+- **Feature: All pipelines now inject .redivivus/rules.md into Supervisor prompt** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `readProjectRules(root)`. Reads `.redivivus/rules.md`, caps at 4KB, returns empty string when absent. `src/ui/chat/chatPanelMsgFix.ts`: Import `readProjectRules`, call it before Phase 1, inject into Supervisor prompt under "PROJECT RULES (must not violate)". `src/ui/chat/chatPanelBuild.ts`: Reads rules and includes in `blueprintContext` enrichment alongside dead_ends. `src/ui/chat/chatPanelChunked.ts`: Adds `rulesBlock` to `planPrompt` alongside `deadEndsBlock`. `src/ui/chat/chatPanelBuildOrchestrated.ts`: Reads rules once via destructuring to avoid double file reads; injects into `context` passed to `createPlan`. Pre-flight step "Read `.redivivus/rules.md`" existed in CLAUDE.md for external editors but was never performed by any internal pipeline. Projects can have custom rules (e.g. "never use AudioContext", "always use WAV blob") that the Supervisor needs before suggesting a fix or planning a build.
 
 ---
 
 ## May 16, 2026 — Session 14d (Rules Audit #3: Rule 17 Causation-First Debugging)
 
-- **Feature: Fix Supervisor now reads build_history.json before diagnosing bugs** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `getRecentBuildContext(root, sourceFiles)`. Reads build history via `BuildHistoryService`, filters to the 5 most recent non-undone builds, finds which source files overlap with currently-broken files, and returns a formatted causation alert with file names, build task, age, and AI used. Returns empty string when no overlap exists. `src/ui/chat/chatPanelMsgFix.ts`: Import and call `getRecentBuildContext` after `collectSourceFiles`. Inject `buildContext` at the TOP of the Supervisor prompt before all other context. Rule 17 states "always check build_history.json BEFORE suggesting any other cause" — but the fix Supervisor was diagnosing blind, never knowing whether the file it was reading had just been written by a CHASSIS build. If a build introduced the bug, the Supervisor's first frame should be "this was recently built" not "what is wrong with this code."
+- **Feature: Fix Supervisor now reads build_history.json before diagnosing bugs** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `getRecentBuildContext(root, sourceFiles)`. Reads build history via `BuildHistoryService`, filters to the 5 most recent non-undone builds, finds which source files overlap with currently-broken files, and returns a formatted causation alert with file names, build task, age, and AI used. Returns empty string when no overlap exists. `src/ui/chat/chatPanelMsgFix.ts`: Import and call `getRecentBuildContext` after `collectSourceFiles`. Inject `buildContext` at the TOP of the Supervisor prompt before all other context. Rule 17 states "always check build_history.json BEFORE suggesting any other cause" — but the fix Supervisor was diagnosing blind, never knowing whether the file it was reading had just been written by a Redivivus build. If a build introduced the bug, the Supervisor's first frame should be "this was recently built" not "what is wrong with this code."
 
 ---
 
 ## May 16, 2026 — Session 14c (Rules Audit #2: Dead_ends in All Build Pipelines)
 
-- **Feature: All build pipelines now read .chassis/dead_ends.md before Supervisor plans** — `src/ui/chat/chatPanelBuild.ts`: Import `readProjectDeadEnds`. Shadow `blueprintContext` at the start of `runSingleFileBuild` with a dead_ends-enriched version; this flows into `supervisorPlan` and `buildWorkerPrompt` automatically. `src/ui/chat/chatPanelChunked.ts`: Import `readProjectDeadEnds`. Add `deadEndsBlock` injected into `planPrompt` before the file-plan JSON request. `src/ui/chat/chatPanelBuildOrchestrated.ts`: Import `readProjectDeadEnds`. Enrich `context` passed to `createPlan` with dead_ends content; combined with rules injection in same refactor. Rule 5 (don't repeat dead ends) was enforced in the fix pipeline but completely absent from all three build pipelines. A Supervisor planning a new build had no knowledge of approaches already known to fail in the project.
+- **Feature: All build pipelines now read .redivivus/dead_ends.md before Supervisor plans** — `src/ui/chat/chatPanelBuild.ts`: Import `readProjectDeadEnds`. Shadow `blueprintContext` at the start of `runSingleFileBuild` with a dead_ends-enriched version; this flows into `supervisorPlan` and `buildWorkerPrompt` automatically. `src/ui/chat/chatPanelChunked.ts`: Import `readProjectDeadEnds`. Add `deadEndsBlock` injected into `planPrompt` before the file-plan JSON request. `src/ui/chat/chatPanelBuildOrchestrated.ts`: Import `readProjectDeadEnds`. Enrich `context` passed to `createPlan` with dead_ends content; combined with rules injection in same refactor. Rule 5 (don't repeat dead ends) was enforced in the fix pipeline but completely absent from all three build pipelines. A Supervisor planning a new build had no knowledge of approaches already known to fail in the project.
 
 ---
 
 ## May 16, 2026 — Session 14b (Rules Audit #1b: Dead-End Annotation Loop + Pattern Validation)
 
-- **Feature: Fix pipeline annotates removed code with [DEAD] and writes successful fixes to dead_ends.md** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `readProjectDeadEnds(root)` (reads `.chassis/dead_ends.md`, caps at 8KB, creates with header if absent) and `appendProjectDeadEnd(root, patternName, triedWhat, whyFails, doInstead)` (appends structured entry to dead_ends.md). `src/ui/chat/chatPanelMsgFixPatterns.ts`: Added `triedWhat`, `whyFails`, `doInstead` fields to `FailurePattern` interface; filled in for the web-audio-linux pattern. `src/ui/chat/chatPanelMsgFix.ts`: (1) Reads project dead_ends.md before Phase 1 and injects into Supervisor prompt under "PREVIOUSLY FAILED APPROACHES". (2) Added Worker Rule 5: annotate every removed/replaced block with [DEAD] comment in correct syntax for the file type. (3) After successful validated fix: calls `appendProjectDeadEnd` for each resolved pattern. Rule 5 and Rule 8 were completely absent from the fix pipeline — Worker was generating fixes with no [DEAD] annotations and Supervisor had no memory of what had failed before.
+- **Feature: Fix pipeline annotates removed code with [DEAD] and writes successful fixes to dead_ends.md** — `src/ui/chat/chatPanelMsgFixUtils.ts`: Added `readProjectDeadEnds(root)` (reads `.redivivus/dead_ends.md`, caps at 8KB, creates with header if absent) and `appendProjectDeadEnd(root, patternName, triedWhat, whyFails, doInstead)` (appends structured entry to dead_ends.md). `src/ui/chat/chatPanelMsgFixPatterns.ts`: Added `triedWhat`, `whyFails`, `doInstead` fields to `FailurePattern` interface; filled in for the web-audio-linux pattern. `src/ui/chat/chatPanelMsgFix.ts`: (1) Reads project dead_ends.md before Phase 1 and injects into Supervisor prompt under "PREVIOUSLY FAILED APPROACHES". (2) Added Worker Rule 5: annotate every removed/replaced block with [DEAD] comment in correct syntax for the file type. (3) After successful validated fix: calls `appendProjectDeadEnd` for each resolved pattern. Rule 5 and Rule 8 were completely absent from the fix pipeline — Worker was generating fixes with no [DEAD] annotations and Supervisor had no memory of what had failed before.
 
 - **Feature: Post-write pattern validation closes the fix loop** — `src/ui/chat/chatPanelMsgFixPatterns.ts`: New file (78 lines). `KNOWN_PATTERNS` registry with Web Audio API silent-failure pattern. `detectPatterns(sourceText)` scans source before Phase 1. `buildSupervisorNotes()` / `buildWorkerRules()` inject domain guidance dynamically only when the pattern is present. `validateOutputFiles(fixes)` scans written files post-write for known-bad patterns. `src/ui/chat/chatPanelMsgFix.ts`: Removed hardcoded Web Audio guidance (now in patterns file). Added `detectPatterns(filesBlock)` before Phase 1. Added post-write `validateOutputFiles()` call and `[VALIDATION PASS/FAIL]` line in result message. Hardcoded prompt guidance was routinely ignored — the fix pipeline had no way to verify whether the Worker followed instructions. Now output is scanned after write; if the bad pattern still appears, the user sees `[VALIDATION FAIL]` and knows to retry.
 
@@ -331,7 +331,7 @@ Two issues compounded:
 
 ## May 16, 2026 — Session 14a (Rules Audit #1: CHASSIS_WORKER_RULES + Build-Info Version Fix)
 
-- **Feature: CHASSIS_WORKER_RULES constant injected into all AI Worker prompts** — `src/services/ai/chassisWorkerRules.ts`: New file (22 lines). Exports `CHASSIS_WORKER_RULES` — 6 rules covering [SCOPE] at line 1 of new files, [WARN] above fragile logic, [DEAD] above every removed block, preservation of all existing annotation tags, 200-line file limit with required splits, and no non-ASCII characters in script blocks. Single source of truth across all pipelines. `src/ui/chat/chatPanelBuildWorker.ts`: Import and append to `buildWorkerPrompt()` return value. `src/ui/chat/chatPanelChunkedLoop.ts`: Import and append to per-file `filePrompt`. `src/services/build/buildOrchestratorPrompt.ts`: Import and append to `generatePhasePromptImpl` before return. `src/ui/chat/chatPanelMsgFix.ts`: Import and inject into fix Worker prompt before FORMAT section. Annotation rules existed in external config files (CLAUDE.md, .windsurfrules) but were never wired into CHASSIS's own internal AI prompts. Build and fix pipelines were generating unannotated code with no [SCOPE], [WARN], or [DEAD] markers.
+- **Feature: CHASSIS_WORKER_RULES constant injected into all AI Worker prompts** — `src/services/ai/chassisWorkerRules.ts`: New file (22 lines). Exports `CHASSIS_WORKER_RULES` — 6 rules covering [SCOPE] at line 1 of new files, [WARN] above fragile logic, [DEAD] above every removed block, preservation of all existing annotation tags, 200-line file limit with required splits, and no non-ASCII characters in script blocks. Single source of truth across all pipelines. `src/ui/chat/chatPanelBuildWorker.ts`: Import and append to `buildWorkerPrompt()` return value. `src/ui/chat/chatPanelChunkedLoop.ts`: Import and append to per-file `filePrompt`. `src/services/build/buildOrchestratorPrompt.ts`: Import and append to `generatePhasePromptImpl` before return. `src/ui/chat/chatPanelMsgFix.ts`: Import and inject into fix Worker prompt before FORMAT section. Annotation rules existed in external config files (CLAUDE.md, .windsurfrules) but were never wired into Redivivus's own internal AI prompts. Build and fix pipelines were generating unannotated code with no [SCOPE], [WARN], or [DEAD] markers.
 
 - **Fix: build-info.json version stuck at 0.3.4 despite package.json being 0.3.6** — `scripts/postcompile.js`: Replace hardcoded `'0.3.4'` with dynamic read from `package.json`. Now reads `package.json` at compile time and falls back to `'0.0.0'` on error. Rule 20 violation — version mismatch between build metadata and actual package version.
 
@@ -339,7 +339,7 @@ Two issues compounded:
 
 ## May 11, 2026 — Session 3o (Scan/Analyze Intent Intercept)
 
-- **Fix: "scan ryppel for problems" going to AI and returning nonsense** — `chatPanelMessages.ts`: Phrases like "scan [project] for problems", "analyze the project", "check my project", "project health" were hitting the intent classifier and being routed to the build/question pipeline. AI responded with "no code was provided" type errors. Added hardcoded pre-screen intercept that matches these patterns and calls `chassis.analyze` directly (zero tokens, instant response), same pattern as the scan/template/setup intercepts above it.
+- **Fix: "scan ryppel for problems" going to AI and returning nonsense** — `chatPanelMessages.ts`: Phrases like "scan [project] for problems", "analyze the project", "check my project", "project health" were hitting the intent classifier and being routed to the build/question pipeline. AI responded with "no code was provided" type errors. Added hardcoded pre-screen intercept that matches these patterns and calls `redivivus.analyze` directly (zero tokens, instant response), same pattern as the scan/template/setup intercepts above it.
 
 ---
 
@@ -363,18 +363,18 @@ Two issues compounded:
 
 ## May 13, 2026 — Session 4c (Rule 20 — Build & Deploy Protocol)
 
-- **Added Rule 20 to all rules files** — `.chassis/rules.md`, `CLAUDE.md`, `GEMINI.md`: Documented the Build & Deploy Protocol that must be followed after every code change: always run `npm run compile`, always copy both `out/` AND `package.json` when deploying, never copy `out/` without `package.json`, ensure version matches current release (0.3.6), and register new commands/settings in `package.json` contributes section.
+- **Added Rule 20 to all rules files** — `.redivivus/rules.md`, `CLAUDE.md`, `GEMINI.md`: Documented the Build & Deploy Protocol that must be followed after every code change: always run `npm run compile`, always copy both `out/` AND `package.json` when deploying, never copy `out/` without `package.json`, ensure version matches current release (0.3.6), and register new commands/settings in `package.json` contributes section.
 
 ---
 
 ## May 13, 2026 — Session 4b (Startup Behavior Setting)
 
-- **Feature: Add chassis.startupBehavior setting** — Multiple files modified:
-  - `package.json`: Added `chassis.startupBehavior` configuration with two options: `"launcher"` (default) and `"lastProject"`. Includes proper enum descriptions for VS Code Settings UI.
-  - `chatPanelHeader.ts`: Reads the startupBehavior setting and computes `shouldAutoOpenLastProject` flag (only true when setting is "lastProject", workspace has no .chassis folder, and at least one recent project exists)
+- **Feature: Add redivivus.startupBehavior setting** — Multiple files modified:
+  - `package.json`: Added `redivivus.startupBehavior` configuration with two options: `"launcher"` (default) and `"lastProject"`. Includes proper enum descriptions for VS Code Settings UI.
+  - `chatPanelHeader.ts`: Reads the startupBehavior setting and computes `shouldAutoOpenLastProject` flag (only true when setting is "lastProject", workspace has no .redivivus folder, and at least one recent project exists)
   - `chatPanelHtml.ts`: Added "Always open my last project on startup" checkbox at the bottom of the launcher screen with `data-action="toggle-auto-open"` attribute
   - `chatPanelScriptActions.ts`: Added event handler for the checkbox that sends `toggle-setting` message to the extension
-  - `chatPanelMessages.ts`: Added message handler for `toggle-setting` that updates the VS Code configuration with `vscode.workspace.getConfiguration('chassis').update()`
+  - `chatPanelMessages.ts`: Added message handler for `toggle-setting` that updates the VS Code configuration with `vscode.workspace.getConfiguration('redivivus').update()`
   - `chatPanel.ts`: Added startup behavior logic in `createOrShow` — when setting is "lastProject" and recent projects exist, auto-opens the most recent project. Falls back to launcher when no recent projects exist.
 
 ---
@@ -382,10 +382,10 @@ Two issues compounded:
 ## May 13, 2026 — Session 4 (Welcome Screen Redesign)
 
 - **Feature: Complete welcome screen redesign** — Multiple files modified:
-  - `chatPanelHeader.ts`: Added `workspaceHasChassis` check (detects `.chassis/` folder in workspace) and `recentProjects` retrieval from globalState
-  - `chatPanelHtml.ts`: New launcher screen with three options: 🚀 Start New Project, 📂 Open Existing Project, 🕐 Recent Projects. Shows "Welcome to CHASSIS - What would you like to build today?" when no `.chassis/` folder detected. Shows "Ready to Build: {projectName}" only when project is initialized.
+  - `chatPanelHeader.ts`: Added `workspaceHasChassis` check (detects `.redivivus/` folder in workspace) and `recentProjects` retrieval from globalState
+  - `chatPanelHtml.ts`: New launcher screen with three options: 🚀 Start New Project, 📂 Open Existing Project, 🕐 Recent Projects. Shows "Welcome to Redivivus - What would you like to build today?" when no `.redivivus/` folder detected. Shows "Ready to Build: {projectName}" only when project is initialized.
   - `chatPanelScriptActions.ts`: Added event listeners for launcher buttons (`data-action` attributes) and recent project items (`data-recent-path`)
-  - `chatPanelMessages.ts`: Added message handlers for `start-new-project`, `open-existing-project`, and `open-recent-project`. Implemented recent projects tracking in globalState (stored as `chassis.recentProjects` array with max 10 items)
+  - `chatPanelMessages.ts`: Added message handlers for `start-new-project`, `open-existing-project`, and `open-recent-project`. Implemented recent projects tracking in globalState (stored as `redivivus.recentProjects` array with max 10 items)
   - `chatPanel.ts`: Updated `buildHeaderInfo` call to pass `extensionContext` for recent projects access
   - `chatPanelHtml.ts`: Added `workspaceHasChassis` and `recentProjects` fields to `ChatHeaderInfo` interface
 
@@ -393,7 +393,7 @@ Two issues compounded:
 
 ## May 12, 2026 — Session 3za (Hardcoded File Dialog Intercept)
 
-- **Fix: AI still using wrong command for file dialog** — `chatPanelMessages.ts`: Even with updated prompt and examples, Gemini was still using `quickOpen` instead of `files.openFile`. Added hardcoded pre-screen intercept: if user says "yes/yeah/sure/ok/please/go ahead" and the last assistant message mentioned "file picker", CHASSIS bypasses the AI entirely and directly executes `workbench.action.files.openFile` to open the native OS file dialog.
+- **Fix: AI still using wrong command for file dialog** — `chatPanelMessages.ts`: Even with updated prompt and examples, Gemini was still using `quickOpen` instead of `files.openFile`. Added hardcoded pre-screen intercept: if user says "yes/yeah/sure/ok/please/go ahead" and the last assistant message mentioned "file picker", Redivivus bypasses the AI entirely and directly executes `workbench.action.files.openFile` to open the native OS file dialog.
 
 ---
 
@@ -405,8 +405,8 @@ Two issues compounded:
 
 ## May 12, 2026 — Session 3y (Stale Project + Command Hallucination Fix)
 
-- **Fix: Modal tried to open non-existent project path** — `chatPanel.ts`: The path `/home/papajoe/projects/self-playing-snake-pong` was stored in `chassis.lastActiveProject` from a previous session, but that folder no longer exists. When CHASSIS tried to restore the "last active project," it caused errors. Added check to clear stale `lastActiveProject` reference if the folder no longer exists.
-- **Fix: AI hallucinated fake command `workbench.action.files.openFileTap`** — `chatPanelAI.ts`: The AI made up a command ID that doesn't exist. Added explicit instruction: "CRITICAL: ONLY use commands from the examples above or the CHASSIS COMMANDS list. NEVER make up command IDs." Also added `quickOpen` to the examples list for file picker scenarios.
+- **Fix: Modal tried to open non-existent project path** — `chatPanel.ts`: The path `/home/papajoe/projects/self-playing-snake-pong` was stored in `redivivus.lastActiveProject` from a previous session, but that folder no longer exists. When Redivivus tried to restore the "last active project," it caused errors. Added check to clear stale `lastActiveProject` reference if the folder no longer exists.
+- **Fix: AI hallucinated fake command `workbench.action.files.openFileTap`** — `chatPanelAI.ts`: The AI made up a command ID that doesn't exist. Added explicit instruction: "CRITICAL: ONLY use commands from the examples above or the Redivivus COMMANDS list. NEVER make up command IDs." Also added `quickOpen` to the examples list for file picker scenarios.
 
 ---
 
@@ -436,13 +436,13 @@ Two issues compounded:
 
 ## May 12, 2026 — Session 3t (VS Code Command Access - Real)
 
-- **Fix: AI claimed VS Code command access but it didn't actually work** — `chatPanelAI.ts`: The system prompt claimed CHASSIS could "execute all VS Code commands" including format document, change theme, toggle word wrap, etc. But the `SAFE_AUTO_EXECUTE_COMMANDS` list only had 16 commands, mostly CHASSIS-specific. Expanded the safe auto-execute list to include: `editor.action.formatDocument`, `editor.action.toggleWordWrap`, `workbench.action.selectTheme`, `workbench.action.terminal.new`, zoom commands, panel toggle, etc. Also added user-friendly labels for these commands. Now when the AI responds with `[[COMMAND:workbench.action.selectTheme]]`, it actually works.
+- **Fix: AI claimed VS Code command access but it didn't actually work** — `chatPanelAI.ts`: The system prompt claimed Redivivus could "execute all VS Code commands" including format document, change theme, toggle word wrap, etc. But the `SAFE_AUTO_EXECUTE_COMMANDS` list only had 16 commands, mostly Redivivus-specific. Expanded the safe auto-execute list to include: `editor.action.formatDocument`, `editor.action.toggleWordWrap`, `workbench.action.selectTheme`, `workbench.action.terminal.new`, zoom commands, panel toggle, etc. Also added user-friendly labels for these commands. Now when the AI responds with `[[COMMAND:workbench.action.selectTheme]]`, it actually works.
 
 ---
 
 ## May 12, 2026 — Session 3s (Accurate AI Capabilities)
 
-- **Fix: AI claims false capabilities like "full VS Code command access"** — `chatPanelAI.ts`: System prompt was telling the AI it could execute "all VS Code commands" including "opening the terminal, formatting a document, changing themes, or running Git commands." This is false — CHASSIS only has access to its own registered commands. Rewrote system prompt with **accurate** capabilities: write/generate code, explain code, scan projects, create save points, track sessions, access vault, run CHASSIS commands. AI can now brag accurately about what it actually does.
+- **Fix: AI claims false capabilities like "full VS Code command access"** — `chatPanelAI.ts`: System prompt was telling the AI it could execute "all VS Code commands" including "opening the terminal, formatting a document, changing themes, or running Git commands." This is false — Redivivus only has access to its own registered commands. Rewrote system prompt with **accurate** capabilities: write/generate code, explain code, scan projects, create save points, track sessions, access vault, run Redivivus commands. AI can now brag accurately about what it actually does.
 
 ---
 
@@ -455,7 +455,7 @@ Two issues compounded:
 
 ## May 12, 2026 — Session 3q (Windsurf-Style Responsiveness)
 
-- **Fix: CHASSIS feels slower than Windsurf** — `chatPanelMessages.ts`, `chatPanelIntent.ts`: Two changes to make CHASSIS as responsive as Windsurf:
+- **Fix: Redivivus feels slower than Windsurf** — `chatPanelMessages.ts`, `chatPanelIntent.ts`: Two changes to make Redivivus as responsive as Windsurf:
   1. **Intent routing**: Replaced AI-driven intent classification with simple regex fast-path. Only messages matching explicit build triggers (`build|create|make|generate|write|add|implement|code|develop|produce` + object) go to the build pipeline. Everything else defaults to chat mode instantly - no AI classification latency.
   2. **Cost modal auto-approve**: Small builds (< 3k tokens, < $0.01) skip the cost estimate modal entirely for instant execution.
   
@@ -471,7 +471,7 @@ Two issues compounded:
 
 ## May 11, 2026 — Session 3m (Template List Intent + Duplicate Panel Fix)
 
-- **Fix: "open ryppel" showing "Untitled (Workspace)" and CHASSIS not initializing** — `projectOperations.ts`, `messageRouterWizard.ts`, `chatPanelMessages.ts`: Reverted `updateWorkspaceFolders` approach (it creates a multi-root workspace, skips extension activation events, leaves CHASSIS uninitialized). Correct fix: pre-create a `<projectName>.code-workspace` file before calling `vscode.openFolder` — VS Code only shows the "save workspace?" dialog for untitled workspaces; once a `.code-workspace` file exists it opens cleanly as a named single-folder workspace. Applied to all three open-folder paths. Also pre-created `ryppel.code-workspace` for the existing ryppel project.
+- **Fix: "open ryppel" showing "Untitled (Workspace)" and Redivivus not initializing** — `projectOperations.ts`, `messageRouterWizard.ts`, `chatPanelMessages.ts`: Reverted `updateWorkspaceFolders` approach (it creates a multi-root workspace, skips extension activation events, leaves Redivivus uninitialized). Correct fix: pre-create a `<projectName>.code-workspace` file before calling `vscode.openFolder` — VS Code only shows the "save workspace?" dialog for untitled workspaces; once a `.code-workspace` file exists it opens cleanly as a named single-folder workspace. Applied to all three open-folder paths. Also pre-created `ryppel.code-workspace` for the existing ryppel project.
 - **Fix: "open ryppel" / project switching showing native "Save workspace?" dialog"** — [DEAD] `updateWorkspaceFolders` approach did not work — created Untitled multi-root workspace instead. — `projectOperations.ts`, `messageRouterWizard.ts`: Both used `vscode.commands.executeCommand('vscode.openFolder', uri)` which triggers the native OS-level "Do you want to save your workspace configuration?" dialog whenever there is no `.code-workspace` file. Replaced with `vscode.workspace.updateWorkspaceFolders(0, removedCount, { uri })` which swaps the workspace folder in-place with no dialog. Falls back to openFolder only if updateWorkspaceFolders returns false.
 - **Fix: "What templates do you have?" generating JavaScript code** — `chatPanelMessages.ts`: Intent classifier routed template-list questions to the build pipeline, so the AI wrote JS code instead of listing templates. Added hardcoded pre-screen intercept (zero tokens, no AI call) that matches patterns like "what templates", "show me templates", "what can you build", "what project types". Pulls actual `TEMPLATE_CATEGORIES` from `templateRegistry.ts` and formats a clean markdown list with fallback if import fails.
 
@@ -485,7 +485,7 @@ Two issues compounded:
 
 ## May 11, 2026 — Session 3k (Surgical Edit + Collapse Detection)
 
-- **Fix: AI collapsing existing file on modification (15-line rewrite bug)** — `chatPanelBuild.ts`: Two changes: (1) `modificationRules` now includes explicit line count floor ("your output MUST be at least N lines"), surgical-only instructions, and specific rules for CSS/HTML/JS insertion (append to existing blocks, never create new ones, never move existing code). Supervisor now also receives the existing file content so it plans a surgical spec not a rewrite spec. (2) Post-generation collapse detection: if the AI returns a file that is less than 80% the line count of the original, CHASSIS shows a warning and retries once with a "you dropped content" message before writing to disk. Risk: low — adds one optional retry on collapse; does not change non-modification builds.
+- **Fix: AI collapsing existing file on modification (15-line rewrite bug)** — `chatPanelBuild.ts`: Two changes: (1) `modificationRules` now includes explicit line count floor ("your output MUST be at least N lines"), surgical-only instructions, and specific rules for CSS/HTML/JS insertion (append to existing blocks, never create new ones, never move existing code). Supervisor now also receives the existing file content so it plans a surgical spec not a rewrite spec. (2) Post-generation collapse detection: if the AI returns a file that is less than 80% the line count of the original, Redivivus shows a warning and retries once with a "you dropped content" message before writing to disk. Risk: low — adds one optional retry on collapse; does not change non-modification builds.
 
 ---
 
@@ -505,7 +505,7 @@ Two issues compounded:
 
 ## May 11, 2026 — Session 3h (Native Dialog + Placement Modal Fixes)
 
-- **Fix: "CHASSIS IDE" native modal appearing instead of WebView modal** — `chatPanelIntent.ts` lines 449-464: The no-folder path for complex project builds was using `vscode.window.showInformationMessage({modal:true})` which renders as the native OS/VSCodium dialog with white background and "CHASSIS IDE" title. Replaced with the existing `show-placement-check` WebView modal (same as placement flow), which renders centered in the chat panel with dark theme. Buttons "Create New Folder/Open Existing Folder" → now "New Project/Cancel" consistent with the rest of the UI.
+- **Fix: "Redivivus IDE" native modal appearing instead of WebView modal** — `chatPanelIntent.ts` lines 449-464: The no-folder path for complex project builds was using `vscode.window.showInformationMessage({modal:true})` which renders as the native OS/VSCodium dialog with white background and "Redivivus IDE" title. Replaced with the existing `show-placement-check` WebView modal (same as placement flow), which renders centered in the chat panel with dark theme. Buttons "Create New Folder/Open Existing Folder" → now "New Project/Cancel" consistent with the rest of the UI.
 - **Fix: Placement modal white background** — `chatPanelScript.ts`: The `show-placement-check` WebView modal was using `var(--vscode-editor-background)` which renders white on light/default themes. Replaced all VS Code theme variable references with hardcoded dark theme colors matching the other modals (`#1e2740` bg, `#e8edf8` text, `#2d3a55` borders, blue gradient primary button).
 - **Fix: Double user message bubble on scope answer** — `chatPanelIntent.ts`: Scope answer was being pushed to conversation inside `handleBuildRequest` after `send-message` already pushed it. Removed duplicate push.
 
@@ -513,7 +513,7 @@ Two issues compounded:
 
 ## May 11, 2026 — Session 3g (Chat-First Scope Clarification)
 
-- **Feature: 2-question scope clarification before template wizard** — `templateScopeService.ts` (new), `chatPanelIntent.ts`, `chatPanelMessages.ts`: When user says something vague like "build me a website" (no detail, <70 chars, no purpose keywords), CHASSIS now asks 2 questions in the chat before touching the wizard: (1) what it's for, (2) simple/medium/full. User's reply is intercepted BEFORE intent classification (so "portfolio for Jane Smith" resolves the scope question, not triggers a new build). `parseScopeAnswer()` extracts complexity + purpose from the reply and builds an enriched task string. The wizard then fires with that enriched task — pre-selecting the right category/subcategory and asking only the gap fields. Risk: low — timeout after 5 min falls through to original task.
+- **Feature: 2-question scope clarification before template wizard** — `templateScopeService.ts` (new), `chatPanelIntent.ts`, `chatPanelMessages.ts`: When user says something vague like "build me a website" (no detail, <70 chars, no purpose keywords), Redivivus now asks 2 questions in the chat before touching the wizard: (1) what it's for, (2) simple/medium/full. User's reply is intercepted BEFORE intent classification (so "portfolio for Jane Smith" resolves the scope question, not triggers a new build). `parseScopeAnswer()` extracts complexity + purpose from the reply and builds an enriched task string. The wizard then fires with that enriched task — pre-selecting the right category/subcategory and asking only the gap fields. Risk: low — timeout after 5 min falls through to original task.
 
 ---
 
@@ -526,14 +526,14 @@ Two issues compounded:
 
 ## May 11, 2026 — Session 3e (Template Registry Logging + Fingerprints)
 
-- **Feature: Output channel logging for template fetches** — `templateRegistry.ts`: Added `vscode.window.createOutputChannel('CHASSIS Templates')`. `fetchTemplate()` now logs every attempt URL, HTTP status on failure, and byte count on success. View in VSCodium: View > Output > "CHASSIS Templates". Risk: none — logging only, no behavior change.
-- **Feature: Provenance fingerprint markers in all 10 templates** — `chassis-templates` repo: All HTML templates got `<!-- CHASSIS:template=<id>:v1.0.0 -->` injected before `<!DOCTYPE html>`. CLI tool got `// CHASSIS:template=cli-tool:v1.0.0` at line 1. FastAPI got `# CHASSIS:template=fastapi-rest-api:v1.0.0` at line 1. Express got `// CHASSIS:template=express-rest-api:v1.0.0` at line 2. Pushed to GitHub main branch (commit 505d952).
+- **Feature: Output channel logging for template fetches** — `templateRegistry.ts`: Added `vscode.window.createOutputChannel('Redivivus Templates')`. `fetchTemplate()` now logs every attempt URL, HTTP status on failure, and byte count on success. View in VSCodium: View > Output > "Redivivus Templates". Risk: none — logging only, no behavior change.
+- **Feature: Provenance fingerprint markers in all 10 templates** — `redivivus-templates` repo: All HTML templates got `<!-- Redivivus:template=<id>:v1.0.0 -->` injected before `<!DOCTYPE html>`. CLI tool got `// Redivivus:template=cli-tool:v1.0.0` at line 1. FastAPI got `# Redivivus:template=fastapi-rest-api:v1.0.0` at line 1. Express got `// Redivivus:template=express-rest-api:v1.0.0` at line 2. Pushed to GitHub main branch (commit 505d952).
 
 ---
 
 ## May 11, 2026 — Session 3d (Duplicate Panel on Build Complete)
 
-- **Fix: Second CHASSIS Chat tab opening after build completes** — `extension.ts`: Root cause was a race condition in `onBuildFinished`. When `updateWorkspaceFolders` adds the built project folder, `onDidChangeWorkspaceFolders` fires synchronously, but `globalState.update('chassis.suppressAutoOpen')` is async — so the suppress flag wasn't written in time and `runAutoInit` → `ChatPanel.show()` spawned a second tab. Fix: added synchronous module-level `_suppressNextFolderAdd` boolean set to `true` immediately before `updateWorkspaceFolders`. The `onDidChangeWorkspaceFolders` handler checks this flag first (synchronous read, no await) before falling through to `globalState` check. Risk: low — flag is always cleared on first use.
+- **Fix: Second Redivivus Chat tab opening after build completes** — `extension.ts`: Root cause was a race condition in `onBuildFinished`. When `updateWorkspaceFolders` adds the built project folder, `onDidChangeWorkspaceFolders` fires synchronously, but `globalState.update('redivivus.suppressAutoOpen')` is async — so the suppress flag wasn't written in time and `runAutoInit` → `ChatPanel.show()` spawned a second tab. Fix: added synchronous module-level `_suppressNextFolderAdd` boolean set to `true` immediately before `updateWorkspaceFolders`. The `onDidChangeWorkspaceFolders` handler checks this flag first (synchronous read, no await) before falling through to `globalState` check. Risk: low — flag is always cleared on first use.
 
 ---
 
@@ -565,13 +565,13 @@ Two issues compounded:
 
 - **Feature: Spec template pinning** — `src/services/specTemplates.ts` (new): `getSpecTemplate()` returns a pinned deterministic spec for matched patterns, skipping Supervisor AI. `getCodeTemplate()` returns verified working code, bypassing AI entirely. Canvas-trail-animation template added and verified. Risk: low — only fires on matched patterns, falls through on no match.
 
-- **Feature: Vault seeder + starter patterns** — `src/services/vaultSeeder.ts`, `src/services/starterPatterns.ts` (new): 17 curated hand-verified patterns (debounce, throttle, deepClone, slugify, formatBytes, fetchWithRetry, apiClient, parseJwt, generateToken, binarySearch, memoize, groupBy, EventEmitter, singleton, tryCatch, validateEmail, loadEnv). Seeded on first install via `chassis.vaultSeeded.v1` global state key. Risk: low — deduplicates by content hash, never overwrites.
+- **Feature: Vault seeder + starter patterns** — `src/services/vaultSeeder.ts`, `src/services/starterPatterns.ts` (new): 17 curated hand-verified patterns (debounce, throttle, deepClone, slugify, formatBytes, fetchWithRetry, apiClient, parseJwt, generateToken, binarySearch, memoize, groupBy, EventEmitter, singleton, tryCatch, validateEmail, loadEnv). Seeded on first install via `redivivus.vaultSeeded.v1` global state key. Risk: low — deduplicates by content hash, never overwrites.
 
-- **Feature: GitHub Knowledge Base refresh command** — `extension.ts`, `package.json`: `chassis.refreshKnowledgeBase` command added. Pulls MIT/Apache-licensed patterns from GitHub API. Progress notification. Optional `chassis.githubToken` setting for higher rate limits. Risk: low — all network calls in try/catch, never blocks extension.
+- **Feature: GitHub Knowledge Base refresh command** — `extension.ts`, `package.json`: `redivivus.refreshKnowledgeBase` command added. Pulls MIT/Apache-licensed patterns from GitHub API. Progress notification. Optional `redivivus.githubToken` setting for higher rate limits. Risk: low — all network calls in try/catch, never blocks extension.
 
-- **Feature: Template Registry architecture** — `src/services/templateRegistry.ts`, `src/services/templateWizard.ts` (new): Detects project-type intent ("build me a website"), shows Quick Pick category/subcategory picker, collects wizard answers, fetches base template from remote registry, builds customization prompt for AI. Registry base URL: `https://raw.githubusercontent.com/smithkjnc-ux/chassis-templates/main`. Falls through to normal build on failure/offline. Risk: low — all remote calls guarded.
+- **Feature: Template Registry architecture** — `src/services/templateRegistry.ts`, `src/services/templateWizard.ts` (new): Detects project-type intent ("build me a website"), shows Quick Pick category/subcategory picker, collects wizard answers, fetches base template from remote registry, builds customization prompt for AI. Registry base URL: `https://raw.githubusercontent.com/smithkjnc-ux/redivivus-templates/main`. Falls through to normal build on failure/offline. Risk: low — all remote calls guarded.
 
-- **Docs: Template Registry guide** — `docs/CHASSIS_TEMPLATE_REGISTRY.md` (new): Complete registry repo structure, meta.json format, quality standards, contribution guide, custom registry config. Registry repo (`smithkjnc-ux/chassis-templates`) still needs to be created on GitHub.
+- **Docs: Template Registry guide** — `docs/REDIVIVUS_TEMPLATE_REGISTRY.md` (new): Complete registry repo structure, meta.json format, quality standards, contribution guide, custom registry config. Registry repo (`smithkjnc-ux/redivivus-templates`) still needs to be created on GitHub.
 
 ---
 
@@ -585,7 +585,7 @@ Two issues compounded:
 
 - **Feature: "Who Did What & Why" card:** `buildLedgerService.ts`, `chatPanelStory.ts`, `chatPanelRenderer.ts`, `chatPanelBuild.ts`, `routingService.ts` — Added `reason` field to `LedgerEntry` and `LedgerSummaryLine`. Each AI action now records why it was chosen. Breakdown card is open by default, titled "Who Did What & Why", shows role badge, action tags, and routing reason in italic. Updated breakdown token format: `ai~role~actions~tokens~costUSD~hasFallback~reason`.
 
-- **Fix: Duplicate CHASSIS Chat tab opened during builds:** `chatPanel.ts` — Root cause: `refresh()` was replacing `webview.html` on every `appendMsg()` call. VS Code interprets HTML replacement as a new panel, causing a duplicate tab. Fix: Added `_initialized` flag. First load sets full HTML once. All subsequent `refresh()` calls use `postMessage({type:'update-conversation', html})` to swap `#conversation` innerHTML in place. Added `update-conversation` handler in `chatPanelScript.ts`. Risk: any code path that needs a full reload must call `location.reload()` explicitly.
+- **Fix: Duplicate Redivivus Chat tab opened during builds:** `chatPanel.ts` — Root cause: `refresh()` was replacing `webview.html` on every `appendMsg()` call. VS Code interprets HTML replacement as a new panel, causing a duplicate tab. Fix: Added `_initialized` flag. First load sets full HTML once. All subsequent `refresh()` calls use `postMessage({type:'update-conversation', html})` to swap `#conversation` innerHTML in place. Added `update-conversation` handler in `chatPanelScript.ts`. Risk: any code path that needs a full reload must call `location.reload()` explicitly.
 
 - **Feature: Reasoning-based Guardian prompt:** `guardianAI.ts` — Replaced 7-item numbered checklist with holistic senior engineer code review framing. Guardian now reasons about correctness, performance, spec compliance, and security without checking boxes. Domain gotchas (canvas trail inversion, double rAF, etc.) kept as reference hints not a checklist. Solo-mode warning updated to match new framing.
 
@@ -593,27 +593,27 @@ Two issues compounded:
 
 - **Feature: Build feedback buttons:** `chatPanelStory.ts`, `chatPanelRenderer.ts`, `chatPanelScript.ts`, `chatPanelMessages.ts` — Added `feedbackId` param to `buildResultCard()`. Each build gets a `__BUILD_FEEDBACK__id|||END_FEEDBACK__` token. Renderer shows "[+] Yes, worked great" / "[-] Had problems" buttons. Bad feedback shows optional note input. Posts `build-feedback` message to extension. Handler in `chatPanelMessages.ts` writes bad feedback notes to NeverDo.
 
-- **Fix: Mechanical phrase ticker not visible:** `chatPanelScript.ts` — Ticker was previously running on page load when `chassis-working` class may not yet be set. Moved ticker start/stop into `set-status` message handler. Added MutationObserver on `#conversation` to re-attach ticker when new bubbles appear mid-build. Ticker starts on `working`, stops cleanly on `ready`.
+- **Fix: Mechanical phrase ticker not visible:** `chatPanelScript.ts` — Ticker was previously running on page load when `redivivus-working` class may not yet be set. Moved ticker start/stop into `set-status` message handler. Added MutationObserver on `#conversation` to re-attach ticker when new bubbles appear mid-build. Ticker starts on `working`, stops cleanly on `ready`.
 
 ## May 11, 2026
 
 - **Fix: Status bar shows "No Project" when project is open but blueprint `who` field is empty:** `statusBar.ts` — The else branch showed hardcoded "No Project" string instead of `name`. Fixed to show project name regardless of blueprint fill state. Risk: none.
 
-- **Fix: "Close current project" opens file picker instead of closing:** `chatPanelIntent.ts` — Root cause: classifier prompt listed "close" under `chassis.openProject`, causing "close the current project" to route to the open-project picker. Fix 1: hardcoded regex override catches close/exit/leave patterns before AI classifier runs. Fix 2: removed "close" from `chassis.openProject` description in classifier prompt. `chatPanelMessages.ts` — Both the intent handler path and the `run-command` path now use `vscode.workspace.updateWorkspaceFolders(0, folders.length)` instead of `workbench.action.closeFolder` to avoid VSCodium's "open file" dialog post-close behavior.
+- **Fix: "Close current project" opens file picker instead of closing:** `chatPanelIntent.ts` — Root cause: classifier prompt listed "close" under `redivivus.openProject`, causing "close the current project" to route to the open-project picker. Fix 1: hardcoded regex override catches close/exit/leave patterns before AI classifier runs. Fix 2: removed "close" from `redivivus.openProject` description in classifier prompt. `chatPanelMessages.ts` — Both the intent handler path and the `run-command` path now use `vscode.workspace.updateWorkspaceFolders(0, folders.length)` instead of `workbench.action.closeFolder` to avoid VSCodium's "open file" dialog post-close behavior.
 
-- **Fix: Stale CHASSIS Chat panel left open after closing project:** `extension.ts` — Added `onDidChangeWorkspaceFolders` listener. When folders are removed, calls `ChatPanel.close()` to dispose the stale panel. Only fresh "Welcome to CHASSIS" panel remains.
+- **Fix: Stale Redivivus Chat panel left open after closing project:** `extension.ts` — Added `onDidChangeWorkspaceFolders` listener. When folders are removed, calls `ChatPanel.close()` to dispose the stale panel. Only fresh "Welcome to Redivivus" panel remains.
 
-- **Fix: "Open the vault" routes to file picker:** `chatPanelIntent.ts` — Added hardcoded regex overrides for all common commands: open vault, open blueprint, open map, start session, end session, save point, switch to project. These fire before the AI classifier to prevent misrouting. Also added `chassis.startSession` and `chassis.endSession` to the `AvailableCommand` union type.
+- **Fix: "Open the vault" routes to file picker:** `chatPanelIntent.ts` — Added hardcoded regex overrides for all common commands: open vault, open blueprint, open map, start session, end session, save point, switch to project. These fire before the AI classifier to prevent misrouting. Also added `redivivus.startSession` and `redivivus.endSession` to the `AvailableCommand` union type.
 
-- **Fix: Vault contained 5965 items from system-wide scans (pip packages, system paths):** `vaultStorage.ts` — Removed legacy Windsurf globalStorage reader (`~/.config/Windsurf/User/globalStorage/papajoe.chassis/vault`). CHASSIS now only reads from `~/.chassis-vault/`. Wiped all existing vault JSON files from both `~/.chassis-vault/` and the Windsurf globalStorage path.
+- **Fix: Vault contained 5965 items from system-wide scans (pip packages, system paths):** `vaultStorage.ts` — Removed legacy Windsurf globalStorage reader (`~/.config/Windsurf/User/globalStorage/papajoe.redivivus/vault`). Redivivus now only reads from `~/.redivivus-vault/`. Wiped all existing vault JSON files from both `~/.redivivus-vault/` and the Windsurf globalStorage path.
 
-- **Feature: Scan Project opens folder picker:** `vault.ts` — `chassis.scanVaultCodebase` now shows a `showOpenDialog` folder picker (defaults to current workspace or `~/projects`). User can scan any project — not just the currently open workspace.
+- **Feature: Scan Project opens folder picker:** `vault.ts` — `redivivus.scanVaultCodebase` now shows a `showOpenDialog` folder picker (defaults to current workspace or `~/projects`). User can scan any project — not just the currently open workspace.
 
 - **Feature: Save to Vault saves pending scan results:** `vault.ts` — Added `_pendingScanItems` module-level cache. After Scan Project runs, results are stored pending user confirmation. Clicking "Save to Vault" shows a confirmation modal ("Save N items?"), then saves all items with proper duplicate detection. After saving, pending cache is cleared. Fallback: if no pending scan, saves from the currently open file as before.
 
-- **Feature: AI context dramatically improved:** `chatPanelAI.ts` — `buildAIPrefix()` now includes: full conversation history (last 14 turns, both user and CHASSIS), project file tree (top 2 levels, 60 entries), active file (150 lines instead of 50), recent work log (last 20 lines from `.chassis/work_log.md`), full blueprint (all 5 W's). System prompt reframed as "senior developer pair-programming" instead of command listing.
+- **Feature: AI context dramatically improved:** `chatPanelAI.ts` — `buildAIPrefix()` now includes: full conversation history (last 14 turns, both user and Redivivus), project file tree (top 2 levels, 60 entries), active file (150 lines instead of 50), recent work log (last 20 lines from `.redivivus/work_log.md`), full blueprint (all 5 W's). System prompt reframed as "senior developer pair-programming" instead of command listing.
 
-- **[WARN] API keys stored in VS Code `settings.json` — wiped if workspace settings lost:** Keys come from `vscode.workspace.getConfiguration('chassis')` or env vars. If workspace `settings.json` is lost or a fresh install occurs, all keys must be re-entered via CHASSIS: AI API Setup.
+- **[WARN] API keys stored in VS Code `settings.json` — wiped if workspace settings lost:** Keys come from `vscode.workspace.getConfiguration('redivivus')` or env vars. If workspace `settings.json` is lost or a fresh install occurs, all keys must be re-entered via Redivivus: AI API Setup.
 
 ---
 
@@ -623,7 +623,7 @@ Two issues compounded:
 
 - **Fix: Vault scanner sweeping Python pip packages into vault:** `vaultScanner.ts` — Added to default `ignorePaths`: `site-packages`, `dist-packages`, `__pycache__`, `.venv`, `venv`, `env`, `.env`, `lib/python`, `lib64/python`, `.tox`, `eggs`, `.eggs`, `sdist`, `wheels`, `.mypy_cache`, `.pytest_cache`.
 
-- **Feature: `chassis.vaultCleanupSystemPaths` command:** `vault.ts` — Scans existing vault items, finds any whose `sourceFile` contains a system/pip path signal, shows count + confirmation modal, then deletes them. Registered in `package.json`.
+- **Feature: `redivivus.vaultCleanupSystemPaths` command:** `vault.ts` — Scans existing vault items, finds any whose `sourceFile` contains a system/pip path signal, shows count + confirmation modal, then deletes them. Registered in `package.json`.
 
 ---
 
@@ -639,7 +639,7 @@ Two issues compounded:
 
 ## May 8, 2026 and earlier
 
-- Architecture Map (chassis.showMap) — interactive force-directed graph, full-screen, click-to-drill
+- Architecture Map (redivivus.showMap) — interactive force-directed graph, full-screen, click-to-drill
 - Guardian Mentor — health scoring, risk scanning, ELI5 translation
 - Vault auto-save after every build
 - Vault-hit gate before builds (high-confidence match modal)
@@ -650,7 +650,7 @@ Two issues compounded:
 - Save Points (git-backed checkpoints)
 - File Split Assistant
 - Project Timeline
-- Learned memory (AI-extracted permanent facts to `.chassis/learned.md`)
+- Learned memory (AI-extracted permanent facts to `.redivivus/learned.md`)
 - Auto-chunking for complex builds
 - Token counter (per-message + session/daily/weekly totals)
 - Build from Vault pipeline

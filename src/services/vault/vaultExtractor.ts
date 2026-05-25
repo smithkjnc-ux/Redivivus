@@ -51,7 +51,7 @@ export function extractFromFile(filePath: string, content: string): { items: Vau
     case '.py': rawBlocks = extractPython(lines, filePath); break;
     case '.md': rawBlocks = extractMarkdown(lines, filePath); break;
     case '.html': case '.htm': case '.css': case '.svg': {
-      // [CHASSIS] Skip entry files (index.*) and large files — whole-app files aren't reusable snippets
+      // [Redivivus] Skip entry files (index.*) and large files — whole-app files aren't reusable snippets
       const baseName = path.basename(filePath, ext).toLowerCase();
       const isEntryFile = ['index','main','app','home','page','style','styles','global'].includes(baseName);
       if (!isEntryFile && content.trim().length > 50 && lines.length <= 150) {

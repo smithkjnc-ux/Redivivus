@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS AI Domain Logger
+// [SCOPE] Redivivus AI Domain Logger
 import { masterLog } from '../../core/logging/masterLogger.js';
 
 const DOMAIN = 'AI';

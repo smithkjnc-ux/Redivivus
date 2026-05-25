@@ -56,7 +56,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         
         let contentToWrite = args.content || '';
         
-        // [CHASSIS] Guardian AI Oversight
+        // [Redivivus] Guardian AI Oversight
         if (ctx.routing && ctx.routing.isGuardianActive()) {
           ctx.log(`🛡️ **Guardian AI** reviewing proposed write to \`${args.filePath}\`...`);
           try {
@@ -86,7 +86,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         fs.writeFileSync(absPath, contentToWrite, 'utf8');
         ctx.modifiedFiles.add(args.filePath);
         ctx.log(`✅ Wrote \`${args.filePath}\``);
-        // [CHASSIS] Live preview: open written file beside the chat immediately.
+        // [Redivivus] Live preview: open written file beside the chat immediately.
         try { const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath)); await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch { /* non-blocking */ }
         return `Successfully wrote to ${args.filePath}.`;
       } catch (e: any) {

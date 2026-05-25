@@ -9,6 +9,7 @@ import type { AIResponse } from './routingTypes.js';
 export interface PlanStep {
   stepNumber: number;
   description: string;
+  spec?: string;          // Exact prescription: file + functions + signatures — Worker reads this directly
   assignedAI: string;     // AI id (e.g., 'gemini', 'claude')
   assignedLabel: string;  // Human label (e.g., 'Gemini')
   type: 'code' | 'review' | 'structure';
@@ -35,7 +36,7 @@ function buildPlanPrompt(task: string, availableAIs: string[], context: string):
     })
     .join('\n');
 
-  return `You are a senior software architect planning a build task. You will create a step-by-step plan and assign each step to the best-fit AI.
+  return `You are a senior software architect planning a build task. Create a step-by-step plan and assign each step to the best-fit AI.
 
 TASK: "${task}"
 
@@ -47,9 +48,15 @@ Create a build plan with 1-4 steps (fewer is better). Each step produces code.
 For simple tasks (1 file, straightforward), use just 1 step.
 For complex tasks (multi-file, architecture decisions), use 2-4 steps.
 
+For each step, "spec" must be a precise prescription the Worker can follow without guessing:
+- Include the exact filename
+- Name every function, class, or variable to implement
+- For changes: quote exact old → new code
+- Specify key constants, types, and behaviors
+
 Respond with ONLY valid JSON, no markdown, no explanation:
 [
-  { "step": 1, "description": "what to build in this step", "ai": "which_ai_id" }
+  { "step": 1, "description": "short label shown in UI", "spec": "File: src/game.ts — export function startGame(): void — calls requestAnimationFrame at 60fps — CANVAS_WIDTH=800 CANVAS_HEIGHT=600", "ai": "which_ai_id" }
 ]`;
 }
 
@@ -103,6 +110,7 @@ function parsePlan(text: string, availableAIs: string[]): PlanStep[] {
       return {
         stepNumber: i + 1,
         description: String(item.description || 'Build step'),
+        spec: item.spec ? String(item.spec) : undefined,
         assignedAI: ai,
         assignedLabel: cap?.label || ai,
         type: 'code' as const,
@@ -121,11 +129,20 @@ export async function executeStep(
   step: PlanStep,
   task: string,
   previousOutput: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>
+  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
+  allSteps?: PlanStep[]
 ): Promise<{ code: string; tokens: number }> {
+  const spec = step.spec || step.description;
+  const planBlock = allSteps && allSteps.length > 1
+    ? `\nFULL BUILD PLAN (all steps — know what each Worker is responsible for):\n` +
+      allSteps.map(s => {
+        const status = s.stepNumber < step.stepNumber ? '[DONE]' : s.stepNumber === step.stepNumber ? '[YOUR STEP]' : '[PENDING]';
+        return `  Step ${s.stepNumber} ${status}: ${s.spec || s.description}`;
+      }).join('\n') + '\n'
+    : '';
   const stepPrompt = previousOutput
-    ? `You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n\nSTEP: ${step.description}\n\nPREVIOUS OUTPUT:\n${previousOutput}\n\nContinue building. Output ONLY code.`
-    : `You are building: "${task}"\n\nSTEP: ${step.description}\n\nOutput ONLY the complete working code.`;
+    ? `You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nPRESCRIPTION FOR YOUR STEP:\n${spec}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Output ONLY code.`
+    : `You are building: "${task}"\n${planBlock}\nPRESCRIPTION:\n${spec}\n\nImplement exactly as prescribed. Output ONLY the complete working code.`;
 
   const res = await callAI(step.assignedAI, stepPrompt);
   if (!res.success) { return { code: '', tokens: 0 }; }

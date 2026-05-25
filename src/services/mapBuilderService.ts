@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Map Builder Service — main entry point for building the project architecture map.
+// [SCOPE] Redivivus Map Builder Service — main entry point for building the project architecture map.
 // Delegates to mapBuilderHelpers.ts for scanning and analysis utilities.
 
 import * as fs from 'fs';
@@ -44,7 +44,7 @@ export function buildProjectMap(root: string, intentService?: any): ProjectMap {
         deadTexts: deadTexts.length ? deadTexts : undefined,
       });
     } catch (e) {
-      console.error('[CHASSIS] Error processing file for map:', full, e);
+      console.error('[Redivivus] Error processing file for map:', full, e);
     }
   }
 

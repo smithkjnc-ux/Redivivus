@@ -11,7 +11,7 @@ export function makeItem(
   const hash = crypto.createHash('sha256').update(code).digest('hex').slice(0, 16);
   return {
     id: hash, name, code, language, category, description,
-    sourceProject: 'chassis-starter', sourceFile: 'starterPatterns.ts',
+    sourceProject: 'redivivus-starter', sourceFile: 'starterPatterns.ts',
     tags, lineCount: code.split('\n').length,
     importCount: 0, createdAt: new Date().toISOString(), contentHash: hash,
   };

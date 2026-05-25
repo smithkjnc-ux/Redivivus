@@ -8,7 +8,7 @@ export function registerBuildFromVaultCommand(
   buildFromVaultService: BuildFromVaultService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.buildFromVault', async (prefill?: { task?: string; targetFile?: string }) => {
+    vscode.commands.registerCommand('redivivus.buildFromVault', async (prefill?: { task?: string; targetFile?: string }) => {
       await buildFromVaultService.run(prefill);
     })
   );

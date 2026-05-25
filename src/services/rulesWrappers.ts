@@ -12,7 +12,7 @@ ${rules}
 
 - Use /compact every 2 hours during long sessions
 - Use /clear before starting major new features
-- Read .chassis/work_log.md at the start of every session
+- Read .redivivus/work_log.md at the start of every session
 - When done, update [NEXT] tags with where you stopped
 `;
 }
@@ -26,7 +26,7 @@ ${rules}
 
 ## Additional Gemini-Specific Instructions
 
-- Read .chassis/work_log.md at session start for context
+- Read .redivivus/work_log.md at session start for context
 - Follow [SCOPE] tags strictly — don't expand file responsibilities
 - When modifying Python, use # comments ONLY
 - Update annotations after every change

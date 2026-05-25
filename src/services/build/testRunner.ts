@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Test Runner — detects the project's test command and runs it as a child process.
+// [SCOPE] Redivivus Test Runner — detects the project's test command and runs it as a child process.
 // Parses pass/fail counts. Used by testAutoFix.ts to close the build → test → fail → fix loop.
 
 import * as cp from 'child_process';

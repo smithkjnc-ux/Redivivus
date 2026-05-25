@@ -70,7 +70,7 @@ export async function routeByComplexityImpl(
   }
 
   if (!chosenAI) {
-    return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in CHASSIS Settings (Files & AI tab).' };
+    return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in Redivivus Settings (Files & AI tab).' };
   }
 
   const capableTier = ['gemini', 'claude', 'openai', 'xai', 'kimi'].filter(ai => ai !== chosenAI && has(ai));

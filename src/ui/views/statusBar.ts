@@ -1,6 +1,6 @@
-// [SCOPE] Manages and updates the VS Code status bar items for CHASSIS — blueprint, session, tokens, save status
+// [SCOPE] Manages and updates the VS Code status bar items for Redivivus — blueprint, session, tokens, save status
 import * as vscode from 'vscode';
-import type { ChassisService } from '../../services/chassisService.js';
+import type { RedivivusService } from '../../services/redivivusService.js';
 import type { SessionService } from '../../services/sessionService.js';
 import type { UsageTracker } from '../../services/usageTracker.js';
 import { getDuration } from '../../services/sessionStorage.js';
@@ -12,7 +12,7 @@ export class StatusBar {
   private saveItem: vscode.StatusBarItem;
 
   constructor(
-    private chassis: ChassisService,
+    private redivivus: RedivivusService,
     private sessions: SessionService,
     private usageTracker?: UsageTracker
   ) {
@@ -44,38 +44,38 @@ export class StatusBar {
   }
 
   private updateBlueprintItem(): void {
-    if (!this.chassis.isInitialized()) {
-      this.blueprintItem.text = '🏗️ CHASSIS: Getting started';
-      this.blueprintItem.tooltip = 'Click here to set up your project with CHASSIS';
-      this.blueprintItem.command = 'chassis.init';
+    if (!this.redivivus.isInitialized()) {
+      this.blueprintItem.text = '🏗️ Redivivus: Getting started';
+      this.blueprintItem.tooltip = 'Click here to set up your project with Redivivus';
+      this.blueprintItem.command = 'redivivus.init';
       this.blueprintItem.color = '#888';
       return;
     }
 
-    const config = this.chassis.loadConfig();
+    const config = this.redivivus.loadConfig();
     const bp = config?.blueprint;
 
     const name = config?.projectName || 'Project';
     if (bp && bp.locked) {
-      this.blueprintItem.text = `\u{1F3D7}\uFE0F CHASSIS: ${name}`;
+      this.blueprintItem.text = `\u{1F3D7}\uFE0F Redivivus: ${name}`;
       this.blueprintItem.tooltip = `${name} — Blueprint ready\nClick to open blueprint`;
-      this.blueprintItem.command = 'chassis.openBlueprint';
+      this.blueprintItem.command = 'redivivus.openBlueprint';
       this.blueprintItem.color = '#3b9dff';
     } else if (bp && bp.who) {
-      this.blueprintItem.text = `\u{1F3D7}\uFE0F CHASSIS: ${name} (draft)`;
+      this.blueprintItem.text = `\u{1F3D7}\uFE0F Redivivus: ${name} (draft)`;
       this.blueprintItem.tooltip = `${name} — Blueprint in progress\nClick to open blueprint`;
-      this.blueprintItem.command = 'chassis.openBlueprint';
+      this.blueprintItem.command = 'redivivus.openBlueprint';
       this.blueprintItem.color = '#f5a623';
     } else {
-      this.blueprintItem.text = `\u{1F3D7}\uFE0F CHASSIS: ${name}`;
+      this.blueprintItem.text = `\u{1F3D7}\uFE0F Redivivus: ${name}`;
       this.blueprintItem.tooltip = `${name} — Click to finish setting up your project`;
-      this.blueprintItem.command = 'chassis.blueprint';
+      this.blueprintItem.command = 'redivivus.blueprint';
       this.blueprintItem.color = '#f5a623';
     }
   }
 
   private updateSessionItem(): void {
-    if (!this.chassis.isInitialized() || !this.sessions.isActive) {
+    if (!this.redivivus.isInitialized() || !this.sessions.isActive) {
       this.sessionItem.hide();
       return;
     }
@@ -84,13 +84,13 @@ export class StatusBar {
     const duration = session ? getDuration(session) : '0m';
     this.sessionItem.text = `🟢 Session: ${duration}`;
     this.sessionItem.tooltip = `Session: ${session?.goal || 'In progress'}\nClick to end session`;
-    this.sessionItem.command = 'chassis.endSession';
+    this.sessionItem.command = 'redivivus.endSession';
     this.sessionItem.color = '#4ec959';
     this.sessionItem.show();
   }
 
   private updateTokenItem(): void {
-    if (!this.chassis.isInitialized() || !this.usageTracker) {
+    if (!this.redivivus.isInitialized() || !this.usageTracker) {
       this.tokenItem.hide();
       return;
     }
@@ -116,19 +116,19 @@ export class StatusBar {
       .join('\n');
     const breakdownSection = aiLines ? `\nBy AI this session:\n${aiLines}\n` : '';
     this.tokenItem.tooltip = `Session: ${report.session.tokens.toLocaleString()} tokens · $${report.session.cost.toFixed(4)}${breakdownSection}\nToday: ${report.day.tokens.toLocaleString()} tokens\nThis week: ${report.week.tokens.toLocaleString()} tokens\n\nClick for detailed breakdown`;
-    this.tokenItem.command = 'chassis.viewUsageInChat';
+    this.tokenItem.command = 'redivivus.viewUsageInChat';
     this.tokenItem.show();
   }
 
   private updateSaveItem(): void {
-    if (!this.chassis.isInitialized()) {
+    if (!this.redivivus.isInitialized()) {
       this.saveItem.hide();
       return;
     }
 
     this.saveItem.text = '💾 Save Point';
     this.saveItem.tooltip = 'Click to create a manual save point (Ctrl+Shift+S)';
-    this.saveItem.command = 'chassis.savePoint';
+    this.saveItem.command = 'redivivus.savePoint';
     this.saveItem.show();
   }
 }

@@ -69,7 +69,7 @@ export function buildChatCssInput(): string {
       background: rgba(52,211,153,0.08); border-left: 3px solid var(--c-green);
       padding: 10px 13px; font-size: 12px; border-radius: 0 6px 6px 0; color: var(--c-text-dim);
     }
-    #chassis-functions {
+    #redivivus-functions {
       border-top: 1px solid var(--c-border); padding: 11px 15px;
       background: var(--c-surface); flex-shrink: 0;
     }
@@ -89,14 +89,14 @@ export function buildChatCssInput(): string {
     .func-btn:hover { background: var(--c-accent-md); color: #fff; border-color: var(--c-accent); }
     .func-btn.secondary { background: var(--c-raised); color: var(--c-text-dim); border: 1px solid var(--c-border); }
     .func-btn.secondary:hover { background: var(--c-border); color: var(--c-text); }
-    #chassis-status { font-size: 11px; color: var(--c-text-faint); }
-    #chassis-status.chassis-working { color: var(--c-accent) !important; font-weight: 600; letter-spacing: 0.3px; }
-    #chassis-status.chassis-working::before {
+    #redivivus-status { font-size: 11px; color: var(--c-text-faint); }
+    #redivivus-status.redivivus-working { color: var(--c-accent) !important; font-weight: 600; letter-spacing: 0.3px; }
+    #redivivus-status.redivivus-working::before {
       content: ''; display: inline-block; width: 9px; height: 9px;
       border: 2px solid var(--c-accent-md); border-top-color: var(--c-accent);
-      border-radius: 50%; animation: chassis-spin 0.7s linear infinite;
+      border-radius: 50%; animation: redivivus-spin 0.7s linear infinite;
       margin-right: 5px; vertical-align: middle;
     }
-    @keyframes chassis-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    @keyframes redivivus-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
   `;
 }

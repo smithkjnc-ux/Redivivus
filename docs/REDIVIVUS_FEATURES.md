@@ -1,6 +1,6 @@
-# CHASSIS — Planned Features & Phase Roadmap
+# Redivivus — Planned Features & Phase Roadmap
 > [SCOPE] All planned features, active work, phase targets, and TODO backlog.
-> See CHASSIS_ROADMAP.md for the index. See CHASSIS_FIXES.md for completed work.
+> See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FIXES.md for completed work.
 
 ---
 
@@ -10,24 +10,24 @@
 
 ## Active Backlog — Work Top-to-Bottom
 
-### 🔴 Priority 1 — Core Differentiators (CHASSIS DNA)
+### 🔴 Priority 1 — Core Differentiators (Redivivus DNA)
 - [x] **Build Narrator** — plain English story while building. AI emits `// NARRATOR:` lines. DONE
 - [x] **Summary card after builds** — structured result card with files, vault pieces, cost, time. DONE
 - [x] **Undo Everything** — snapshots before every build, red ↩ Undo button in result card. DONE
 
 ### 🟡 Priority 2 — Makes Chat Dramatically Smarter
 - [x] **Active file context injection** — injects relative path + first 150 lines of open file. DONE (upgraded May 11)
-- [x] **Full conversation history in AI context** — last 14 turns (user + CHASSIS), not just 3 user messages. DONE (May 11)
+- [x] **Full conversation history in AI context** — last 14 turns (user + Redivivus), not just 3 user messages. DONE (May 11)
 - [x] **Project file tree in AI context** — top 2-level file tree injected into system prompt. DONE (May 11)
-- [x] **Work log in AI context** — last 20 lines of `.chassis/work_log.md` injected. DONE (May 11)
-- [x] **Terminal error awareness** — `terminalErrorService.ts`, `Ctrl+Shift+E`, `chassis.injectTerminalError` command. DONE (May 13)
+- [x] **Work log in AI context** — last 20 lines of `.redivivus/work_log.md` injected. DONE (May 11)
+- [x] **Terminal error awareness** — `terminalErrorService.ts`, `Ctrl+Shift+E`, `redivivus.injectTerminalError` command. DONE (May 13)
 
 ### 🟢 Priority 3 — Polish & Onboarding
 - [x] **Better first-run onboarding** — 3 empty states: initialized / uninitialized / no workspace. DONE
-- [x] **Learned memory** — AI-triggered permanent facts stored to `.chassis/learned.md`. DONE
+- [x] **Learned memory** — AI-triggered permanent facts stored to `.redivivus/learned.md`. DONE
 
 ### ⚪ Priority 4 — Later / Low Urgency
-- [ ] **Terminal awareness (full)** — CHASSIS reads terminal output and reacts to errors automatically.
+- [ ] **Terminal awareness (full)** — Redivivus reads terminal output and reacts to errors automatically.
 - [ ] **Multi-session vault intelligence** — vault search ranks results by recency + frequency of reuse.
 - [ ] **Mobile-friendly wizard** — blueprint setup that works on phone/tablet.
 
@@ -35,17 +35,17 @@
 
 ## Active Work
 
-### CHASSIS AI — Intent Classifier Improvements
+### Redivivus AI — Intent Classifier Improvements
 **Status:** ONGOING
 
 Hardcoded regex overrides added (May 11) for common commands to prevent AI misclassification:
 - close/exit project → `workbench.action.closeFolder`
-- open vault → `chassis.openVault`
-- open blueprint → `chassis.openBlueprint`
-- open map → `chassis.showMap`
-- start/end session → `chassis.startSession` / `chassis.endSession`
-- save point → `chassis.savePoint`
-- switch/open project → `chassis.openProject`
+- open vault → `redivivus.openVault`
+- open blueprint → `redivivus.openBlueprint`
+- open map → `redivivus.showMap`
+- start/end session → `redivivus.startSession` / `redivivus.endSession`
+- save point → `redivivus.savePoint`
+- switch/open project → `redivivus.openProject`
 
 [NEXT] Add hardcoded overrides for any new commands that get misrouted.
 
@@ -53,65 +53,65 @@ Hardcoded regex overrides added (May 11) for common commands to prevent AI miscl
 **Status:** DONE (May 11)
 
 Vault only accepts items from:
-1. Files CHASSIS builds (auto-capture after build via `autoCaptureFile`)
+1. Files Redivivus builds (auto-capture after build via `autoCaptureFile`)
 2. Manual "Scan Project" on a user-selected folder (folder picker)
-3. Manual file saves (`chassis.saveToVault` on active file)
+3. Manual file saves (`redivivus.saveToVault` on active file)
 
 Never from system paths, pip packages, or Windsurf globalStorage.
 
 ### Universal Project Protocol (Editor Shims)
 **Status:** DONE
 
-During wizard init: generates `.chassis/rules.md` + shim files at project root:
+During wizard init: generates `.redivivus/rules.md` + shim files at project root:
 - `.cursorrules`, `.windsurfrules`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`
 
-`saveBlueprint()` regenerates `.chassis/rules.md` from current config on every save.
+`saveBlueprint()` regenerates `.redivivus/rules.md` from current config on every save.
 
 ### Open Existing Project Flow
 **Status:** DONE (May 13)
 
-Non-CHASSIS folders now show branching dialog with "Open Anyway" option. Existing CHASSIS projects load dashboard directly.
+Non-Redivivus folders now show branching dialog with "Open Anyway" option. Existing Redivivus projects load dashboard directly.
 
 ---
 
 ## TODO — After Core Is Stable
 
 ### Natural Language VS Code Command Router
-- [x] Phase 1: Local dictionary (`commands.json`) — DONE (May 13). Normalize + 2-pass match, friendly labels, CHASSIS commands included.
+- [x] Phase 1: Local dictionary (`commands.json`) — DONE (May 13). Normalize + 2-pass match, friendly labels, Redivivus commands included.
 - [ ] Phase 2: Gemini-backed fallback — free AI with VS Code command list as context
 - [ ] Phase 3: Full agent chaining — "refactor, split, commit, update roadmap" as one instruction
 
-### CHASSIS Sidebar Chat Panel
+### Redivivus Sidebar Chat Panel
 - [x] Registered in Activity Bar with `chassisSidebar` viewType. DONE (May 13).
 - [x] Live status header: project name, blueprint badge, session badge, AI badge. DONE (May 13).
-- [x] All commands wired correctly including `chassis.openChatPanel`, `vaultDedup`, `injectTerminalError`. DONE (May 13).
+- [x] All commands wired correctly including `redivivus.openChatPanel`, `vaultDedup`, `injectTerminalError`. DONE (May 13).
 
 ### Guardian Mentor Pending Items
 - [ ] Visual Blueprint Wizard — drag-and-drop goal interface for Five Ws
 - [ ] Proactive Architectural Blocking — hard stops for functions >50 lines / files >500 lines
 - [ ] Safety Stoplights — real-time Blueprint Health Score in status bar, turns RED on insecure logic
-- [ ] Starter Chassis Templates — "Secure AI Web Tool", "Local Database App", etc.
+- [ ] Starter Redivivus Templates — "Secure AI Web Tool", "Local Database App", etc.
 
 ### AI Delegation Button
 - [ ] "Delegate to AI" next to `[WARN]` and `[TODO]` tags in dashboard
 - [ ] Generates a ready-made prompt with file path, line range, tag type, annotation text, 3 lines of context
-- [ ] One-click: CHASSIS writes the work order, editor AI executes it
+- [ ] One-click: Redivivus writes the work order, editor AI executes it
 
 ### Built-in Git (No Terminal Needed)
 - [ ] Auto-commit after every AI change, session end, Build from Vault
 - [ ] GitHub integration wizard — setup, auto-push, branch management
 - [ ] Conflict resolution in plain English
-- [ ] Commit format: `[CHASSIS] {action}: {description}`
+- [ ] Commit format: `[Redivivus] {action}: {description}`
 
 ### Retrofit Blueprint-from-Scan
-- [ ] When applying CHASSIS to existing project: scan code to auto-generate draft blueprint
+- [ ] When applying Redivivus to existing project: scan code to auto-generate draft blueprint
 - [ ] Infer 5 W's from structure, dependencies, README, patterns, imports, UI patterns, auth flows
 - [ ] Present draft for user review/correction
 
 ### Guided Blueprint Mode
 - [x] Inline gap detection before builds — `blueprintGapDetector.ts`. DONE (May 13).
 - [x] Blue card with text inputs per missing W field, "Let's build" + "Skip" buttons. DONE (May 13).
-- [x] Answers persisted to blueprint via `chassis.saveConfig()`, build resumes automatically. DONE (May 13).
+- [x] Answers persisted to blueprint via `redivivus.saveConfig()`, build resumes automatically. DONE (May 13).
 - [ ] "Help me think through this" AI follow-up button next to each W field (future)
 
 ### Scope Creep Detection
@@ -133,7 +133,7 @@ Non-CHASSIS folders now show branching dialog with "Open Anyway" option. Existin
 - [x] Guardian First Principle — health checks before any build
 - [x] `guardianService.ts` — health scoring, file/function length enforcement, Level 4 Block
 - [x] ELI5 integration — converts AI actions to plain English
-- [x] Starter Chassis Templates — 10 templates in `chassis-templates` repo, all live. DONE (May 13).
+- [x] Starter Redivivus Templates — 10 templates in `redivivus-templates` repo, all live. DONE (May 13).
 - [ ] Visual Blueprint Wizard
 - [ ] Proactive Architectural Blocking
 - [ ] Safety Stoplights
@@ -161,8 +161,8 @@ Non-CHASSIS folders now show branching dialog with "Open Anyway" option. Existin
 | 2 | Hybrid | 32–48GB | Local model + API mix | $5–9/mo Pro |
 | 3 | Suite | 64GB+ | 6+ parallel agents | Managed "Senior Architect" |
 
-### PHASE 7 — P2P AI Network & CHASSIS LLM (2027 Target)
-See `CHASSIS_VISION.md` for full spec.
+### PHASE 7 — P2P AI Network & Redivivus LLM (2027 Target)
+See `REDIVIVUS_VISION.md` for full spec.
 
 ---
 

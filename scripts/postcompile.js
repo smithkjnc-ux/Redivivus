@@ -1,4 +1,4 @@
-// [SCOPE] This script runs after compilation to perform post-build tasks, including packaging extensions, updating build info, checking roadmap freshness, and managing auto-commits based on CHASSIS configuration.
+// [SCOPE] This script runs after compilation to perform post-build tasks, including packaging extensions, updating build info, checking roadmap freshness, and managing auto-commits based on Redivivus configuration.
 // Post-compile script: packages extension and installs to Windsurf
 
 const { execSync } = require('child_process');
@@ -6,10 +6,10 @@ const fs = require('fs');
 const path = require('path');
 
 const workspaceRoot = process.cwd();
-const configPath = path.join(workspaceRoot, '.chassis', 'config.json');
+const configPath = path.join(workspaceRoot, '.redivivus', 'config.json');
 
-// Check if CHASSIS_ROADMAP.md has been updated recently
-const roadmapPath = path.join(workspaceRoot, 'CHASSIS_ROADMAP.md');
+// Check if REDIVIVUS_ROADMAP.md has been updated recently
+const roadmapPath = path.join(workspaceRoot, 'REDIVIVUS_ROADMAP.md');
 // [WARN] File system operation: `fs.existsSync` can fail due to permissions or path issues.
 if (fs.existsSync(roadmapPath)) {
   // [WARN] File system operation: `fs.readFileSync` can fail due to permissions or path issues.
@@ -19,7 +19,7 @@ if (fs.existsSync(roadmapPath)) {
     const lastUpdated = new Date(match[1]);
     const daysSince = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);
     if (daysSince > 1) {
-      console.warn(`⚠️  CHASSIS_ROADMAP.md last updated ${Math.floor(daysSince)} day(s) ago. Update it before ending your session.`);
+      console.warn(`⚠️  REDIVIVUS_ROADMAP.md last updated ${Math.floor(daysSince)} day(s) ago. Update it before ending your session.`);
     }
   }
 }
@@ -46,7 +46,7 @@ if (fs.existsSync(srcDir)) {
   for (const f of overLimit) {
     const rel = path.relative(workspaceRoot, f);
     const lines = fs.readFileSync(f, 'utf-8').split('\n').length;
-    console.warn(`[CHASSIS RULE 9] ${rel} is ${lines} lines -- split required before editing`);
+    console.warn(`[Redivivus RULE 9] ${rel} is ${lines} lines -- split required before editing`);
   }
 }
 
@@ -54,8 +54,8 @@ if (fs.existsSync(srcDir)) {
 const buildTimestamp = new Date().toISOString();
 const pkgVersion = (() => { try { return JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf-8')).version; } catch { return '0.0.0'; } })();
 const buildInfo = { timestamp: buildTimestamp, version: pkgVersion };
-// [WARN] Write to both .chassis/ (project tooling) and out/data/ (deployed with extension, readable at runtime)
-const buildInfoPath = path.join(workspaceRoot, '.chassis', 'build-info.json');
+// [WARN] Write to both .redivivus/ (project tooling) and out/data/ (deployed with extension, readable at runtime)
+const buildInfoPath = path.join(workspaceRoot, '.redivivus', 'build-info.json');
 fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2));
 const outDataDir = path.join(workspaceRoot, 'out', 'data');
 if (fs.existsSync(outDataDir)) { fs.writeFileSync(path.join(outDataDir, 'build-info.json'), JSON.stringify(buildInfo, null, 2)); }
@@ -65,14 +65,14 @@ if (fs.existsSync(outDataDir)) { fs.writeFileSync(path.join(outDataDir, 'build-i
 const home = require('os').homedir();
 const deployTargets = [
   // Baked extension (custom VSCode build)
-  path.join(home, 'projects', 'chassis-build', 'VSCode-linux-x64', 'resources', 'app', 'extensions', 'chassis'),
+  path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'extensions', 'redivivus'),
 ];
 
-// Also sync to any installed chassis extension in ~/.vscode/extensions/ (takes priority over baked in VS Code/Cursor)
+// Also sync to any installed redivivus extension in ~/.vscode/extensions/ (takes priority over baked in VS Code/Cursor)
 const vscodeExts = path.join(home, '.vscode', 'extensions');
 if (fs.existsSync(vscodeExts)) {
   for (const entry of fs.readdirSync(vscodeExts)) {
-    if (/^papajoe\.chassis-/.test(entry)) {
+    if (/^papajoe\.redivivus-/.test(entry)) {
       deployTargets.push(path.join(vscodeExts, entry));
     }
   }
@@ -124,7 +124,7 @@ try {
   }
 
   const timestamp = new Date().toISOString();
-  const sessionsDir = path.join(workspaceRoot, '.chassis', 'sessions');
+  const sessionsDir = path.join(workspaceRoot, '.redivivus', 'sessions');
   let sessionGoal = 'no session';
 
   // [WARN] File system operation: `fs.existsSync` can fail due to permissions or path issues.
@@ -140,7 +140,7 @@ try {
     }
   }
 
-  const commitMessage = `CHASSIS checkpoint: ${timestamp} — ${sessionGoal}`;
+  const commitMessage = `Redivivus checkpoint: ${timestamp} — ${sessionGoal}`;
 
   if (mode === 'auto') {
     try {
@@ -153,9 +153,9 @@ try {
       console.error('Auto-commit failed:', e.message);
     }
   } else if (mode === 'prompt') {
-    console.log('CHASSIS: Ready to commit');
+    console.log('Redivivus: Ready to commit');
     console.log('Message:', commitMessage);
-    console.log('Run "chassis.autoCommit" command to complete commit');
+    console.log('Run "redivivus.autoCommit" command to complete commit');
   }
 } catch (e) {
   console.error('Post-compile error:', e.message);

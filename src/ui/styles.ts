@@ -1,4 +1,4 @@
-// [SCOPE] Provides a function to generate CSS styles for the CHASSIS Dashboard WebView.
+// [SCOPE] Provides a function to generate CSS styles for the Redivivus Dashboard WebView.
 
 // [WARN] Embedding a large block of CSS as a string can be fragile and lacks tooling support for complex styles.
 export function getStyles(): string {

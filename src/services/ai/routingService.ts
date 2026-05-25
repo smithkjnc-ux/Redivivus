@@ -11,14 +11,14 @@ import { routeByComplexityImpl } from './routingComplexity.js';
 import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
 import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
 import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
-import { chassisLog } from '../logging/chassisLogger.js';
+import { redivivusLog } from '../logging/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
 
 interface SwPair { supervisor: string; worker: string | null; }
 let _swCache: { pair: SwPair; settingsKey: string } | null = null;
 
 function _settingsKey(): string {
-  const cfg = vscode.workspace.getConfiguration('chassis');
+  const cfg = vscode.workspace.getConfiguration('redivivus');
   const keys = ['gemini','claude','openai','groq','xai','kimi'];
   return keys.map(k => cfg.get<string>(k + 'ApiKey') ? k : '').join(',') + '|' + (cfg.get<string>('defaultAI') || 'gemini');
 }
@@ -65,7 +65,7 @@ export class RoutingService {
 
   /** Returns the user's explicitly selected AI (from the header chip / settings), or '' if none set. */
   getPreferredAI(): string {
-    return vscode.workspace.getConfiguration('chassis').get<string>('defaultAI') || '';
+    return vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '';
   }
 
   getModelName(): string {
@@ -78,8 +78,8 @@ export class RoutingService {
     return modelMap[ai] || ai;
   }
 
-  getAvailableAI(): { ai: string; source: 'chassis-settings' | 'env' | 'none'; label: string } {
-    const config = vscode.workspace.getConfiguration('chassis');
+  getAvailableAI(): { ai: string; source: 'redivivus-settings' | 'env' | 'none'; label: string } {
+    const config = vscode.workspace.getConfiguration('redivivus');
     const defaultAI = config.get<string>('defaultAI') || 'gemini';
     const checks = [
       { id: 'gemini', label: 'Gemini', key: getGeminiKey },
@@ -90,8 +90,8 @@ export class RoutingService {
       { id: 'kimi', label: 'Kimi', key: getKimiKey },
     ];
     const preferred = checks.find(c => c.id === defaultAI);
-    if (preferred && preferred.key()) { return { ai: preferred.id, source: 'chassis-settings', label: preferred.label }; }
-    for (const c of checks) { if (c.key()) {return { ai: c.id, source: 'chassis-settings', label: c.label + ' (fallback)' };} }
+    if (preferred && preferred.key()) { return { ai: preferred.id, source: 'redivivus-settings', label: preferred.label }; }
+    for (const c of checks) { if (c.key()) {return { ai: c.id, source: 'redivivus-settings', label: c.label + ' (fallback)' };} }
     return { ai: 'none', source: 'none', label: 'No AI' };
   }
 
@@ -100,7 +100,7 @@ export class RoutingService {
     return analyzeFileImpl(supervisor, this.vaultContext, this.fetchWithTimeout.bind(this), filePath, content, instruction, cancelToken);
   }
 
-  // [CHASSIS] Failover callback — set by caller to show "Gemini timed out, retrying with Kimi..." in chat
+  // [Redivivus] Failover callback — set by caller to show "Gemini timed out, retrying with Kimi..." in chat
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
 
   async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string): Promise<AIResponse & { usingFallback?: string }> {
@@ -112,13 +112,13 @@ export class RoutingService {
       .map(([ai]) => ai);
 
     if (ranked.length === 0) {
-      chassisLog({ operation: 'system', message: 'No AI keys configured', success: false });
-      return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in CHASSIS Settings (Files & AI tab).' };
+      redivivusLog({ operation: 'system', message: 'No AI keys configured', success: false });
+      return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in Redivivus Settings (Files & AI tab).' };
     }
     
     const startTime = Date.now();
     const promptPreview = text.substring(0, 200);
-    chassisLog({ operation: 'chat', message: 'AI prompt sent', data: { ai: ranked[0], promptLength: text.length, hasImage: !!imageBase64 } });
+    redivivusLog({ operation: 'chat', message: 'AI prompt sent', data: { ai: ranked[0], promptLength: text.length, hasImage: !!imageBase64 } });
 
     // [WARN] Try each AI in rank order — failover on timeout/network errors only
     let lastError = '';

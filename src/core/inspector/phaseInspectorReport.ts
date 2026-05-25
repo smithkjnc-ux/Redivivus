@@ -46,14 +46,14 @@ export function formatInspectionReport(inspection: PhaseInspection): string {
 
   if (inspection.status === 'fail') {
     report += `**⛔ Cannot proceed to next phase until issues are resolved.**\n`;
-    report += `__ACTION_CARD__chassis.fixPhaseIssues|||🔧 Fix These Issues|||END__\n`;
+    report += `__ACTION_CARD__redivivus.fixPhaseIssues|||🔧 Fix These Issues|||END__\n`;
   } else if (inspection.status === 'warning') {
     report += `**⚠️ Proceed with caution — address warnings before they become errors.**\n`;
-    report += `__ACTION_CARD__chassis.proceedToNextPhase|||▶️ Proceed Anyway|||END__\n`;
-    report += `__ACTION_CARD__chassis.fixPhaseIssues|||🔧 Fix Warnings First|||END__\n`;
+    report += `__ACTION_CARD__redivivus.proceedToNextPhase|||▶️ Proceed Anyway|||END__\n`;
+    report += `__ACTION_CARD__redivivus.fixPhaseIssues|||🔧 Fix Warnings First|||END__\n`;
   } else {
     report += `**✅ Phase complete and ready for next phase.**\n`;
-    report += `__ACTION_CARD__chassis.proceedToNextPhase|||▶️ Proceed to Next Phase|||END__`;
+    report += `__ACTION_CARD__redivivus.proceedToNextPhase|||▶️ Proceed to Next Phase|||END__`;
   }
 
   return report;

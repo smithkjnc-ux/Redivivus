@@ -1,31 +1,31 @@
-// [SCOPE] chassis.profileRuntime command — runs the Project Runtime Profiler,
+// [SCOPE] redivivus.profileRuntime command — runs the Project Runtime Profiler,
 // posts plain-English summary to the chat panel with [Start] / [Not Now] buttons.
 
 import * as vscode from 'vscode';
 import { runRuntimeProfiler, buildProfileSummary } from '../core/runtime/runtimeProfiler';
 
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import type { UsageTracker } from '../services/usageTracker.js';
 import type { VaultService } from '../services/vault/vaultService.js';
 
 export function registerProfileRuntimeCommand(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routing: RoutingService,
   usageTracker?: UsageTracker,
   vault?: VaultService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.profileRuntime', async () => {
+    vscode.commands.registerCommand('redivivus.profileRuntime', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
-        vscode.window.showErrorMessage('CHASSIS: No workspace folder open.');
+        vscode.window.showErrorMessage('Redivivus: No workspace folder open.');
         return;
       }
 
       const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
-      ChatPanel.show(chassis, routing, usageTracker, vault);
+      ChatPanel.show(redivivus, routing, usageTracker, vault);
       await new Promise(r => setTimeout(r, 300));
 
       if (ChatPanel.currentPanel) {

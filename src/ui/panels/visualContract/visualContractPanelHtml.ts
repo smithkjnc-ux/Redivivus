@@ -21,15 +21,17 @@ header h1{font-size:14px;font-weight:600;flex:1}
 .tabs button.active{background:#1e1e2e;color:#cdd6f4;border-color:#313244}
 .canvas{flex:1;overflow-y:auto;padding:14px}
 .empty{color:#6c7086;font-size:13px;padding:20px}
-.prop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px}
-.prop-card{background:#181825;border:1px solid #313244;border-radius:8px;padding:10px}
-.prop-card label{display:block;font-size:11px;color:#a6adc8;margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.prop-card input[type=color]{width:100%;height:36px;border:none;border-radius:4px;cursor:pointer;background:transparent}
-.prop-card input[type=text]{width:100%;padding:6px 8px;background:#313244;border:1px solid #45475a;border-radius:4px;color:#cdd6f4;font-size:13px}
-.prop-card .num-row{display:flex;gap:6px;align-items:center}
-.prop-card input[type=range]{flex:1;accent-color:#89b4fa}
-.prop-card .num-val{width:54px;padding:4px 6px;background:#313244;border:1px solid #45475a;border-radius:4px;color:#cdd6f4;font-size:12px;text-align:right}
-.prop-card .num-val-unit{font-size:11px;color:#6c7086}
+.prop-list{display:flex;flex-direction:column;gap:1px}
+.prop-row{display:flex;align-items:center;gap:6px;padding:0 6px;background:#181825;height:24px;overflow:hidden;border-bottom:1px solid #23243a;cursor:pointer}
+.prop-row:hover{background:#1e1e2e}
+.prop-row.active{background:#0d1f2d;outline:1px solid #89b4fa;outline-offset:-1px}
+@keyframes propPulse{0%,100%{outline-color:#89b4fa}50%{outline-color:#cdd6f4}}
+.prop-row label{flex:1;font-size:11px;color:#a6adc8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;cursor:default}
+.prop-row input[type=color]{width:22px;height:16px;border:none;border-radius:2px;cursor:pointer;background:transparent;padding:0;flex-shrink:0}
+.prop-row input[type=text]{flex:1;padding:1px 5px;background:#313244;border:1px solid #45475a;border-radius:3px;color:#cdd6f4;font-size:11px;min-width:0}
+.prop-row input[type=range]{flex:1;accent-color:#89b4fa;min-width:0}
+.prop-row .num-val{width:42px;padding:1px 4px;background:#313244;border:1px solid #45475a;border-radius:3px;color:#cdd6f4;font-size:11px;text-align:right;flex-shrink:0}
+.prop-row .num-val-unit{font-size:10px;color:#6c7086;width:22px;flex-shrink:0}
 .sections{display:flex;flex-direction:column;gap:8px}
 .section-row{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;background:#181825;border:1px solid #313244;border-radius:8px}
 .section-row span{font-size:13px}
@@ -61,9 +63,12 @@ const TAB_LABELS = {colors:'🎨 Colors',text:'✏️ Text',layout:'📐 Layout'
 
 window.addEventListener('message', e => {
   const msg = e.data;
-  console.log('[CHASSIS][VisualEditor] webview received message:', msg.type, JSON.stringify(msg).slice(0, 200));
+  console.log('[Redivivus][VisualEditor] webview received message:', msg.type, JSON.stringify(msg).slice(0, 200));
   if (msg.type === 'load-contract') { contract = msg.contract; render(); }
-  if (msg.type === 'patch-ack') { showStatus(msg.ok ? 'Saved ✓' : 'Error: ' + msg.message); }
+  if (msg.type === 'patch-ack') {
+    if (msg.ok) { pending = {}; } else { document.getElementById('applyBtn').disabled = false; }
+    showStatus(msg.ok ? 'Saved ✓' : '⚠ ' + msg.message, !msg.ok);
+  }
 });
 
 function setMode(m) {
@@ -94,21 +99,20 @@ function renderTab() {
     p.category === activeTab && (mode === 'pro' || !p.proOnly)
   );
   if (!props.length) { el.innerHTML = '<div class="empty">No ' + activeTab + ' properties found in this project.</div>'; return; }
-  el.innerHTML = '<div class="prop-grid">' + props.map(renderProp).join('') + '</div>';
+  el.innerHTML = '<div class="prop-list">' + props.map(renderProp).join('') + '</div>';
 }
 
 function renderProp(p) {
   const cur = pending[p.id] !== undefined ? pending[p.id] : p.value;
-  if (p.type === 'color') return \`<div class="prop-card"><label title="\${p.label}">\${p.label}</label>
+  if (p.type === 'color') return \`<div class="prop-row" title="\${escH(p.label)}\${p.selectorCtx?' ('+escH(p.selectorCtx)+')':''}">
     <input type="color" data-id="\${p.id}" data-label="\${escQ(p.label)}" value="\${toHex(cur)}">
-    \${p.selectorCtx ? \`<div class="ctx">\${escH(p.selectorCtx)}</div>\` : ''}</div>\`;
-  if (p.type === 'text') return \`<div class="prop-card"><label title="\${p.label}">\${p.label}</label>
-    <input type="text" data-id="\${p.id}" data-label="\${escQ(p.label)}" value="\${escH(cur)}">
-    </div>\`;
-  if (p.type === 'number') return \`<div class="prop-card"><label title="\${p.label}">\${p.label}</label>
-    <div class="num-row"><input type="range" data-id="\${p.id}" data-label="\${escQ(p.label)}" data-peer="num-\${p.id}" min="0" max="\${numMax(p)}" step="\${numStep(p)}" value="\${cur}">
+    <label>\${escH(p.label)}</label></div>\`;
+  if (p.type === 'text') return \`<div class="prop-row"><label title="\${escH(p.label)}">\${escH(p.label)}</label>
+    <input type="text" data-id="\${p.id}" data-label="\${escQ(p.label)}" value="\${escH(cur)}"></div>\`;
+  if (p.type === 'number') return \`<div class="prop-row"><label title="\${escH(p.label)}">\${escH(p.label)}</label>
+    <input type="range" data-id="\${p.id}" data-label="\${escQ(p.label)}" data-peer="num-\${p.id}" min="0" max="\${numMax(p)}" step="\${numStep(p)}" value="\${cur}">
     <input class="num-val" type="number" id="num-\${p.id}" data-id="\${p.id}" data-label="\${escQ(p.label)}" data-peer-range="true" min="0" max="\${numMax(p)}" value="\${cur}">
-    <span class="num-val-unit">\${p.unit||''}</span></div></div>\`;
+    <span class="num-val-unit">\${p.unit||''}</span></div>\`;
   return '';
 }
 
@@ -147,15 +151,15 @@ function setPending(id, value, label) {
 
 function applyAll() {
   if (!Object.keys(pending).length) return;
-  vscode.postMessage({ type: 'apply-all', pending });
-  pending = {};
+  vscode.postMessage({ type: 'apply-all', pending: Object.assign({}, pending) });
   document.getElementById('applyBtn').disabled = true;
+  // pending is NOT cleared here — cleared in patch-ack on success so errors can be retried
 }
 
-function showStatus(msg) {
+function showStatus(msg, isErr) {
   const el = document.getElementById('status');
-  el.textContent = msg; el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2000);
+  el.textContent = msg; el.style.color = isErr ? '#f38ba8' : '#a6e3a1'; el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), isErr ? 6000 : 2000);
 }
 
 function toHex(v) {
@@ -174,7 +178,7 @@ document.getElementById('proBtn').addEventListener('click', () => setMode('pro')
 document.getElementById('applyBtn').addEventListener('click', applyAll);
 document.getElementById('tabs').addEventListener('click', e => { const b = e.target.closest('[data-tab]'); if (b) { activeTab = b.dataset.tab; render(); } });
 document.getElementById('canvas').addEventListener('input', e => { const el = e.target.closest('[data-id]'); if (!el) return; const peer = el.dataset.peer && document.getElementById(el.dataset.peer); if (peer) peer.value = el.value; setPending(el.dataset.id, el.value, el.dataset.label || ''); });
-document.getElementById('canvas').addEventListener('change', e => { const el = e.target.closest('[data-id]'); if (!el || el.type === 'range' || el.type === 'color') return; const prev = el.previousElementSibling; if (el.dataset.peerRange && prev) prev.value = el.value; setPending(el.dataset.id, el.value, el.dataset.label || ''); });
+document.getElementById('canvas').addEventListener('change', e => { const el = e.target.closest('[data-id]'); if (!el || el.type === 'range') return; if (el.dataset.peerRange) { const prev = el.previousElementSibling; if (prev) prev.value = el.value; } setPending(el.dataset.id, el.value, el.dataset.label || ''); });
 document.getElementById('canvas').addEventListener('click', e => { if (e.target.closest('#addSecBtn')) showAddSection(); if (e.target.closest('#submitSecBtn')) submitAddSection(); });
 if (contract) { render(); }
 </script></body></html>`;

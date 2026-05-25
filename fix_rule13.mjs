@@ -1,14 +1,14 @@
 import fs from 'fs';
 
 const rule13Text = `\n### Rule 13: NO FLAT FILES
-Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects CHASSIS builds and to CHASSIS itself. No exceptions, no matter what vibe editor is being used.`;
+Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects Redivivus builds and to Redivivus itself. No exceptions, no matter what vibe editor is being used.`;
 
 const files = [
   'CLAUDE.md',
   '.cursorrules',
   '.windsurf/rules.md',
   'src/services/rulesContent.ts',
-  'src/services/chassisRules.ts'
+  'src/services/redivivusRules.ts'
 ];
 
 for (const f of files) {
@@ -33,19 +33,19 @@ gemini = gemini.replace(
 );
 fs.writeFileSync('GEMINI.md', gemini, 'utf8');
 
-// Now chassisWorkerRules.ts
-let workerRules = fs.readFileSync('src/services/ai/chassisWorkerRules.ts', 'utf8');
+// Now redivivusWorkerRules.ts
+let workerRules = fs.readFileSync('src/services/ai/redivivusWorkerRules.ts', 'utf8');
 workerRules = workerRules.replace(
   '7. SCOPE DISCIPLINE', 
   '7. NO FLAT FILES — Every file lives in a folder that matches its responsibility (UI in UI, logic in logic). No exceptions.\n8. SCOPE DISCIPLINE'
 );
-fs.writeFileSync('src/services/ai/chassisWorkerRules.ts', workerRules, 'utf8');
+fs.writeFileSync('src/services/ai/redivivusWorkerRules.ts', workerRules, 'utf8');
 
 // Now agentService.ts
 let agentService = fs.readFileSync('src/services/ai/agentService.ts', 'utf8');
 agentService = agentService.replace(
   '10. ACTUALLY WRITE THE CODE',
-  '10. NO FLAT FILES. Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects CHASSIS builds and to CHASSIS itself. No exceptions.\n11. ACTUALLY WRITE THE CODE'
+  '10. NO FLAT FILES. Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects Redivivus builds and to Redivivus itself. No exceptions.\n11. ACTUALLY WRITE THE CODE'
 );
 fs.writeFileSync('src/services/ai/agentService.ts', agentService, 'utf8');
 

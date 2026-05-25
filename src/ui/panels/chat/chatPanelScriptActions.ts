@@ -129,7 +129,7 @@ export function buildActionsScript(): string {
         var b64ctx = fixErrBtn.getAttribute('data-ctx') || '';
         var errorContext = ''; try { errorContext = atob(b64ctx); } catch(e){}
         if (errorContext) {
-          fixErrBtn.textContent = 'Sending to CHASSIS...';
+          fixErrBtn.textContent = 'Sending to Redivivus...';
           fixErrBtn.setAttribute('disabled','true');
           try { vscode.postMessage({ type: 'fix-terminal-error', errorContext: errorContext }); } catch(e) {}
         }

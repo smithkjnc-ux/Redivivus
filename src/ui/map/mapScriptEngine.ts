@@ -22,10 +22,10 @@ export const MAP_SCRIPT_ENGINE = `
 
   function resize() {
     const p = canvas.parentElement;
-    console.log('[CHASSIS Map] resize() - parent:', p, 'canvas:', canvas);
-    if (!p) { console.log('[CHASSIS Map] resize: no parent, aborting'); return; }
+    console.log('[Redivivus Map] resize() - parent:', p, 'canvas:', canvas);
+    if (!p) { console.log('[Redivivus Map] resize: no parent, aborting'); return; }
     const w=p.clientWidth, h=p.clientHeight;
-    console.log('[CHASSIS Map] resize() - w:', w, 'h:', h);
+    console.log('[Redivivus Map] resize() - w:', w, 'h:', h);
     if (w>0&&h>0) { canvas.width=w; canvas.height=h; simActive=true; simTick=0; }
   }
   if (typeof ResizeObserver !== 'undefined') { new ResizeObserver(resize).observe(canvas.parentElement); }
@@ -107,8 +107,8 @@ export const MAP_SCRIPT_ENGINE = `
 
   function frame() { simulate(); draw(); requestAnimationFrame(frame); }
   function startWhenReady() {
-    console.log('[CHASSIS Map] startWhenReady() called - canvas:', canvas.width, 'x', canvas.height);
-    if(canvas.width>0&&canvas.height>0){console.log('[CHASSIS Map] canvas ready, starting frame loop');frame();}else{resize();setTimeout(startWhenReady,50);}
+    console.log('[Redivivus Map] startWhenReady() called - canvas:', canvas.width, 'x', canvas.height);
+    if(canvas.width>0&&canvas.height>0){console.log('[Redivivus Map] canvas ready, starting frame loop');frame();}else{resize();setTimeout(startWhenReady,50);}
   }
   startWhenReady();
 
@@ -165,7 +165,7 @@ export const MAP_SCRIPT_ENGINE = `
   const refreshBtn=document.getElementById('refresh-btn'); if(refreshBtn)refreshBtn.onclick=()=>{if(vs)vs.postMessage({type:'refresh'});};
   const backBtn=document.getElementById('back-btn'); if(backBtn)backBtn.onclick=()=>{if(vs)vs.postMessage({type:'back-to-chat'});};
   const architectBtn=document.getElementById('architect-btn'); if(architectBtn)architectBtn.onclick=()=>window.doArchitectReview();
-  // [CHASSIS] Exposed so the timeline view switcher can set layout state without re-dispatching events
+  // [Redivivus] Exposed so the timeline view switcher can set layout state without re-dispatching events
   window.setLayoutMode = function(mode) { layoutMode=mode; simActive=true; simTick=0; };
   document.querySelectorAll('.layout-btn').forEach(btn => {
     btn.onclick=(e)=>{document.querySelectorAll('.layout-btn').forEach(b=>b.classList.remove('active'));const t=e.currentTarget;t.classList.add('active');layoutMode=t.dataset.layout;simActive=true;simTick=0;};

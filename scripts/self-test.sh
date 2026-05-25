@@ -1,5 +1,5 @@
 #!/bin/bash
-# CHASSIS Self-Test — run after reorgs, big feature adds, or "something broke"
+# Redivivus Self-Test — run after reorgs, big feature adds, or "something broke"
 # Usage: bash scripts/self-test.sh
 
 cd "$(dirname "$0")/.." || exit 1
@@ -7,7 +7,7 @@ ERRORS=0
 WARNS=0
 
 echo "═══════════════════════════════════════"
-echo "  CHASSIS Self-Test v1.0"
+echo "  Redivivus Self-Test v1.0"
 echo "═══════════════════════════════════════"
 echo ""
 
@@ -107,9 +107,9 @@ echo "▸ [6/7] Core file existence check..."
 MISSING=0
 CORE_FILES=(
   "src/extension.ts"
-  "src/services/chassisService.ts"
-  "src/services/project/chassisInit.ts"
-  "src/services/project/chassisPaths.ts"
+  "src/services/redivivusService.ts"
+  "src/services/project/redivivusInit.ts"
+  "src/services/project/redivivusPaths.ts"
   "src/services/project/templateRegistry.ts"
   "src/services/ai/routingService.ts"
   "src/ui/chat/chatPanel.ts"
@@ -133,7 +133,7 @@ echo ""
 echo "▸ [7/7] VSIX package test..."
 VSIX_OUT=$(npx vsce package --no-dependencies 2>&1)
 if echo "$VSIX_OUT" | grep -q "\.vsix"; then
-  VSIX_FILE=$(echo "$VSIX_OUT" | grep -oP 'chassis-[\d.]+\.vsix')
+  VSIX_FILE=$(echo "$VSIX_OUT" | grep -oP 'redivivus-[\d.]+\.vsix')
   echo "  ✅ VSIX built: $VSIX_FILE"
 else
   echo "  ❌ VSIX build failed"
@@ -155,6 +155,6 @@ echo "════════════════════════�
 if [ $ERRORS -gt 0 ]; then
   echo ""
   echo "── Copy below into Windsurf ──"
-  echo "CHASSIS self-test found $ERRORS errors. Fix these issues:"
+  echo "Redivivus self-test found $ERRORS errors. Fix these issues:"
   echo "$TSC_OUT" | grep "error TS" | head -20
 fi

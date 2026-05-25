@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build Clarification — Supervisor-level design triage
+// [SCOPE] Redivivus Build Clarification — Supervisor-level design triage
 // The AI decides IF questions are needed (lightbulb vs paint job), then generates
 // targeted design questions for ambiguous requests. Simple edits pass through.
 
@@ -18,6 +18,8 @@ export interface ClarifyQuestion {
 // [WARN] Fast-path skips: modification requests, fix requests, and explicit single-property
 // changes never need clarification. Only new builds with design ambiguity trigger questions.
 const SKIP_CLARIFY = /\b(fix|bug|broken|error|crash|change\s+the\s+(color|font|size|text|margin|padding)|rename|delete|remove|update\s+the)\b/i;
+// Inspector element context prefix — always a targeted fix, no design ambiguity possible
+const INSPECTOR_PREFIX = /^\[[\w#.,\s:-]+\s+\d+x\d+\]/;
 
 /**
  * Supervisor design triage: decides if the task needs clarifying questions.
@@ -30,8 +32,8 @@ export async function generateClarifyQuestions(
   routing: RoutingService,
   previousAnswersBlock?: string,
 ): Promise<ClarifyQuestion[]> {
-  // Fast skip: obvious edits, fixes, single-property changes
-  if (SKIP_CLARIFY.test(task)) { return []; }
+  // Fast skip: obvious edits, fixes, single-property changes, or inspector element selections
+  if (SKIP_CLARIFY.test(task) || INSPECTOR_PREFIX.test(task)) { return []; }
   // Fast skip: very short modification requests (under 8 words, no "build/create/make")
   const words = task.trim().split(/\s+/);
   if (words.length < 8 && !/\b(build|create|make|design|generate|write)\b/i.test(task)) { return []; }

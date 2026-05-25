@@ -101,7 +101,7 @@ export class BuildFromVaultModal {
 </head>
 <body>
   <h1>🏗️ Build from Vault</h1>
-  <p>Describe what you want to build. CHASSIS will search your vault for reusable code and fill in any gaps.</p>
+  <p>Describe what you want to build. Redivivus will search your vault for reusable code and fill in any gaps.</p>
   
   <label for="task">Task description *</label>
   <input type="text" id="task" placeholder="e.g. add push notifications when a new listing is posted" autofocus value="${this.prefill?.task ? this.prefill.task.replace(/"/g, '&quot;') : ''}">

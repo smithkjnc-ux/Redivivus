@@ -1,22 +1,22 @@
-// [SCOPE] CHASSIS Chat Panel AI helpers — system prompt builder, command card renderer, response processor
+// [SCOPE] Redivivus Chat Panel AI helpers — system prompt builder, command card renderer, response processor
 // Extracted from chatPanelHtml.ts. Keep under 200 lines.
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisService } from '../../services/chassisService';
+import type { RedivivusService } from '../../services/redivivusService';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
 import { getSystemPrompt } from './chatPanelAIPrompt';
 import { buildProjectAnnotationContext } from '../project/chatPanelProjectContext';
 import { extractFileMentions } from '../project/chatPanelFileContext';
 
-/** Builds the AI prompt prefix — question path gets CHASSIS identity + annotations, code gen gets focused prompt */
-export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string): string {
-  const config = chassis.isInitialized() ? chassis.loadConfig() : null;
+/** Builds the AI prompt prefix — question path gets Redivivus identity + annotations, code gen gets focused prompt */
+export function buildAIPrefix(redivivus: RedivivusService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string): string {
+  const config = redivivus.isInitialized() ? redivivus.loadConfig() : null;
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'none';
   const bp = config?.blueprint;
 
-  // [CHASSIS] Detect code generation requests — use a focused prompt, not the CHASSIS identity prompt
+  // [Redivivus] Detect code generation requests — use a focused prompt, not the Redivivus identity prompt
   if (userText && /\b(convert|turn|transform|rewrite|replace|port|rebuild|build|create|make|generate|write|implement)\b/i.test(userText)) {
     return buildCodeGenPrefix(userText, workspaceRoot);
   }
@@ -26,7 +26,7 @@ export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] 
     bpStr = ['who','what','where','when','why'].map(f => `${f.toUpperCase()}: ${String(bp[f as keyof typeof bp] || '(not set)').trim()}`).join('\n');
   }
 
-  // [CHASSIS] If user mentions a specific file, find and inject it — never make the user paste content.
+  // [Redivivus] If user mentions a specific file, find and inject it — never make the user paste content.
   let activeFileContext = '';
   if (userText && workspaceRoot !== 'none') {
     const mentioned = extractFileMentions(userText, workspaceRoot);
@@ -54,8 +54,8 @@ export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] 
   }
 
   const prompt = getSystemPrompt(bpStr);
-  // [CHASSIS] Inject annotation-driven project context — the AI sees [SCOPE] from ALL files
-  // in ~200 tokens instead of loading 50,000 tokens of raw code. This is the CHASSIS advantage.
+  // [Redivivus] Inject annotation-driven project context — the AI sees [SCOPE] from ALL files
+  // in ~200 tokens instead of loading 50,000 tokens of raw code. This is the Redivivus advantage.
   const projectContext = buildProjectAnnotationContext(workspaceRoot);
   // [FIX] Inject user memory profile (~30 tokens, 0 AI cost to learn)
   let userProfileCtx = '';
@@ -63,9 +63,9 @@ export function buildAIPrefix(chassis: ChassisService, recentMessages: string[] 
   return `${prompt}\n${userProfileCtx ? userProfileCtx + '\n' : ''}${projectContext}${activeFileContext}${conversationContext}\nUser:`;
 }
 
-// [SCOPE] Focused code generation prompt — bypasses CHASSIS identity noise entirely
+// [SCOPE] Focused code generation prompt — bypasses Redivivus identity noise entirely
 // [WARN] This is the key difference vs Antigravity. Antigravity reads the whole file and uses a focused prompt.
-// CHASSIS was wrapping code gen in 44 lines of identity/capabilities/behavioral rules that distracted the AI.
+// Redivivus was wrapping code gen in 44 lines of identity/capabilities/behavioral rules that distracted the AI.
 function buildCodeGenPrefix(userText: string, workspaceRoot: string): string {
   // 1. Find source files — read from disk, don't rely on activeTextEditor
   let sourceCode = '';
@@ -141,14 +141,14 @@ export function findSourceFiles(userText: string, workspaceRoot: string): Source
 /** Map VS Code command IDs to human-readable labels for action cards */
 export function commandLabel(command: string): string {
   const labels: Record<string, string> = {
-    'chassis.startSession': '🚀 Start Session', 'chassis.endSession': '🏁 End Session',
-    'chassis.wizardRetrofit': '🆕 New Project', 'chassis.analyze': '🔍 Analyze',
-    'chassis.openVault': '💾 Vault', 'chassis.savePoint': '💾 Save Point'
+    'redivivus.startSession': '🚀 Start Session', 'redivivus.endSession': '🏁 End Session',
+    'redivivus.wizardRetrofit': '🆕 New Project', 'redivivus.analyze': '🔍 Analyze',
+    'redivivus.openVault': '💾 Vault', 'redivivus.savePoint': '💾 Save Point'
   };
   return labels[command] || `▶ Run: ${command}`;
 }
 
-const SAFE_COMMANDS = ['chassis.showMap', 'chassis.viewUsageInChat', 'chassis.log', 'chassis.deadends', 'chassis.openVault'];
+const SAFE_COMMANDS = ['redivivus.showMap', 'redivivus.viewUsageInChat', 'redivivus.log', 'redivivus.deadends', 'redivivus.openVault'];
 
 /** Process AI response — extract commands, generate action cards */
 export function processAIResponse(text: string): { text: string; executedCommand: boolean } {

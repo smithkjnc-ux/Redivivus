@@ -8,29 +8,29 @@ export async function handleActiveSessionWizard(session: SessionInfo | null): Pr
   const options: any[] = [
     {
       label: '$(eye)  Check a file before I change it',
-      description: 'See what\'s in the file and what CHASSIS recommends',
-      _command: 'chassis.checkFileHealth',
+      description: 'See what\'s in the file and what Redivivus recommends',
+      _command: 'redivivus.checkFileHealth',
     },
     {
       label: '$(comment)  Have AI review my current file',
       description: 'Get feedback on bugs, risks, and suggestions',
-      _command: 'chassis.reviewFile',
+      _command: 'redivivus.reviewFile',
     },
     {
       label: '$(wand)  Clean up a file',
       description: 'AI adds helpful notes and warnings to the code',
-      _command: 'chassis.cleanUpFile',
+      _command: 'redivivus.cleanUpFile',
     },
     {
       label: '$(debug-stop)  I\'m done for now',
       description: 'Wrap up this session — I\'ll ask a few quick questions',
       detail: 'Goal was: ' + (session?.goal || ''),
-      _command: 'chassis.endSession',
+      _command: 'redivivus.endSession',
     },
   ];
 
   const pick = await vscode.window.showQuickPick(options, {
-    title: 'CHASSIS — Working with ' + (session?.ai || 'AI'),
+    title: 'Redivivus — Working with ' + (session?.ai || 'AI'),
     placeHolder: 'What do you need?',
   });
   if (pick) {await vscode.commands.executeCommand((pick as any)._command);}

@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build Pipeline — Vault assembly build
+// [SCOPE] Redivivus Build Pipeline — Vault assembly build
 // [FIX] Was raw concatenation — now uses AI to adapt and merge vault items into a working file.
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 

@@ -12,7 +12,7 @@ export function scanWorkspaceFiles(root: string): { files: FileInfo[]; entryPoin
 
 function walkDirectory(root: string, relativeDir: string, files: FileInfo[], entryPoints: string[]): void {
   const fullDir = path.join(root, relativeDir);
-  const skipDirs = ['node_modules', '.git', 'dist', 'build', '.chassis', 'out', 'coverage', '.vscode'];
+  const skipDirs = ['node_modules', '.git', 'dist', 'build', '.redivivus', 'out', 'coverage', '.vscode'];
   if (skipDirs.some(skip => relativeDir.includes(skip))) {return;}
   try {
     const entries = fs.readdirSync(fullDir, { withFileTypes: true });

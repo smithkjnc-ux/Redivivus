@@ -141,12 +141,12 @@ export class VaultContextService {
       }
       score += Math.min(previewHits, 3);
 
-      // [CHASSIS] Quality gate boost — prefer higher-quality items
+      // [Redivivus] Quality gate boost — prefer higher-quality items
       const qs = (item as any).qualityScore as number | undefined;
       if (qs && qs >= 4) { score += 2; }
       if (qs && qs >= 5) { score += 2; }
 
-      // [CHASSIS] Description/useCase keyword matching
+      // [Redivivus] Description/useCase keyword matching
       const desc = ((item.description || '') + ' ' + ((item as any).useCase || '')).toLowerCase();
       for (const kw of keywords) {
         if (kw.length > 4 && desc.includes(kw)) { score += 1; break; }
@@ -159,7 +159,7 @@ export class VaultContextService {
   // ── Build the context block injected into AI prompts ──
   buildContextBlock(items: VaultItem[]): string {
     const lines: string[] = [
-      '=== CHASSIS VAULT: Relevant existing code ===',
+      '=== Redivivus VAULT: Relevant existing code ===',
       'The following reusable blocks already exist in the project vault.',
       'PREFER using or adapting these over writing new code from scratch.',
       '',
@@ -186,7 +186,7 @@ export class VaultContextService {
 export function isVaultEnabled(): boolean {
   try {
     const ctx = (require('../../ui/panels/chat/chatPanel.js') as any).ChatPanel?.extensionContext;
-    return ctx ? ctx.globalState.get('chassis.vaultEnabled', true) !== false : true;
+    return ctx ? ctx.globalState.get('redivivus.vaultEnabled', true) !== false : true;
   } catch { return true; }
 }
 

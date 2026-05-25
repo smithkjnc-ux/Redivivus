@@ -1,4 +1,4 @@
-// [SCOPE] Shared types for the CHASSIS analyzer — FileInfo and AnalysisResult
+// [SCOPE] Shared types for the Redivivus analyzer — FileInfo and AnalysisResult
 
 export interface FileInfo {
   relativePath: string;
@@ -7,7 +7,7 @@ export interface FileInfo {
   size: number;
   todos: string[];
   hasComments: boolean;
-  missingScopeAtLine1: boolean; // [CHASSIS] true = no correct [SCOPE] comment on line 1
+  missingScopeAtLine1: boolean; // [Redivivus] true = no correct [SCOPE] comment on line 1
 }
 
 export interface AnalysisResult {
@@ -17,6 +17,6 @@ export interface AnalysisResult {
   largeFiles: FileInfo[];
   todoItems: { file: string; line: string }[];
   uncommentedFiles: FileInfo[];
-  missingScopeFiles: FileInfo[]; // [CHASSIS] files missing [SCOPE] at line 1
+  missingScopeFiles: FileInfo[]; // [Redivivus] files missing [SCOPE] at line 1
   structure: string[];
 }

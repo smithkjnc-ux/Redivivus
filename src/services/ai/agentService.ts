@@ -5,7 +5,7 @@ import type { AgentContext } from './agentTools.js';
 import { BUILT_IN_TOOLS, getToolInstructions } from './agentTools.js';
 import type { RoutingService } from './routingService.js';
 import type { AIResponse } from './routingTypes.js';
-import { CHASSIS_WORKER_RULES } from './chassisWorkerRules.js';
+import { Redivivus_WORKER_RULES } from './redivivusWorkerRules.js';
 import { getAllTools, callTool } from '../mcpService.js';
 import { BuildLedger } from '../build/buildLedgerService.js';
 import { extractAgentThought, narrateTool } from './agentNarrator.js';
@@ -35,11 +35,11 @@ export async function executeAgentTask(
     ).join('\n\n');
   }
 
-  let history = `You are CHASSIS Agent Mode, a highly capable autonomous software engineer.
+  let history = `You are Redivivus Agent Mode, a highly capable autonomous software engineer.
 You have access to a set of tools to read files, write code, run terminal commands, and ask the user questions.
 You must solve the user's task by thinking step-by-step and using these tools.
 
-CRITICAL RULES FOR CHASSIS AGENT:
+CRITICAL RULES FOR Redivivus AGENT:
 1. ZERO MANUAL INSTRUCTIONS. You are strictly forbidden from writing "How-To" guides, checklists, or telling the user to "Go to", "Open", or "Run" anything. 
 2. AUTOMATE EVERYTHING. If the user asks for something to be runnable, installed, or deployed, YOU MUST use the \`run_command\` tool or write a setup script. You are an autonomous agent, not a chat bot.
 3. NO HALLUCINATIONS. Do not claim that files, folders (like 'dist/'), or executables exist unless you have actively verified them or created them yourself using tools.
@@ -49,7 +49,7 @@ CRITICAL RULES FOR CHASSIS AGENT:
 7. DIAGNOSE BEFORE FIXING. Read the relevant files FIRST. Understand the actual root cause before proposing a fix. If the user says "X doesn't work" and you add defensive null checks without finding the real bug, you have failed.
 8. BROWSER PROJECTS. If the project uses ES modules (\`<script type="module">\`), it MUST be served via HTTP, not opened from \`file://\`. Use \`run_command\` with \`python3 -m http.server\` or a Node.js server to verify.
 9. PROPER WEB STRUCTURE. If you create an \`.html\` file, it MUST contain a valid, fully-formed HTML5 structure (\`<!DOCTYPE html><html><body>...\`). DO NOT just write raw JavaScript or CSS directly into an \`.html\` file.
-10. NO FLAT FILES. Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects CHASSIS builds and to CHASSIS itself. No exceptions.
+10. NO FLAT FILES. Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects Redivivus builds and to Redivivus itself. No exceptions.
 11. ACTUALLY WRITE THE CODE. If the user asks you to build an app, game, or project, you MUST use the \`write_file\` tool to create the actual source files. Do NOT just output a text description, markdown checkboxes, or a plan of the project in your final answer. The user expects a working, runnable project in their workspace.
 
 AVAILABLE TOOLS:
@@ -72,7 +72,7 @@ TASK: ${task}
 PROJECT CONTEXT:
 ${context}
 
-${CHASSIS_WORKER_RULES}
+${Redivivus_WORKER_RULES}
 
 Begin. Think step-by-step.`;
 
@@ -100,7 +100,7 @@ Begin. Think step-by-step.`;
     const aiText = res.text.trim();
     history += `\n\nAssistant:\n${aiText}`;
 
-    // [CHASSIS] Surface AI's own reasoning as narrator bubble — zero extra tokens
+    // [Redivivus] Surface AI's own reasoning as narrator bubble — zero extra tokens
     const thought = extractAgentThought(aiText);
     if (thought) { onUpdate(`\uD83D\uDCAD _Step ${iterations}:_ ${thought}`); }
 

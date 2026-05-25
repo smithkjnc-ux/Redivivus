@@ -7,6 +7,7 @@ import { extractVisualContract } from '../../../services/visualContract/property
 import { applyBatchPatches, applyPropertyPatch } from '../../../services/visualContract/visualContractPatcher';
 import type { VisualContract, VisualProperty } from '../../../services/visualContract/visualContractTypes';
 import { ChatPanel } from '../chat/chatPanel';
+import { postToChatWebview } from '../chat/chatPanelPublicAPI';
 
 let _activePanel: vscode.WebviewPanel | undefined;
 
@@ -25,7 +26,7 @@ export function openVisualContractPanel(
   }
 
   const panel = vscode.window.createWebviewPanel(
-    'chassisVisualEditor',
+    'redivivusVisualEditor',
     'Visual Editor',
     { viewColumn: vscode.ViewColumn.Two, preserveFocus: true },
     { enableScripts: true, retainContextWhenHidden: true },
@@ -34,17 +35,17 @@ export function openVisualContractPanel(
   panel.onDidDispose(() => { _activePanel = undefined; }, null, context.subscriptions);
 
   const contract = extractVisualContract(projectRoot, builtFiles);
-  console.log('[CHASSIS][VisualEditor] projectRoot:', projectRoot);
-  console.log('[CHASSIS][VisualEditor] builtFiles:', builtFiles);
-  console.log('[CHASSIS][VisualEditor] contract.properties.length:', contract.properties.length);
-  console.log('[CHASSIS][VisualEditor] contract.properties:', JSON.stringify(contract.properties.slice(0, 5)));
+  console.log('[Redivivus][VisualEditor] projectRoot:', projectRoot);
+  console.log('[Redivivus][VisualEditor] builtFiles:', builtFiles);
+  console.log('[Redivivus][VisualEditor] contract.properties.length:', contract.properties.length);
+  console.log('[Redivivus][VisualEditor] contract.properties:', JSON.stringify(contract.properties.slice(0, 5)));
   const nonce = Math.random().toString(36).slice(2);
   panel.webview.html = getVisualContractHtml(nonce, contract);
 
   panel.webview.onDidReceiveMessage(
     async (msg) => {
       if (msg.type === 'debug-log') {
-        console.log('[CHASSIS][VisualEditor] WEBVIEW REPORTS: contractIsNull=', msg.contractIsNull, 'propCount=', msg.propCount, 'snippet=', msg.contractSnippet);
+        console.log('[Redivivus][VisualEditor] WEBVIEW REPORTS: contractIsNull=', msg.contractIsNull, 'propCount=', msg.propCount, 'snippet=', msg.contractSnippet);
         return;
       }
       handleMessage(msg, panel, contract, projectRoot, routing, context);
@@ -78,6 +79,12 @@ async function handleMessage(
     });
     // Update in-memory contract values for the session
     for (const { prop, newValue } of patches) { prop.value = newValue; }
+    // Re-extract and push refreshed contract so swatches reflect applied values
+    if (failed.length === 0) {
+      const refreshed = extractVisualContract(projectRoot, contract.files);
+      panel.webview.postMessage({ type: 'load-contract', contract: refreshed });
+      postToChatWebview({ type: 'preview-refresh' });
+    }
     return;
   }
 
@@ -97,10 +104,10 @@ async function handleMessage(
     const prompt = `Add a new section to the project: ${desc}. Match the existing visual style and color scheme.`;
     if (ChatPanel.currentPanel) {
       await ChatPanel.currentPanel.handleMessage({ type: 'fix-request', text: prompt });
-      vscode.window.showInformationMessage(`CHASSIS: Building section — "${desc}"`);
+      vscode.window.showInformationMessage(`Redivivus: Building section — "${desc}"`);
     } else {
       // Open chat and send the request
-      await vscode.commands.executeCommand('chassis.openChatPanel');
+      await vscode.commands.executeCommand('redivivus.openChatPanel');
       setTimeout(async () => {
         if (ChatPanel.currentPanel) {
           await ChatPanel.currentPanel.handleMessage({ type: 'fix-request', text: prompt });

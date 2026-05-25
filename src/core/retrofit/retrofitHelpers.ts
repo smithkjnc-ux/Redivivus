@@ -17,7 +17,7 @@ export async function handleAllAnnotated(doneFiles: string[]): Promise<void> {
 
   if (filesWithOldMarkers.length === 0) {
     await vscode.window.showInformationMessage(
-      '✅ All files are annotated and all markers are in CHASSIS format. Nothing to do!',
+      '✅ All files are annotated and all markers are in Redivivus format. Nothing to do!',
       { modal: true }
     );
     return;
@@ -25,7 +25,7 @@ export async function handleAllAnnotated(doneFiles: string[]): Promise<void> {
 
   const fix = await vscode.window.showInformationMessage(
     'All files have [SCOPE] — but ' + filesWithOldMarkers.length + ' file(s) still have bare legacy markers.',
-    { modal: true, detail: 'CHASSIS can convert them to [TODO], [WARN], [DEAD] format in-place. No AI needed.\n\nFiles affected: ' + filesWithOldMarkers.length },
+    { modal: true, detail: 'Redivivus can convert them to [TODO], [WARN], [DEAD] format in-place. No AI needed.\n\nFiles affected: ' + filesWithOldMarkers.length },
     'Convert Markers', 'Cancel'
   );
   if (fix !== 'Convert Markers') { return; }
@@ -45,7 +45,7 @@ export async function handleAllAnnotated(doneFiles: string[]): Promise<void> {
       fixed++;
     } catch { /* skip */ }
   }
-  vscode.window.showInformationMessage('✅ Converted legacy markers in ' + fixed + ' file(s) to CHASSIS format.');
+  vscode.window.showInformationMessage('✅ Converted legacy markers in ' + fixed + ' file(s) to Redivivus format.');
 }
 
 export async function showRetrofitSummary(
@@ -61,12 +61,12 @@ export async function showRetrofitSummary(
     ? 'Already done: ' + doneFiles.length + ' file' + (doneFiles.length === 1 ? '' : 's') + '\n\n'
     : '';
   return vscode.window.showInformationMessage(
-    'CHASSIS Retrofit — ' + projectName,
+    'Redivivus Retrofit — ' + projectName,
     {
       modal: true,
       detail: 'Project: ' + projectName + '\n\nPending (' + pendingFiles.length + '):\n' + pendingSnippet + '\n\n' +
-        doneSnippet + 'What happens:\n1. Your current project is backed up to .chassis/backup/\n' +
-        '2. Pending files get CHASSIS annotations added by AI\n3. Already-done files are skipped\n' +
+        doneSnippet + 'What happens:\n1. Your current project is backed up to .redivivus/backup/\n' +
+        '2. Pending files get Redivivus annotations added by AI\n3. Already-done files are skipped\n' +
         '4. You test, then confirm or revert\n\nEstimated time: ~' + Math.ceil(pendingFiles.length * 0.5) +
         ' minutes (' + pendingFiles.length + ' files)'
     },
@@ -75,9 +75,9 @@ export async function showRetrofitSummary(
 }
 
 export function buildReport(results: { file: string; status: string }[], total: number, failed: number): string {
-  let report = '# CHASSIS Retrofit Report\n\n';
+  let report = '# Redivivus Retrofit Report\n\n';
   report += '*Retrofit completed: ' + new Date().toISOString().split('T')[0] + '*\n\n---\n\n## Summary\n\n';
-  report += '- Files processed: ' + total + '\n- Successful: ' + (total - failed) + '\n- Failed: ' + failed + '\n- Backup location: `.chassis/backup/`\n\n';
+  report += '- Files processed: ' + total + '\n- Successful: ' + (total - failed) + '\n- Failed: ' + failed + '\n- Backup location: `.redivivus/backup/`\n\n';
   report += '## Results\n\n| File | Status |\n|------|--------|\n';
   for (const r of results) {
     const icon = r.status === 'OK' ? '\u2705' : r.status.startsWith('SKIP') ? '\u23ed\ufe0f' : '\u274c';
@@ -85,7 +85,7 @@ export function buildReport(results: { file: string; status: string }[], total: 
   }
   report += '\n---\n\n## Next Steps\n\n';
   report += '1. **Test your project** — make sure everything still works\n';
-  report += '2. If good: run **CHASSIS: Confirm Retrofit** to delete the backup\n';
-  report += '3. If bad: run **CHASSIS: Revert Retrofit** to restore original files\n';
+  report += '2. If good: run **Redivivus: Confirm Retrofit** to delete the backup\n';
+  report += '3. If bad: run **Redivivus: Revert Retrofit** to restore original files\n';
   return report;
 }

@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Master Log Aggregator — manages all domain logs and log rotation
+// [SCOPE] Redivivus Master Log Aggregator — manages all domain logs and log rotation
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -19,7 +19,7 @@ const LOG_CONFIG = {
 /** Initialize the master logger and perform log rotation */
 export function initMasterLogger(root: string): void {
   projectRoot = root;
-  const logsDir = path.join(root, '.chassis', 'logs', 'master');
+  const logsDir = path.join(root, '.redivivus', 'logs', 'master');
   
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
@@ -27,7 +27,7 @@ export function initMasterLogger(root: string): void {
 
   // Log rotation: Keep last 3 runs
   const files = fs.readdirSync(logsDir)
-    .filter(f => f.startsWith('chassis-master-') && f.endsWith('.log'))
+    .filter(f => f.startsWith('redivivus-master-') && f.endsWith('.log'))
     .sort()
     .reverse();
 
@@ -38,15 +38,15 @@ export function initMasterLogger(root: string): void {
       try {
         fs.unlinkSync(path.join(logsDir, f));
       } catch (e) {
-        console.error('[CHASSIS] Failed to delete old log:', e);
+        console.error('[Redivivus] Failed to delete old log:', e);
       }
     }
   }
 
   const dateStr = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
-  currentLogFile = path.join(logsDir, `chassis-master-${dateStr}.log`);
+  currentLogFile = path.join(logsDir, `redivivus-master-${dateStr}.log`);
 
-  const header = `=== CHASSIS MASTER LOG SESSION START ===\nTimestamp: ${new Date().toISOString()}\nProject: ${root}\n\n`;
+  const header = `=== Redivivus MASTER LOG SESSION START ===\nTimestamp: ${new Date().toISOString()}\nProject: ${root}\n\n`;
   fs.writeFileSync(currentLogFile, header, 'utf-8');
 }
 
@@ -90,7 +90,7 @@ function flushLogs(): void {
     fs.appendFileSync(currentLogFile, logBuffer.join('\n') + '\n', 'utf-8');
     logBuffer = [];
   } catch (e) {
-    console.error('[CHASSIS] Failed to write master log:', e);
+    console.error('[Redivivus] Failed to write master log:', e);
   }
 
   if (flushTimer) {

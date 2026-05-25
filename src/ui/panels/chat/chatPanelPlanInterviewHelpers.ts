@@ -116,7 +116,7 @@ Only fill fields that are OBVIOUS from context. Leave empty string for anything 
 /** Saves the 5W answers into the project config blueprint. */
 export function saveBlueprint(deps: any, answers: Record<string, string>): void {
   try {
-    const config = deps.chassis?.isInitialized?.() ? deps.chassis.loadConfig() : null;
+    const config = deps.redivivus?.isInitialized?.() ? deps.redivivus.loadConfig() : null;
     if (config) {
       config.blueprint = {
         ...config.blueprint,
@@ -126,8 +126,8 @@ export function saveBlueprint(deps: any, answers: Record<string, string>): void 
         when: answers.when  || config.blueprint?.when  || '',
         why:  answers.why   || config.blueprint?.why   || '',
       };
-      deps.chassis.saveConfig(config);
-      syncBlueprintMd(deps.chassis, config);
+      deps.redivivus.saveConfig(config);
+      syncBlueprintMd(deps.redivivus, config);
     }
   } catch { /* never crash the interview */ }
 }

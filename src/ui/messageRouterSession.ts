@@ -30,14 +30,14 @@ export async function handleSessionMessage(
       if (msg.url) {vscode.env.openExternal(vscode.Uri.parse(msg.url));}
       return true;
     case 'switchAI': {
-      const aiCfg = vscode.workspace.getConfiguration('chassis');
+      const aiCfg = vscode.workspace.getConfiguration('redivivus');
       await aiCfg.update('defaultAI', msg.ai, true);
-      vscode.window.showInformationMessage('CHASSIS now using ' + msg.ai.toUpperCase());
+      vscode.window.showInformationMessage('Redivivus now using ' + msg.ai.toUpperCase());
       refresh();
       return true;
     }
     case 'saveApiKey': {
-      const keyCfg = vscode.workspace.getConfiguration('chassis');
+      const keyCfg = vscode.workspace.getConfiguration('redivivus');
       const keyMap: Record<string, string> = { gemini: 'geminiApiKey', claude: 'claudeApiKey', openai: 'openaiApiKey', groq: 'groqApiKey', xai: 'xaiApiKey', kimi: 'kimiApiKey' };
       const setting = keyMap[msg.ai];
       if (!setting) {return false;}

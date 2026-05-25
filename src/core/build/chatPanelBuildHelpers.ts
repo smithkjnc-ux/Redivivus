@@ -1,9 +1,9 @@
-// [SCOPE] CHASSIS Chat Panel Build Helpers — BuildContext type, vault resolvers, message helpers
+// [SCOPE] Redivivus Chat Panel Build Helpers — BuildContext type, vault resolvers, message helpers
 // Extracted from chatPanelBuild.ts to keep that file under 200 lines.
 
 import type { RoutingService } from '../../services/ai/routingService';
 import type { VaultService } from '../../services/vault/vaultService';
-import type { ChassisService } from '../../services/chassisService';
+import type { RedivivusService } from '../../services/redivivusService';
 import type { UsageTracker } from '../../services/usageTracker';
 import type { VaultSearchResult } from '../../services/vault/buildFromVaultSearch';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
@@ -11,7 +11,7 @@ import type { BlueprintContract } from '../../services/blueprint/blueprintContra
 
 export interface BuildContext {
   task: string; root: string; blueprintContext: string; vault?: VaultService; routing: RoutingService; conversation: ChatMessage[]; refresh: () => void; logError: (t: string, p: string, e: string, l: number) => void; postToWebview?: (msg: any) => void; onBuildFinished?: (t: string, f?: string[]) => void;
-  chassis?: ChassisService;
+  redivivus?: RedivivusService;
   usageTracker?: UsageTracker;
   onClarifySubmit?: (answers: Record<string, string>) => void;
   buildStartMessage?: string;

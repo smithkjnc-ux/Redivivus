@@ -6,7 +6,7 @@ import type { AIResponse } from './routingTypes.js';
 import { getGeminiKey } from './routingKeys.js';
 import { callGemini } from './routingGemini.js';
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
-import { chassisLog, logAIInteraction } from '../logging/chassisLogger.js';
+import { redivivusLog, logAIInteraction } from '../logging/redivivusLogger.js';
 
 export async function analyzeFileImpl(
   supervisor: string,
@@ -18,12 +18,12 @@ export async function analyzeFileImpl(
   cancelToken?: import('vscode').CancellationToken
 ): Promise<AIResponse> {
   const startTime = Date.now();
-  chassisLog({ operation: 'analyze', phase: 'start', message: `Analyzing ${path.basename(filePath)}`, data: { file: filePath, ai: supervisor } });
+  redivivusLog({ operation: 'analyze', phase: 'start', message: `Analyzing ${path.basename(filePath)}`, data: { file: filePath, ai: supervisor } });
 
   let result: AIResponse;
   if (supervisor === 'gemini') {
     const key = getGeminiKey();
-    if (!key) { return { text: '', model: 'none', success: false, error: 'No Gemini API key. Set it in CHASSIS settings or via GEMINI_API_KEY env var.' }; }
+    if (!key) { return { text: '', model: 'none', success: false, error: 'No Gemini API key. Set it in Redivivus settings or via GEMINI_API_KEY env var.' }; }
     result = await callGemini(key, filePath, content, instruction, vaultContext, cancelToken);
   } else {
     const fetch = (url: string, opts: RequestInit) => fetchWithTimeout(url, opts, 30_000);

@@ -1,8 +1,8 @@
-// [SCOPE] CHASSIS Chat Panel header builder — computes ChatHeaderInfo from chassis/routing state
+// [SCOPE] Redivivus Chat Panel header builder — computes ChatHeaderInfo from redivivus/routing state
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ChassisService } from '../../../services/chassisService';
+import type { RedivivusService } from '../../../services/redivivusService';
 import type { RoutingService } from '../../../services/ai/routingService';
 import type { UsageTracker } from '../../../services/usageTracker';
 import type { ChatHeaderInfo } from './chatPanelHtml';
@@ -10,7 +10,7 @@ import { BuildHistoryService } from '../../../services/build/buildHistoryService
 import * as fs from 'fs';
 
 export function buildHeaderInfo(
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routing: RoutingService,
   usageTracker?: UsageTracker,
   lastModel?: string,
@@ -19,10 +19,10 @@ export function buildHeaderInfo(
   assistMode?: boolean,
 ): ChatHeaderInfo {
   const available = routing.getAvailableAI();
-  const config = chassis.isInitialized() ? chassis.loadConfig() : null;
+  const config = redivivus.isInitialized() ? redivivus.loadConfig() : null;
   const hasBlueprint = !!config?.blueprint?.who;
   const blueprintLocked = config?.blueprint?.locked || false;
-  const isInitialized = chassis.isInitialized();
+  const isInitialized = redivivus.isInitialized();
   const projectName = config?.projectName || (vscode.workspace.workspaceFolders?.[0] ? path.basename(vscode.workspace.workspaceFolders[0].uri.fsPath) : 'No Project');
 
   const now = new Date();
@@ -30,17 +30,17 @@ export function buildHeaderInfo(
   const workspaceFolderIsOpen = !!vscode.workspace.workspaceFolders?.length;
   const hasProjectOpen = workspaceFolderIsOpen && isInitialized;
 
-  // Check if current workspace has a .chassis/ folder or .chassis-assist shim
+  // Check if current workspace has a .redivivus/ folder or .redivivus-assist shim
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const fs = require('fs');
-  const workspaceHasChassis = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.chassis')) : false;
-  // [FIX] Check .chassis-assist regardless of whether .chassis/ exists — .chassis/ now exists in both modes
-  const workspaceIsAssistMode = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.chassis-assist')) : false;
+  const workspaceHasRedivivus = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.redivivus')) : false;
+  // [FIX] Check .redivivus-assist regardless of whether .redivivus/ exists — .redivivus/ now exists in both modes
+  const workspaceIsAssistMode = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.redivivus-assist')) : false;
 
   // Get recent projects from globalState
   const recentProjects: Array<{ path: string; name: string; timestamp?: number }> = [];
   if (extensionContext) {
-    const recent = extensionContext.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('chassis.recentProjects', []);
+    const recent = extensionContext.globalState.get<Array<{ path: string; name: string; timestamp: number }>>('redivivus.recentProjects', []);
     // Filter out deleted projects and sort by most recent
     const valid = recent
       .filter((p: any) => fs.existsSync(p.path))
@@ -52,7 +52,7 @@ export function buildHeaderInfo(
   // Determine blueprint status: 'complete' | 'incomplete' | 'missing'
   const blueprintStatus = determineBlueprintStatus(config);
 
-  const selectedAI = vscode.workspace.getConfiguration('chassis').get<string>('defaultAI') || 'gemini';
+  const selectedAI = vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || 'gemini';
   const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
 
   const hasKey = available.ai !== 'none';
@@ -69,9 +69,9 @@ export function buildHeaderInfo(
   const rosterDisplay = routing.getRosterDisplay();
 
   // [STARTUP BEHAVIOR] Check if we should auto-open the last project
-  const startupBehavior = vscode.workspace.getConfiguration('chassis').get<string>('startupBehavior') || 'launcher';
+  const startupBehavior = vscode.workspace.getConfiguration('redivivus').get<string>('startupBehavior') || 'launcher';
   const shouldAutoOpenLastProject = startupBehavior === 'lastProject' 
-    && !workspaceHasChassis 
+    && !workspaceHasRedivivus 
     && recentProjects.length > 0;
 
   // Project-level token totals — sums all build history entries for the current workspace
@@ -105,7 +105,7 @@ export function buildHeaderInfo(
     usageReport: usageTracker?.getReport(),
     lastModel,
     hasProjectOpen,
-    workspaceHasChassis,
+    workspaceHasRedivivus,
     workspaceFolderIsOpen,
     workspaceIsAssistMode,
     assistMode,

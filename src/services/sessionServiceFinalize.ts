@@ -1,11 +1,11 @@
 // [SCOPE] Session finalization helpers — extracted from sessionService.ts (Rule 9 split)
 
 import type { SessionInfo, ExitInterview } from '../types/index.js';
-import type { ChassisService } from './chassisService.js';
+import type { RedivivusService } from './redivivusService.js';
 import { saveSessionFile, getDuration } from './sessionStorage.js';
 
-export function finalizeSession(session: SessionInfo, chassis: ChassisService, interview: ExitInterview): void {
-  chassis.appendWorkLog(
+export function finalizeSession(session: SessionInfo, redivivus: RedivivusService, interview: ExitInterview): void {
+  redivivus.appendWorkLog(
     '- **Session End** — ID: ' + session.id + '\n' +
     '- Duration: ' + getDuration(session) + '\n' +
     '- Completed: ' + (interview.completed.join(', ') || 'none') + '\n' +
@@ -13,8 +13,8 @@ export function finalizeSession(session: SessionInfo, chassis: ChassisService, i
     '- Risks: ' + (interview.risks.join(', ') || 'none') + '\n' +
     '- Next session: ' + interview.nextSessionStart
   );
-  chassis.appendRoadmap(session.goal, interview.completed, interview.inProgress, interview.nextSessionStart);
-  saveSessionFile(session, interview, chassis.sessionsDir);
+  redivivus.appendRoadmap(session.goal, interview.completed, interview.inProgress, interview.nextSessionStart);
+  saveSessionFile(session, interview, redivivus.sessionsDir);
 }
 
 export function parseEndSessionData(data: any): ExitInterview {

@@ -1,6 +1,6 @@
 // [SCOPE] Project Runtime Profiler — static scan that determines a project's runtime architecture
 // before any instrumentation is attempted. Answers: entry points, language mix, IPC patterns,
-// process topology, and external services. Writes .chassis/runtime_profile.json.
+// process topology, and external services. Writes .redivivus/runtime_profile.json.
 // No vscode dependency — pure Node/fs so it can be used from any context.
 
 import * as fs from 'fs';
@@ -54,11 +54,11 @@ export function runRuntimeProfiler(root: string): RuntimeProfile {
     externalServices,
   };
 
-  // Write to .chassis/runtime_profile.json
+  // Write to .redivivus/runtime_profile.json
   try {
-    const chassisDir = path.join(root, '.chassis');
-    if (!fs.existsSync(chassisDir)) { fs.mkdirSync(chassisDir, { recursive: true }); }
-    fs.writeFileSync(path.join(chassisDir, 'runtime_profile.json'), JSON.stringify(profile, null, 2), 'utf8');
+    const redivivusDir = path.join(root, '.redivivus');
+    if (!fs.existsSync(redivivusDir)) { fs.mkdirSync(redivivusDir, { recursive: true }); }
+    fs.writeFileSync(path.join(redivivusDir, 'runtime_profile.json'), JSON.stringify(profile, null, 2), 'utf8');
   } catch { /* best-effort write */ }
 
   return profile;
@@ -67,7 +67,7 @@ export function runRuntimeProfiler(root: string): RuntimeProfile {
 /** Load existing profile from disk, or return null if not present. */
 export function loadRuntimeProfile(root: string): RuntimeProfile | null {
   try {
-    const raw = fs.readFileSync(path.join(root, '.chassis', 'runtime_profile.json'), 'utf8');
+    const raw = fs.readFileSync(path.join(root, '.redivivus', 'runtime_profile.json'), 'utf8');
     return JSON.parse(raw) as RuntimeProfile;
   } catch { return null; }
 }

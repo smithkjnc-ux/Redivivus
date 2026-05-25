@@ -1,11 +1,11 @@
-// [SCOPE] CHASSIS Misc commands — undo phased build
+// [SCOPE] Redivivus Misc commands — undo phased build
 
 import * as vscode from 'vscode';
 import { getPhaseUndoService } from '../services/phaseUndoService.js';
 
 export function registerUndoCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.undoPhase', async () => {
+    vscode.commands.registerCommand('redivivus.undoPhase', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) { vscode.window.showErrorMessage('No workspace open.'); return; }
       const phaseUndo = getPhaseUndoService(root);

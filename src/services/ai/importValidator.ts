@@ -10,7 +10,7 @@ export interface ImportValidationResult {
   brokenPackageImports: string[];
 }
 
-// Packages CHASSIS builds commonly use — treated as always-valid even if not in package.json
+// Packages Redivivus builds commonly use — treated as always-valid even if not in package.json
 const KNOWN_NPM_PACKAGES = new Set([
   'react', 'react-dom', 'react-router-dom', 'react-router',
   'recharts', 'd3', 'chart.js', 'victory', 'nivo',

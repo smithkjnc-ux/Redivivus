@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Vault commands — scan result display helpers
+// [SCOPE] Redivivus Vault commands — scan result display helpers
 
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
@@ -21,12 +21,12 @@ export function showVaultScanResults(items: any[], fileCount: number, filteredCo
 
   const actionsHtml = `
     <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;">
-      <button data-cmd="chassis.openVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">💾 Open Vault</button>
-      <button data-cmd="chassis.saveToVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">💾 Save to Vault</button>
-      <button data-cmd="chassis.scanVaultCodebase" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">📁 Scan to Vault</button>
-      <button data-cmd="chassis.buildFromVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-secondaryBackground, var(--vscode-button-background));color:var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.9;">🏗️ Build from Vault</button>
-      <button data-cmd="chassis.queryVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-secondaryBackground, var(--vscode-button-background));color:var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.9;">🔍 Query Vault</button>
-      <button data-cmd="chassis.validateVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-secondaryBackground, var(--vscode-button-background));color:var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.9;">✅ Validate</button>
+      <button data-cmd="redivivus.openVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">💾 Open Vault</button>
+      <button data-cmd="redivivus.saveToVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">💾 Save to Vault</button>
+      <button data-cmd="redivivus.scanVaultCodebase" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;">📁 Scan to Vault</button>
+      <button data-cmd="redivivus.buildFromVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-secondaryBackground, var(--vscode-button-background));color:var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.9;">🏗️ Build from Vault</button>
+      <button data-cmd="redivivus.queryVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-secondaryBackground, var(--vscode-button-background));color:var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.9;">🔍 Query Vault</button>
+      <button data-cmd="redivivus.validateVault" style="flex:1;min-width:120px;padding:10px 12px;background:var(--vscode-button-secondaryBackground, var(--vscode-button-background));color:var(--vscode-button-secondaryForeground, var(--vscode-button-foreground));border:none;border-radius:6px;cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;gap:6px;opacity:0.9;">✅ Validate</button>
     </div>
   `;
 

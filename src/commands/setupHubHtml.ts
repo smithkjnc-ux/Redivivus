@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Setup Hub — HTML template for the setup webview panel
+// [SCOPE] Redivivus Setup Hub — HTML template for the setup webview panel
 // Imported by setupHub.ts. statusBadge is a local helper, not exported.
 
 function statusBadge(ok: boolean, okLabel: string, notLabel: string): string {
@@ -46,7 +46,7 @@ export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string,
   </style>
   </head><body>
   <div class="hub">
-    <h1>&#x2699;&#xFE0F; CHASSIS Setup</h1>
+    <h1>&#x2699;&#xFE0F; Redivivus Setup</h1>
     <p class="subtitle">Configure your tools once -- everything works from here.</p>
     <div class="section">
       <div class="section-icon">&#x1F916;</div>
@@ -104,18 +104,18 @@ export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string,
     </div>
     <hr class="divider">
     <div style="text-align:center;">
-      <button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="send('open-chat')">Open CHASSIS Chat &#x2192;</button>
+      <button class="btn btn-primary" style="padding:10px 32px;font-size:14px;" onclick="send('open-chat')">Open Redivivus Chat &#x2192;</button>
     </div>
-    <p class="footer">CHASSIS -- Your AI coding partner. Not just an extension -- a system.</p>
+    <p class="footer">Redivivus -- Your AI coding partner. Not just an extension -- a system.</p>
   </div>
   <div id="gh-overlay" onclick="if(event.target===this)closeGitHubModal()">
     <div id="gh-modal">
       <h2>&#x1F419; Connect GitHub</h2>
-      <p class="sub">Lets CHASSIS back up your code to GitHub. You decide when &mdash; nothing is automatic.</p>
+      <p class="sub">Lets Redivivus back up your code to GitHub. You decide when &mdash; nothing is automatic.</p>
       <div style="background:rgba(74,158,255,0.08);border:1px solid rgba(74,158,255,0.25);border-radius:8px;padding:12px 14px;margin-bottom:16px;font-size:12px;line-height:1.7;color:#c8c8c8;">
         <div style="font-weight:700;color:#fff;margin-bottom:6px;">How to get your token (2 minutes):</div>
         <div><span style="color:#4a9eff;font-weight:700;">1.</span> Click <a class="gh-ext-link" data-url="https://github.com/settings/tokens/new?scopes=repo" style="color:#4a9eff;cursor:pointer;font-weight:600;">Open GitHub Token Page &rarr;</a></div>
-        <div><span style="color:#4a9eff;font-weight:700;">2.</span> Give it any name &mdash; e.g. <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">chassis</code></div>
+        <div><span style="color:#4a9eff;font-weight:700;">2.</span> Give it any name &mdash; e.g. <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;">redivivus</code></div>
         <div><span style="color:#4a9eff;font-weight:700;">3.</span> <strong style="color:#fff;">Only check &ldquo;repo&rdquo;</strong> &mdash; it&rsquo;s already pre-selected. Ignore everything else.</div>
         <div><span style="color:#4a9eff;font-weight:700;">4.</span> Scroll down and click <strong style="color:#fff;">Generate token</strong></div>
         <div><span style="color:#4a9eff;font-weight:700;">5.</span> Copy the token and paste it below</div>

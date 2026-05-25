@@ -17,12 +17,12 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
   debugLog(_root, 'run-command', `received: ${command}`);
   if (!command) { return; }
   try {
-    if (command === 'chassis.buildFromVault') {
+    if (command === 'redivivus.buildFromVault') {
       await vscode.commands.executeCommand(command, deps.buildFromVaultPrefill());
-    } else if (command === 'chassis.openVault' && msg.vaultItem) {
+    } else if (command === 'redivivus.openVault' && msg.vaultItem) {
       await vscode.commands.executeCommand(command, msg.vaultItem);
       debugLog(_root, 'run-command', `executed OK: ${command} -> ${msg.vaultItem}`);
-    } else if (command === 'chassis.listProjects') {
+    } else if (command === 'redivivus.listProjects') {
       const homeDir = os.homedir();
       const projects: { name: string; fullPath: string }[] = [];
       for (const dir of [path.join(homeDir, 'projects'), path.join(homeDir, 'Projects'), path.join(homeDir, 'dev'), path.join(homeDir, 'workspace'), path.join(homeDir, 'code'), path.join(homeDir, 'src')]) {
@@ -31,14 +31,14 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
             for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
               if (entry.isDirectory()) {
                 const pp = path.join(dir, entry.name);
-                if (fs.existsSync(path.join(pp, '.chassis'))) { projects.push({ name: entry.name, fullPath: pp }); }
+                if (fs.existsSync(path.join(pp, '.redivivus'))) { projects.push({ name: entry.name, fullPath: pp }); }
               }
             }
           } catch { /* ignore permission errors */ }
         }
       }
       panel.webview.postMessage({ type: 'show-projects-modal', projects });
-      debugLog(_root, 'run-command', `listed ${projects.length} CHASSIS projects`);
+      debugLog(_root, 'run-command', `listed ${projects.length} Redivivus projects`);
     } else if (command === 'workbench.action.closeFolder') {
       const folders = vscode.workspace.workspaceFolders;
       if (folders && folders.length > 0) {
@@ -47,7 +47,7 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
         await vscode.commands.executeCommand(command);
       }
       debugLog(_root, 'run-command', `executed OK: ${command}`);
-    } else if (command === 'chassis.runProject') {
+    } else if (command === 'redivivus.runProject') {
       // [FIX] Run directly — VS Code command dispatch unreliable for this command
       const runRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!runRoot) { vscode.window.showWarningMessage('No project folder open.'); return; }
@@ -75,19 +75,17 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
       if (!info.runCmd && info.type === 'unknown') { vscode.window.showInformationMessage('No runnable entry point detected. Build something first!'); return; }
       if (info.type === 'html') {
         const htmlFile = info.entryFile || (info.detectedJsEntry ? createHtmlWrapperIfNeeded(runRoot, info.detectedJsEntry) : null);
-        if (htmlFile) {
-          if (!info.entryFile) {
-            deps.conversation.push({ role: 'assistant', content: `This is browser code — it needs an HTML page to run. I created \`index.html\` for you automatically. Opening in browser now...`, timestamp: Date.now() });
-            deps.refresh();
-          }
-          vscode.env.openExternal(vscode.Uri.file(path.join(runRoot, htmlFile)));
-          debugLog(runRoot, 'run-command', `runProject: opened ${htmlFile} in browser (auto-created: ${!info.entryFile})`);
-        } else {
-          vscode.window.showInformationMessage('Ask CHASSIS: "create an index.html for this project"');
+        if (!htmlFile) { vscode.window.showInformationMessage('Ask Redivivus: "create an index.html for this project"'); return; }
+        if (!info.entryFile) {
+          deps.conversation.push({ role: 'assistant', content: `This is browser code — it needs an HTML page to run. I created \`index.html\` for you automatically.`, timestamp: Date.now() });
+          deps.refresh();
         }
+        // Open in the user's default browser outside of VS Code
+        vscode.env.openExternal(vscode.Uri.file(path.join(runRoot, htmlFile)));
+        debugLog(runRoot, 'run-command', `runProject: opened externally: ${htmlFile}`);
         return;
       }
-      const term = vscode.window.createTerminal({ name: 'CHASSIS: Run', cwd: runRoot });
+      const term = vscode.window.createTerminal({ name: 'Redivivus: Run', cwd: runRoot });
       term.show();
       if (info.needsDeps && info.depsCmd) { term.sendText(info.depsCmd + ' && ' + (info.runCmd || '')); }
       else if (info.runCmd) { term.sendText(info.runCmd); }
@@ -100,9 +98,9 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
           (ChatPanel.currentPanel as any)._panel?.reveal(undefined, false);
         }
       }, _monitorDelay);
-    } else if (command === 'chassis.openVisualEditor') {
+    } else if (command === 'redivivus.openVisualEditor') {
       const root = _root;
-      if (!root) { vscode.window.showWarningMessage('CHASSIS: Open a project folder first.'); return; }
+      if (!root) { vscode.window.showWarningMessage('Redivivus: Open a project folder first.'); return; }
       let builtFiles: string[] = [];
       try { const h = new BuildHistoryService(root); const last = h.list()[0]; builtFiles = last?.files ?? []; } catch {}
       if (!builtFiles.length) {

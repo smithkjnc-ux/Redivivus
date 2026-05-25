@@ -1,8 +1,8 @@
-// [SCOPE] Extension Inline Commands — inline command registrations for CHASSIS
+// [SCOPE] Extension Inline Commands — inline command registrations for Redivivus
 // Extracted from extensionCommands.ts
 
 import * as vscode from 'vscode';
-import type { ChassisService } from './services/chassisService.js';
+import type { RedivivusService } from './services/redivivusService.js';
 import type { RoutingService } from './services/ai/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
 import type { VaultService } from './services/vault/vaultService.js';
@@ -22,7 +22,7 @@ import { registerInlineCommandsB } from './extensionInlineCommandsB.js';
 
 export function registerInlineCommands(
   context: vscode.ExtensionContext,
-  chassisService: ChassisService,
+  redivivusService: RedivivusService,
   routingService: RoutingService,
   usageTracker: UsageTracker,
   vaultService: VaultService,
@@ -32,12 +32,12 @@ export function registerInlineCommands(
   guardianService: GuardianService,
   _suppressNextFolderAdd: { value: boolean },
 ): void {
-// ── CHASSIS: Refresh Knowledge Base — pull GitHub patterns into vault ──
-  context.subscriptions.push(vscode.commands.registerCommand('chassis.refreshKnowledgeBase', async () => {
-    const token = vscode.workspace.getConfiguration('chassis').get<string>('githubToken') || undefined;
+// ── Redivivus: Refresh Knowledge Base — pull GitHub patterns into vault ──
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.refreshKnowledgeBase', async () => {
+    const token = vscode.workspace.getConfiguration('redivivus').get<string>('githubToken') || undefined;
     const useGitHub = true;
     await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: 'CHASSIS: Refreshing Knowledge Base...', cancellable: false },
+      { location: vscode.ProgressLocation.Notification, title: 'Redivivus: Refreshing Knowledge Base...', cancellable: false },
       async (progress) => {
         try {
           const result = await seedVault(vaultService, {
@@ -46,21 +46,21 @@ export function registerInlineCommands(
             onProgress: (msg) => progress.report({ message: msg }),
           });
           vscode.window.showInformationMessage(
-            `CHASSIS: Knowledge Base refreshed — ${result.added} new patterns added (${result.fromGitHub} from GitHub, ${result.fromStarter} starter), ${result.skipped} already present.`
+            `Redivivus: Knowledge Base refreshed — ${result.added} new patterns added (${result.fromGitHub} from GitHub, ${result.fromStarter} starter), ${result.skipped} already present.`
           );
-          context.globalState.update('chassis.vaultSeeded.v1', true);
+          context.globalState.update('redivivus.vaultSeeded.v1', true);
         } catch (e) {
-          vscode.window.showErrorMessage(`CHASSIS: Knowledge Base refresh failed — ${e instanceof Error ? e.message : String(e)}`);
+          vscode.window.showErrorMessage(`Redivivus: Knowledge Base refresh failed — ${e instanceof Error ? e.message : String(e)}`);
         }
       }
     );
   }));
 
   // ── GitHub commands ──
-  try { registerGitHubBackupCommands(context, githubBackupService); } catch (e) { console.error('[CHASSIS] GitHub backup registration failed', e); }
+  try { registerGitHubBackupCommands(context, githubBackupService); } catch (e) { console.error('[Redivivus] GitHub backup registration failed', e); }
 
   // ── Setup hub — aggregates all global setup, shows on first install ──
-  try { registerSetupHubCommand(context, githubBackupService); } catch (e) { console.error('[CHASSIS] Setup hub registration failed', e); }
+  try { registerSetupHubCommand(context, githubBackupService); } catch (e) { console.error('[Redivivus] Setup hub registration failed', e); }
   // [FIX] Chain from existing onBuildFinished (save-point/session callback set by session.ts) instead of overwriting.
   const _prevOnBuildFinished = ChatPanel.onBuildFinished;
   ChatPanel.onBuildFinished = async (_task: string, _files: string[], buildRoot?: string) => {
@@ -69,15 +69,15 @@ export function registerInlineCommands(
   };
 
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.helpMeRefine', async () => {
-      vscode.commands.executeCommand('chassis.postToChat', "I need help refining my idea. Can you ask me some clarifying questions?");
+    vscode.commands.registerCommand('redivivus.helpMeRefine', async () => {
+      vscode.commands.executeCommand('redivivus.postToChat', "I need help refining my idea. Can you ask me some clarifying questions?");
     })
   );
 
-  // [CHASSIS] Global command for Recommendations panel Fix buttons — always goes directly to build
+  // [Redivivus] Global command for Recommendations panel Fix buttons — always goes directly to build
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.postToChat', async (text: string) => {
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+    vscode.commands.registerCommand('redivivus.postToChat', async (text: string) => {
+      ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
       // Small delay to allow panel creation before posting
       await new Promise(r => setTimeout(r, 300));
       if (ChatPanel.currentPanel) {
@@ -86,10 +86,10 @@ export function registerInlineCommands(
     })
   );
 
-  // [CHASSIS] Map "Chat About This" — sends structured node context to chat as Q&A, never triggers build
+  // [Redivivus] Map "Chat About This" — sends structured node context to chat as Q&A, never triggers build
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.mapContextChat', async (nodeInfo: any) => {
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+    vscode.commands.registerCommand('redivivus.mapContextChat', async (nodeInfo: any) => {
+      ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
       await new Promise(r => setTimeout(r, 300));
       if (ChatPanel.currentPanel) {
         await ChatPanel.currentPanel.handleMessage({ type: 'map-context', ...nodeInfo });
@@ -97,15 +97,15 @@ export function registerInlineCommands(
     })
   );
 
-  // [CHASSIS] Edit-in-place fix: reads existing file, patches it, saves new vault blocks.
+  // [Redivivus] Edit-in-place fix: reads existing file, patches it, saves new vault blocks.
   // Used for TODO and scope (uncommented) fixes — avoids vault search and new file creation.
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.runEditFix', async (task: string, filePath: string | null, issueType: string) => {
+    vscode.commands.registerCommand('redivivus.runEditFix', async (task: string, filePath: string | null, issueType: string) => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) { vscode.window.showErrorMessage('CHASSIS: No workspace folder open.'); return; }
+      if (!root) { vscode.window.showErrorMessage('Redivivus: No workspace folder open.'); return; }
       // If filePath not passed (Fix All batch), parse from the task prompt
       let resolved = filePath;
-      // [WARN] Strip "# CHASSIS Review — " or similar heading prefixes from file paths
+      // [WARN] Strip "# Redivivus Review — " or similar heading prefixes from file paths
       if (resolved) { resolved = resolved.replace(/^#[^:]+[—\-]\s*/, '').trim(); }
       if (!resolved || resolved.startsWith('#')) {
         // Try to extract from the first line of the prompt — handles both direct and batch cases
@@ -116,12 +116,12 @@ export function registerInlineCommands(
       }
       if (!resolved) {
         // Cannot determine target file — fall back to new-file pipeline
-        ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+        ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
         await new Promise(r => setTimeout(r, 300));
         if (ChatPanel.currentPanel) { await ChatPanel.currentPanel.handleMessage({ type: 'fix-request', text: task }); }
         return;
       }
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+      ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
       await new Promise(r => setTimeout(r, 300));
       if (ChatPanel.currentPanel) {
         await ChatPanel.currentPanel.handleMessage({ type: 'edit-request', filePath: resolved, task, issueType });
@@ -129,10 +129,10 @@ export function registerInlineCommands(
     })
   );
 
-  // [CHASSIS] Open the inline 5W new-project form inside the Chat panel (triggered by "Set it up properly" card)
+  // [Redivivus] Open the inline 5W new-project form inside the Chat panel (triggered by "Set it up properly" card)
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.newProjectChat', async () => {
-      ChatPanel.show(chassisService, routingService, usageTracker, vaultService);
+    vscode.commands.registerCommand('redivivus.newProjectChat', async () => {
+      ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
       await new Promise(r => setTimeout(r, 300));
       if (ChatPanel.currentPanel) {
         const pendingTask = ChatPanel.currentPanel.getPendingTask();
@@ -142,13 +142,13 @@ export function registerInlineCommands(
     })
   );
 
-  // [CHASSIS] "Just build it" — resumes the task stored in _pendingTask without re-asking
+  // [Redivivus] "Just build it" — resumes the task stored in _pendingTask without re-asking
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.buildSimple', async () => {
+    vscode.commands.registerCommand('redivivus.buildSimple', async () => {
       if (ChatPanel.currentPanel) {
         await ChatPanel.currentPanel.handleMessage({ type: 'build-simple' });
       }
     })
   );
-  registerInlineCommandsB(context, chassisService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd);
+  registerInlineCommandsB(context, redivivusService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd);
 }

@@ -1,8 +1,8 @@
-// [SCOPE] CHASSIS Scope Creep Detection — warns when project drifts from blueprint
+// [SCOPE] Redivivus Scope Creep Detection — warns when project drifts from blueprint
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisService } from '../chassisService.js';
+import type { RedivivusService } from '../redivivusService.js';
 import type { RoutingService } from '../ai/routingService.js';
 
 export interface ScopeIssue {
@@ -12,27 +12,27 @@ export interface ScopeIssue {
 }
 
 export class ScopeCreepDetectionService {
-  constructor(private root: string, private chassis: ChassisService, private routing: RoutingService) {}
+  constructor(private root: string, private redivivus: RedivivusService, private routing: RoutingService) {}
 
   /** Detect scope creep by comparing blueprint to actual files */
   async detectScopeCreep(): Promise<ScopeIssue[]> {
     const issues: ScopeIssue[] = [];
 
-    if (!this.chassis.isInitialized()) {
+    if (!this.redivivus.isInitialized()) {
       issues.push({
         type: 'drift',
-        description: 'CHASSIS not initialized — no blueprint to compare against',
+        description: 'Redivivus not initialized — no blueprint to compare against',
         severity: 'high',
       });
       return issues;
     }
 
-    const config = this.chassis.loadConfig();
+    const config = this.redivivus.loadConfig();
 
     // Get actual source files
     const actualFiles = this.getSourceFiles();
 
-    // Use AI to detect conceptual drift (CHASSIS blueprint doesn't track files, only 5 W's)
+    // Use AI to detect conceptual drift (Redivivus blueprint doesn't track files, only 5 W's)
     const driftIssues = await this.detectConceptualDrift(actualFiles, config?.blueprint?.what || '');
     issues.push(...driftIssues);
 

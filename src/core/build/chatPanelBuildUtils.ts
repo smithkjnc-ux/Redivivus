@@ -9,19 +9,19 @@ import type { BuildRequestDeps} from '../ai/chatPanelIntent';
 import { classifyIntent, isBuildRequest, handleBuildRequest } from '../ai/chatPanelIntent';
 import type { ChatPanel } from '../../ui/panels/chat/chatPanel';
 
-/** Validates that a build root is a legitimate user project directory, not the CHASSIS extension folder or other invalid paths. */
+/** Validates that a build root is a legitimate user project directory, not the Redivivus extension folder or other invalid paths. */
 export function isValidBuildRoot(root: string | undefined): root is string {
   if (!root || !fs.existsSync(root)) { return false; }
-  // Never build into the CHASSIS extension directory or any VS Code extensions dir
+  // Never build into the Redivivus extension directory or any VS Code extensions dir
   const lower = root.toLowerCase();
-  if (lower.includes('/extensions/chassis') || lower.includes('\\extensions\\chassis')) { return false; }
+  if (lower.includes('/extensions/redivivus') || lower.includes('\\extensions\\redivivus')) { return false; }
   if (lower.includes('/resources/app/extensions/') || lower.includes('\\resources\\app\\extensions\\')) { return false; }
   return true;
 }
 
 export function panelBuildRequestDeps(panel: ChatPanel): BuildRequestDeps {
   return {
-    chassis: (panel as any).chassis,
+    redivivus: (panel as any).redivivus,
     routing: (panel as any).routing,
     vault: (panel as any).vault,
     usageTracker: (panel as any).usageTracker, // [FIX] was missing — build pipeline tokens were never recorded
@@ -38,12 +38,12 @@ export function panelBuildRequestDeps(panel: ChatPanel): BuildRequestDeps {
 }
 
 export async function panelClassifyIntent(panel: ChatPanel, text: string) {
-  const workspaceRoot = (panel as any).chassis.getWorkspaceRoot();
+  const workspaceRoot = (panel as any).redivivus.getWorkspaceRoot();
   const projectName = workspaceRoot ? path.basename(workspaceRoot) : 'No Project';
   const context = {
     projectName,
     workspacePath: workspaceRoot || 'None',
-    blueprintStatus: (panel as any).chassis.isInitialized() ? 'Initialized' : 'Not Initialized'
+    blueprintStatus: (panel as any).redivivus.isInitialized() ? 'Initialized' : 'Not Initialized'
   };
   const ut = (panel as any).usageTracker;
   const onUsage = ut ? (inTok: number, outTok: number, model: string) => {
@@ -63,22 +63,22 @@ export async function panelHandleBuildRequest(panel: ChatPanel, task: string, sk
 export function panelLogBuildError(panel: ChatPanel, task: string, prompt: string, error: string, promptTokens = 0): void {
   try {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const chassisDir = root ? path.join(root, '.chassis') : null;
-    if (!chassisDir) { return; }
-    if (!fs.existsSync(chassisDir)) { fs.mkdirSync(chassisDir, { recursive: true }); }
+    const redivivusDir = root ? path.join(root, '.redivivus') : null;
+    if (!redivivusDir) { return; }
+    if (!fs.existsSync(redivivusDir)) { fs.mkdirSync(redivivusDir, { recursive: true }); }
     const div = '─'.repeat(60);
     const entry = [div, `[${new Date().toISOString()}] BUILD FAILED`,
       `Message       : ${task}`, `Error         : ${error}`,
       `Prompt length : ~${promptTokens} tokens`, `Prompt (first 800 chars):`,
       prompt.slice(0, 800), div, ''].join('\n');
-    fs.appendFileSync(path.join(chassisDir, 'build_errors.log'), entry, 'utf8');
+    fs.appendFileSync(path.join(redivivusDir, 'build_errors.log'), entry, 'utf8');
   } catch { /* never crash the build flow */ }
 }
 
 export function panelLoadBlueprintContext(panel: ChatPanel): void {
   const state = (panel as any).state;
-  if (!(panel as any).chassis.isInitialized()) { state.blueprintContext = ''; return; }
-  const config = (panel as any).chassis.loadConfig();
+  if (!(panel as any).redivivus.isInitialized()) { state.blueprintContext = ''; return; }
+  const config = (panel as any).redivivus.loadConfig();
   if (!config?.blueprint) { state.blueprintContext = ''; return; }
   const bp = config.blueprint;
   state.blueprintContext = [
@@ -117,10 +117,10 @@ export async function panelVaultOnlyBuild(panel: ChatPanel, task: string): Promi
   if (vault) {
     try {
       const ext = /python|\.py\b/i.test(task) ? '.py' : /html/i.test(task) ? '.html' : /css/i.test(task) ? '.css' : '.js';
-      const tmpPath = path.join(os.tmpdir(), `chassis-snippet-${Date.now()}${ext}`);
+      const tmpPath = path.join(os.tmpdir(), `redivivus-snippet-${Date.now()}${ext}`);
       fs.writeFileSync(tmpPath, code, 'utf-8');
       const { autoCaptureFile } = await import('../../services/vault/vaultAutoCapture.js');
-      const projectName = (panel as any).chassis?.isInitialized?.() ? ((panel as any).chassis.loadConfig()?.projectName || 'snippets') : 'snippets';
+      const projectName = (panel as any).redivivus?.isInitialized?.() ? ((panel as any).redivivus.loadConfig()?.projectName || 'snippets') : 'snippets';
       const captured = await autoCaptureFile(tmpPath, projectName, vault, task);
       try { fs.unlinkSync(tmpPath); } catch { /* temp cleanup best-effort */ }
       if (captured.newItems > 0) { vaultCapture = `\n&#x1F4BE; Saved **${captured.newItems}** snippet${captured.newItems !== 1 ? 's' : ''} to vault`; }

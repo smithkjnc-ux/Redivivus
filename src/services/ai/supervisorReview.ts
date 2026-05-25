@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Supervisor Review — lightweight phase validation run after each Worker build phase.
+// [SCOPE] Redivivus Supervisor Review — lightweight phase validation run after each Worker build phase.
 // Checks for hallucinations and scope drift. Supervisor corrects or takes over on failure.
 // [WARN] scope_check makes a real AI call (max_tokens:50). Keep fast — called after every phase.
 

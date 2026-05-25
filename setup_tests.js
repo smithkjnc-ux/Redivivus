@@ -13,7 +13,7 @@ const dirs = [
 
 dirs.forEach(d => fs.mkdirSync(path.join(process.cwd(), d), { recursive: true }));
 
-const baselineTs = `// [SCOPE] CHASSIS Test Utility - Strict Baseline Validation
+const baselineTs = `// [SCOPE] Redivivus Test Utility - Strict Baseline Validation
 import * as fs from 'fs';
 import * as path from 'path';
 import * as assert from 'assert';
@@ -36,7 +36,7 @@ export function assertMatchesBaseline(testName: string, actualOutput: unknown): 
 }
 `;
 
-const logDumperTs = `// [SCOPE] CHASSIS Test Utility - Mocha Global Hooks for Log Dumping
+const logDumperTs = `// [SCOPE] Redivivus Test Utility - Mocha Global Hooks for Log Dumping
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -51,11 +51,11 @@ export const mochaHooks = {
       else if (testFile.includes('/core/build/')) targetDomain = 'BUILD';
       else if (testFile.includes('/ui/panels/chat/')) targetDomain = 'CHAT';
 
-      const logsDir = path.join(process.cwd(), '.chassis', 'logs', 'master');
+      const logsDir = path.join(process.cwd(), '.redivivus', 'logs', 'master');
       if (!fs.existsSync(logsDir)) return;
 
       const files = fs.readdirSync(logsDir)
-        .filter(f => f.startsWith('chassis-master-') && f.endsWith('.log'))
+        .filter(f => f.startsWith('redivivus-master-') && f.endsWith('.log'))
         .sort()
         .reverse();
       
@@ -81,7 +81,7 @@ export const mochaHooks = {
 };
 `;
 
-const nockMockTs = `// [SCOPE] CHASSIS Test Utility - HTTP Interceptor Setup using Nock
+const nockMockTs = `// [SCOPE] Redivivus Test Utility - HTTP Interceptor Setup using Nock
 import * as fs from 'fs';
 import * as path from 'path';
 import nock from 'nock';
@@ -98,7 +98,7 @@ export function setupNockMock(domain: string, endpoint: string, responseFixtureN
 
   const responseData = JSON.parse(fs.readFileSync(fixturePath, 'utf-8'));
 
-  // Assuming Google Gemini endpoint format since CHASSIS uses Gemini
+  // Assuming Google Gemini endpoint format since Redivivus uses Gemini
   nock('https://generativelanguage.googleapis.com')
     .post(endpoint)
     .reply(200, responseData);

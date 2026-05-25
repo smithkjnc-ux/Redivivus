@@ -1,12 +1,12 @@
-// [SCOPE] CHASSIS Snapshot Service — pre-build snapshots, initial-state capture, archive on overflow
-// Active snapshots: .chassis/snapshots/<id>/  |  Archive: .chassis/snapshots/archive/<id>.json.gz
+// [SCOPE] Redivivus Snapshot Service — pre-build snapshots, initial-state capture, archive on overflow
+// Active snapshots: .redivivus/snapshots/<id>/  |  Archive: .redivivus/snapshots/archive/<id>.json.gz
 // init_ prefix = permanent baseline (first build), never pruned. archive/ = compressed history, always restorable.
 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
 
-const SNAPSHOTS_DIR = '.chassis/snapshots';
+const SNAPSHOTS_DIR = '.redivivus/snapshots';
 const MAX_SNAPSHOTS = 10; // keep 10 active; older ones go to archive, not deleted
 
 export interface SnapshotMeta {

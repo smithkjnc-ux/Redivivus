@@ -1,8 +1,8 @@
-// [SCOPE] CHASSIS Guardian Service orchestrator — thin facade over health, risk, and ELI5 modules
+// [SCOPE] Redivivus Guardian Service orchestrator — thin facade over health, risk, and ELI5 modules
 // Split from 327-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import type { ChassisService } from '../chassisService.js';
+import type { RedivivusService } from '../redivivusService.js';
 import type { GuardianConfig, HealthScore, RiskReport, FileMetrics, ELI5Entry } from './guardianTypes.js';
 import { computeHealthScore } from './guardianHealth.js';
 import { scanForRisks, analyzeFileMetrics } from './guardianRisk.js';
@@ -11,7 +11,7 @@ import { translateToELI5 } from './guardianELI5.js';
 export class GuardianService {
   private config: GuardianConfig;
 
-  constructor(private chassisService: ChassisService) {
+  constructor(private redivivusService: RedivivusService) {
     // Default guardian settings tuned for non-technical users
     this.config = {
       maxFunctionLines: 50,
@@ -38,7 +38,7 @@ export class GuardianService {
   // ── health score (delegated to guardianHealth)
 
   computeHealthScore(): HealthScore {
-    return computeHealthScore(this.chassisService);
+    return computeHealthScore(this.redivivusService);
   }
 
   // ── risk scanning (delegated to guardianRisk)

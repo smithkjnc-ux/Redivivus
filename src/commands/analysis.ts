@@ -1,21 +1,21 @@
-// [SCOPE] CHASSIS Analysis commands — full codebase scan + file-level annotation health check
+// [SCOPE] Redivivus Analysis commands — full codebase scan + file-level annotation health check
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { AnalyzerService } from '../ui/panels/analyzer/analyzerService';
 
 export function registerAnalysisCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   analyzerService: AnalyzerService,
   refreshAll: () => void
 ): void {
   // Analyze Project
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.analyze', async () => {
-      if (!chassis.isInitialized()) {
-        vscode.window.showErrorMessage('Run "CHASSIS: Initialize Project" first.');
+    vscode.commands.registerCommand('redivivus.analyze', async () => {
+      if (!redivivus.isInitialized()) {
+        vscode.window.showErrorMessage('Run "Redivivus: Initialize Project" first.');
         return;
       }
       try {
@@ -24,7 +24,7 @@ export function registerAnalysisCommands(
         // [WARN] analyzeProject can throw after writing results (e.g. panel reveal conflict).
         // The scan data was already written and the Recommendations panel was shown.
         // Log but don't propagate — the action should not show ❌ Failed.
-        console.error('[CHASSIS] analyzeProject post-scan error (non-fatal):', err);
+        console.error('[Redivivus] analyzeProject post-scan error (non-fatal):', err);
       }
       try { refreshAll(); } catch { /* non-fatal */ }
     })
@@ -32,7 +32,7 @@ export function registerAnalysisCommands(
 
   // Verify Fix — checks if a file is actually fixed before marking done
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.verifyFix', async (filePath: string, issueType: string) => {
+    vscode.commands.registerCommand('redivivus.verifyFix', async (filePath: string, issueType: string) => {
       if (!filePath || !issueType) {
         return { fixed: false, reason: 'Missing file path or issue type' };
       }
@@ -53,7 +53,7 @@ export function registerAnalysisCommands(
         fixed = lines.length <= 200;
         if (!fixed) {
           reason = `File is still ${lines.length} lines (must be under 200)`;
-          retryPrompt = `Split ${filePath} (${lines.length} lines) into smaller files.\nEach new file should handle one responsibility and be under 200 lines.\nKeep all existing behavior — just reorganize the code.\nAdd a // [SCOPE] comment at the top of each new file explaining what it does.\nReference .chassis/rules.md for annotation standards.\nAfter splitting, make sure the project still compiles with: npm run compile`;
+          retryPrompt = `Split ${filePath} (${lines.length} lines) into smaller files.\nEach new file should handle one responsibility and be under 200 lines.\nKeep all existing behavior — just reorganize the code.\nAdd a // [SCOPE] comment at the top of each new file explaining what it does.\nReference .redivivus/rules.md for annotation standards.\nAfter splitting, make sure the project still compiles with: npm run compile`;
         }
       } else if (issueType === 'todo') {
         const hasTodo = lines.some(l => l.includes('[TODO]') || l.includes('TODO:') || l.includes('FIXME') || l.includes('HACK'));
@@ -61,14 +61,14 @@ export function registerAnalysisCommands(
         if (!fixed) {
           reason = 'File still contains TODO/FIXME markers';
           const todoLines = lines.filter((l, i) => l.includes('[TODO]') || l.includes('TODO:') || l.includes('FIXME') || l.includes('HACK')).map((l, i) => `L${i + 1}: ${l.trim()}`).slice(0, 3).join('\n');
-          retryPrompt = `Look at ${filePath}\nThere are still TODO/FIXME markers that need to be addressed:\n${todoLines}\n\nImplement these following the project rules in .chassis/rules.md.\nAfter making changes, verify the project still compiles.`;
+          retryPrompt = `Look at ${filePath}\nThere are still TODO/FIXME markers that need to be addressed:\n${todoLines}\n\nImplement these following the project rules in .redivivus/rules.md.\nAfter making changes, verify the project still compiles.`;
         }
       } else if (issueType === 'uncommented') {
         const hasScope = lines.some(l => l.includes('[SCOPE]'));
         fixed = hasScope;
         if (!fixed) {
           reason = 'File still has no [SCOPE] comment at the top';
-          retryPrompt = `Add a // [SCOPE] comment at the very top of ${filePath} explaining what this file does, what it connects to, and why it exists.\nAlso add // [WARN] to any fragile or unclear sections.\nReference .chassis/rules.md for the annotation format.\nDo not change any existing code — comments only.`;
+          retryPrompt = `Add a // [SCOPE] comment at the very top of ${filePath} explaining what this file does, what it connects to, and why it exists.\nAlso add // [WARN] to any fragile or unclear sections.\nReference .redivivus/rules.md for the annotation format.\nDo not change any existing code — comments only.`;
         }
       }
 
@@ -76,9 +76,9 @@ export function registerAnalysisCommands(
     })
   );
 
-  // Analyze Current File — counts CHASSIS tags, shows health
+  // Analyze Current File — counts Redivivus tags, shows health
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.checkFileHealth', async (pickedPath?: string) => {
+    vscode.commands.registerCommand('redivivus.checkFileHealth', async (pickedPath?: string) => {
       let doc: vscode.TextDocument;
       let filePath: string;
       let content: string;
@@ -133,7 +133,7 @@ export function registerAnalysisCommands(
         'Clean Up File', 'Check Another File', 'Done'
       );
       if (next === 'Clean Up File') {
-        await vscode.commands.executeCommand('chassis.cleanUpFile');
+        await vscode.commands.executeCommand('redivivus.cleanUpFile');
       }
     })
   );

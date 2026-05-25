@@ -22,7 +22,7 @@ let contextLogFile: string | null = null;
 export function initProjectContextLogger(root: string): void {
   if (currentProjectRoot === root) {return;} // Already tracking this project
   
-  const logsDir = path.join(root, '.chassis', 'logs');
+  const logsDir = path.join(root, '.redivivus', 'logs');
   if (!fs.existsSync(logsDir)) {
     fs.mkdirSync(logsDir, { recursive: true });
   }
@@ -58,12 +58,12 @@ export function logProjectContextSwitch(
       trigger,
       userRequest,
       blocked: true,
-      reason: 'CRITICAL: Attempted to switch projects during active session. User was in one project but CHASSIS tried to work in another. This is a bug.'
+      reason: 'CRITICAL: Attempted to switch projects during active session. User was in one project but Redivivus tried to work in another. This is a bug.'
     };
     appendContextLog(event);
     
-    // Also log to the main CHASSIS log
-    const chassisLog = {
+    // Also log to the main Redivivus log
+    const redivivusLog = {
       timestamp: new Date().toISOString(),
       operation: 'system',
       message: 'PROJECT SWITCH BLOCKED',
@@ -72,12 +72,12 @@ export function logProjectContextSwitch(
         attemptedNewProject: newRoot,
         trigger,
         userRequest,
-        action: 'Switch prevented. CHASSIS should not change projects without explicit user request.'
+        action: 'Switch prevented. Redivivus should not change projects without explicit user request.'
       }
     };
     
     if (contextLogFile) {
-      fs.appendFileSync(contextLogFile, JSON.stringify(chassisLog) + '\n', 'utf-8');
+      fs.appendFileSync(contextLogFile, JSON.stringify(redivivusLog) + '\n', 'utf-8');
     }
     
     return { allowed: false, reason: event.reason };
@@ -141,6 +141,6 @@ function appendContextLog(event: ProjectContextEvent): void {
   try {
     fs.appendFileSync(contextLogFile, JSON.stringify(event) + '\n', 'utf-8');
   } catch (e) {
-    console.error('[CHASSIS] Failed to write context log:', e);
+    console.error('[Redivivus] Failed to write context log:', e);
   }
 }

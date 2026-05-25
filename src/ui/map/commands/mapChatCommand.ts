@@ -7,7 +7,7 @@ export async function executeMapChat(msg: any, ctx: MapMsgCtx): Promise<void> {
 
   if (msg.type === 'mapChat' && msg.nodeId) {
     const node = map.nodes.find(n => n.id === msg.nodeId);
-    await vscode.commands.executeCommand('chassis.mapContextChat', {
+    await vscode.commands.executeCommand('redivivus.mapContextChat', {
       nodeId: msg.nodeId, label: node?.label || msg.label || '',
       lines: node?.lines ?? msg.lines ?? 0, health: node?.health ?? msg.health ?? 'neutral',
       todos: node?.todos ?? msg.todos ?? 0,
@@ -19,6 +19,6 @@ export async function executeMapChat(msg: any, ctx: MapMsgCtx): Promise<void> {
       : node
         ? `Tell me about \`${msg.nodeId}\`. It's described as: "${node.label}". Stats: ${node.lines} lines, ${node.todos} TODOs, ${node.warns} WARNs.`
         : `Tell me about \`${msg.nodeId}\`.`;
-    await vscode.commands.executeCommand('chassis.postToChat', promptText);
+    await vscode.commands.executeCommand('redivivus.postToChat', promptText);
   }
 }

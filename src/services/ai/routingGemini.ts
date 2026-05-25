@@ -24,7 +24,7 @@ export async function callGemini(
     }
   }
 
-  const prompt = `You are CHASSIS, an AI code structure assistant.
+  const prompt = `You are Redivivus, an AI code structure assistant.
 
 CRITICAL: This file is ${filePath.split('.').pop()?.toUpperCase()} — use ONLY ${commentStyle.single} style comments.
 Example: ${commentStyle.example}
@@ -32,7 +32,7 @@ NEVER use // comments in Python files. NEVER use # comments in JavaScript files.
 
 Rules:
 - Add ${commentStyle.example.replace('description', 'what this file does')} at the very top of the file
-- Convert any TODO, FIXME, HACK, XXX comments to CHASSIS format using ${commentStyle.single} style: ${commentStyle.single} [TODO], ${commentStyle.single} [WARN], ${commentStyle.single} [DEAD]
+- Convert any TODO, FIXME, HACK, XXX comments to Redivivus format using ${commentStyle.single} style: ${commentStyle.single} [TODO], ${commentStyle.single} [WARN], ${commentStyle.single} [DEAD]
 - Add ${commentStyle.single} [WARN] to any fragile or risky code
 - If a file is over 200 lines, suggest where to split it with ${commentStyle.single} [NEXT] split point markers
 - Keep all existing code exactly as-is — only add/convert comments

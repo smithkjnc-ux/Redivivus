@@ -8,7 +8,7 @@ export { FileInfo, AnalysisResult };
 
 // directories to always skip
 export const SKIP_DIRS = new Set([
-  'node_modules', '.git', '.chassis', '__pycache__', '.vscode',
+  'node_modules', '.git', '.redivivus', '__pycache__', '.vscode',
   'venv', '.venv', 'dist', 'out', 'build', '.next', '.cache',
   'venv_ryppel', 'LivePortrait', 'avatar', 'old files',
 ]);
@@ -25,7 +25,7 @@ export const SKIP_FILES = new Set([
   'poetry.lock', 'Cargo.lock', 'Gemfile.lock', 'packages.lock.json',
   'shrinkwrap.json', 'npm-shrinkwrap.json',
   'tsconfig.tsbuildinfo', '.eslintcache', '.stylelintcache',
-  'CHASSIS_ROADMAP.md', 'CHANGELOG.md', 'CHASSIS-SPEC.md',
+  'REDIVIVUS_ROADMAP.md', 'CHANGELOG.md', 'REDIVIVUS-SPEC.md',
 ]);
 
 // file extensions that should never be flagged as "too long" — docs/config are exempt
@@ -71,8 +71,8 @@ export function scanDirectory(
           // Only flag bare legacy markers inside actual comments, not string literals or code
           const isComment = /^\s*(\/\/|\/\*|\*|#\s)/.test(line);
           const hasBareMarker = /\b(TODO|FIXME|HACK|XXX|BUG)\b/i.test(line);
-          const hasChassisTag = /\[(TODO|WARN|NEXT|DEAD|DONE|SCOPE)\]/i.test(line);
-          if (isComment && hasBareMarker && !hasChassisTag) {
+          const hasRedivivusTag = /\[(TODO|WARN|NEXT|DEAD|DONE|SCOPE)\]/i.test(line);
+          if (isComment && hasBareMarker && !hasRedivivusTag) {
             todos.push(`L${i + 1}: ${line.trim().substring(0, 100)}`);
           }
         }
@@ -80,7 +80,7 @@ export function scanDirectory(
         const commentLines = lines.filter(l => /^\s*(\/\/|\/\*|\*|#\s|<!--|"""|''')/.test(l)).length;
         const hasScope = /\[(SCOPE|TODO|WARN|NEXT|DEAD|DONE)\]/.test(content);
         const hasComments = hasScope || (lines.length > 0 && commentLines / lines.length >= 0.03);
-        // [CHASSIS] Check if [SCOPE] is correctly at line 1 with right syntax for the file type
+        // [Redivivus] Check if [SCOPE] is correctly at line 1 with right syntax for the file type
         const line0 = lines[0]?.trim() || '';
         let missingScopeAtLine1 = false;
         if (['.js', '.ts', '.jsx', '.tsx'].includes(ext)) {
@@ -114,14 +114,14 @@ export function buildAnalysis(files: FileInfo[]): AnalysisResult {
     if (!f.hasComments && ['.ts', '.tsx', '.js', '.jsx', '.py'].includes(f.extension)) {
       uncommentedFiles.push(f);
     }
-    // [CHASSIS] Flag any code file missing proper [SCOPE] at line 1
+    // [Redivivus] Flag any code file missing proper [SCOPE] at line 1
     if (f.missingScopeAtLine1 && ['.ts', '.tsx', '.js', '.jsx', '.py', '.html', '.sh', '.bash'].includes(f.extension)) {
       missingScopeFiles.push(f);
     }
   }
   largeFiles.sort((a, b) => b.lines - a.lines);
 
-  // [CHASSIS] Filter out items the user has already resolved — they persist in .chassis/resolved.json
+  // [Redivivus] Filter out items the user has already resolved — they persist in .redivivus/resolved.json
   const resolvedLarge = getResolvedPaths('largeFile');
   const resolvedTodo = getResolvedPaths('todo');
   const resolvedUncommented = getResolvedPaths('uncommented');

@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisService } from '../../../services/chassisService';
+import type { RedivivusService } from '../../../services/redivivusService';
 import type { SessionService } from '../../../services/sessionService';
 import { handleNewProjectWizard } from './wizardNewProject';
 import { handleActiveSessionWizard } from './wizardActiveSession';
@@ -13,23 +13,23 @@ import { handleNormalWorkflowWizard } from './wizardNormalWorkflow';
 
 export class WizardService {
   constructor(
-    private chassis: ChassisService,
+    private redivivus: RedivivusService,
     private sessions: SessionService
   ) {}
 
   async run(): Promise<void> {
-    if (!this.chassis.hasWorkspace()) {
+    if (!this.redivivus.hasWorkspace()) {
       vscode.window.showErrorMessage('Open a project folder first, then try again.');
       return;
     }
 
-    const initialized = this.chassis.isInitialized();
-    const config = initialized ? this.chassis.loadConfig() : null;
+    const initialized = this.redivivus.isInitialized();
+    const config = initialized ? this.redivivus.loadConfig() : null;
     const hasBlueprint = config?.blueprint?.who ? true : false;
     const blueprintLocked = config?.blueprint?.locked || false;
     const sessionActive = this.sessions.isActive;
-    const backupExists = initialized && fs.existsSync(path.join(this.chassis.chassisDir, 'backup'));
-    const hasAnalysis = initialized && fs.existsSync(path.join(this.chassis.chassisDir, 'project_map.md'));
+    const backupExists = initialized && fs.existsSync(path.join(this.redivivus.redivivusDir, 'backup'));
+    const hasAnalysis = initialized && fs.existsSync(path.join(this.redivivus.redivivusDir, 'project_map.md'));
 
     // ── Brand new project (delegated to wizardNewProject)
     if (!initialized) {
@@ -50,6 +50,6 @@ export class WizardService {
     }
 
     // ── Normal workflow (delegated to wizardNormalWorkflow)
-    await handleNormalWorkflowWizard(this.chassis);
+    await handleNormalWorkflowWizard(this.redivivus);
   }
 }

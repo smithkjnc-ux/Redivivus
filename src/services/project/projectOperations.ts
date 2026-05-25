@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Project Operations — local project listing, opening, status checking without AI
+// [SCOPE] Redivivus Project Operations — local project listing, opening, status checking without AI
 // Status helpers (getProjectStatus, getCurrentProjectInfo) -> projectOperationsStatus.ts
 
 import * as vscode from 'vscode';
@@ -17,33 +17,33 @@ export class ProjectOperations {
   private getProjectsDir(): string { return getProjectsDir(); }
 
   /** List all projects in the projects directory */
-  async listProjects(): Promise<{ chassis: ProjectInfo[]; other: string[] }> {
+  async listProjects(): Promise<{ redivivus: ProjectInfo[]; other: string[] }> {
     const projectsDir = this.getProjectsDir();
-    const chassisProjects: ProjectInfo[] = [];
+    const redivivusProjects: ProjectInfo[] = [];
     const otherProjects: string[] = [];
 
-    if (!fs.existsSync(projectsDir)) { return { chassis: [], other: [] }; }
+    if (!fs.existsSync(projectsDir)) { return { redivivus: [], other: [] }; }
 
     const entries = fs.readdirSync(projectsDir, { withFileTypes: true });
     for (const entry of entries) {
       if (!entry.isDirectory()) { continue; }
       const projectPath = path.join(projectsDir, entry.name);
-      const chassisPath = path.join(projectPath, '.chassis', 'config.json');
+      const redivivusPath = path.join(projectPath, '.redivivus', 'config.json');
 
-      if (fs.existsSync(chassisPath)) {
+      if (fs.existsSync(redivivusPath)) {
         const info = await this.getProjectInfo(projectPath, entry.name);
-        chassisProjects.push(info);
+        redivivusProjects.push(info);
       } else {
         otherProjects.push(entry.name);
       }
     }
 
-    return { chassis: chassisProjects, other: otherProjects };
+    return { redivivus: redivivusProjects, other: otherProjects };
   }
 
   private async getProjectInfo(projectPath: string, name: string): Promise<ProjectInfo> {
-    const configPath = path.join(projectPath, '.chassis', 'config.json');
-    const info: ProjectInfo = { name, path: projectPath, isChassis: true };
+    const configPath = path.join(projectPath, '.redivivus', 'config.json');
+    const info: ProjectInfo = { name, path: projectPath, isRedivivus: true };
 
     if (fs.existsSync(configPath)) {
       try {

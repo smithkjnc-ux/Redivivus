@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS RUNTIME Domain Logger
+// [SCOPE] Redivivus RUNTIME Domain Logger
 import { masterLog } from '../../core/logging/masterLogger.js';
 
 const DOMAIN = 'RUNTIME';

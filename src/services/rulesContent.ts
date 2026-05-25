@@ -1,12 +1,12 @@
-// [SCOPE] Rules content generator — builds the main CHASSIS rules content for AI editor instruction files
+// [SCOPE] Rules content generator — builds the main Redivivus rules content for AI editor instruction files
 // Called by rulesService. No file writing or AI-specific wrapping logic here.
 
 export function buildRules(projectName: string): string {
-  return `# CHASSIS Project Rules — ${projectName}
+  return `# Redivivus Project Rules — ${projectName}
 
 ## CRITICAL: Read Before Making ANY Changes
 
-This project uses CHASSIS, an AI-agnostic code structure protocol.
+This project uses Redivivus, an AI-agnostic code structure protocol.
 Every AI tool, editor, and assistant MUST follow these rules.
 
 ---
@@ -80,13 +80,13 @@ If a file exceeds 200 lines, it should be split.
 Add [NEXT] tags at natural split points.
 Small files = better AI context = fewer bugs.
 
-## Rule 10: Check .chassis/ For Context
+## Rule 10: Check .redivivus/ For Context
 
 Before starting work, check these files:
-- .chassis/blueprint.md — What this project is about
-- .chassis/work_log.md — What happened recently
-- .chassis/project_map.md — File structure and health
-- .chassis/recommendations.md — Known issues to fix
+- .redivivus/blueprint.md — What this project is about
+- .redivivus/work_log.md — What happened recently
+- .redivivus/project_map.md — File structure and health
+- .redivivus/recommendations.md — Known issues to fix
 
 
 
@@ -143,7 +143,7 @@ After every modification, mentally verify:
 If the answer to any of these is no, go back and fix it before moving on.
 ---
 
-*These rules are enforced by CHASSIS v0.1.0*
+*These rules are enforced by Redivivus v0.1.0*
 *Removing this file does not remove the rules — they're in the code.*
 `;
 }

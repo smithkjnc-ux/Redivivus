@@ -17,21 +17,21 @@ import { autoCreateProject } from './chatPanelBuildAutoCreate';
 import { emptyContract } from '../../services/blueprint/blueprintContract';
 import { runBuildClarifyStep } from './chatPanelBuildClarify';
 
-// [WARN] Always use LIVE workspace folder — chassis service root can be stale from activation
+// [WARN] Always use LIVE workspace folder — redivivus service root can be stale from activation
 // [WARN] ~/projects itself may be open as workspace — must reject it as a build root or files land in the container
 function isProjectsContainer(root: string): boolean {
-  const cfg = vscode.workspace.getConfiguration('chassis').get<string>('projectsDirectory', '~/projects').replace('~', os.homedir());
+  const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects').replace('~', os.homedir());
   return path.resolve(root) === path.resolve(cfg);
 }
 
 function getLiveRoot(deps: BuildRequestDeps): string | undefined {
   const liveRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (isValidBuildRoot(liveRoot) && !isProjectsContainer(liveRoot)) { return liveRoot; }
-  // [FIX] Only fall back to chassisRoot when there IS a workspace open (e.g. multi-root edge case).
+  // [FIX] Only fall back to redivivusRoot when there IS a workspace open (e.g. multi-root edge case).
   // If no workspace folders exist, user explicitly closed the project — do NOT use stale cached root.
   if (!liveRoot) { return undefined; }
-  const chassisRoot = deps.chassis?.getWorkspaceRoot?.();
-  if (isValidBuildRoot(chassisRoot) && chassisRoot !== liveRoot && !isProjectsContainer(chassisRoot)) { return chassisRoot; }
+  const redivivusRoot = deps.redivivus?.getWorkspaceRoot?.();
+  if (isValidBuildRoot(redivivusRoot) && redivivusRoot !== liveRoot && !isProjectsContainer(redivivusRoot)) { return redivivusRoot; }
   return undefined;
 }
 
@@ -77,7 +77,7 @@ export async function runBuildAfterGates(
   // Direct mode: skip complexity routing — execute immediately for speed
   if (!skipComplex && deps.buildMode !== 'direct') {
     const orchDeps: OrchestratorDeps = {
-      chassis: deps.chassis,
+      redivivus: deps.redivivus,
       routing: deps.routing,
       vault: deps.vault,
       conversation: deps.conversation,
@@ -103,7 +103,7 @@ export async function runBuildAfterGates(
     root,
     blueprintContext: deps.blueprintContext,
     vault: deps.vault,
-    chassis: deps.chassis,
+    redivivus: deps.redivivus,
     routing: deps.routing,
     conversation: deps.conversation,
     refresh: deps.refresh,
@@ -115,15 +115,15 @@ export async function runBuildAfterGates(
     isFix: isFixRequest,
     buildMode: deps.buildMode,
     onBuildFinished: (t: string, builtFiles?: string[]) => {
-      // [CHASSIS] Only call resolveFix for actual fix requests, not fresh builds
+      // [Redivivus] Only call resolveFix for actual fix requests, not fresh builds
       if (isFixRequest) {
-        vscode.commands.executeCommand('chassis.resolveFix', t, builtFiles);
+        vscode.commands.executeCommand('redivivus.resolveFix', t, builtFiles);
       }
       const { ChatPanel } = require('../../ui/panels/chat/chatPanel.js');
       ChatPanel.onBuildFinished?.(t, builtFiles || [], root);
     },
     onBuildFailed: (t: string, reason: string) => {
-      vscode.commands.executeCommand('chassis.buildFailed', t, reason);
+      vscode.commands.executeCommand('redivivus.buildFailed', t, reason);
     },
     contract: emptyContract(),
   };
@@ -141,7 +141,7 @@ export async function runBuildAfterGates(
     // [WARN] Without this catch, any throw inside runSingleFileBuild (e.g. surgical-edit parse failure)
     // leaves the user with a frozen "Review complete — writing..." bubble and no error feedback.
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[CHASSIS] Build failed:', err);
+    console.error('[Redivivus] Build failed:', err);
     ctx.conversation.push({ role: 'assistant', content: `❌ **Build failed:** ${msg}\n\n_Try rephrasing your request, or ask the AI to rewrite the full file instead of using surgical edits._`, timestamp: Date.now() });
     ctx.refresh();
   } finally {
@@ -149,13 +149,13 @@ export async function runBuildAfterGates(
     deps.postToWebview({ type: 'set-status', status: 'ready' });
   }
   if (root) { 
-    import('../../services/blueprint/blueprintRevisionService.js').then(m => m.tryBlueprintRevision(root!, deps.chassis, deps.routing)).catch(() => {}); 
+    import('../../services/blueprint/blueprintRevisionService.js').then(m => m.tryBlueprintRevision(root!, deps.redivivus, deps.routing)).catch(() => {}); 
     
-    // [CHASSIS] Auto-update the project map in the background after complex chunked builds
+    // [Redivivus] Auto-update the project map in the background after complex chunked builds
     // Only runs for chunked builds to keep fast direct edits snappy
     if (await isChunkedBuildRequest(task, ctx.routing)) {
       import('../../ui/panels/analyzer/analyzerService.js').then(m => {
-        const analyzer = new m.AnalyzerService(deps.chassis);
+        const analyzer = new m.AnalyzerService(deps.redivivus);
         analyzer.updateProjectMapOnly(root!);
       }).catch(e => console.error('Failed to auto-update project map', e));
     }

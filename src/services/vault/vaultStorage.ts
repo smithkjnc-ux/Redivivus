@@ -1,6 +1,6 @@
 // [SCOPE] Vault storage operations — CRUD for vault items
-// Storage: ~/.chassis-vault/{category}/{name}_{hash}.json
-// [WARN] Also reads legacy flat files from ~/.chassis-vault/ root and globalStorage for migration.
+// Storage: ~/.redivivus-vault/{category}/{name}_{hash}.json
+// [WARN] Also reads legacy flat files from ~/.redivivus-vault/ root and globalStorage for migration.
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -9,8 +9,8 @@ import * as crypto from 'crypto';
 import type { VaultItem} from './vaultTypes.js';
 import { VAULT_CATEGORIES } from './vaultTypes.js';
 
-const VAULT_ROOT = path.join(os.homedir(), '.chassis-vault');
-// [DEAD] Legacy Windsurf globalStorage path removed — CHASSIS only reads from ~/.chassis-vault/
+const VAULT_ROOT = path.join(os.homedir(), '.redivivus-vault');
+// [DEAD] Legacy Windsurf globalStorage path removed — Redivivus only reads from ~/.redivivus-vault/
 
 function computeContentHash(code: string): string {
   return crypto.createHash('sha256').update(code.trim()).digest('hex');
@@ -47,7 +47,7 @@ function migrateOldItem(raw: any): VaultItem | null {
     };
   }
 
-  // Format 3: source/provenance structure (from ~/.chassis-vault/ root)
+  // Format 3: source/provenance structure (from ~/.redivivus-vault/ root)
   if (raw.code && raw.name && raw.source) {
     const code = raw.code || '';
     return {
@@ -152,7 +152,7 @@ export class VaultStorage {
       }
     }
 
-    // 2. Legacy flat files in ~/.chassis-vault/ root
+    // 2. Legacy flat files in ~/.redivivus-vault/ root
     if (fs.existsSync(this.rootDir)) {
       const rootFiles = fs.readdirSync(this.rootDir).filter(f => f.endsWith('.json'));
       for (const f of rootFiles) {

@@ -28,7 +28,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
   refresh();
 
-  // [CHASSIS] Auto-session: silently start on first user message if no session is active
+  // [Redivivus] Auto-session: silently start on first user message if no session is active
   // [FIX] Skip for session commands — prevents ghost session creation before override check fires
   if (!/\bdone\s+for\s+(now|today)\b|\bend\s+(the\s+)?session\b|\bstart\s+(a\s+)?session\b/i.test(userText)) {
     try { const silentStart = (ChatPanel as any).startSessionSilent; if (silentStart) { silentStart(userText); } } catch { /* non-blocking */ }
@@ -45,24 +45,24 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
 
   // [FIX] Direct mode bypass only for new projects. Initialized projects fall through so "add X"/"change Y" routes to
   // the edit pipeline (reads existing files) not build-from-scratch. [DEAD] Was: all direct-mode non-fix text bypassed.
-  if (deps.buildMode === 'direct' && !deps.chassis?.isInitialized?.() && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing|done for now|done for today|end session|stop session|finish session|start session)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
+  if (deps.buildMode === 'direct' && !deps.redivivus?.isInitialized?.() && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing|done for now|done for today|end session|stop session|finish session|start session)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
 
-  // [CHASSIS] Design triage — ask clarifying questions BEFORE routing so all modes get user preferences
+  // [Redivivus] Design triage — ask clarifying questions BEFORE routing so all modes get user preferences
   const clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
   if (clarify.cancelled) { return; }
   const routedText = clarify.routedText;
 
-  // [CHASSIS] Early Exit: Hardcoded Command Overrides (bypasses Adaptive/Agent Mode)
+  // [Redivivus] Early Exit: Hardcoded Command Overrides (bypasses Adaptive/Agent Mode)
   const { checkHardcodedOverrides } = await import('../ai/chatPanelClassifierOverrides.js');
   const hardcodedCmd = checkHardcodedOverrides(lowerText);
   if (hardcodedCmd && hardcodedCmd.type === 'command' && hardcodedCmd.command) {
-    const label = (hardcodedCmd.command as string).replace(/^(chassis|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
+    const label = (hardcodedCmd.command as string).replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
     await vscode.commands.executeCommand(hardcodedCmd.command as string);
     conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
     refresh(); return;
   }
 
-  // [CHASSIS] Adaptive Mode — auto-route between simple pipeline and agent pipeline
+  // [Redivivus] Adaptive Mode — auto-route between simple pipeline and agent pipeline
   const { evaluateTaskComplexity } = await import('../../services/ai/adaptiveClassifier.js');
   const route = await evaluateTaskComplexity(routedText, deps.routing);
   if (route === 'complex') {
@@ -83,7 +83,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
 
   if (intent.type === 'command' && intent.command) {
-    const label = (intent.command as string).replace(/^(chassis|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
+    const label = (intent.command as string).replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
     await vscode.commands.executeCommand(intent.command as string);
     conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
     refresh(); return;

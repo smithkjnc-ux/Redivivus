@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS project dashboard — idle screen shown when a project is loaded
+// [SCOPE] Redivivus project dashboard — idle screen shown when a project is loaded
 // Renders blueprint summary, recent build activity, and project stats instead of bare "Ready to Build".
 
 import * as fs from 'fs';
@@ -19,7 +19,7 @@ export function readDashboardData(root: string, config: any): DashboardData {
   let recentBuilds: DashboardData['recentBuilds'] = [];
   let buildCount = 0;
   try {
-    const histPath = path.join(root, '.chassis', 'build_history.json');
+    const histPath = path.join(root, '.redivivus', 'build_history.json');
     if (fs.existsSync(histPath)) {
       const hist: any[] = JSON.parse(fs.readFileSync(histPath, 'utf-8'));
       buildCount = hist.length;
@@ -31,7 +31,7 @@ export function readDashboardData(root: string, config: any): DashboardData {
   } catch {}
   let deadEndCount = 0;
   try {
-    const dePath = path.join(root, '.chassis', 'dead_ends.md');
+    const dePath = path.join(root, '.redivivus', 'dead_ends.md');
     if (fs.existsSync(dePath)) { deadEndCount = (fs.readFileSync(dePath, 'utf-8').match(/^## /gm) || []).length; }
   } catch {}
   let fileCount = 0;
@@ -63,22 +63,16 @@ export function buildProjectDashboard(header: ChatHeaderInfo, progress: SetupPro
   // Blueprint card
   const bp = data?.blueprint;
   const bpRows = [bp?.what ? `<div class="dash-bp-row"><span class="dash-bp-key">WHAT</span>${h(bp.what)}</div>` : '', bp?.who ? `<div class="dash-bp-row"><span class="dash-bp-key">WHO</span>${h(bp.who)}</div>` : '', bp?.why ? `<div class="dash-bp-row"><span class="dash-bp-key">WHY</span>${h(bp.why)}</div>` : ''].filter(Boolean).join('');
-  const bpCard = bpRows ? `<div class="dash-section"><div class="dash-section-label">&#x1F4CB; Blueprint</div><div class="dash-bp-card">${bpRows}</div></div>` : `<div class="dash-section"><div class="dash-section-label">&#x1F4CB; Blueprint</div><div class="dash-bp-empty">No blueprint yet &mdash; <span class="dash-link" data-cmd="chassis.blueprintInterview">create one</span></div></div>`;
+  const bpCard = bpRows ? `<div class="dash-section"><div class="dash-section-label">&#x1F4CB; Blueprint</div><div class="dash-bp-card">${bpRows}</div></div>` : `<div class="dash-section"><div class="dash-section-label">&#x1F4CB; Blueprint</div><div class="dash-bp-empty">No blueprint yet &mdash; <span class="dash-link" data-cmd="redivivus.blueprintInterview">create one</span></div></div>`;
   // Recent activity
   const actRows = data?.recentBuilds.length ? data.recentBuilds.slice(0, 3).map(b => { const ago = _ago(b.timestamp); return `<div class="dash-act-row" title="${h(b.task)}"><div class="dash-act-task">${h(b.task.slice(0, 50))}${b.task.length > 50 ? '...' : ''}</div><div class="dash-act-meta">${b.files.length} file${b.files.length !== 1 ? 's' : ''} &middot; $${b.costUSD.toFixed(4)} &middot; ${ago}</div></div>`; }).join('') : `<div class="dash-act-empty">No builds yet &mdash; type a request to start</div>`;
   const actCard = `<div class="dash-section"><div class="dash-section-label">&#x1F552; Recent Activity</div>${actRows}</div>`;
   // Progress bar (inline compact)
-  const progBar = progress && progress.percentage < 100 ? `<div class="dash-progress" data-cmd="chassis.showSetupProgress" title="Setup ${progress.percentage}% complete -- click for checklist"><div class="dash-progress-label">Setup ${progress.percentage}%</div><div class="dash-progress-track"><div class="dash-progress-fill" style="width:${progress.percentage}%"></div></div></div>` : '';
-  // Show Edit Visually pill when any recent build produced HTML or CSS
-  const hasVisualFiles = data?.recentBuilds.some(b => b.files.some(f => /\.(html|css)$/i.test(f)));
-  const editVisuallyPill = hasVisualFiles
-    ? `<button class="dash-action-pill dash-action-visual" data-cmd="chassis.openVisualEditor" title="Open the Visual Contract Editor to change colors, text, and layout">&#x270F;&#xFE0F; Edit Visually</button>`
-    : '';
+  const progBar = progress && progress.percentage < 100 ? `<div class="dash-progress" data-cmd="redivivus.showSetupProgress" title="Setup ${progress.percentage}% complete -- click for checklist"><div class="dash-progress-label">Setup ${progress.percentage}%</div><div class="dash-progress-track"><div class="dash-progress-fill" style="width:${progress.percentage}%"></div></div></div>` : '';
   // Actions
   const actions = `<div class="dash-actions">
-    <button class="dash-action-pill" data-cmd="chassis.startSession" title="Start a focused work session with goals and tracking">&#x25B6;&#xFE0F; Start Session</button>
-    <button class="dash-action-pill" data-cmd="chassis.buildFromVault" title="Build new code using your saved Vault snippets">&#x1F3D7;&#xFE0F; Build from Vault</button>
-    ${editVisuallyPill}
+    <button class="dash-action-pill" data-cmd="redivivus.startSession" title="Start a focused work session with goals and tracking">&#x25B6;&#xFE0F; Start Session</button>
+    <button class="dash-action-pill" data-cmd="redivivus.buildFromVault" title="Build new code using your saved Vault snippets">&#x1F3D7;&#xFE0F; Build from Vault</button>
     <button class="dash-action-pill" data-action="start-new-project" data-mode="direct" title="Start a different project">&#x2795; New Project</button>
     <button class="dash-action-pill dash-action-close" data-cmd="workbench.action.closeFolder" title="Close this project and return to the launcher">&#x2716; Close Project</button>
   </div>`;

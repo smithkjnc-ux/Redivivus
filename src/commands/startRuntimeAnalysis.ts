@@ -1,7 +1,7 @@
-// [SCOPE] chassis.startRuntimeAnalysis command -- Runtime Analysis Engine phases 1-4.
+// [SCOPE] redivivus.startRuntimeAnalysis command -- Runtime Analysis Engine phases 1-4.
 // Reads runtime_profile.json, writes instrumentation files, spawns the entry point,
 // observes for 30 seconds, cleans up, writes runtime_connections.json, posts report.
-// [WARN] chassis_trace.py and chassis_hook.js are TEMPORARY -- always deleted in finally block.
+// [WARN] redivivus_trace.py and redivivus_hook.js are TEMPORARY -- always deleted in finally block.
 // Helpers (types, parsing, report) -> startRuntimeAnalysisHelpers.ts
 
 import * as vscode from 'vscode';
@@ -12,7 +12,7 @@ import { loadRuntimeProfile } from '../core/runtime/runtimeProfiler';
 import { buildPythonTraceScript } from '../runtime/pythonInstrumentor.js';
 import { buildJsHookScript } from '../runtime/jsInstrumentor.js';
 
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import type { UsageTracker } from '../services/usageTracker.js';
 import type { VaultService } from '../services/vault/vaultService.js';
@@ -20,13 +20,13 @@ import { postToChat, deleteSafe, readTraceEntries, summariseEntries, buildConnec
 
 const DURATION_S  = 30;
 const POLL_MS     = 5000;
-const TRACE_FILE  = 'chassis_trace.py';
-const HOOK_FILE   = 'chassis_hook.js';
+const TRACE_FILE  = 'redivivus_trace.py';
+const HOOK_FILE   = 'redivivus_hook.js';
 
 async function runRuntimeAnalysis(root: string): Promise<void> {
-  const chassisDir  = path.join(root, '.chassis');
-  const tracePath   = path.join(chassisDir, 'runtime_trace.json');
-  const connPath    = path.join(chassisDir, 'runtime_connections.json');
+  const redivivusDir  = path.join(root, '.redivivus');
+  const tracePath   = path.join(redivivusDir, 'runtime_trace.json');
+  const connPath    = path.join(redivivusDir, 'runtime_connections.json');
   const pyTracePath = path.join(root, TRACE_FILE);
   const jsHookPath  = path.join(root, HOOK_FILE);
 
@@ -48,7 +48,7 @@ async function runRuntimeAnalysis(root: string): Promise<void> {
     return;
   }
 
-  if (!fs.existsSync(chassisDir)) { fs.mkdirSync(chassisDir, { recursive: true }); }
+  if (!fs.existsSync(redivivusDir)) { fs.mkdirSync(redivivusDir, { recursive: true }); }
   try { fs.writeFileSync(tracePath, '[]', 'utf8'); } catch { /* ok */ }
 
   if (isPython) { fs.writeFileSync(pyTracePath, buildPythonTraceScript(tracePath, DURATION_S), 'utf8'); }
@@ -64,11 +64,11 @@ async function runRuntimeAnalysis(root: string): Promise<void> {
 
     if (isPython) {
       cmd  = 'python3';
-      args = ['-c', `import chassis_trace\nimport runpy\nrunpy.run_path('${ep.file}', run_name='__main__')`];
+      args = ['-c', `import redivivus_trace\nimport runpy\nrunpy.run_path('${ep.file}', run_name='__main__')`];
       env['PYTHONPATH'] = root + (env['PYTHONPATH'] ? ':' + env['PYTHONPATH'] : '');
     } else {
       cmd  = 'node';
-      args = ['--require', './chassis_hook.js', ep.file];
+      args = ['--require', './redivivus_hook.js', ep.file];
     }
 
     proc = cp.spawn(cmd, args, { cwd: root, env, stdio: 'ignore', detached: false });
@@ -101,17 +101,17 @@ async function runRuntimeAnalysis(root: string): Promise<void> {
 
 export function registerStartRuntimeAnalysisCommand(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routing: RoutingService,
   usageTracker?: UsageTracker,
   vault?: VaultService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.startRuntimeAnalysis', async () => {
+    vscode.commands.registerCommand('redivivus.startRuntimeAnalysis', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) { vscode.window.showErrorMessage('CHASSIS: No workspace folder open.'); return; }
+      if (!root) { vscode.window.showErrorMessage('Redivivus: No workspace folder open.'); return; }
       const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
-      ChatPanel.show(chassis, routing, usageTracker, vault);
+      ChatPanel.show(redivivus, routing, usageTracker, vault);
       await new Promise(r => setTimeout(r, 300));
       try {
         await runRuntimeAnalysis(root);

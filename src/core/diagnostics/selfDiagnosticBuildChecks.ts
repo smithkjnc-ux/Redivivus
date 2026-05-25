@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Self-Diagnostic — commands, file system, vault, routing, guardian, and build checks
+// [SCOPE] Redivivus Self-Diagnostic — commands, file system, vault, routing, guardian, and build checks
 // Extracted from selfDiagnostic.ts. Imported by runDiagnostic in selfDiagnostic.ts.
 
 import * as vscode from 'vscode';
@@ -31,7 +31,7 @@ export function checkExtensionResources(context: vscode.ExtensionContext): DiagR
 }
 
 export function checkOutDir(): DiagResult {
-  const extPath = vscode.extensions.getExtension('chassis.chassis')?.extensionPath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+  const extPath = vscode.extensions.getExtension('redivivus.redivivus')?.extensionPath || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
   const outDir = path.join(extPath, 'out');
   if (!fs.existsSync(outDir)) { return { name: 'out/ directory', category: 'File System', status: 'fail', message: 'out/ directory missing -- extension not compiled' }; }
   const jsFiles = fs.readdirSync(outDir).filter(f => f.endsWith('.js'));
@@ -43,7 +43,7 @@ export function checkOutDir(): DiagResult {
 export function checkVaultDir(): DiagResult {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { return { name: 'Vault', category: 'Vault', status: 'skip', message: 'No workspace -- skipped' }; }
-  const vaultPath = path.join(root, '.chassis', 'vault');
+  const vaultPath = path.join(root, '.redivivus', 'vault');
   if (fs.existsSync(vaultPath)) {
     try {
       const files = fs.readdirSync(vaultPath);
@@ -109,7 +109,7 @@ export function checkBuildFreshness(): DiagResult {
   const outExt = path.join(root, 'out', 'extension.js');
   const srcExt = path.join(root, 'src', 'extension.ts');
   if (!fs.existsSync(outExt)) { return { name: 'Build freshness', category: 'Build', status: 'warn', message: 'out/extension.js not found in workspace' }; }
-  if (!fs.existsSync(srcExt)) { return { name: 'Build freshness', category: 'Build', status: 'skip', message: 'Not in CHASSIS dev workspace' }; }
+  if (!fs.existsSync(srcExt)) { return { name: 'Build freshness', category: 'Build', status: 'skip', message: 'Not in Redivivus dev workspace' }; }
   const outTime = fs.statSync(outExt).mtimeMs;
   const srcTime = fs.statSync(srcExt).mtimeMs;
   if (srcTime > outTime) { return { name: 'Build freshness', category: 'Build', status: 'warn', message: 'Source is newer than build output -- run npm run compile' }; }
@@ -120,9 +120,9 @@ export function checkBuildFreshness(): DiagResult {
 
 export async function checkAllCommandsRegistered(): Promise<DiagResult[]> {
   const allCommands = await vscode.commands.getCommands(true);
-  const chassisCommands = allCommands.filter(c => c.startsWith('chassis.'));
+  const redivivusCommands = allCommands.filter(c => c.startsWith('redivivus.'));
   const results: DiagResult[] = [];
-  const extPath = vscode.extensions.getExtension('chassis.chassis')?.extensionPath;
+  const extPath = vscode.extensions.getExtension('redivivus.redivivus')?.extensionPath;
   if (!extPath) {
     results.push({ name: 'Command audit', category: 'Commands', status: 'warn', message: 'Could not locate extension to read package.json' });
     return results;
@@ -131,11 +131,11 @@ export async function checkAllCommandsRegistered(): Promise<DiagResult[]> {
     const pkg = JSON.parse(fs.readFileSync(path.join(extPath, 'package.json'), 'utf-8'));
     const declaredCommands: string[] = (pkg.contributes?.commands || []).map((c: any) => c.command);
     for (const declared of declaredCommands) {
-      if (!chassisCommands.includes(declared)) {
+      if (!redivivusCommands.includes(declared)) {
         results.push({ name: declared, category: 'Commands (Deep)', status: 'fail', message: 'Declared in package.json but NOT registered at runtime' });
       }
     }
-    for (const registered of chassisCommands) {
+    for (const registered of redivivusCommands) {
       if (!declaredCommands.includes(registered)) {
         results.push({ name: registered, category: 'Commands (Deep)', status: 'warn', message: 'Registered at runtime but not in package.json (dynamic command)' });
       }

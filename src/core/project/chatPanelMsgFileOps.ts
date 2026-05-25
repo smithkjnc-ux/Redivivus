@@ -22,6 +22,8 @@ export async function handleUndoBuild(msg: any, deps: MessageHandlerDeps, conver
     } else {
       conversation.push({ role: 'assistant', content: `✅ Undone! Restored ${restored} file${restored !== 1 ? 's' : ''} to the previous version.`, timestamp: Date.now() });
       try { const { BuildHistoryService } = await import('../../services/build/buildHistoryService.js'); new BuildHistoryService(root).markUndone(snapshotId); } catch { /* best-effort */ }
+      deps.panel.webview.postMessage({ type: 'preview-reverted' });
+      deps.panel.webview.postMessage({ type: 'preview-refresh' });
     }
   } catch (err) {
     conversation.push({ role: 'assistant', content: `❌ Something went wrong while undoing — please try again.`, timestamp: Date.now() });

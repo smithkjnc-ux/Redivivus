@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Map Builder Helpers — utility functions for scanning and analyzing project files.
+// [SCOPE] Redivivus Map Builder Helpers — utility functions for scanning and analyzing project files.
 // Extracted from mapBuilderService.ts to keep source files under 200 lines.
 
 // [SCOPE] Visual map builder — scans project source files and builds a graph of nodes (files) and edges (imports)
@@ -88,7 +88,7 @@ export function extractImports(content: string, ext: string): string[] {
 }
 
 export function getBlueprintIntent(root: string): string[] {
-  const bpPath = path.join(root, '.chassis', 'blueprint.md');
+  const bpPath = path.join(root, '.redivivus', 'blueprint.md');
   if (!fs.existsSync(bpPath)) {return [];}
   try {
     const content = fs.readFileSync(bpPath, 'utf-8');
@@ -99,7 +99,7 @@ export function getBlueprintIntent(root: string): string[] {
 }
 
 export function getDeadEnds(root: string): { from: string, to: string }[] {
-  const dePath = path.join(root, '.chassis', 'dead_ends.md');
+  const dePath = path.join(root, '.redivivus', 'dead_ends.md');
   if (!fs.existsSync(dePath)) {return [];}
   try {
     const content = fs.readFileSync(dePath, 'utf-8');

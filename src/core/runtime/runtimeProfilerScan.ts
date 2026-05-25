@@ -29,8 +29,8 @@ export function walkDir(
   if (visited.has(realDir)) { return []; }
   visited.add(realDir);
 
-  // Rule 5 — skip recursing INTO .chassis of the current project (write ops are separate)
-  if (dir === path.join(projectRoot, '.chassis')) { return []; }
+  // Rule 5 — skip recursing INTO .redivivus of the current project (write ops are separate)
+  if (dir === path.join(projectRoot, '.redivivus')) { return []; }
 
   let entries: fs.Dirent[];
   try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return []; }
@@ -49,8 +49,8 @@ export function walkDir(
       if (e.name === 'node_modules') { continue; }
       // Rule 3 — standard build/cache dirs
       if (SKIP_EXACT_DIRS.has(e.name)) { continue; }
-      // Rule 4 — external project boundary: a .chassis dir whose parent is NOT projectRoot
-      if (e.name === '.chassis' && dir !== projectRoot) {
+      // Rule 4 — external project boundary: a .redivivus dir whose parent is NOT projectRoot
+      if (e.name === '.redivivus' && dir !== projectRoot) {
         console.warn('[Profiler] Found external project boundary at ' + full + ' -- excluded from scan');
         continue;
       }

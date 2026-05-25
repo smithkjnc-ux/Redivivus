@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Compile Auto-Fix — runs compile check after every build, parses errors,
+// [SCOPE] Redivivus Compile Auto-Fix — runs compile check after every build, parses errors,
 // calls AI to fix them, rewrites files, and retries. Up to 3 loops per build.
 // This is what closes the "write code → compile → error → fix → recompile" gap vs Claude Code.
 

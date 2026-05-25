@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Usage Tracker — tracks AI token usage and costs across sessions with persistent storage
+// [SCOPE] Redivivus Usage Tracker — tracks AI token usage and costs across sessions with persistent storage
 // Provides breakdowns by session, day, week, month with reset capability while preserving lifetime totals.
 // Tracks: timestamp, tokens, cost, AI provider, message count per interaction
 
@@ -49,9 +49,9 @@ export interface UsageReport {
   lifetimeUnresettable: UsagePeriodWithBreakdown;
 }
 
-export const STORAGE_KEY = 'chassis_usage_history';
-export const LIFETIME_KEY = 'chassis_lifetime_total';
-export const SESSION_START_KEY = 'chassis_session_start';
+export const STORAGE_KEY = 'redivivus_usage_history';
+export const LIFETIME_KEY = 'redivivus_lifetime_total';
+export const SESSION_START_KEY = 'redivivus_session_start';
 
 export class UsageTracker {
   private context: vscode.ExtensionContext;

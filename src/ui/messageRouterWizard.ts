@@ -5,12 +5,12 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { WizardPanelState } from './messageRouterTypes.js';
 
 export async function handleWizardMessage(
   msg: any,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   state: WizardPanelState,
   context: vscode.ExtensionContext | undefined,
   refresh: () => void
@@ -54,8 +54,8 @@ export async function handleWizardMessage(
       try {
         if (state.wizardData.folder && state.wizardData.projectName) {
           if (!fs.existsSync(state.wizardData.folder)) {fs.mkdirSync(state.wizardData.folder, { recursive: true });}
-          await chassis.scaffoldAt(state.wizardData.folder, state.wizardData.projectName, state.wizardData.blueprint);
-          if (context) {await context.globalState.update('pendingChassisInit', undefined);}
+          await redivivus.scaffoldAt(state.wizardData.folder, state.wizardData.projectName, state.wizardData.blueprint);
+          if (context) {await context.globalState.update('pendingRedivivusInit', undefined);}
           const _wsFile = path.join(state.wizardData.folder, `${state.wizardData.projectName}.code-workspace`);
           if (!fs.existsSync(_wsFile)) {
             try { fs.writeFileSync(_wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { /* best-effort */ }

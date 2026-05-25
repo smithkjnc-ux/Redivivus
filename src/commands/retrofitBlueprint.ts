@@ -1,26 +1,26 @@
-// [SCOPE] CHASSIS Retrofit Blueprint Command — scan project, auto-generate 5 W's, save to config
+// [SCOPE] Redivivus Retrofit Blueprint Command — scan project, auto-generate 5 W's, save to config
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { RetrofitBlueprintService } from '../core/retrofit/retrofitBlueprint';
 import type { RoutingService } from '../services/ai/routingService.js';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import { openBlueprintPanel } from '../ui/views/blueprintInterviewPanel.js';
 import type { Blueprint5W } from '../core/retrofit/retrofitBlueprint';
 
 export function registerRetrofitBlueprintCommand(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   routing: RoutingService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.retrofitBlueprint', async () => {
+    vscode.commands.registerCommand('redivivus.retrofitBlueprint', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) { vscode.window.showErrorMessage('Open a project folder first.'); return; }
 
       const confirm = await vscode.window.showInformationMessage(
-        'CHASSIS will look at your project and figure out what it does, who it\'s for, and why it exists. Takes about 30 seconds.',
+        'Redivivus will look at your project and figure out what it does, who it\'s for, and why it exists. Takes about 30 seconds.',
         'Scan my project',
         'Cancel'
       );
@@ -30,7 +30,7 @@ export function registerRetrofitBlueprintCommand(
       const ref: { blueprint: Blueprint5W | null } = { blueprint: null };
 
       await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: 'CHASSIS is reading your project...', cancellable: false },
+        { location: vscode.ProgressLocation.Notification, title: 'Redivivus is reading your project...', cancellable: false },
         async () => { ref.blueprint = await service.generateBlueprint(); }
       );
 
@@ -50,7 +50,7 @@ export function registerRetrofitBlueprintCommand(
       ].join('\n');
 
       const next = await vscode.window.showInformationMessage(
-        'Got it — here\'s what CHASSIS found about your project:',
+        'Got it — here\'s what Redivivus found about your project:',
         { modal: true, detail: detail + '\n\nThis is now saved. You can edit it anytime.' },
         'Looks right',
         'Edit it now'
@@ -58,37 +58,37 @@ export function registerRetrofitBlueprintCommand(
 
       // Both "Looks right" and "Edit it now" confirm acceptance — finalize the conversion
       if (next === 'Looks right' || next === 'Edit it now') {
-        // Remove .chassis-assist to promote from Assist Mode → Full CHASSIS
-        const assistFile = path.join(root, '.chassis-assist');
+        // Remove .redivivus-assist to promote from Assist Mode → Full Redivivus
+        const assistFile = path.join(root, '.redivivus-assist');
         if (fs.existsSync(assistFile)) { try { fs.unlinkSync(assistFile); } catch { /* ignore */ } }
 
-        // Create CHASSIS_ROADMAP.md at project root if missing
-        const roadmapPath = path.join(root, 'CHASSIS_ROADMAP.md');
+        // Create REDIVIVUS_ROADMAP.md at project root if missing
+        const roadmapPath = path.join(root, 'REDIVIVUS_ROADMAP.md');
         if (!fs.existsSync(roadmapPath)) {
           const projName = path.basename(root);
           const today = new Date().toISOString().slice(0, 10);
           fs.writeFileSync(roadmapPath,
-            `# CHASSIS Roadmap — ${projName}\n\n*Last updated: ${today}* — Converted from Assist Mode to Full CHASSIS\n\n## Recent Fixes\n\n_No changes logged yet._\n`,
+            `# Redivivus Roadmap — ${projName}\n\n*Last updated: ${today}* — Converted from Assist Mode to Full Redivivus\n\n## Recent Fixes\n\n_No changes logged yet._\n`,
             'utf-8');
         }
 
-        // Write blueprint.md to .chassis/ if missing
-        const bpMdPath = path.join(root, '.chassis', 'blueprint.md');
+        // Write blueprint.md to .redivivus/ if missing
+        const bpMdPath = path.join(root, '.redivivus', 'blueprint.md');
         if (!fs.existsSync(bpMdPath)) {
           try { fs.writeFileSync(bpMdPath, service.formatMarkdown(blueprint), 'utf-8'); } catch { /* ignore */ }
         }
 
         // Create work_log.md if missing (required by sessionService.appendWorkLog)
-        const wlPath = path.join(root, '.chassis', 'work_log.md');
+        const wlPath = path.join(root, '.redivivus', 'work_log.md');
         if (!fs.existsSync(wlPath)) {
           const projName = path.basename(root);
           fs.writeFileSync(wlPath, `# Work Log — ${projName}\n\n`, 'utf-8');
         }
 
-        // Refresh chat panel to show Full CHASSIS screen
-        vscode.commands.executeCommand('chassis.openChatPanel');
+        // Refresh chat panel to show Full Redivivus screen
+        vscode.commands.executeCommand('redivivus.openChatPanel');
 
-        if (next === 'Edit it now') { openBlueprintPanel(context, chassis, routing); }
+        if (next === 'Edit it now') { openBlueprintPanel(context, redivivus, routing); }
       }
     })
   );

@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Test Utility - Mocha Global Hooks for Log Dumping
+// [SCOPE] Redivivus Test Utility - Mocha Global Hooks for Log Dumping
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -16,11 +16,11 @@ export const mochaHooks = {
       else if (testFile.includes('/core/build/')) {targetDomain = 'BUILD';}
       else if (testFile.includes('/ui/panels/chat/')) {targetDomain = 'CHAT';}
 
-      const logsDir = path.join(process.cwd(), '.chassis', 'logs', 'master');
+      const logsDir = path.join(process.cwd(), '.redivivus', 'logs', 'master');
       if (!fs.existsSync(logsDir)) {return;}
 
       const files = fs.readdirSync(logsDir)
-        .filter(f => f.startsWith('chassis-master-') && f.endsWith('.log'))
+        .filter(f => f.startsWith('redivivus-master-') && f.endsWith('.log'))
         .sort()
         .reverse();
       

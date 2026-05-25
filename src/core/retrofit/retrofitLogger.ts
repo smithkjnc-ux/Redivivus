@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS RETROFIT Domain Logger
+// [SCOPE] Redivivus RETROFIT Domain Logger
 import { masterLog } from '../../core/logging/masterLogger.js';
 
 const DOMAIN = 'RETROFIT';

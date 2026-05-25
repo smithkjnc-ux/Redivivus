@@ -1,43 +1,43 @@
-// [SCOPE] CHASSIS Misc commands — core status, guides, AI switching, rules
+// [SCOPE] Redivivus Misc commands — core status, guides, AI switching, rules
 
 import * as vscode from 'vscode';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import type { SessionService } from '../services/sessionService.js';
 import type { GuideService } from '../services/guideService.js';
 import type { RulesService } from '../services/rulesService.js';
-import type { ChassisWebviewProvider } from '../ui/views/chassisWebviewProvider.js';
+import type { RedivivusWebviewProvider } from '../ui/views/redivivusWebviewProvider.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 
 export function registerMiscCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   sessions: SessionService,
   guideService: GuideService,
   rulesService: RulesService,
-  provider: ChassisWebviewProvider,
+  provider: RedivivusWebviewProvider,
   refreshAll: () => void
 ): void {
-  registerCoreCommands(context, chassis, guideService, rulesService, refreshAll);
-  registerGitCommands(context, chassis);
+  registerCoreCommands(context, redivivus, guideService, rulesService, refreshAll);
+  registerGitCommands(context, redivivus);
   registerUndoCommands(context);
   registerBrowserCommands(context);
 }
 
 function registerCoreCommands(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
   guideService: GuideService,
   rulesService: RulesService,
   refreshAll: () => void
 ): void {
   // Show Progress
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.progress', async () => {
-      if (!chassis.isInitialized()) {
-        vscode.window.showErrorMessage('Run "CHASSIS: Initialize Project" first.');
+    vscode.commands.registerCommand('redivivus.progress', async () => {
+      if (!redivivus.isInitialized()) {
+        vscode.window.showErrorMessage('Run "Redivivus: Initialize Project" first.');
         return;
       }
-      const config = chassis.loadConfig();
+      const config = redivivus.loadConfig();
       if (!config) { return; }
       const bp = config.blueprint;
       const healthLine = `✅ ${bp.health.confirmed} Confirmed · 🔶 ${bp.health.assumed} Assumed · ❓ ${bp.health.unknown} Unknown`;
@@ -51,7 +51,7 @@ function registerCoreCommands(
 
   // Getting Started panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.showChatGettingStarted', async () => {
+    vscode.commands.registerCommand('redivivus.showChatGettingStarted', async () => {
       ChatPanel.show(undefined as any, undefined as any);
       setTimeout(() => { if (ChatPanel.currentPanel) { ChatPanel.currentPanel.showGettingStarted(); } }, 100);
     })
@@ -59,13 +59,13 @@ function registerCoreCommands(
 
   // Guide
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.guide', async () => { await guideService.showGuide(); })
+    vscode.commands.registerCommand('redivivus.guide', async () => { await guideService.showGuide(); })
   );
 
   // Switch AI
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.switchAI', async () => {
-      const config = vscode.workspace.getConfiguration('chassis');
+    vscode.commands.registerCommand('redivivus.switchAI', async () => {
+      const config = vscode.workspace.getConfiguration('redivivus');
       const current = config.get<string>('defaultAI') || 'gemini';
       const ais = [
         { id: 'gemini', label: 'Gemini', desc: 'Free tier — fast, good for most tasks', icon: '✨' },
@@ -83,7 +83,7 @@ function registerCoreCommands(
       }).join('');
       const html = `<div id="ai-switch-panel" style="padding:4px 0">${cardsHtml}</div>`;
       if (!ChatPanel.currentPanel) {
-        vscode.commands.executeCommand('chassis.openChatPanel');
+        vscode.commands.executeCommand('redivivus.openChatPanel');
         setTimeout(() => ChatPanel.currentPanel?.showPanel('switch-ai', '🤖 Switch AI', html), 300);
       } else {
         ChatPanel.currentPanel.showPanel('switch-ai', '🤖 Switch AI', html);
@@ -93,14 +93,14 @@ function registerCoreCommands(
 
   // Generate AI Editor Rules
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.generateRules', async () => {
+    vscode.commands.registerCommand('redivivus.generateRules', async () => {
       try {
         const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (!root) { vscode.window.showErrorMessage('No workspace open.'); return; }
-        const config = chassis.loadConfig();
+        const config = redivivus.loadConfig();
         const name = config?.projectName || 'Project';
         const created = rulesService.generateAll(root, name);
-        vscode.window.showInformationMessage('CHASSIS rules generated: ' + created.join(', '));
+        vscode.window.showInformationMessage('Redivivus rules generated: ' + created.join(', '));
         refreshAll();
       } catch (err) {
         vscode.window.showErrorMessage('Generate Rules failed: ' + (err instanceof Error ? err.message : String(err)));
@@ -111,16 +111,16 @@ function registerCoreCommands(
 
   // Wizard Panel
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.wizard', async () => {
-      await vscode.commands.executeCommand('chassisSidebar.focus');
+    vscode.commands.registerCommand('redivivus.wizard', async () => {
+      await vscode.commands.executeCommand('redivivusSidebar.focus');
     })
   );
 
-  // Show CHASSIS capabilities
+  // Show Redivivus capabilities
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.showCapabilities', async () => {
+    vscode.commands.registerCommand('redivivus.showCapabilities', async () => {
       vscode.window.showInformationMessage(
-        'CHASSIS Capabilities: Build code, Blueprint, Map, Vault, AI Review, Tests, Undo Phase, VS Code commands',
+        'Redivivus Capabilities: Build code, Blueprint, Map, Vault, AI Review, Tests, Undo Phase, VS Code commands',
         'Got it'
       );
     })

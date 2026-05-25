@@ -1,17 +1,17 @@
-// [SCOPE] Guide content builder — buildGuide function generates the CHASSIS getting started guide markdown
+// [SCOPE] Guide content builder — buildGuide function generates the Redivivus getting started guide markdown
 // Called by guideService. No markdown parsing or webview logic here.
 
 export function buildGuide(): string {
-  let md = "# What is CHASSIS?\n\n";
-  md += "CHASSIS is a helper that keeps your project organized while you build with AI. ";
+  let md = "# What is Redivivus?\n\n";
+  md += "Redivivus is a helper that keeps your project organized while you build with AI. ";
   md += "It asks you a few questions up front, tracks what you do each session, and keeps notes inside your code. ";
   md += "Think of it as a job site clipboard — it holds the plan, the checklist, and the notes so nothing falls through the cracks.\n\n";
-  md += "You do not need to be a programmer to use it. If you can describe what you want to build, CHASSIS can help keep it organized.\n\n";
+  md += "You do not need to be a programmer to use it. If you can describe what you want to build, Redivivus can help keep it organized.\n\n";
 
   // ── BLUEPRINT ──
   md += "---\n\n";
   md += "## My Project Plan (Blueprint)\n\n";
-  md += "The first thing CHASSIS asks you to do is answer five plain English questions about your project. ";
+  md += "The first thing Redivivus asks you to do is answer five plain English questions about your project. ";
   md += "These are not technical. They are just about what you are building and why.\n\n";
   md += "**Who is going to use this?** Just you? Friends? Kids? Strangers? ";
   md += "This shapes what the finished thing needs to feel like.\n\n";
@@ -33,7 +33,7 @@ export function buildGuide(): string {
   md += "Every time you sit down to work, click **Start Working** and type what you are doing today. ";
   md += "Just one sentence — \"Build the main menu\" or \"Fix the score counter.\" ";
   md += "Then pick which AI you are working with.\n\n";
-  md += "When you stop, click **Done for Now**. CHASSIS asks four quick questions:\n\n";
+  md += "When you stop, click **Done for Now**. Redivivus asks four quick questions:\n\n";
   md += "1. What did you finish?\n";
   md += "2. What is still in progress?\n";
   md += "3. Any problems or risks?\n";
@@ -45,7 +45,7 @@ export function buildGuide(): string {
   md += "---\n\n";
   md += "## Annotation Tags — Sticky Notes in Your Code\n\n";
   md += "These are small labels you can drop into any code file. They look like comments, ";
-  md += "so your code still runs normally — but CHASSIS and your AI can read them as signals.\n\n";
+  md += "so your code still runs normally — but Redivivus and your AI can read them as signals.\n\n";
   md += "**[SCOPE]** — What this file does. Put one at the very top of every file. ";
   md += "It is the first thing you or your AI reads when opening a file cold.\n\n";
   md += "**[TODO]** — Work that still needs doing.\n\n";
@@ -78,15 +78,15 @@ export function buildGuide(): string {
   md += "It counts annotation tags, flags old TODOs, and checks how well commented the file is. Good for a quick look.\n\n";
   md += "**AI Review** sends the file to your AI and asks for a second opinion. ";
   md += "The AI describes what the file does, spots risks, and suggests improvements. ";
-  md += "The review is saved in your `.chassis/reviews/` folder so you can read it later.\n\n";
+  md += "The review is saved in your `.redivivus/reviews/` folder so you can read it later.\n\n";
   md += "**Clean Up File** also uses AI, but this one actually edits the file. ";
-  md += "It adds a [SCOPE] tag at the top, converts old TODO comments to CHASSIS format, ";
-  md += "and flags risky spots with [WARN]. Before saving, CHASSIS shows you a diff so you can approve or reject the changes.\n\n";
+  md += "It adds a [SCOPE] tag at the top, converts old TODO comments to Redivivus format, ";
+  md += "and flags risky spots with [WARN]. Before saving, Redivivus shows you a diff so you can approve or reject the changes.\n\n";
 
   // ── WORK LOG & DEAD ENDS ──
   md += "---\n\n";
   md += "## Work Log and Dead Ends\n\n";
-  md += "Two plain text files that CHASSIS keeps for you inside the `.chassis/` folder.\n\n";
+  md += "Two plain text files that Redivivus keeps for you inside the `.redivivus/` folder.\n\n";
   md += "**Work Log** (`work_log.md`) — an automatic diary. Every session start, ";
   md += "end, review, and scan gets written here with a timestamp. ";
   md += "Open it at the start of each day instead of trying to remember where you left off.\n\n";
@@ -97,7 +97,7 @@ export function buildGuide(): string {
   // ── SWITCH AI ──
   md += "---\n\n";
   md += "## Switch AI — Pick Your Engine\n\n";
-  md += "CHASSIS works with several AI providers. You can switch anytime from the **Project** tab.\n\n";
+  md += "Redivivus works with several AI providers. You can switch anytime from the **Project** tab.\n\n";
   md += "- **Gemini 2.5 Flash** — Free tier available. Fast. Good starting point.\n";
   md += "- **Groq (Llama 3)** — Free tier available. Very fast.\n";
   md += "- **Claude 3.5 Haiku** — Paid. Strong at understanding complex code.\n";
@@ -112,7 +112,7 @@ export function buildGuide(): string {
   md += "## Snippets (Vault) — Save and Reuse Code\n\n";
   md += "The Vault is your personal code library. When you build something useful — a function, a pattern, a tricky bit of logic — ";
   md += "you can save it to the Vault and reuse it in future projects.\n\n";
-  md += "To fill it, click **Snippets** and run a scan. CHASSIS walks through your project, ";
+  md += "To fill it, click **Snippets** and run a scan. Redivivus walks through your project, ";
   md += "pulls out reusable blocks, and uses your AI to sort them into categories automatically.\n\n";
 
   // ── QUICK TIPS ──

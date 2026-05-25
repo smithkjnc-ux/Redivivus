@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS ANALYZER Domain Logger
+// [SCOPE] Redivivus ANALYZER Domain Logger
 import { masterLog } from '../../../core/logging/masterLogger.js';
 
 const DOMAIN = 'ANALYZER';

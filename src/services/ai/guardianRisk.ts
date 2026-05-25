@@ -47,7 +47,7 @@ export function scanForRisks(filePath: string, content: string, config: Guardian
       title: metrics.totalLines > config.maxFileLines * 2 ? 'File Too Large — Blocked' : 'File Getting Too Long',
       description: `This file is ${metrics.totalLines} lines long. For non-technical projects, big files are hard to read, debug, and fix. Splitting into smaller pieces makes your project safer and easier to manage.`,
       filePath,
-      suggestion: 'Use the CHASSIS "Clean Up File" or "Restructure Project" feature to split this into smaller files.',
+      suggestion: 'Use the Redivivus "Clean Up File" or "Restructure Project" feature to split this into smaller files.',
       acknowledged: false,
     });
   }
@@ -93,7 +93,7 @@ export function analyzeFileMetrics(content: string, config: GuardianConfig): Fil
   return { totalLines, functionCount, longestFunctionLines, needsSplit };
 }
 
-/** [CHASSIS] Returns a plain-English roadmap for improving a file's architecture */
+/** [Redivivus] Returns a plain-English roadmap for improving a file's architecture */
 export function generateRefactorRoadmap(metrics: FileMetrics, complexity: number): string[] {
   const steps: string[] = [];
   

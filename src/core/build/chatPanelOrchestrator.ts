@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import type { RoutingService } from '../../services/ai/routingService';
 import type { VaultService } from '../../services/vault/vaultService';
-import type { ChassisService } from '../../services/chassisService';
+import type { RedivivusService } from '../../services/redivivusService';
 import type { ComplexityResult} from '../ai/complexityAssessment';
 import { assessComplexity, getTierDescription } from '../ai/complexityAssessment';
 import { BuildOrchestrator, BuildBlueprint, BuildPlan, BuildPhase } from '../../services/build/buildOrchestrator';
@@ -19,7 +19,7 @@ import { isValidBuildRoot } from './chatPanelBuildUtils';
 import { isModificationRequest } from './chatPanelBuildInference';
 
 export interface OrchestratorDeps {
-  chassis: ChassisService;
+  redivivus: RedivivusService;
   routing: RoutingService;
   vault?: VaultService;
   conversation: ChatMessage[];
@@ -54,7 +54,7 @@ export async function handleComplexityRoutedBuild(
   if (vagueWarning) {
     deps.conversation.push({
       role: 'assistant',
-      content: vagueWarning + '\n\n__ACTION_CARD__chassis.helpMeRefine|||💬 Help Me Refine This|||END__',
+      content: vagueWarning + '\n\n__ACTION_CARD__redivivus.helpMeRefine|||💬 Help Me Refine This|||END__',
       timestamp: Date.now(),
     });
     deps.refresh();
@@ -130,12 +130,12 @@ async function handleStandardBuild(
 
   deps.setPendingTask(task);
 
-  // [FIX] Check for .chassis/ folder (not just blueprint.md) — project may be initialized without blueprint
+  // [FIX] Check for .redivivus/ folder (not just blueprint.md) — project may be initialized without blueprint
   const fs = require('fs');
   const path = require('path');
-  const chassisInitialized = root && fs.existsSync(path.join(root, '.chassis'));
+  const redivivusInitialized = root && fs.existsSync(path.join(root, '.redivivus'));
 
-  if (!chassisInitialized) {
+  if (!redivivusInitialized) {
     // No blueprint — AI-extract 5W answers then show wizard with pre-fills
     const prefillAnswers = await extractBlueprintFromPrompt(task, deps.routing);
     deps.postToWebview({
@@ -147,7 +147,7 @@ async function handleStandardBuild(
       prefillAnswers,
     });
   } else {
-    // [CHASSIS] Has blueprint + cost estimate already confirmed — build directly, no second dialog
+    // [Redivivus] Has blueprint + cost estimate already confirmed — build directly, no second dialog
     const ctx = createBuildContext(task, deps);
     if (await isChunkedBuildRequest(task, ctx.routing)) {
       await runChunkedBuild(task, ctx);
@@ -172,7 +172,7 @@ async function handleDeepBuild(
   const phaseCount = complexity.recommendedPhases;
   deps.conversation.push({
     role: 'assistant',
-    content: `🔴 **Complex Build Detected**\n\nThis request requires a **phased build approach** (~${phaseCount} phases).\n\nLike building a car: foundation → data → core → interface → features → polish → delivery.\n\n**Next:** Expanded interview to capture requirements, then we'll build phase by phase.\n\n__ACTION_CARD__chassis.startExpandedInterview|||📝 Start Expanded Interview|||END__`,
+    content: `🔴 **Complex Build Detected**\n\nThis request requires a **phased build approach** (~${phaseCount} phases).\n\nLike building a car: foundation → data → core → interface → features → polish → delivery.\n\n**Next:** Expanded interview to capture requirements, then we'll build phase by phase.\n\n__ACTION_CARD__redivivus.startExpandedInterview|||📝 Start Expanded Interview|||END__`,
     timestamp: Date.now(),
   });
   deps.refresh();

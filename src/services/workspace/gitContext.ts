@@ -1,6 +1,6 @@
-// [SCOPE] CHASSIS Git Context — reads git status/diff/log via child process.
+// [SCOPE] Redivivus Git Context — reads git status/diff/log via child process.
 // Injected into build and fix prompts so the AI knows what changed recently.
-// This is what Claude Code does natively; CHASSIS was blind to git history before this.
+// This is what Claude Code does natively; Redivivus was blind to git history before this.
 
 import * as cp from 'child_process';
 import * as fs from 'fs';

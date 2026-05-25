@@ -9,7 +9,7 @@ import { BuildLedger } from '../../services/build/buildLedgerService';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService';
 import * as Inf from './chatPanelBuildInference';
 import * as Writer from './chatPanelBuildWriter';
-import { chassisLog } from '../../services/logging/chassisLogger';
+import { redivivusLog } from '../../services/logging/redivivusLogger';
 import type { BuildContext } from './chatPanelBuildHelpers';
 
 export interface SingleFileBuildResultParams {
@@ -38,7 +38,7 @@ export function buildSingleFileResult(p: SingleFileBuildResultParams): {
     const importCheck = checkImports(p.root, p.absPath, p.cleanCode);
     const importWarning = formatMissingImports(importCheck, p.relPath);
     if (p.ext === '.ts' && !Inf.isWebPageTask(p.task.toLowerCase())) {
-      try { Writer.scaffoldNodeProject(p.root, path.basename(p.absPath, p.ext), scaffoldedFiles); } catch (e) { console.error('[CHASSIS] scaffoldNodeProject failed:', e); }
+      try { Writer.scaffoldNodeProject(p.root, path.basename(p.absPath, p.ext), scaffoldedFiles); } catch (e) { console.error('[Redivivus] scaffoldNodeProject failed:', e); }
     }
     const ledgerSummary = p.ledger.hasData() ? p.ledger.getSummary() : undefined;
     totalTokens = ledgerSummary ? ledgerSummary.reduce((s, l) => s + l.tokens, 0) : 0;
@@ -53,21 +53,21 @@ export function buildSingleFileResult(p: SingleFileBuildResultParams): {
       } else {
         p.ctx.usageTracker?.recordUsage(totalTokens, totalCost, p.workerAI, p.res.inputTokens, p.res.outputTokens, 'solo', _proj);
       }
-    } catch (e) { console.error('[CHASSIS] usageTracker failed:', e); }
+    } catch (e) { console.error('[Redivivus] usageTracker failed:', e); }
 
     const elapsed = (Date.now() - p.buildStart) / 1000;
-    chassisLog({ operation: 'build', phase: 'complete', message: 'Build completed', data: { file: p.relPath, durationSec: elapsed, tokens: totalTokens, cost: totalCost, method: p.usedSurgical ? 'surgical' : 'full_file' }, success: true });
+    redivivusLog({ operation: 'build', phase: 'complete', message: 'Build completed', data: { file: p.relPath, durationSec: elapsed, tokens: totalTokens, cost: totalCost, method: p.usedSurgical ? 'surgical' : 'full_file' }, success: true });
     const resultCard = buildResultCard([p.relPath, ...scaffoldedFiles], p.searchResult.items.length, totalTokens, totalCost, elapsed, p.snapshotId, 0, !!p.existingTarget, ledgerSummary) + (_diff ? `\n_Changes: ${_diff}_` : '');
-    try { new BuildHistoryService(p.root).record(makeBuildHistoryEntry({ snapshotId: p.snapshotId || Date.now().toString(), task: p.task, files: [p.relPath, ...scaffoldedFiles], tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: p.supervisorAI, worker: p.workerAI !== p.supervisorAI ? p.workerAI : null, resultCardToken: resultCard })); } catch (e) { console.error('[CHASSIS] BuildHistory.record failed:', e); }
+    try { new BuildHistoryService(p.root).record(makeBuildHistoryEntry({ snapshotId: p.snapshotId || Date.now().toString(), task: p.task, files: [p.relPath, ...scaffoldedFiles], tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: p.supervisorAI, worker: p.workerAI !== p.supervisorAI ? p.workerAI : null, resultCardToken: resultCard })); } catch (e) { console.error('[Redivivus] BuildHistory.record failed:', e); }
     const previewToken = p.relPath.endsWith('.html') ? `\n__PREVIEW_BROWSER__${p.absPath}|||END_PREVIEW_BROWSER__` : '';
     let nextSteps = '';
-    try { nextSteps = buildPostBuildGuidance(p.root, [p.relPath, ...scaffoldedFiles]); } catch (e) { console.error('[CHASSIS] postBuildGuidance failed:', e); }
+    try { nextSteps = buildPostBuildGuidance(p.root, [p.relPath, ...scaffoldedFiles]); } catch (e) { console.error('[Redivivus] postBuildGuidance failed:', e); }
     let compileAction = '';
-    try { compileAction = (require('./chatPanelBuildPipeline.js') as any).appendCompileAction(p.relPath) || ''; } catch (e) { console.error('[CHASSIS] appendCompileAction failed:', e); }
+    try { compileAction = (require('./chatPanelBuildPipeline.js') as any).appendCompileAction(p.relPath) || ''; } catch (e) { console.error('[Redivivus] appendCompileAction failed:', e); }
     resultMessage = `${p.narration ? '📝 ' + p.narration + '\n\n' : ''}${resultCard}${importWarning}\n__BUILD_RESULT__${p.relPath}|||${p.absPath}|||END__${previewToken}${nextSteps}${compileAction}`;
   } catch (e) {
-    chassisLog({ operation: 'build', phase: 'error', message: 'Build failed', error: e instanceof Error ? e.message : String(e), success: false });
-    console.error('[CHASSIS] Result construction failed:', e);
+    redivivusLog({ operation: 'build', phase: 'error', message: 'Build failed', error: e instanceof Error ? e.message : String(e), success: false });
+    console.error('[Redivivus] Result construction failed:', e);
     resultMessage = `✅ **Done** — ${p.existingTarget ? 'Modified' : 'Created'} \`${p.relPath}\`\n\n_(result card unavailable: ${e instanceof Error ? e.message : String(e)})_`;
   }
   return { resultMessage, scaffoldedFiles, totalTokens, totalCost };

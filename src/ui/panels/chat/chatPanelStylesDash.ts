@@ -55,5 +55,33 @@ export function buildChatCssDash(): string {
     .dash-action-close:hover { border-color: #f44336; color: #f44336; background: rgba(244,67,54,0.08); }
     .dash-action-visual { border-color: #89b4fa55; color: #89b4fa; }
     .dash-action-visual:hover { border-color: #89b4fa; background: rgba(137,180,250,0.1); color: #89b4fa; }
+    /* ── Embedded Visual Editor drawer ── */
+    #ve-drawer { width: 250px; flex-shrink: 0; background: #13131f; border-left: 1px solid #313244; display: none; flex-direction: column; overflow: hidden; }
+    #ve-drawer.open { display: flex; }
+    .ve-hdr { display: flex; align-items: center; gap: 5px; padding: 5px 6px; border-bottom: 1px solid #313244; flex-shrink: 0; flex-wrap: wrap; }
+    .ve-mtoggle { display: flex; border: 1px solid #45475a; border-radius: 4px; overflow: hidden; }
+    .ve-mtoggle button { padding: 1px 7px; font-size: 10px; background: transparent; color: #a6adc8; border: none; cursor: pointer; }
+    .ve-mtoggle button.active { background: #89b4fa; color: #1e1e2e; font-weight: 600; }
+    #ve-apply { padding: 2px 8px; background: #a6e3a1; color: #1e1e2e; border: none; border-radius: 4px; font-size: 10px; font-weight: 700; cursor: pointer; }
+    #ve-apply:disabled { background: #313244; color: #6c7086; cursor: not-allowed; }
+    #ve-close { margin-left: auto; background: transparent; border: none; color: #6c7086; cursor: pointer; font-size: 13px; line-height: 1; padding: 0 2px; }
+    #ve-close:hover { color: #cdd6f4; }
+    .ve-tabs { display: flex; flex-wrap: wrap; gap: 1px; padding: 3px 3px 0; background: #13131f; flex-shrink: 0; }
+    .ve-tabs button { padding: 2px 7px; font-size: 10px; background: transparent; color: #a6adc8; border: 1px solid transparent; border-radius: 3px 3px 0 0; cursor: pointer; }
+    .ve-tabs button.active { background: #1e1e2e; color: #cdd6f4; border-color: #313244; }
+    .ve-canvas { flex: 1; overflow-y: auto; padding: 2px; }
+    .ve-status { font-size: 10px; color: #a6e3a1; opacity: 0; transition: opacity 0.3s; flex: 1; }
+    .ve-status.show { opacity: 1; }
+    .ve-empty { padding: 10px; font-size: 11px; color: #6c7086; }
+    .ve-list { display: flex; flex-direction: column; gap: 1px; }
+    .ve-row { display: flex; align-items: center; gap: 5px; padding: 0 5px; background: #181825; height: 24px; overflow: hidden; border-bottom: 1px solid #23243a; cursor: pointer; }
+    .ve-row:hover { background: #1e1e2e; }
+    .ve-row.active { background: #0d1f2d; outline: 1px solid #89b4fa; outline-offset: -1px; }
+    .ve-row label { flex: 1; font-size: 11px; color: #a6adc8; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; cursor: default; }
+    .ve-row input[type=color] { width: 20px; height: 16px; border: none; border-radius: 2px; cursor: pointer; background: transparent; padding: 0; flex-shrink: 0; }
+    .ve-row input[type=text] { flex: 1; padding: 1px 4px; background: #313244; border: 1px solid #45475a; border-radius: 3px; color: #cdd6f4; font-size: 11px; min-width: 0; }
+    .ve-row input[type=range] { flex: 1; accent-color: #89b4fa; min-width: 0; }
+    .ve-row .ve-num { width: 36px; padding: 1px 3px; background: #313244; border: 1px solid #45475a; border-radius: 3px; color: #cdd6f4; font-size: 10px; text-align: right; flex-shrink: 0; }
+    .ve-row .ve-unit { font-size: 10px; color: #6c7086; width: 18px; flex-shrink: 0; }
   `;
 }

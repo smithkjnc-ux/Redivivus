@@ -9,7 +9,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
   const state = (panel as any).state;
   const _panel = (panel as any)._panel;
 
-  require('fs').appendFileSync(require('os').homedir() + '/chassis_debug.log', `[handleMessage] type=${msg.type} name=${msg.name || ''}\n`);
+  require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[handleMessage] type=${msg.type} name=${msg.name || ''}\n`);
 
   // Remap analysis prompts sent as fix-request to map-context so they route correctly
   if (msg.type === 'fix-request' && /^You are (a senior software architect|a code analyst|explaining code|a code reviewer|a test engineer)\b/.test(msg.text?.trim() || '')) {
@@ -26,12 +26,12 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     if (msg.assistMode) {
       state.assistMode = true;
       const r = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (r) { try { require('fs').writeFileSync(require('path').join(r, '.chassis-assist'), JSON.stringify({ mode: 'assist', addedAt: new Date().toISOString().slice(0, 10) })); } catch {} }
+      if (r) { try { require('fs').writeFileSync(require('path').join(r, '.redivivus-assist'), JSON.stringify({ mode: 'assist', addedAt: new Date().toISOString().slice(0, 10) })); } catch {} }
     }
   }
 
   const msgDeps = {
-    chassis: (panel as any).chassis,
+    redivivus: (panel as any).redivivus,
     routing: (panel as any).routing,
     usageTracker: (panel as any).usageTracker,
     conversation: state.conversation,

@@ -51,7 +51,7 @@ export interface BuildBlueprint {
 
 export class BuildOrchestrator {
   private plans: Map<string, BuildPlan> = new Map();
-  private storageKey = 'chassis_build_plans';
+  private storageKey = 'redivivus_build_plans';
 
   constructor(private context: vscode.ExtensionContext) {
     this.loadPlans();

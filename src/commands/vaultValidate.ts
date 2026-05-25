@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Vault commands — AI validate/recategorize vault items
+// [SCOPE] Redivivus Vault commands — AI validate/recategorize vault items
 
 import * as vscode from 'vscode';
 import * as path from 'path';
@@ -14,11 +14,11 @@ export function registerVaultValidate(
   routing: RoutingService
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.validateVault', async () => {
+    vscode.commands.registerCommand('redivivus.validateVault', async () => {
       const allItems = vaultService.listItems();
       if (allItems.length === 0) { vscode.window.showInformationMessage('Vault is empty. Save some items first.'); return; }
       await vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification, title: 'CHASSIS Vault: Validating categories with AI...', cancellable: true,
+        location: vscode.ProgressLocation.Notification, title: 'Redivivus Vault: Validating categories with AI...', cancellable: true,
       }, async (progress, token) => {
         const BATCH = 20;
         let processed = 0;
@@ -56,7 +56,7 @@ export function registerVaultValidate(
               }
               processed++;
             });
-          } catch (e) { console.warn('[CHASSIS] Batch validation failed:', e); }
+          } catch (e) { console.warn('[Redivivus] Batch validation failed:', e); }
         }
 
         await ensureChatPanelOpen();

@@ -1,5 +1,5 @@
-// [SCOPE] CHASSIS Git Auto-Commit Service — optional local commits after every AI build or fix
-// Asks once per project on first build. Stores answer in .chassis/config.json.
+// [SCOPE] Redivivus Git Auto-Commit Service — optional local commits after every AI build or fix
+// Asks once per project on first build. Stores answer in .redivivus/config.json.
 // Silent on all errors — never interrupts the build pipeline.
 
 import * as vscode from 'vscode';
@@ -60,14 +60,14 @@ function doCommit(root: string, message: string, files?: string[]): void {
 
 function readPref(root: string): 'auto' | 'off' | undefined {
   try {
-    const cfg = JSON.parse(fs.readFileSync(path.join(root, '.chassis', 'config.json'), 'utf-8'));
+    const cfg = JSON.parse(fs.readFileSync(path.join(root, '.redivivus', 'config.json'), 'utf-8'));
     return cfg.autoCommit as 'auto' | 'off' | undefined;
   } catch { return undefined; }
 }
 
 function savePref(root: string, value: 'auto' | 'off'): void {
   try {
-    const cfgPath = path.join(root, '.chassis', 'config.json');
+    const cfgPath = path.join(root, '.redivivus', 'config.json');
     const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
     cfg.autoCommit = value;
     fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2), 'utf-8');
@@ -76,14 +76,14 @@ function savePref(root: string, value: 'auto' | 'off'): void {
 
 export async function autoCommitIfEnabled(root: string, message: string, files?: string[]): Promise<void> {
   try {
-    // Only applies to CHASSIS projects — if no config.json, skip silently
-    if (!fs.existsSync(path.join(root, '.chassis', 'config.json'))) { return; }
+    // Only applies to Redivivus projects — if no config.json, skip silently
+    if (!fs.existsSync(path.join(root, '.redivivus', 'config.json'))) { return; }
     const pref = readPref(root);
     if (pref === 'off') { return; }
     if (pref === 'auto') { doCommit(root, message, files); return; }
     // Never asked — prompt once, plain English
     const choice = await vscode.window.showInformationMessage(
-      'Want CHASSIS to automatically save your change history? You\'ll be able to undo any change at any time.',
+      'Want Redivivus to automatically save your change history? You\'ll be able to undo any change at any time.',
       'Yes, save history',
       'No thanks'
     );

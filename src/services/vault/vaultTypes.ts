@@ -1,5 +1,5 @@
 // [SCOPE] Shared types and constants for the Vault system — VaultItem, categories
-// Rebuilt to spec: ~/.chassis-vault/{category}/{name}_{hash}.json
+// Rebuilt to spec: ~/.redivivus-vault/{category}/{name}_{hash}.json
 
 export const VAULT_CATEGORIES = [
   'component', 'utility', 'algorithm', 'pattern', 'config',
@@ -32,7 +32,7 @@ export interface VaultItem {
   importCount: number;    // times imported into projects
   createdAt: string;      // ISO timestamp
   contentHash: string;    // hash of code for dedup
-  // [CHASSIS] AI quality gate fields — populated by vaultQualityGate.ts
+  // [Redivivus] AI quality gate fields — populated by vaultQualityGate.ts
   useCase?: string;       // AI: "when you would use this"
   qualityScore?: number;  // AI: 1-5 quality rating (3+ = worth saving)
   reusable?: boolean;     // AI: judgment on reusability

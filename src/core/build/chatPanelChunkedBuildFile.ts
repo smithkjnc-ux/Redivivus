@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Chunked Build File Generation -- AI call, retry, 429 fallback, supervisor review
+// [SCOPE] Redivivus Chunked Build File Generation -- AI call, retry, 429 fallback, supervisor review
 // Extracted from chatPanelChunkedLoop.ts (Rule 9 split -- was over 200 lines). Single-file generation only.
 import * as path from 'path';
 import type { BuildContext } from './chatPanelBuild';

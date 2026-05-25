@@ -2,7 +2,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisService } from '../../../services/chassisService';
+import type { RedivivusService } from '../../../services/redivivusService';
 import { AnalysisResult } from './analyzerTypes';
 import { scanDirectory, buildAnalysis } from './analyzerScanner';
 import { generateProjectMap, generateRecommendations, analyzeCurrentFile as _analyzeCurrentFile } from './analyzerReports';
@@ -16,7 +16,7 @@ export { AnalysisResult };
 export class AnalyzerService {
   private lastResult: AnalysisResult | null = null;
 
-  constructor(private chassis: ChassisService) {}
+  constructor(private redivivus: RedivivusService) {}
 
   getLastResult(): AnalysisResult | null { return this.lastResult; }
 
@@ -26,7 +26,7 @@ export class AnalyzerService {
 
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
-      title: 'CHASSIS: Analyzing project...',
+      title: 'Redivivus: Analyzing project...',
       cancellable: false,
     }, async (progress) => {
       progress.report({ increment: 0, message: 'Scanning files...' });
@@ -49,12 +49,12 @@ export class AnalyzerService {
       this.lastResult = result;
       progress.report({ increment: 30, message: 'Generating project map...' });
 
-      const mapPath = path.join(this.chassis.chassisDir, 'project_map.md');
+      const mapPath = path.join(this.redivivus.redivivusDir, 'project_map.md');
       fs.writeFileSync(mapPath, generateProjectMap(result, root));
-      fs.writeFileSync(path.join(this.chassis.chassisDir, 'recommendations.md'), generateRecommendations(result));
+      fs.writeFileSync(path.join(this.redivivus.redivivusDir, 'recommendations.md'), generateRecommendations(result));
       progress.report({ increment: 30, message: 'Done!' });
 
-      this.chassis.appendWorkLog(
+      this.redivivus.appendWorkLog(
         `- Action: Project Analysis\n- Files scanned: ${result.totalFiles}\n` +
         `- Total lines: ${result.totalLines}\n- Large files (>200 lines): ${result.largeFiles.length}\n` +
         `- TODOs found: ${result.todoItems.length}\n- Files needing comments: ${result.uncommentedFiles.length}`
@@ -62,7 +62,7 @@ export class AnalyzerService {
 
       // Persist scan results so Setup Progress survives reload
       try {
-        const cfg = this.chassis.loadConfig();
+        const cfg = this.redivivus.loadConfig();
         if (cfg) {
           cfg.lastScan = new Date().toISOString();
           cfg.scanResults = {
@@ -70,7 +70,7 @@ export class AnalyzerService {
             todos: result.todoItems.map(t => ({ file: t.file, line: t.line })),
             uncommented: result.uncommentedFiles.map(f => ({ relativePath: f.relativePath, lines: f.lines })),
           };
-          this.chassis.saveConfig(cfg);
+          this.redivivus.saveConfig(cfg);
         }
       } catch { /* non-fatal */ }
 
@@ -105,12 +105,12 @@ export class AnalyzerService {
     const result = buildAnalysis(files);
     
     // Update map file
-    const mapPath = path.join(this.chassis.chassisDir, 'project_map.md');
+    const mapPath = path.join(this.redivivus.redivivusDir, 'project_map.md');
     fs.writeFileSync(mapPath, generateProjectMap(result, root));
 
     // Update config snapshot
     try {
-      const cfg = this.chassis.loadConfig();
+      const cfg = this.redivivus.loadConfig();
       if (cfg) {
         cfg.lastScan = new Date().toISOString();
         cfg.scanResults = {
@@ -118,7 +118,7 @@ export class AnalyzerService {
           todos: result.todoItems.map(t => ({ file: t.file, line: t.line })),
           uncommented: result.uncommentedFiles.map(f => ({ relativePath: f.relativePath, lines: f.lines })),
         };
-        this.chassis.saveConfig(cfg);
+        this.redivivus.saveConfig(cfg);
       }
     } catch { /* non-fatal */ }
   }

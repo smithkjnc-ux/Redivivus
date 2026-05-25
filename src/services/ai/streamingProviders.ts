@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Streaming AI Providers — SSE/streaming implementations for all providers.
+// [SCOPE] Redivivus Streaming AI Providers — SSE/streaming implementations for all providers.
 // Used by chatPanelBuildWorker.ts to show code appearing in real-time as the AI generates it.
 // Falls back to a single onChunk call with the full response when streaming is unsupported.
 

@@ -90,19 +90,18 @@ export async function supervisorPlanImpl(
     ? `\n\n${getFolderStructureTemplate(projectType)}`
     : '';
 
-  const prompt = `You are the CHASSIS Supervisor AI. Your ONLY job is to resolve ambiguity in the user's request — do NOT add features, complexity, or implementation patterns the user didn't ask for.${neverDoSection}
+  const prompt = `You are the Redivivus Supervisor AI. Resolve ambiguity — do NOT add features or patterns the user didn't ask for.${neverDoSection}
 
 USER REQUEST: "${userTask}"
 TARGET FILE: ${targetFile}
-${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}Write a TECHNICAL SPEC that:
-- Keeps the SAME scope as the user's request — no new features, no extra classes, no patterns not implied by the request
-- Replaces vague words with specific values ONLY
-- Stays under 200 words
-- Is written as terse direct instructions to the Worker AI
-${folderBlock ? '- Includes the folder structure above so the Worker places each file in the correct subdirectory' : ''}
+${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}Write a PRESCRIPTION the Worker will implement directly — be specific enough that the Worker needs zero guesswork:
+PRESCRIPTION:
+## [filename]
+- [label]: \`[exact function/class/variable name]\` — [exact behavior, return type, key values]
+- [label]: change \`[exact old code]\` → \`[exact new code]\`
 
-DO NOT: add classes, new features, refactor simple tasks into OOP, suggest libraries, or expand scope.
-Reply with ONLY the spec. No preamble.`;
+RULES: Match EXACT scope of request — no extra features. Name every function and key variable. For changes, quote exact text being replaced.${folderBlock ? ' Place each file in the correct subdirectory per the folder structure below.' : ''}
+Reply with ONLY the prescription. No preamble.${folderBlock}`;
   try {
     const res = await callProvider(supervisor, prompt, fetch, 'pro');
     if (res.success && res.text.trim().length > 50) {

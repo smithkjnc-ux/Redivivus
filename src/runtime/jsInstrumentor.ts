@@ -1,13 +1,13 @@
 // [SCOPE] JavaScript instrumentation script generator for Runtime Analysis Engine.
-// Produces chassis_hook.js — a Node.js require() hook loaded via --require flag.
+// Produces redivivus_hook.js — a Node.js require() hook loaded via --require flag.
 // TEMPORARY — must be deleted after analysis (try/finally in caller).
 // No vscode dependency.
 
-/** Returns the content of chassis_hook.js as a string. */
+/** Returns the content of redivivus_hook.js as a string. */
 export function buildJsHookScript(traceOutputPath: string, durationSeconds: number): string {
   // [WARN] ASCII-only content only. No emoji or Unicode in generated script.
   const escapedPath = traceOutputPath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-  return `// chassis_hook.js -- CHASSIS Runtime Analysis instrumentation
+  return `// redivivus_hook.js -- Redivivus Runtime Analysis instrumentation
 // AUTO-GENERATED. DO NOT EDIT. Deleted automatically after analysis.
 'use strict';
 const fs   = require('fs');

@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { ChassisService } from '../../services/chassisService';
+import type { RedivivusService } from '../../services/redivivusService';
 import type { ChangeTracker } from '../../services/build/changeTracker';
 import type { MeasureTwiceService } from '../../services/build/measureTwiceService';
 import type { RoutingService } from '../../services/ai/routingService';
@@ -17,7 +17,7 @@ import { handleAllAnnotated, showRetrofitSummary, buildReport } from './retrofit
 
 export class RetrofitService {
   constructor(
-    private chassis: ChassisService,
+    private redivivus: RedivivusService,
     private routing: RoutingService,
     private measureTwice: MeasureTwiceService,
     private changeTracker: ChangeTracker,
@@ -28,17 +28,17 @@ export class RetrofitService {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) { vscode.window.showErrorMessage('No project folder is open. Open a project first, then try again.'); return; }
 
-    const mapPath = path.join(this.chassis.chassisDir, 'project_map.md');
+    const mapPath = path.join(this.redivivus.redivivusDir, 'project_map.md');
     if (!fs.existsSync(mapPath)) {
       const run = await vscode.window.showInformationMessage(
         'No project analysis found. Run Analyze first?',
         { modal: true }, 'Analyze Now', 'Cancel'
       );
-      if (run === 'Analyze Now') { await vscode.commands.executeCommand('chassis.analyze'); }
+      if (run === 'Analyze Now') { await vscode.commands.executeCommand('redivivus.analyze'); }
       return;
     }
 
-    const recsPath = path.join(this.chassis.chassisDir, 'recommendations.md');
+    const recsPath = path.join(this.redivivus.redivivusDir, 'recommendations.md');
     const filesToProcess = getCodeFiles(root);
     const projectName = path.basename(root);
 
@@ -68,7 +68,7 @@ export class RetrofitService {
         const recsEscaped = recsRaw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const recsHtml = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">📋 Recommendations</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${recsEscaped}</pre></div>`;
         if (!ChatPanel.currentPanel) {
-          vscode.commands.executeCommand('chassis.openChatPanel');
+          vscode.commands.executeCommand('redivivus.openChatPanel');
           setTimeout(() => ChatPanel.currentPanel?.showPanel('recommendations', '📋 Recommendations', recsHtml), 300);
         } else {
           ChatPanel.currentPanel.showPanel('recommendations', '📋 Recommendations', recsHtml);
@@ -78,7 +78,7 @@ export class RetrofitService {
     }
     if (proceed !== 'Start Retrofit') { return; }
 
-    const backupDir = path.join(this.chassis.chassisDir, 'backup');
+    const backupDir = path.join(this.redivivus.redivivusDir, 'backup');
     if (fs.existsSync(backupDir)) {
       const overwrite = await vscode.window.showWarningMessage(
         'A backup already exists. Overwrite it?', { modal: true }, 'Overwrite', 'Cancel'
@@ -89,7 +89,7 @@ export class RetrofitService {
 
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
-      title: 'CHASSIS Retrofit',
+      title: 'Redivivus Retrofit',
       cancellable: true,
     }, async (progress, token) => {
       progress.report({ message: 'Backing up original files...' });
@@ -119,7 +119,7 @@ export class RetrofitService {
           } else {
             result = await this.routing.analyzeFile(
               relPath, content,
-              'Add CHASSIS annotations to this file. Add a [SCOPE] comment at the very top explaining what this file does. Convert any TODO/FIXME/HACK to [TODO]/[WARN]/[DEAD]. Add [WARN] to fragile code. Keep ALL existing code exactly as-is.',
+              'Add Redivivus annotations to this file. Add a [SCOPE] comment at the very top explaining what this file does. Convert any TODO/FIXME/HACK to [TODO]/[WARN]/[DEAD]. Add [WARN] to fragile code. Keep ALL existing code exactly as-is.',
               token
             );
           }
@@ -141,14 +141,14 @@ export class RetrofitService {
       }
 
       progress.report({ message: 'Generating report...' });
-      const reportPath = path.join(this.chassis.chassisDir, 'retrofit_report.md');
+      const reportPath = path.join(this.redivivus.redivivusDir, 'retrofit_report.md');
       fs.writeFileSync(reportPath, buildReport(results, total, failed));
-      this.chassis.appendWorkLog('- Action: Project Retrofit\n- Files processed: ' + total + '\n- Successful: ' + (total - failed) + '\n- Failed: ' + failed + '\n- Backup: .chassis/backup/');
+      this.redivivus.appendWorkLog('- Action: Project Retrofit\n- Files processed: ' + total + '\n- Successful: ' + (total - failed) + '\n- Failed: ' + failed + '\n- Backup: .redivivus/backup/');
       const reportContent = fs.readFileSync(reportPath, 'utf-8');
       const escaped = reportContent.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
       const html = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">🔧 Retrofit Report</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${escaped}</pre></div>`;
       if (!ChatPanel.currentPanel) {
-        vscode.commands.executeCommand('chassis.openChatPanel');
+        vscode.commands.executeCommand('redivivus.openChatPanel');
         setTimeout(() => ChatPanel.currentPanel?.showPanel('retrofit-report', '🔧 Retrofit Report', html), 300);
       } else {
         ChatPanel.currentPanel.showPanel('retrofit-report', '🔧 Retrofit Report', html);
@@ -157,7 +157,7 @@ export class RetrofitService {
   }
 
   async confirmRetrofit(): Promise<void> {
-    const backupDir = path.join(this.chassis.chassisDir, 'backup');
+    const backupDir = path.join(this.redivivus.redivivusDir, 'backup');
     if (!fs.existsSync(backupDir)) { vscode.window.showInformationMessage('No backup to confirm — nothing to do.'); return; }
     const confirm = await vscode.window.showWarningMessage(
       'Delete the backup and keep the restructured files?',
@@ -166,15 +166,15 @@ export class RetrofitService {
     );
     if (confirm === 'Confirm — Delete Backup') {
       deleteDir(backupDir);
-      this.chassis.appendWorkLog('- Action: Retrofit Confirmed\n- Backup deleted');
-      vscode.window.showInformationMessage('\u2705 Retrofit confirmed. Backup deleted. Project is now under CHASSIS structure.');
+      this.redivivus.appendWorkLog('- Action: Retrofit Confirmed\n- Backup deleted');
+      vscode.window.showInformationMessage('\u2705 Retrofit confirmed. Backup deleted. Project is now under Redivivus structure.');
     }
   }
 
   async revertRetrofit(): Promise<void> {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) { return; }
-    const backupDir = path.join(this.chassis.chassisDir, 'backup');
+    const backupDir = path.join(this.redivivus.redivivusDir, 'backup');
     if (!fs.existsSync(backupDir)) { vscode.window.showInformationMessage('No backup found to revert from.'); return; }
     const confirm = await vscode.window.showWarningMessage(
       'Revert all files to their pre-retrofit state?',
@@ -184,7 +184,7 @@ export class RetrofitService {
     if (confirm === 'Revert') {
       restoreFiles(root, backupDir);
       deleteDir(backupDir);
-      this.chassis.appendWorkLog('- Action: Retrofit Reverted\n- Original files restored from backup');
+      this.redivivus.appendWorkLog('- Action: Retrofit Reverted\n- Original files restored from backup');
       vscode.window.showInformationMessage('\u2705 Reverted to original files. Backup cleaned up.');
     }
   }

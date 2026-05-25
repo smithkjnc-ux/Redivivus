@@ -1,22 +1,22 @@
-// [SCOPE] CHASSIS Timeline Command — view project history in chat panel
+// [SCOPE] Redivivus Timeline Command — view project history in chat panel
 
 import * as vscode from 'vscode';
-import type { ChassisService } from '../services/chassisService.js';
+import type { RedivivusService } from '../services/redivivusService.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 import { TimelineService } from '../services/timelineService.js';
 
 export function registerTimelineCommand(
   context: vscode.ExtensionContext,
-  chassis: ChassisService,
+  redivivus: RedivivusService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.viewTimeline', async () => {
+    vscode.commands.registerCommand('redivivus.viewTimeline', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
         vscode.window.showErrorMessage('No workspace open.');
         return;
       }
-      ChatPanel.show(chassis, null as any, null as any, null as any);
+      ChatPanel.show(redivivus, null as any, null as any, null as any);
       setTimeout(() => {
         const panel = ChatPanel.currentPanel;
         if (panel) {

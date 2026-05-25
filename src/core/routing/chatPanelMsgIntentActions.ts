@@ -30,7 +30,7 @@ export async function handleRunIntent(intent: any, deps: MessageHandlerDeps, con
       conversation.push({ role: 'assistant', content: 'No package.json or requirements.txt found -- nothing to install.', timestamp: Date.now() });
       refresh(); return;
     }
-    const terminal = vscode.window.createTerminal(`CHASSIS: Install (${depsLabel})`);
+    const terminal = vscode.window.createTerminal(`Redivivus: Install (${depsLabel})`);
     terminal.show();
     terminal.sendText(installCmd);
     conversation.push({ role: 'assistant', content: `⌛ Running \`${installCmd}\` in terminal...`, timestamp: Date.now() });

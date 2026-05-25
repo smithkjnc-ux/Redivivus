@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS File Split Assistant Command — scans and suggests file splits
+// [SCOPE] Redivivus File Split Assistant Command — scans and suggests file splits
 
 import * as vscode from 'vscode';
 import { FileSplitService } from '../services/code/fileSplitService.js';
@@ -10,7 +10,7 @@ export function registerFileSplitCommand(
   routing: RoutingService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.splitFiles', async () => {
+    vscode.commands.registerCommand('redivivus.splitFiles', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
         vscode.window.showErrorMessage('No workspace open.');

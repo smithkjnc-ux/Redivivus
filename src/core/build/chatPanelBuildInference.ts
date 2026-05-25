@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build Pipeline — Inference helpers (target detection, extension inference)
+// [SCOPE] Redivivus Build Pipeline — Inference helpers (target detection, extension inference)
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import * as fs from 'fs';

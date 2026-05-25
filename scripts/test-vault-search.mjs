@@ -12,8 +12,8 @@ function test(name, fn) {
   catch (e) { console.log(`  ✗ ${name}\n    ${e.message}`); failed++; }
 }
 
-// ── Load real vault items from ~/.chassis-vault ──────────────────────────────
-const VAULT_ROOT = path.join(os.homedir(), '.chassis-vault');
+// ── Load real vault items from ~/.redivivus-vault ──────────────────────────────
+const VAULT_ROOT = path.join(os.homedir(), '.redivivus-vault');
 function loadVaultItems() {
   const items = [];
   if (!fs.existsSync(VAULT_ROOT)) { return items; }
@@ -97,7 +97,7 @@ function findRelevantByTaskOLD(task, items) {
 // ── formatVaultContext (mirrors vaultContextService.ts buildContextBlock) ──────
 function formatVaultContext(items) {
   const lines = [
-    '=== CHASSIS VAULT: Relevant existing code ===',
+    '=== Redivivus VAULT: Relevant existing code ===',
     'The following reusable blocks already exist in the project vault.',
     'PREFER using or adapting these over writing new code from scratch.',
     '',
@@ -170,7 +170,7 @@ test('context block includes description and useCase', () => {
   const hits = findRelevantByTask(task, vaultItems);
   assert(hits.length > 0, 'No vault hits for game task');
   const block = formatVaultContext(hits.slice(0, 3));
-  assert(block.includes('=== CHASSIS VAULT'), 'Missing vault header');
+  assert(block.includes('=== Redivivus VAULT'), 'Missing vault header');
   const hasDesc = hits.slice(0,3).some(i => i.description && block.includes(i.description.slice(0,20)));
   assert(hasDesc, 'No description found in context block');
   const hasUseCase = hits.slice(0,3).some(i => i.useCase && block.includes('Use when:'));

@@ -97,8 +97,8 @@ export function renderVaultBrowser(allItems: VaultItem[]): string {
     <div style="text-align:center;padding:48px 20px;">
       <div style="font-size:52px;margin-bottom:12px;">🏦</div>
       <div style="font-size:17px;font-weight:700;color:#333;margin-bottom:8px;">Your Vault is empty</div>
-      <div style="font-size:13px;color:#666;line-height:1.6;max-width:280px;margin:0 auto 20px;">Every time CHASSIS builds something for you, it automatically saves the best parts here so they can be reused.</div>
-      <button data-cmd="chassis.scanVaultCodebase" style="padding:10px 24px;background:#1a6fb8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">📁 Scan My Project to Fill the Vault</button>
+      <div style="font-size:13px;color:#666;line-height:1.6;max-width:280px;margin:0 auto 20px;">Every time Redivivus builds something for you, it automatically saves the best parts here so they can be reused.</div>
+      <button data-cmd="redivivus.scanVaultCodebase" style="padding:10px 24px;background:#1a6fb8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;">📁 Scan My Project to Fill the Vault</button>
     </div>`;
 
   // Stats cells — fully inline, no classes
@@ -136,18 +136,18 @@ export function renderVaultBrowser(allItems: VaultItem[]): string {
     </div>
 
     <div style="display:flex;gap:8px;padding:4px 14px 10px;">
-      <button data-cmd="chassis.buildFromVault" style="flex:1;padding:9px 8px;background:#1a6fb8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">🏗️ Build From Vault</button>
-      <button data-cmd="chassis.scanVaultCodebase" style="flex:1;padding:9px 8px;background:#fff;color:#1a6fb8;border:2px solid #1a6fb8;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">📁 Scan Project</button>
+      <button data-cmd="redivivus.buildFromVault" style="flex:1;padding:9px 8px;background:#1a6fb8;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">🏗️ Build From Vault</button>
+      <button data-cmd="redivivus.scanVaultCodebase" style="flex:1;padding:9px 8px;background:#fff;color:#1a6fb8;border:2px solid #1a6fb8;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;">📁 Scan Project</button>
     </div>
 
     <details style="margin:0 14px 12px;background:#fffbea;border:1px solid #f0d060;border-radius:10px;overflow:hidden;">
       <summary style="list-style:none;padding:10px 14px;cursor:pointer;font-size:12px;font-weight:700;color:#7a5c00;user-select:none;">💡 What is a Vault? Tap to learn more</summary>
       <div style="padding:4px 14px 12px;">
         <p style="font-size:12px;color:#555;line-height:1.7;margin:4px 0;">
-          <strong>A Vault is like a secure drawer on your own computer.</strong> Every time CHASSIS builds something for you, it automatically saves the best parts — small tools, screen pieces, logic — right here.
+          <strong>A Vault is like a secure drawer on your own computer.</strong> Every time Redivivus builds something for you, it automatically saves the best parts — small tools, screen pieces, logic — right here.
         </p>
         <p style="font-size:12px;color:#555;line-height:1.7;margin:0 0 4px;">
-          The next time you need something similar, CHASSIS checks your Vault first and reuses what's already there. <strong>Faster builds, lower cost, consistent code.</strong>
+          The next time you need something similar, Redivivus checks your Vault first and reuses what's already there. <strong>Faster builds, lower cost, consistent code.</strong>
         </p>
         <p style="font-size:12px;color:#555;line-height:1.7;margin:0;">
           Your data stays on your own machine. No cloud. No one else can see it.

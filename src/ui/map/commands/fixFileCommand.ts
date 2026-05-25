@@ -15,6 +15,6 @@ export async function executeFixFile(msg: any, ctx: MapMsgCtx): Promise<void> {
       : issueType === 'refactor'
       ? `Refactor ${msg.nodeId} for clarity, simplicity, and best practices. Reduce complexity, improve naming, and remove dead code.`
       : `Add a [SCOPE] comment at the top of ${msg.nodeId} explaining what this file does.`;
-    await vscode.commands.executeCommand('chassis.runEditFix', task, msg.nodeId, issueType);
+    await vscode.commands.executeCommand('redivivus.runEditFix', task, msg.nodeId, issueType);
   }
 }

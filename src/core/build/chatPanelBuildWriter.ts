@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Build Pipeline — File Writing, Snapshots, and Post-build actions
+// [SCOPE] Redivivus Build Pipeline — File Writing, Snapshots, and Post-build actions
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import * as fs from 'fs';

@@ -1,4 +1,4 @@
-# CHASSIS Enforcement Rules — Cursor
+# Redivivus Enforcement Rules — Cursor
 # Auto-loaded by Cursor. These rules are NOT optional.
 # They apply to every file touch in this project, no exceptions, no shortcuts.
 
@@ -6,12 +6,12 @@
 
 Complete ALL of the following before writing a single line of code:
 
-1. Read CHASSIS_ROADMAP.md in full.
-2. Read .chassis/rules.md in full.
-3. Read .chassis/blueprint.md — confirm your change fits the project scope.
+1. Read REDIVIVUS_ROADMAP.md in full.
+2. Read .redivivus/rules.md in full.
+3. Read .redivivus/blueprint.md — confirm your change fits the project scope.
 4. Read the [SCOPE] tag at the top of every file you plan to touch.
 5. Read every [WARN] tag in or near the code you plan to change.
-6. Check CHASSIS_ROADMAP.md for [DEAD] entries related to what you're about to do.
+6. Check REDIVIVUS_ROADMAP.md for [DEAD] entries related to what you're about to do.
 
 If any step is skipped, stop and complete it first.
 
@@ -19,7 +19,7 @@ If any step is skipped, stop and complete it first.
 
 After every single file touch — one line, one comment, anything:
 
-1. Open CHASSIS_ROADMAP.md
+1. Open REDIVIVUS_ROADMAP.md
 2. Add an entry: file changed, what changed, why, any risk introduced
 3. Update the *Last updated:* line with today's date
 
@@ -50,6 +50,6 @@ CSS/SCSS:              /* [TAG] */
 ## Consequence of Non-Compliance
 
 Skipping these rules corrupts the project history chain that every future AI and human depends on.
-CHASSIS exists to prevent this. You are in a CHASSIS project. Follow the rules.
+Redivivus exists to prevent this. You are in a Redivivus project. Follow the rules.
 
-Rules also exist in: CLAUDE.md, .chassis/rules.md, .windsurf/rules.md
+Rules also exist in: CLAUDE.md, .redivivus/rules.md, .windsurf/rules.md

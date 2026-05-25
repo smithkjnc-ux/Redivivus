@@ -14,7 +14,7 @@ import { findRelevantByTask } from '../../services/vault/buildFromVaultSearch';
 import { formatVaultContext, isVaultEnabled } from '../../services/vault/vaultContextService';
 import { collectFixContext } from './chatPanelMsgFixContext';
 import { detectPatterns, buildSupervisorNotes, buildWorkerRules, validateOutputFiles } from './chatPanelMsgFixPatterns';
-import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules';
+import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService';
 import { initFixLogger, fixLog, finalizeFixLogger, getCurrentLogPath } from '../../services/logging/fixPipelineLogger';
 
@@ -33,10 +33,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   fixLog('=== Fix Request Started ===', { userText, root, imageProvided: !!imageBase64 });
 
   // [DIAG] Log source file discovery for debugging
-  const diagLog = (msg: string) => {
-    try { fs.appendFileSync('/tmp/chassis_debug.log', `[fix] ${msg}\n`); } catch {}
-    fixLog(msg);
-  };
+  const diagLog = (msg: string) => { try { fs.appendFileSync('/tmp/redivivus_debug.log', `[fix] ${msg}\n`); } catch {} fixLog(msg); };
   diagLog(`root=${root} exists=${fs.existsSync(root)}`);
 
   let sourceFiles = collectSourceFiles(root, userText);
@@ -85,7 +82,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // [LOG] Debug: What files are we sending to the AI?
   fixLog('Files selected for AI context', { fileNames, count: sourceFiles.length });
   sourceFiles.forEach(f => fixLog(`  File: ${f.rel}`, { chars: f.content.length }));
-  const activePatterns = detectPatterns(filesBlock);
+  const activePatterns = detectPatterns(filesBlock, userText);
   const projectDeadEnds = readProjectDeadEnds(root);
   const vaultCtx = (deps.vault && isVaultEnabled()) ? (() => { const h = findRelevantByTask(userText, deps.vault!.listItems()); return h.items.length > 0 ? formatVaultContext(h.items.slice(0, 4)) + '\n' : ''; })() : '';
   const buildContext = vaultCtx + collectFixContext(root, sourceFiles);
@@ -145,23 +142,29 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
 
   // [FIX] Try surgical edits first (SEARCH/REPLACE), fall back to full-file parsing
   fixLog('Phase 3: Applying fix content...');
-  fixLog('Phase 3: Parsing response for file edits...');
   const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
   const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
   let { written, failed, skipped, fixSnapId } = applyRes;
   fixLog('Phase 3: Application complete', { written, failed, skipped });
   
   if (written.length === 0 && failed.length === 0) {
-    const skipNote = skipped.length > 0 ? `\n\n⚠️ AI tried to create ${skipped.length} file(s) not in this project: ${skipped.join(', ')}` : '';
-    const plainSummary = diagnosis.match(/^PLAIN:\s*(.+?)(?:\n|$)/m)?.[1]?.trim() ?? '';
-    // Log as dead end so future Supervisor prompts avoid repeating this no-output approach
-    const deadEndTask = userText.slice(0, 80).replace(/\s+/g, ' ');
-    appendProjectDeadEnd(root, `fix-no-output: ${deadEndTask}`, plainSummary || 'Worker produced no parseable file edits', 'Response had no FILE: blocks or SEARCH/REPLACE markers — fix was never applied to disk', 'Ensure each changed file has a fenced code block with a FILE: header or uses SEARCH/REPLACE format');
-    conversation[conversation.length - 1].content =
-      (plainSummary ? `**What I found:** ${plainSummary}\n\n` : '') +
-      `Couldn't make the change automatically. Try describing what to fix in more detail.${skipNote}`;
-    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
+    const { retryNoOutput } = await import('./chatPanelMsgFixRetry.js');
+    const retryResult = await retryNoOutput({ diagnosis, filesBlock, fileNames, activePatterns, allowedRels, deps, userText, conversation, refresh, supervisorLabel, root });
+    if (retryResult.written.length > 0) {
+      written = retryResult.written; failed = retryResult.failed; skipped = retryResult.skipped; fixSnapId = retryResult.fixSnapId; workerLabel = retryResult.workerLabel;
+    } else {
+      const plain = diagnosis.match(/^PLAIN:\s*(.+?)(?:\n|$)/m)?.[1]?.trim() ?? '';
+      const skipNote = skipped.length > 0 ? `\n\n⚠️ AI tried to create ${skipped.length} file(s) not in this project: ${skipped.join(', ')}` : '';
+      appendProjectDeadEnd(root, `fix-no-output: ${userText.slice(0,80)}`, plain || 'Worker produced no parseable file edits', 'No FILE: blocks or SEARCH/REPLACE markers after two attempts', 'Add FILE: header with fenced code block for each changed file');
+      conversation[conversation.length - 1].content = (plain ? `**What I found:** ${plain}\n\n` : '') + `Couldn't make the change automatically. Try describing what to fix in more detail.${skipNote}`;
+      refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
+    }
   }
+
+  // Auto-retry if known patterns survived the first write — transparent to user on success
+  const { retryPatternFix } = await import('./chatPanelMsgFixRetry.js');
+  const retryRes = await retryPatternFix({ written, activePatterns, root, diagnosis, supervisorLabel, allowedRels, deps, userText, conversation, refresh });
+  if (retryRes.retried && retryRes.written.length > 0) { written = retryRes.written; workerLabel = retryRes.workerLabel; }
 
   finalizeFixLogger();
   const { presentFixResult } = await import('./chatPanelMsgFixOutput.js');
@@ -171,14 +174,8 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // Compiler as truth — real execution feedback Guardian AI cannot provide
   if (written.length > 0) {
     const { runCompileAutoFix } = await import('../../services/build/compileAutoFix.js');
-    const compileCtx = {
-      task: userText, root, blueprintContext: '',
-      routing: deps.routing, conversation, refresh,
-      logError: () => {},
-      vault: deps.vault,
-      postToWebview: (m: any) => deps.panel?.webview?.postMessage(m),
-    };
-    await runCompileAutoFix(compileCtx as any, written);
+    const ctx = { task: userText, root, blueprintContext: '', routing: deps.routing, conversation, refresh, logError: () => {}, vault: deps.vault, postToWebview: (m: any) => deps.panel?.webview?.postMessage(m) };
+    await runCompileAutoFix(ctx as any, written);
   }
 
   if (needsAgentHandoff) {

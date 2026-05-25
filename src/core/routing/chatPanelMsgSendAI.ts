@@ -27,12 +27,12 @@ export async function handleAIChat(
   refresh: () => void,
   options?: { isConvert?: boolean },
 ): Promise<void> {
-  const { chassis, routing, usageTracker } = deps;
+  const { redivivus, routing, usageTracker } = deps;
   const isConvert = options?.isConvert ?? false;
   try {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
     const recentUserMsgs = conversation.filter(m => m.role === 'user').slice(-4, -1).map(m => m.content);
-    const prefix = buildAIPrefix(chassis, recentUserMsgs, routing, conversation.slice(-14), userText);
+    const prefix = buildAIPrefix(redivivus, recentUserMsgs, routing, conversation.slice(-14), userText);
     (routing as any).promptFailoverCallback = (failedAI: string, nextAI: string) => {
       conversation.push({ role: 'assistant', content: `Switching to ${AI_LABEL[nextAI] || nextAI}...`, timestamp: Date.now() });
       refresh();
@@ -50,7 +50,7 @@ export async function handleAIChat(
     let lastResponseModel = '';
 
     if (isConvert && wsRoot) {
-      // [CHASSIS] Conversion path: chunked for large files, single-call for small ones
+      // [Redivivus] Conversion path: chunked for large files, single-call for small ones
       const chunked = await runChunkedConvert(userText, wsRoot, routing, usageTracker, conversation, refresh);
       if (chunked) {
         finalText = chunked.finalText;
@@ -90,7 +90,7 @@ export async function handleAIChat(
     // Running a code-review prompt on a conversational Q&A answer causes Guardian to strip the conversation and hallucinate file replacements.
     if (routing.isGuardianActive() && isConvert && hasCodeBlock) {
       const workerAI = routing.getAvailableAI().ai;
-      const blueprintCtx = chassis.isInitialized() ? (chassis.loadConfig()?.blueprint ? JSON.stringify(chassis.loadConfig()!.blueprint) : '') : '';
+      const blueprintCtx = redivivus.isInitialized() ? (redivivus.loadConfig()?.blueprint ? JSON.stringify(redivivus.loadConfig()!.blueprint) : '') : '';
       const guardianTask = isConvert ? `Code conversion/transform task: ${userText}` : userText;
       const review = await routing.guardianReview(guardianTask, finalText, workerAI, blueprintCtx).catch(() => null);
       if (review && review.guardianAI && review.guardianAI !== 'none') {

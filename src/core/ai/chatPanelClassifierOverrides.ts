@@ -1,43 +1,43 @@
-// [SCOPE] CHASSIS intent classifier — hardcoded fast-path overrides before AI call
+// [SCOPE] Redivivus intent classifier — hardcoded fast-path overrides before AI call
 // Patterns where the user's structural phrasing unambiguously maps to a specific intent.
 // Rule 18: these are structural/keyword matches (vault, map, session), NOT natural language understanding.
 
 import type { IntentResult } from './chatPanelClassifier';
 
 export function checkHardcodedOverrides(t: string): IntentResult | null {
-  // CHASSIS navigation commands
+  // Redivivus navigation commands
   if (/\b(close|exit|leave|quit)\b.*(current\s+)?(project|folder|workspace)/i.test(t) ||
       /\b(close|exit)\s+(this|the)\s+(project|folder)/i.test(t)) {
     return { type: 'command', command: 'workbench.action.closeFolder' };
   }
   if (/\b(open|show|view|see|browse|launch)\b.*(the\s+)?vault\b/i.test(t) ||
       /\bvault\b.*(open|show|view|browse)/i.test(t)) {
-    return { type: 'command', command: 'chassis.openVault' };
+    return { type: 'command', command: 'redivivus.openVault' };
   }
   if (/\b(scan|search)\b.*\b(codebase|project|workspace|folder|files?)\b.*\bvault\b/i.test(t) ||
       /\b(scan|search)\b.*\breusable\b.*\bvault\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.scanVaultCodebase' };
+    return { type: 'command', command: 'redivivus.scanVaultCodebase' };
   }
   if (/\b(open|show|view)\b.*(the\s+)?blueprint\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.openBlueprint' };
+    return { type: 'command', command: 'redivivus.openBlueprint' };
   }
   if (/\b(open|show|view)\b.*(the\s+)?(architecture\s+)?map\b/i.test(t) ||
       /\barchitecture\s+map\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.showMap' };
+    return { type: 'command', command: 'redivivus.showMap' };
   }
   if (/\b(start|begin|new)\s+session\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.startSession' };
+    return { type: 'command', command: 'redivivus.startSession' };
   }
   if (/\b(end|stop|finish|done\s+for\s+now)\s+(the\s+)?session\b/i.test(t) ||
       /\bdone\s+for\s+(now|today)\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.endSession' };
+    return { type: 'command', command: 'redivivus.endSession' };
   }
   if (/\b(save\s+point|savepoint|checkpoint|save\s+my\s+work)\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.savePoint' };
+    return { type: 'command', command: 'redivivus.savePoint' };
   }
   if (/\b(switch|open|go\s+to|load)\s+(to\s+)?(a\s+)?(different|another|new\s+)?project\b/i.test(t) ||
       /\bopen\s+project\b/i.test(t)) {
-    return { type: 'command', command: 'chassis.openProject' };
+    return { type: 'command', command: 'redivivus.openProject' };
   }
 
   // "yes, apply the fix" / "yes fix it" / "go ahead" after a fix diagnosis → question (re-confirm context)

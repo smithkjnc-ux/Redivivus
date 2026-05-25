@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Chat Panel Doc Generator — auto-writes docs/README.md after every build
+// [SCOPE] Redivivus Chat Panel Doc Generator — auto-writes docs/README.md after every build
 
 import * as path from 'path';
 import * as fs from 'fs';

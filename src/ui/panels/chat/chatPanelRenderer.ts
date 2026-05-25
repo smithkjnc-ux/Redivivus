@@ -40,7 +40,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
       const b64path = encodeBase64(filepath);
       return `<div class="build-result"><button class="open-file-btn" data-path="${b64path}">📂 Open ${escapeHtml(filename)}</button></div>`;
     });
-    // [CHASSIS] Preview in Browser button for HTML/web builds
+    // [Redivivus] Preview in Browser button for HTML/web builds
     html = html.replace(/__PREVIEW_BROWSER__([^|]+)\|\|\|END_PREVIEW_BROWSER__/g, (_m, filepath) => {
       const b64path = encodeBase64(filepath);
       return `<div class="build-result" style="margin-top:6px;"><button class="preview-browser-btn" data-path="${b64path}">🌐 Preview in Browser</button></div>`;
@@ -49,7 +49,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
     html = html.replace(/__BUILD_RESULT__[^\n]*/g, '');
     html = html.replace(/__PREVIEW_BROWSER__[^\n]*/g, '');
     
-    // [CHASSIS] Guided Blueprint Mode token — renders inline gap question form
+    // [Redivivus] Guided Blueprint Mode token — renders inline gap question form
     html = html.replace(/__BLUEPRINT_GAPS__([a-z0-9]+)\|\|\|(\[.*?\])\|\|\|([^|]*)\|\|\|END_BLUEPRINT_GAPS__/g, (_m, sid, gapsJson, encodedTask) => {
       let gaps: Array<{ field: string; question: string; hint: string; currentValue: string }> = [];
       try { gaps = JSON.parse(gapsJson); } catch { return ''; }
@@ -74,14 +74,14 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `</div>`;
     });
 
-    // [CHASSIS] Multi-file build clarification token — delegates to chatPanelRendererClarify
+    // [Redivivus] Multi-file build clarification token — delegates to chatPanelRendererClarify
     // [WARN] escapeHtml() runs first (line 27), so JSON quotes become &quot; — must unescape before parse
     html = html.replace(/__CLARIFY__(.*?)__END_CLARIFY__/g, (_m, rawJson) => {
       const unescaped = rawJson.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#039;/g, "'");
       try { return renderClarifyCard(JSON.parse(unescaped)); } catch { return ''; }
     });
 
-    // [CHASSIS] Vault dedup actions token — renders Merge button
+    // [Redivivus] Vault dedup actions token — renders Merge button
     html = html.replace(/__VAULT_DEDUP_ACTIONS__END_VAULT_DEDUP__/g, () => {
       return `<div class="vault-dedup-actions">`
         + `<button class="vault-dedup-merge-btn" style="padding:5px 14px;background:rgba(251,191,36,0.12);color:#fbbf24;border:1px solid #fbbf24;border-radius:6px;cursor:pointer;font-size:11px;font-weight:600;font-family:inherit;margin-right:8px;">Merge duplicates</button>`
@@ -89,7 +89,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `</div>`;
     });
 
-    // [CHASSIS] Technical details collapsible — plain-language fix output hides verbose diagnosis here
+    // [Redivivus] Technical details collapsible — plain-language fix output hides verbose diagnosis here
     html = html.replace(/__TECH_DETAILS__([\s\S]*?)__END_TECH__/g, (_m, raw) => {
       const content = raw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#039;/g,"'");
       const safe = content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -97,12 +97,12 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `<pre style="font-size:11px;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,0.2);border-radius:6px;padding:10px;margin-top:8px;color:var(--vscode-descriptionForeground);line-height:1.5;">${safe}</pre></details>`;
     });
 
-    // [CHASSIS] GitHub commit button — shown on fix/build result cards when GitHub is connected
+    // [Redivivus] GitHub commit button — shown on fix/build result cards when GitHub is connected
     html = html.replace(/__GITHUB_COMMIT__([A-Za-z0-9+/=]+)\|\|\|END_GITHUB_COMMIT__/g, (_m, b64) => {
       return `<button class="github-commit-btn" data-payload="${b64}" style="margin-top:10px;padding:6px 14px;background:rgba(30,215,96,0.12);color:#1ed760;border:1px solid rgba(30,215,96,0.4);border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit;">&#x1F4BE; Commit + Push to GitHub</button>`;
     });
 
-    // [CHASSIS] Terminal error token — renders error card with "Fix this error" button
+    // [Redivivus] Terminal error token — renders error card with "Fix this error" button
     html = html.replace(/__TERMINAL_ERROR__([A-Za-z0-9+/=]+)\|\|\|END_TERMINAL_ERROR__/g, (_m, b64ctx) => {
       return `<div class="terminal-error-card">`
         + `<div class="terminal-error-label">[!] Terminal Error</div>`
@@ -110,13 +110,13 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `</div>`;
     });
 
-    // [CHASSIS] Edit Visually button — opens the Visual Contract Editor panel
+    // [Redivivus] Edit Visually button — opens the Visual Contract Editor panel
     html = html.replace(/__EDIT_VISUALLY__(.+?)\|\|\|END_EDIT_VISUALLY__/g, (_m, rawRoot) => {
       const b64 = encodeBase64(rawRoot);
       return `<button class="edit-visually-btn" data-root="${b64}" style="margin-top:8px;padding:7px 14px;background:linear-gradient(135deg,#89b4fa,#74c7ec);color:#1e1e2e;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:700;font-family:inherit;box-shadow:0 2px 6px rgba(137,180,250,0.3);">✏️ Edit Visually</button>`;
     });
 
-    // [CHASSIS] Open workspace token — renders a manual button instead of forcing a window reload
+    // [Redivivus] Open workspace token — renders a manual button instead of forcing a window reload
     html = html.replace(/__OPEN_WORKSPACE__(.+?)\|\|\|END_OPEN__/g, (_m, rawPath) => {
       const b64 = encodeBase64(rawPath);
       return `<button class="open-workspace-btn" data-path="${b64}" style="margin-top:10px;padding:8px 16px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;width:100%;box-shadow:0 2px 6px rgba(16,185,129,0.3);">&#x1F4C2; Open Project in Explorer (Reloads Window)</button>`;

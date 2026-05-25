@@ -1,27 +1,27 @@
-# CHASSIS Template Registry
+# Redivivus Template Registry
 
-> This document describes the structure and contribution guidelines for the CHASSIS remote template registry.
-> The registry lives at: `https://github.com/smithkjnc-ux/chassis-templates`
+> This document describes the structure and contribution guidelines for the Redivivus remote template registry.
+> The registry lives at: `https://github.com/smithkjnc-ux/redivivus-templates`
 
 ---
 
 ## What This Is
 
-The CHASSIS extension is lean by design — templates and vault patterns are NOT bundled with the extension.
+The Redivivus extension is lean by design — templates and vault patterns are NOT bundled with the extension.
 Instead they live in this separate repo and are pulled on demand when a user chooses a template.
 
 This means:
 - Extension stays small and fast to install
 - Templates can be updated without releasing a new extension version
 - Community can contribute templates via pull requests
-- Users can fork the registry and point CHASSIS at their own version
+- Users can fork the registry and point Redivivus at their own version
 
 ---
 
 ## Registry Structure
 
 ```
-chassis-templates/
+redivivus-templates/
 ├── README.md                    <- This file (registry root)
 ├── registry.json                <- Machine-readable index of all templates
 │
@@ -84,7 +84,7 @@ Each template folder contains a `meta.json`:
   "category": "web",
   "tags": ["html", "css", "js", "portfolio"],
   "license": "MIT",
-  "author": "CHASSIS Core Team",
+  "author": "Redivivus Core Team",
   "version": "1.0.0",
   "wizardQuestions": [
     { "id": "name", "prompt": "Your name or brand", "placeholder": "Jane Smith", "required": true },
@@ -109,24 +109,24 @@ All templates in this registry must:
 
 ---
 
-## How CHASSIS Uses Templates
+## How Redivivus Uses Templates
 
 1. User types: "Build me a portfolio website"
-2. CHASSIS detects template intent
+2. Redivivus detects template intent
 3. Shows Quick Pick: Website > Portfolio / Business / Blog / Dashboard
 4. User selects "Portfolio / Personal Site"
 5. Wizard asks: name, tagline, color
-6. CHASSIS fetches `web/portfolio/index.html` from this repo
+6. Redivivus fetches `web/portfolio/index.html` from this repo
 7. AI customizes it with user's answers
 8. Complete personalized file written to project
 
-If the registry is unavailable (offline), CHASSIS falls back to AI generation from scratch.
+If the registry is unavailable (offline), Redivivus falls back to AI generation from scratch.
 
 ---
 
 ## Contributing Templates
 
-1. Fork `https://github.com/smithkjnc-ux/chassis-templates`
+1. Fork `https://github.com/smithkjnc-ux/redivivus-templates`
 2. Add your template folder under the appropriate category
 3. Include `meta.json` with all required fields
 4. Ensure template works standalone (test before submitting)
@@ -139,8 +139,8 @@ If the registry is unavailable (offline), CHASSIS falls back to AI generation fr
 Run these commands to initialize the registry:
 
 ```bash
-git clone https://github.com/smithkjnc-ux/chassis-templates
-cd chassis-templates
+git clone https://github.com/smithkjnc-ux/redivivus-templates
+cd redivivus-templates
 # Create the folder structure
 mkdir -p web/portfolio web/business web/blog web/dashboard
 mkdir -p games/arcade games/puzzle
@@ -153,11 +153,11 @@ mkdir -p vault-patterns/utility vault-patterns/api vault-patterns/auth vault-pat
 
 ## Custom Registry
 
-Power users can point CHASSIS at their own registry by setting in VSCodium settings:
+Power users can point Redivivus at their own registry by setting in VSCodium settings:
 
 ```json
 {
-  "chassis.templateRegistryUrl": "https://raw.githubusercontent.com/YOUR_ORG/your-templates/main"
+  "redivivus.templateRegistryUrl": "https://raw.githubusercontent.com/YOUR_ORG/your-templates/main"
 }
 ```
 

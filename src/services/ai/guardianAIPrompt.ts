@@ -85,7 +85,7 @@ DIRECT MODE LIMITATION RULE:
 If the user's task is complex and requires multi-file logic/coordination (changing more than one file), running terminal commands/servers (like starting a Node/Python HTTP server), or active diagnostic diagnostics/testing that a single-file write cannot achieve or verify, you MUST reject the pass.
 WARNING: You are reviewing a simple direct-mode worker. This worker is physically incapable of running commands, starting servers, or testing code in a browser. If the worker claims to have "Verified", "Tested", or "Run" the code (e.g. claiming "Game is ready at localhost" or "All module dependencies load"), IT IS HALLUCINATING. Ignore its claims of verification and strictly reject the pass if the task requires environment testing.
 Output exactly this line under GUARDIAN_ISSUES:
-"Simple Pipeline is insufficient for this task because it requires multi-file coordination or environment diagnostics. Routing to Agent Pipeline to allow CHASSIS to autonomously fix and verify this."
+"Simple Pipeline is insufficient for this task because it requires multi-file coordination or environment diagnostics. Routing to Agent Pipeline to allow Redivivus to autonomously fix and verify this."
 
 If code is correct and no scope violations: GUARDIAN_PASS
 

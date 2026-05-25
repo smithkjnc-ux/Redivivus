@@ -1,24 +1,24 @@
-// [SCOPE] CHASSIS service orchestrator — thin facade over path, config, init, rules, and logging modules
+// [SCOPE] Redivivus service orchestrator — thin facade over path, config, init, rules, and logging modules
 // Split from 427-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { ChassisPaths, isInitialized, hasWorkspace } from './project/chassisPaths.js';
-import { loadConfig, saveConfig } from './chassisConfig.js';
-import { initProject, scaffoldAt } from './project/chassisInit.js';
-import { generateRules } from './chassisRules.js';
-import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from './chassisLogging.js';
+import { RedivivusPaths, isInitialized, hasWorkspace } from './project/redivivusPaths.js';
+import { loadConfig, saveConfig } from './redivivusConfig.js';
+import { initProject, scaffoldAt } from './project/redivivusInit.js';
+import { generateRules } from './redivivusRules.js';
+import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from './redivivusLogging.js';
 
-export class ChassisService {
-  private paths: ChassisPaths;
+export class RedivivusService {
+  private paths: RedivivusPaths;
 
   constructor(root?: string) {
-    this.paths = new ChassisPaths(root);
+    this.paths = new RedivivusPaths(root);
   }
 
-  // ── path helpers (delegated to ChassisPaths)
+  // ── path helpers (delegated to RedivivusPaths)
 
-  get chassisDir(): string { return this.paths.chassisDir; }
+  get redivivusDir(): string { return this.paths.redivivusDir; }
   get configPath(): string { return this.paths.configPath; }
   get blueprintPath(): string { return this.paths.blueprintPath; }
   get worklogPath(): string { return this.paths.worklogPath; }
@@ -26,21 +26,21 @@ export class ChassisService {
   get sessionsDir(): string { return this.paths.sessionsDir; }
   get roadmapPath(): string { return this.paths.roadmapPath; }
 
-  // ── state checks (delegated to ChassisPaths)
+  // ── state checks (delegated to RedivivusPaths)
 
   isInitialized(): boolean { return isInitialized(this.paths); }
   hasWorkspace(): boolean { return hasWorkspace(this.paths); }
 
-  /** Returns true if the given folder has already been set up with CHASSIS (.chassis/config.json exists). */
-  static hasChassisSetup(folderPath: string): boolean {
-    return fs.existsSync(path.join(folderPath, '.chassis', 'config.json'));
+  /** Returns true if the given folder has already been set up with Redivivus (.redivivus/config.json exists). */
+  static hasRedivivusSetup(folderPath: string): boolean {
+    return fs.existsSync(path.join(folderPath, '.redivivus', 'config.json'));
   }
 
   // ── workspace root (for compatibility with guardianService)
 
   getWorkspaceRoot(): string | undefined { return this.paths.getWorkspaceRoot(); }
 
-  // ── initialization (delegated to chassisInit)
+  // ── initialization (delegated to redivivusInit)
 
   async initProject(projectName: string): Promise<void> {
     await initProject(this.paths, projectName);
@@ -50,18 +50,18 @@ export class ChassisService {
     await scaffoldAt(targetPath, projectName, blueprint);
   }
 
-  // ── config read/write (delegated to chassisConfig)
+  // ── config read/write (delegated to redivivusConfig)
 
   loadConfig() { return loadConfig(this.paths); }
   saveConfig(config: any) { saveConfig(this.paths, config); }
 
-  // ── rules generation (delegated to chassisRules)
+  // ── rules generation (delegated to redivivusRules)
 
   generateRules(projectName: string, blueprint: any, targetPath?: string) {
     generateRules(this.paths, projectName, blueprint, targetPath);
   }
 
-  // ── logging (delegated to chassisLogging)
+  // ── logging (delegated to redivivusLogging)
 
   async updateGitignore() {
     const root = this.paths.getWorkspaceRoot();

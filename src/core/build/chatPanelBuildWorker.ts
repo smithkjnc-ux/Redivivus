@@ -1,9 +1,9 @@
-// [SCOPE] CHASSIS Build Pipeline — Worker AI execution and prompt assembly
+// [SCOPE] Redivivus Build Pipeline — Worker AI execution and prompt assembly
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import type { BuildContext } from './chatPanelBuild';
 import { tracer } from '../../services/pipelineTracer';
-import { CHASSIS_WORKER_RULES } from '../../services/ai/chassisWorkerRules';
+import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { streamProvider } from '../../services/ai/streamingProviders';
 
 // AI display names for user messages
@@ -75,7 +75,7 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onCh
 export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifying: boolean, existingContent: string, supervisorSpec: string | null, vaultSummary: string, sourceRef?: string): string {
   const { task, blueprintContext } = ctx;
   const isHtml = relPath.endsWith('.html');
-  const role = supervisorSpec ? 'CHASSIS Worker AI. Implementation only.' : 'CHASSIS AI. Generate complete code.';
+  const role = supervisorSpec ? 'Redivivus Worker AI. Implementation only.' : 'Redivivus AI. Generate complete code.';
   
   const rules = isHtml
     ? '- COMPLETE, self-contained HTML file. CSS/JS inline. No external files. No modules.\n- Must open via double-click on file://.'
@@ -96,8 +96,8 @@ REPLACE>>>
   const vaultBlock = vaultSummary
     ? `VAULT CODE (already written and tested — strict rules apply):\n- If a vault item solves part of the task: COPY IT into your output as-is. Mark it with // [FROM VAULT: name].\n- DO NOT rewrite or duplicate vault code. Do not create a parallel version.\n- Only write NEW code for parts NOT covered by vault items.\n${vaultSummary}`
     : '';
-  const chassisRules = ctx.assistMode ? '' : `\n\n${CHASSIS_WORKER_RULES}`;
+  const redivivusRules = ctx.assistMode ? '' : `\n\n${Redivivus_WORKER_RULES}`;
   const ext = relPath.split('.').pop()?.toUpperCase() || 'code';
   const sourceBlock = sourceRef ? `\nSOURCE REFERENCE (existing implementation in a different language -- use this as a guide for game logic, physics, and behavior, but rewrite as native ${ext}):\n${sourceRef}` : '';
-  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${vaultBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${chassisRules}\n\nReturn ONLY the code.`;
+  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${vaultBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${redivivusRules}\n\nReturn ONLY the code.`;
 }

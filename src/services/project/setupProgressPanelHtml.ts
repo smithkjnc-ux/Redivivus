@@ -19,7 +19,7 @@ export function buildSetupProgressHtml(progress: SetupProgress): string {
   const pct = progress.percentage;
   const blocks = '&#x2588;'.repeat(Math.floor(pct / 10)) + '&#x2591;'.repeat(10 - Math.floor(pct / 10));
   const celebration = pct === 100
-    ? `<div class="celebration">&#x1F389; Your project is fully set up with CHASSIS! Start building.</div>`
+    ? `<div class="celebration">&#x1F389; Your project is fully set up with Redivivus! Start building.</div>`
     : '';
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">

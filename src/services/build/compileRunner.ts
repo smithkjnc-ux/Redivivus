@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Compile Runner — detects the project's compile command and runs it
+// [SCOPE] Redivivus Compile Runner — detects the project's compile command and runs it
 // as a Node child process (not a terminal) so stdout/stderr can be read programmatically.
 // Used by compileAutoFix.ts to close the build → compile → error → fix loop.
 

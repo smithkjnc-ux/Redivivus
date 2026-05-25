@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Duplicate Code Detection Command — find repeated patterns
+// [SCOPE] Redivivus Duplicate Code Detection Command — find repeated patterns
 
 import * as vscode from 'vscode';
 import { DuplicateCodeDetectionService } from '../services/code/duplicateCodeDetection.js';
@@ -10,7 +10,7 @@ export function registerDuplicateCodeCommand(
   routing: RoutingService,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('chassis.detectDuplicates', async () => {
+    vscode.commands.registerCommand('redivivus.detectDuplicates', async () => {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) {
         vscode.window.showErrorMessage('No workspace open.');

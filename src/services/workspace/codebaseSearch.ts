@@ -1,11 +1,11 @@
-// [SCOPE] CHASSIS Codebase Search — lists source files and searches for patterns across
+// [SCOPE] Redivivus Codebase Search — lists source files and searches for patterns across
 // the entire project tree. Used by build/fix pipelines for full-project AI context.
 // Replaces the capped collectSourceFiles in chatPanelMsgFixUtils — no MAX_FILES hard cap.
 
 import * as fs from 'fs';
 import * as path from 'path';
 
-const SKIP_DIRS = new Set(['.chassis', 'node_modules', '.git', 'dist', 'out', 'build', '.next', 'coverage', '__pycache__', '.venv', 'venv', '.cache']);
+const SKIP_DIRS = new Set(['.redivivus', 'node_modules', '.git', 'dist', 'out', 'build', '.next', 'coverage', '__pycache__', '.venv', 'venv', '.cache']);
 const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.cs', '.java', '.rb', '.html', '.css', '.scss', '.sh', '.toml', '.yaml', '.yml']);
 const MAX_FILE_BYTES = 60_000;
 

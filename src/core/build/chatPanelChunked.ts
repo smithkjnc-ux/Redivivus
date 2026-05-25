@@ -1,4 +1,4 @@
-// [SCOPE] CHASSIS Chat Panel Chunked Build — multi-file build pipeline orchestration
+// [SCOPE] Redivivus Chat Panel Chunked Build — multi-file build pipeline orchestration
 // Per-file loop extracted to chatPanelChunkedLoop.ts
 
 import * as vscode from 'vscode';
