@@ -11,6 +11,7 @@ export class StatusBar {
   private tokenItem: vscode.StatusBarItem;
   private saveItem: vscode.StatusBarItem;
   private connectionItem: vscode.StatusBarItem;
+  private updateItem: vscode.StatusBarItem;
   private _isConnected = false;
 
   constructor(
@@ -23,6 +24,7 @@ export class StatusBar {
     this.tokenItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
     this.saveItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 97);
     this.connectionItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
+    this.updateItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 999);
   }
 
   activate(context: vscode.ExtensionContext): void {
@@ -33,7 +35,7 @@ export class StatusBar {
     this.saveItem.show();
     this.connectionItem.show();
     this.updateConnectionItem();
-    context.subscriptions.push(this.blueprintItem, this.sessionItem, this.tokenItem, this.saveItem, this.connectionItem);
+    context.subscriptions.push(this.blueprintItem, this.sessionItem, this.tokenItem, this.saveItem, this.connectionItem, this.updateItem);
 
     // [WARN] This interval continuously updates the status bar. Ensure 'update' is performant to avoid UI lag.
     // [WARN] Proper disposal of this interval is crucial to prevent resource leaks upon deactivation.
@@ -59,6 +61,14 @@ export class StatusBar {
   setConnected(value: boolean): void {
     this._isConnected = value;
     this.updateConnectionItem();
+  }
+
+  showUpdateAvailable(version: string): void {
+    this.updateItem.text = `$(cloud-download) Update v${version}`;
+    this.updateItem.tooltip = `Redivivus v${version} is available — click to update now`;
+    this.updateItem.color = new vscode.ThemeColor('terminal.ansiYellow');
+    this.updateItem.command = 'redivivus.checkForUpdates';
+    this.updateItem.show();
   }
 
   private updateConnectionItem(): void {

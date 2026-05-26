@@ -56,6 +56,7 @@ import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnal
 import { registerInlineCommands } from './extensionInlineCommands.js';
 import { registerSignInCommand } from './commands/signIn.js';
 import { registerReportIssueCommand } from './commands/reportIssue.js';
+import { registerCheckForUpdatesCommand } from './commands/checkForUpdates.js';
 
 export function registerAllCommands(
   context: vscode.ExtensionContext,
@@ -134,6 +135,7 @@ export function registerAllCommands(
   registerInlineCommands(context, redivivusService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd);
   try { registerSignInCommand(context, statusBar); } catch (e) { console.error('Failed to register signIn command', e); }
   try { registerReportIssueCommand(context); } catch (e) { console.error('Failed to register reportIssue command', e); }
+  try { registerCheckForUpdatesCommand(context); } catch (e) { console.error('Failed to register checkForUpdates command', e); }
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
 
   // redivivus.compileProject — triggered by "Package as Executable" action card button

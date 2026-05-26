@@ -120,25 +120,33 @@ export function activate(context: vscode.ExtensionContext) {
     } catch { /* never block over nudge failure */ }
   }, 5_000);
 
-  // ── update check — runs once 10s after startup, non-blocking ──
+  // ── update check — runs once per day, 10s after startup, non-blocking ──
+  const UPDATE_CHECK_KEY = 'redivivus.lastUpdateCheck';
   setTimeout(async () => {
     try {
+      const last = context.globalState.get<number>(UPDATE_CHECK_KEY, 0);
+      if (Date.now() - last < 24 * 60 * 60 * 1000) { return; }
+      context.globalState.update(UPDATE_CHECK_KEY, Date.now());
+
       const pkg = require('../package.json');
       const currentVersion: string = pkg.version;
       const cfg = vscode.workspace.getConfiguration('redivivus');
       const apiBase = cfg.get<string>('apiBase') || 'https://redivivus.dev';
       const webBase = apiBase.replace('/api/v1', '');
       const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(5000) });
-      if (!res.ok) return;
-      const { version: latestVersion } = await res.json() as { version: string };
-      if (latestVersion && latestVersion !== currentVersion) {
-        const choice = await vscode.window.showInformationMessage(
-          `Redivivus v${latestVersion} is available (you have v${currentVersion}). Download the update from redivivus.dev/download.`,
-          'Open Download Page', 'Dismiss'
-        );
-        if (choice === 'Open Download Page') {
-          vscode.env.openExternal(vscode.Uri.parse(`${webBase}/download`));
-        }
+      if (!res.ok) { return; }
+      const { version: latestVersion, downloadUrl } = await res.json() as { version: string; downloadUrl?: string };
+      if (!latestVersion || latestVersion === currentVersion) { return; }
+
+      statusBar.showUpdateAvailable(latestVersion);
+
+      const choice = await vscode.window.showInformationMessage(
+        `Redivivus v${latestVersion} is available (you have v${currentVersion}).`,
+        'Update Now', 'Later'
+      );
+      if (choice === 'Update Now') {
+        const { runUpdate } = await import('./commands/checkForUpdates.js');
+        await runUpdate(latestVersion, downloadUrl ?? `https://github.com/smithkjnc-ux/Redivivus/releases/latest/download/redivivus-${latestVersion}.tar.gz`);
       }
     } catch { /* never block extension over update check failure */ }
   }, 10_000);
