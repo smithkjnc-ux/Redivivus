@@ -144,12 +144,13 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Name=Redivivus IDE
 Comment=AI-powered code editor
-Exec=$STABLE_LINK/redivivus
+Exec=$STABLE_LINK/redivivus --no-sandbox %U
 Icon=$ICON_DEST
 Terminal=false
 Type=Application
 Categories=Development;IDE;
 StartupWMClass=redivivus
+MimeType=text/plain;inode/directory;
 EOF
 chmod +x "$DESKTOP_FILE"
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true

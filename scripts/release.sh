@@ -63,6 +63,20 @@ ln -s "$BUILD_DIR" "$STABLE_LINK"
 ICON_SRC="$BUILD_DIR/resources/app/resources/linux/redivivus.png"
 ICON_DEST="$HOME/.local/share/icons/redivivus.png"
 if [ -f "$ICON_SRC" ]; then cp -f "$ICON_SRC" "$ICON_DEST"; fi
+DESKTOP_FILE="$HOME/.local/share/applications/redivivus.desktop"
+cat > "$DESKTOP_FILE" <<DESKTOPEOF
+[Desktop Entry]
+Name=Redivivus IDE
+Comment=AI-powered code editor
+Exec=$STABLE_LINK/redivivus --no-sandbox %U
+Icon=$ICON_DEST
+Terminal=false
+Type=Application
+Categories=Development;IDE;
+StartupWMClass=redivivus
+MimeType=text/plain;inode/directory;
+DESKTOPEOF
+chmod +x "$DESKTOP_FILE"
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 echo "▶  Desktop launcher updated → $STABLE_LINK"
 
