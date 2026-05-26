@@ -43,6 +43,7 @@ export interface ChatHeaderInfo {
   buildMode?: 'plan' | 'direct'; dashData?: DashboardData;
   projectTokens?: { tokens: number; cost: number };
   buildStamp?: string;
+  isSignedIn?: boolean;
 }
 
 export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderInfo, progress?: SetupProgress): string {
@@ -76,9 +77,9 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
   <style nonce="${nonce}">${buildChatCss()}</style></head><body>
   <div class="header">
     <div class="header-left">
-      <strong style="font-size: 15px; letter-spacing: 2px; font-weight: 700;"><span style="color:#a78bfa;-webkit-text-fill-color:#a78bfa;">C</span><span style="color:#4d9eff;-webkit-text-fill-color:#4d9eff;"> H A S S I S</span></strong>
+      <div style="display:flex;align-items:center;gap:7px;"><img src="data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIxMDkgNzkgMjMzIDI5MyIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTMwLDM1MCBMMTMwLDEwMCBMMjQ1LDEwMCBRMzIwLDEwMCAzMjAsMTY1IFEzMjAsMjMwIDI0NSwyMzAgTDE4NSwyMzAgTDMxMCwzNTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzE0QjhBNiIgc3Ryb2tlLXdpZHRoPSI0MiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PC9zdmc+" height="52" width="37" style="display:block;flex-shrink:0;" alt="R" /><span style="font-size:13px;color:#5eead4;letter-spacing:3px;font-weight:700;">EDIVIVUS</span></div>
       <span id="redivivus-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);">${header && header.sessionActive ? '&#x25cf; working' : '&#x25cf; ready'}</span>
-      ${header?.buildStamp ? `<span title="Compiled: ${header.buildStamp}" style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.6;margin-left:6px;font-family:monospace;user-select:none;">${header.buildStamp}</span>` : ''}
+      ${header?.buildStamp ? `<span title="Compiled: ${header.buildStamp}" style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.6;margin-left:6px;font-family:monospace;user-select:none;">${header.buildStamp}</span>` : ''}<span style="font-size:9px;font-weight:700;letter-spacing:0.08em;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 5px;margin-left:6px;user-select:none;">BETA</span>
     </div>
     <div class="header-right">
       ${header && header.hasProjectOpen ? `
@@ -90,6 +91,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       ${header && header.projectTokens ? `<button class="header-btn" data-cmd="redivivus.viewUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="redivivus.viewUsage" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
       <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
       <button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.showChatGettingStarted' : 'redivivus.showCapabilities'}" title="${header && header.hasProjectOpen ? 'How to use Redivivus with your project' : 'What is Redivivus?'}">? Help</button>
+      <button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">🐛 Report</button>
     </div>
   </div>
   ${headerHtml}

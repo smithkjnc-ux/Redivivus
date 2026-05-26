@@ -52,11 +52,24 @@ export function buildActionsScript(): string {
           if(sw){
             var spb=sw.previousElementSibling;
             if(spb&&spb.classList&&spb.classList.contains('create-file-btn')){
-              spb.style.display='none'; 
-              // Replace form with green checkmark
+              spb.style.display='none';
               var conf = document.createElement('div');
-              conf.style.cssText = 'font-size:12px;color:#4ec959;font-weight:600;margin-top:6px;display:flex;align-items:center;gap:4px;';
+              conf.style.cssText = 'font-size:12px;color:#4ec959;font-weight:600;margin-top:6px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;';
               conf.innerHTML = '<span>\\u2705</span> Saved: ' + sfname;
+              // For HTML files, add an Open in Browser button immediately
+              if(sfname.toLowerCase().endsWith('.html')){
+                var obtn=document.createElement('button');
+                obtn.className='preview-browser-btn';
+                obtn.setAttribute('data-cf-name',sfname);
+                obtn.style.cssText='background:rgba(20,184,166,0.12);border:1px solid rgba(20,184,166,0.4);color:#14B8A6;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;';
+                obtn.textContent='\\uD83C\\uDF0E Open in Browser';
+                conf.appendChild(obtn);
+                var obtn2=document.createElement('button');
+                obtn2.style.cssText='background:transparent;border:1px solid var(--c-border);color:var(--c-text-dim);border-radius:6px;padding:4px 12px;font-size:12px;cursor:pointer;font-family:inherit;';
+                obtn2.textContent='\\uD83D\\uDCC2 Show in Explorer';
+                obtn2.onclick=function(){try{vscode.postMessage({type:'open-file',path:btoa(sfname)});}catch(e){}};
+                conf.appendChild(obtn2);
+              }
               sw.replaceWith(conf);
             } else { sw.remove(); }
           }
@@ -143,8 +156,14 @@ export function buildActionsScript(): string {
       }
       const previewBtn = target.closest ? target.closest('.preview-browser-btn') : (target.classList&&target.classList.contains('preview-browser-btn')?target:null);
       if (previewBtn) {
-        const b64path = previewBtn.getAttribute('data-path') || '';
-        if (b64path) { try { vscode.postMessage({ type: 'preview-browser', path: b64path }); } catch(e) {} }
+        const cfName = previewBtn.getAttribute('data-cf-name');
+        if (cfName) {
+          // Created via + Create File button — resolve by filename in workspace root
+          try { vscode.postMessage({ type: 'open-html-by-name', filename: cfName }); } catch(e) {}
+        } else {
+          const b64path = previewBtn.getAttribute('data-path') || '';
+          if (b64path) { try { vscode.postMessage({ type: 'preview-browser', path: b64path }); } catch(e) {} }
+        }
         return;
       }
       const undoEl = target.closest ? target.closest('[data-undo-build]') : (target.getAttribute&&target.getAttribute('data-undo-build')?target:null);

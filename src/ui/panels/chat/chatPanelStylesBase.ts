@@ -49,9 +49,7 @@ export function buildChatCssBase(): string {
     .header-top { display: flex; align-items: center; justify-content: space-between; }
     .header-title { font-size: 13px; font-weight: 600; color: var(--c-text); }
     .header-actions { display: flex; gap: 8px; align-items: center; }
-    .header strong {
-      letter-spacing: 2px; font-size: 14px; font-weight: 700;
-    }
+    .header strong { letter-spacing: 2px; font-size: 14px; font-weight: 700; }
     .header-btn, .clear-btn, .map-btn {
       background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text-dim);
       padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 11px;

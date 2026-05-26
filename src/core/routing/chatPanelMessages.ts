@@ -9,7 +9,7 @@ import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import { resolveBuildConfirm, resolvePlacement } from '../ai/chatPanelIntent';
 import { resolveVaultHit } from '../build/chatPanelBuild';
 import { handleSendMessage } from './chatPanelMsgSendMessage';
-import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser } from '../project/chatPanelMsgFileOps';
+import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser, handleOpenHtmlByName } from '../project/chatPanelMsgFileOps';
 import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder, handleStartNewProject } from '../project/chatPanelMsgProjectOps';
 import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne, handleArchitectPerAction, handleArchitectActionConfirm } from '../../ui/panels/chat/chatPanelMsgArchitect';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial';
@@ -66,6 +66,9 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
 
   } else if (msg.type === 'preview-browser') {
     await handlePreviewBrowser(msg);
+
+  } else if (msg.type === 'open-html-by-name') {
+    await handleOpenHtmlByName(msg);
 
   } else if (msg.type === 'create-file') {
     await handleCreateFile(msg);

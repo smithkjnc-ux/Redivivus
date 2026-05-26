@@ -92,6 +92,7 @@ export async function panelRefresh(panel: any): Promise<void> {
   const state = panel.state;
   const usageTracker = panel.usageTracker;
   const headerInfo = buildHeaderInfo(panel.redivivus, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
+  try { const { getAccountToken } = await import('../../../services/api/apiClient.js'); headerInfo.isSignedIn = !!(await getAccountToken()); } catch {}
   const _panel = panel._panel;
   const _initialized = panel._initialized;
   if (!_initialized) {

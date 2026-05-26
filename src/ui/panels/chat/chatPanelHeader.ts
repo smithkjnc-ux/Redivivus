@@ -7,6 +7,7 @@ import type { RoutingService } from '../../../services/ai/routingService';
 import type { UsageTracker } from '../../../services/usageTracker';
 import type { ChatHeaderInfo } from './chatPanelHtml';
 import { BuildHistoryService } from '../../../services/build/buildHistoryService';
+import { getAccountToken } from '../../../services/api/apiClient.js';
 import * as fs from 'fs';
 
 export function buildHeaderInfo(
@@ -117,6 +118,7 @@ export function buildHeaderInfo(
     projectTokens,
     buildStamp,
     vaultItemCount: (() => { try { const { VaultService } = require('../../../services/vault/vaultService.js'); const v = new VaultService(extensionContext); return v.listItems().length; } catch { return 0; } })(),
+    isSignedIn: false, // populated async below — caller uses refreshHeader() to get updated value
   };
 }
 

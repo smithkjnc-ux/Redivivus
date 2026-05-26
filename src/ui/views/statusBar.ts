@@ -10,6 +10,8 @@ export class StatusBar {
   private sessionItem: vscode.StatusBarItem;
   private tokenItem: vscode.StatusBarItem;
   private saveItem: vscode.StatusBarItem;
+  private connectionItem: vscode.StatusBarItem;
+  private _isConnected = false;
 
   constructor(
     private redivivus: RedivivusService,
@@ -20,6 +22,7 @@ export class StatusBar {
     this.sessionItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
     this.tokenItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 98);
     this.saveItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 97);
+    this.connectionItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
   }
 
   activate(context: vscode.ExtensionContext): void {
@@ -28,12 +31,48 @@ export class StatusBar {
     this.sessionItem.show();
     this.tokenItem.show();
     this.saveItem.show();
-    context.subscriptions.push(this.blueprintItem, this.sessionItem, this.tokenItem, this.saveItem);
+    this.connectionItem.show();
+    this.updateConnectionItem();
+    context.subscriptions.push(this.blueprintItem, this.sessionItem, this.tokenItem, this.saveItem, this.connectionItem);
 
     // [WARN] This interval continuously updates the status bar. Ensure 'update' is performant to avoid UI lag.
     // [WARN] Proper disposal of this interval is crucial to prevent resource leaks upon deactivation.
     const interval = setInterval(() => this.update(), 5000);
     context.subscriptions.push({ dispose: () => clearInterval(interval) });
+
+    // Async connection check on activate + every 30s
+    this.refreshConnection();
+    const connInterval = setInterval(() => this.refreshConnection(), 30_000);
+    context.subscriptions.push({ dispose: () => clearInterval(connInterval) });
+  }
+
+  async refreshConnection(): Promise<void> {
+    try {
+      const { getAccountToken } = await import('../../services/api/apiClient.js');
+      this._isConnected = !!(await getAccountToken());
+    } catch {
+      this._isConnected = false;
+    }
+    this.updateConnectionItem();
+  }
+
+  setConnected(value: boolean): void {
+    this._isConnected = value;
+    this.updateConnectionItem();
+  }
+
+  private updateConnectionItem(): void {
+    if (this._isConnected) {
+      this.connectionItem.text = '$(account) Connected';
+      this.connectionItem.color = new vscode.ThemeColor('terminal.ansiGreen');
+      this.connectionItem.tooltip = 'Redivivus: Account connected — click to manage';
+      this.connectionItem.command = 'redivivus.signIn';
+    } else {
+      this.connectionItem.text = '$(account) Sign In';
+      this.connectionItem.color = new vscode.ThemeColor('disabledForeground');
+      this.connectionItem.tooltip = 'Redivivus: Not signed in — click to connect your account';
+      this.connectionItem.command = 'redivivus.signIn';
+    }
   }
 
   update(): void {

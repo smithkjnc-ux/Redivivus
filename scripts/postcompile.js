@@ -14,7 +14,7 @@ const roadmapPath = path.join(workspaceRoot, 'REDIVIVUS_ROADMAP.md');
 if (fs.existsSync(roadmapPath)) {
   // [WARN] File system operation: `fs.readFileSync` can fail due to permissions or path issues.
   const roadmap = fs.readFileSync(roadmapPath, 'utf-8');
-  const match = roadmap.match(/\*Last updated: (.+?) —/);
+  const match = roadmap.match(/\*Last updated:\*?\s*([A-Z][a-z]+ \d+, \d{4})/);
   if (match) {
     const lastUpdated = new Date(match[1]);
     const daysSince = (Date.now() - lastUpdated.getTime()) / (1000 * 60 * 60 * 24);

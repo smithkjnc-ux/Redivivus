@@ -52,7 +52,14 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
     ? `<div class="launcher-vault-status" data-cmd="redivivus.openVault" title="Open Vault browser -- browse and manage your reusable code library"><span class="lvs-icon">&#x229E;</span>${vaultCount} item${vaultCount !== 1 ? 's' : ''} in your code library</div>`
     : `<div class="launcher-vault-status launcher-vault-empty" title="Your Vault stores reusable code snippets. It fills automatically as you build."><span class="lvs-icon">&#x229E;</span>Vault empty &mdash; builds will populate it</div>`;
 
+  const signInBanner = header.isSignedIn ? '' :
+    `<div style="margin-bottom:16px;padding:12px 16px;background:rgba(20,184,166,0.07);border:1px solid rgba(20,184,166,0.25);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <span style="font-size:13px;color:#c0c0d8;">Connect your Redivivus account to route AI through the cloud.</span>
+      <button data-cmd="redivivus.signIn" style="flex-shrink:0;padding:6px 14px;background:#14B8A6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Sign In</button>
+    </div>`;
+
   return `<div class="empty-state launcher-root">
+    ${signInBanner}
     <div class="launcher-hero">
       <span class="launcher-logo">&#x1F3D7;&#xFE0F;</span>
       <div class="launcher-hero-text">

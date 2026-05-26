@@ -54,6 +54,8 @@ import { registerSetupHubCommand } from './commands/setupHub.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
 import { registerInlineCommands } from './extensionInlineCommands.js';
+import { registerSignInCommand } from './commands/signIn.js';
+import { registerReportIssueCommand } from './commands/reportIssue.js';
 
 export function registerAllCommands(
   context: vscode.ExtensionContext,
@@ -130,6 +132,8 @@ export function registerAllCommands(
   try {   registerDuplicateCodeCommand(context, routingService); } catch (e) { console.error('Failed to register ' + 'registerDuplicateCodeCommand(context, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerDuplicateCodeCommand(context, routingService); failed: ' + e + '\n'); }
   try {   registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); failed: ' + e + '\n'); }
   registerInlineCommands(context, redivivusService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd);
+  try { registerSignInCommand(context, statusBar); } catch (e) { console.error('Failed to register signIn command', e); }
+  try { registerReportIssueCommand(context); } catch (e) { console.error('Failed to register reportIssue command', e); }
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
 
   // redivivus.compileProject — triggered by "Package as Executable" action card button

@@ -1,9 +1,10 @@
-// [SCOPE] Chat Panel Intent Classifier — AI-driven intent classification
+// [SCOPE] Chat Panel Intent Classifier — delegates to cloud API; system prompt lives server-side
 // Extracted from chatPanelIntent.ts
 
 import type { RoutingService } from '../../services/ai/routingService';
 import { tracer } from '../../services/pipelineTracer';
 import { checkHardcodedOverrides, fallbackClassify } from './chatPanelClassifierOverrides';
+import { cloudClassify } from '../../services/api/apiClient.js';
 
 export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service';
 export type AvailableCommand =
@@ -38,153 +39,22 @@ export async function classifyIntent(
   context?: { projectName?: string; workspacePath?: string; blueprintStatus?: string },
   onUsage?: (inputTokens: number, outputTokens: number, model: string) => void
 ): Promise<IntentResult> {
+  void routing; void onUsage; // kept for call-site compat; classification is now server-side
   const t = text.toLowerCase().trim();
   const override = checkHardcodedOverrides(t);
   if (override) { return override; }
-  if (!routing) { return fallbackClassify(text); }
-
-  const systemPrompt = `You are the Redivivus intent classifier. Given a user message and project context, classify it as ONE of these intents and return ONLY valid JSON, nothing else.
-
-Intents:
-- build: user wants to CREATE something NEW from scratch, OR they want to MODIFY, ADD, or CHANGE a feature in their project. ALSO build when: user asks "how do I add X", "can you make X do Y", or "is there a way to make X more Y". Any feature request or code modification request (even if phrased as a question) is a build. IMPORTANT: Do NOT use 'build' for vague requests about packaging (e.g. "make this a stand alone game", "turn this into an app", "make an executable") — route those to 'question' instead so the AI can clarify.
-- fix: user is reporting a BUG, PROBLEM, or MALFUNCTION in EXISTING code — something that used to or should work is broken, wrong, or missing behavior
-- convert: user wants to TRANSFORM or PORT existing code (convert, rewrite, refactor, port, turn X into Y, change language/format)
-- run: user wants to RUN, PREVIEW, LAUNCH, TEST, or SEE the existing project/app/file in action. IMPORTANT: Do NOT use 'run' if the user makes a vague request like "make this a real app" or "I want to click an icon" — send those to 'question' instead.
-- scaffold: user wants a BLANK PROJECT TEMPLATE with NO specific content specified — just the boilerplate for a framework (React app, Flask API, Go service, Express server). ONLY scaffold when NO specific files, functions, or features are named.
-- service: user wants to SET UP or INTEGRATE an EXTERNAL SERVICE (Firebase, Supabase, Stripe, OpenAI API, add auth, add database, add payments)
-- question: user asking a PURELY THEORETICAL or FACTUAL question about coding concepts. ALSO use 'question' if the user makes a vague, non-technical overarching request like "turn this into a real app" or "I want to run it when I click it" so the AI can ask clarifying questions. DO NOT use this if the user is asking to modify specific code (e.g. "how do I add gravity" should be build, NOT question).
-- command: user wants to trigger a Redivivus action
-- offtopic: no connection to software development, coding, architecture, databases, APIs, or technical topics
-
-For command intent, return the specific command:
-- redivivus.openProject (open or switch to a different project)
-- workbench.action.closeFolder (close/exit/leave the current project or folder)
-- redivivus.wizardRetrofit (new project)
-- redivivus.openBlueprint (view/edit blueprint)
-- redivivus.showMap (architecture map, show map, open map, view map, show architecture, open architecture, map view, dependency map, project structure map)
-- redivivus.savePoint (save checkpoint)
-- redivivus.showBuildHistory (build history)
-- redivivus.profileRuntime (profile project)
-- redivivus.viewUsageInChat (usage/tokens spent)
-
-Project context:
-- Project: ${context?.projectName || 'Unknown'}
-- Path: ${context?.workspacePath || 'None'}
-- Blueprint: ${context?.blueprintStatus || 'Unknown'}
-
-User message: ${text}
-
-Examples (follow these exactly):
-"I want to switch over to the rigops project" → {"intent": "command", "command": "redivivus.openProject"}
-"can you pull up the map for me" → {"intent": "command", "command": "redivivus.showMap"}
-"close doaidream and open redivivus" → {"intent": "command", "command": "redivivus.openProject"}
-"show me how the project is structured" → {"intent": "command", "command": "redivivus.showMap"}
-"what's the weather today" → {"intent": "offtopic"}
-"tell me a joke" → {"intent": "offtopic"}
-"how does async/await work" → {"intent": "question"}
-"what does this file do" → {"intent": "question"}
-"what is 2 + 2" → {"intent": "question"}
-"explain what a REST API is" → {"intent": "question"}
-"build me a login page" → {"intent": "build"}
-"add a dark mode toggle" → {"intent": "build"}
-"add a settings page" → {"intent": "build"}
-"how do I add gravity to the bird" → {"intent": "build"}
-"is there anyway to make the bird more realistic" → {"intent": "build"}
-"can you make the player jump higher" → {"intent": "build"}
-"make this a stand alone game" → {"intent": "question"}
-"I want to run it when I click an icon" → {"intent": "question"}
-"turn this into a real desktop app" → {"intent": "question"}
-"can you fix the audio" → {"intent": "fix"}
-"fix this bug" → {"intent": "fix"}
-"the button doesn't work" → {"intent": "fix"}
-"it runs but doesn't produce any sounds" → {"intent": "fix"}
-"nothing happens when I click" → {"intent": "fix"}
-"the colors are wrong" → {"intent": "fix"}
-"it's broken" → {"intent": "fix"}
-"something is off with the layout" → {"intent": "fix"}
-"run the animal sound player" → {"intent": "run"}
-"let me see if it works" → {"intent": "run"}
-"open it in the browser" → {"intent": "run"}
-"launch the app" → {"intent": "run"}
-"update the styles" → {"intent": "build"}
-"repair the broken link" → {"intent": "build"}
-"option A" → {"intent": "build"}
-"go with option B" → {"intent": "build"}
-"let's do the first approach" → {"intent": "build"}
-"convert this to TypeScript" → {"intent": "convert"}
-"rewrite this in Python" → {"intent": "convert"}
-"turn this HTML into a React component" → {"intent": "convert"}
-"port this to Go" → {"intent": "convert"}
-"refactor this into components" → {"intent": "convert"}
-"transform this JSON into CSV" → {"intent": "convert"}
-"scaffold a new React app" → {"intent": "scaffold"}
-"set up a Flask API" → {"intent": "scaffold"}
-"create a new Go service" → {"intent": "scaffold"}
-"init a Node Express project" → {"intent": "scaffold"}
-"start a new React project" → {"intent": "scaffold"}
-"create a new project called my-app with a TypeScript file src/greet.ts containing a greet function" → {"intent": "build"}
-"create a new test project called surgical-test-greet with a single TypeScript file src/test-surgical.ts containing a greet function that returns Hello + name" → {"intent": "build"}
-"write a Python script that reads a CSV and prints each row" → {"intent": "build"}
-"set up Firebase auth" → {"intent": "service"}
-"add Stripe payments" → {"intent": "service"}
-"integrate Supabase database" → {"intent": "service"}
-"configure OpenAI API" → {"intent": "service"}
-"add Firebase to my project" → {"intent": "service"}
-
-Return ONLY JSON:
-{ "intent": "command", "command": "redivivus.openProject" }
-{ "intent": "build" }
-{ "intent": "fix" }
-{ "intent": "convert" }
-{ "intent": "run" }
-{ "intent": "scaffold" }
-{ "intent": "service" }
-{ "intent": "question" }
-{ "intent": "offtopic" }
-
-OFFTOPIC definition: No connection to software development, coding, architecture, databases, APIs, or technical topics. NOT offtopic: coding education, dev concepts, project advice, architecture questions. IS offtopic: weather, sports, recipes, jokes, travel, personal advice, general knowledge.`;
 
   let _sid = '';
   let _t0 = 0;
   try {
     _t0 = Date.now();
-    _sid = tracer.step('INTENT', 'AI classifier', text.slice(0, 60));
-    // Use Supervisor AI (Gemini) for classification with max_tokens: 50
-    const result = await (routing as any).prompt(systemPrompt);
-    if (result && onUsage) { onUsage(result.inputTokens ?? 0, result.outputTokens ?? 0, result.model ?? ''); }
-
-    if (!result || !result.text) {
-      throw new Error('No response from AI classifier');
-    }
-
-    // Parse JSON response
-    const jsonMatch = result.text.match(/\{[^}]+\}/);
-    const jsonStr = jsonMatch ? jsonMatch[0] : result.text;
-    const parsed = JSON.parse(jsonStr);
-
-    // Validate and normalize response
-    const intent = parsed.intent as IntentType;
-    
-    if (intent === 'offtopic') {
-      return { type: 'offtopic' };
-    }
-    
-    if (intent === 'command' && parsed.command) {
-      return { type: 'command', command: parsed.command as AvailableCommand };
-    }
-    
-    if (intent === 'build' || intent === 'convert' || intent === 'run' || intent === 'fix' || intent === 'scaffold' || intent === 'service') {
-      tracer.done(_sid, 'success', Date.now() - _t0, `classified as "${intent}"`, Math.ceil(systemPrompt.length / 4), Math.ceil(result.text.length / 4));
-      return { type: intent };
-    }
-
-    tracer.done(_sid, 'success', Date.now() - _t0, `classified as "${intent}"`, Math.ceil(systemPrompt.length / 4), Math.ceil(result.text.length / 4));
-    return { type: 'question' };
-
+    _sid = tracer.step('INTENT', 'cloud classifier', text.slice(0, 60));
+    const result = await cloudClassify(text, context);
+    tracer.done(_sid, 'success', Date.now() - _t0, `classified as "${result.type}"`);
+    return { type: result.type as IntentType, command: result.command as AvailableCommand | undefined };
   } catch (error) {
-    if (_sid) {tracer.done(_sid, 'fail', Date.now() - _t0, String(error).slice(0, 60));}
-    // Fallback: if classification fails, treat as question and continue to normal chat
-    return { type: 'question' };
+    if (_sid) { tracer.done(_sid, 'fail', Date.now() - _t0, String(error).slice(0, 60)); }
+    return fallbackClassify(text);
   }
 }
 
@@ -193,4 +63,3 @@ export async function isBuildRequest(text: string, routing?: RoutingService): Pr
   const result = await classifyIntent(text, routing);
   return result.type === 'build';
 }
-
