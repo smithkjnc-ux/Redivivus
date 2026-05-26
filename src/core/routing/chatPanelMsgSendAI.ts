@@ -125,7 +125,17 @@ export async function handleAIChat(
     conversation.push({ role: 'assistant', content: finalContent + `\n\n---\n*-- ${answeredBy}*`, timestamp: Date.now(), tokens: estimatedTokens, cost: estimatedCost });
     refresh();
 
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    // Don't auto-save into the projects container — land in an auto-created subfolder instead
+    if (root) {
+      const os = require('os') as typeof import('os');
+      const path = require('path') as typeof import('path');
+      const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
+      if (path.resolve(root) === path.resolve(cfg)) {
+        const { lastAutoCreatedDir } = await import('../build/chatPanelBuildAutoCreate.js');
+        root = (lastAutoCreatedDir && require('fs').existsSync(lastAutoCreatedDir)) ? lastAutoCreatedDir : '';
+      }
+    }
     if (await shouldAutoSave(finalText, userText, routing)) {
       const target = extractAutoSaveTarget(finalText, userText);
       if (target) {

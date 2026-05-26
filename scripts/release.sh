@@ -56,5 +56,15 @@ fs.writeFileSync(file, content);
 "
 cd "$WEB_DIR" && npm run deploy 2>&1 | grep -E "✨|Deployed|Error|error" | tail -5
 
+# Update developer's local stable symlink so the .desktop launcher always works
+STABLE_LINK="$HOME/.local/opt/redivivus"
+rm -f "$STABLE_LINK"
+ln -s "$BUILD_DIR" "$STABLE_LINK"
+ICON_SRC="$BUILD_DIR/resources/app/resources/linux/redivivus.png"
+ICON_DEST="$HOME/.local/share/icons/redivivus.png"
+if [ -f "$ICON_SRC" ]; then cp -f "$ICON_SRC" "$ICON_DEST"; fi
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+echo "▶  Desktop launcher updated → $STABLE_LINK"
+
 echo "✓  Released $TAG — users will get the update on next download"
 echo "   https://github.com/$REPO/releases/tag/$TAG"

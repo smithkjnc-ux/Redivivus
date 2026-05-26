@@ -1,11 +1,18 @@
 // [SCOPE] Chat send-message: build intent handler — mode gates, blueprint gap check, template wizard
 import * as vscode from 'vscode';
+import * as os from 'os';
+import * as path from 'path';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { handleFixRequest } from './chatPanelMsgFix';
 import { runTemplateWizard } from '../../services/project/templateWizard';
 import { detectBlueprintGaps, buildGapPromptMessage } from '../../services/blueprint/blueprintGapDetector';
 import { _pendingGuidedBuilds } from './chatPanelMsgSpecial';
+
+function isProjectsContainer(root: string): boolean {
+  const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
+  return path.resolve(root) === path.resolve(cfg);
+}
 
 export async function handleBuildIntent(
   routedText: string,
@@ -17,7 +24,9 @@ export async function handleBuildIntent(
 ): Promise<void> {
   const { panel } = deps;
   if (!deps.buildMode) {
-    if (!vscode.workspace.workspaceFolders?.length) { await deps.handleBuildRequest(routedText); return; }
+    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    // No project open OR workspace is just the projects container → build directly (auto-create project folder)
+    if (!wsRoot || isProjectsContainer(wsRoot)) { await deps.handleBuildRequest(routedText); return; }
     if (deps.redivivus?.isInitialized?.()) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
     panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
     return;
