@@ -27,6 +27,7 @@ import { runDiagnostic } from './core/diagnostics/selfDiagnostic';
 
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
+import { initApiClient } from './services/api/apiClient.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
 import { initProjectContextLogger } from './services/logging/projectContextLogger.js';
@@ -39,6 +40,7 @@ let _suppressNextFolderAdd = false;
 export function activate(context: vscode.ExtensionContext) {
   console.log('[Redivivus] Activating...');
   ChatPanel.extensionContext = context;
+  initApiClient(context);
 
   // ── init services ──
   // [WARN] This block initializes all core services. The order and dependencies are critical for the extension's functionality.
@@ -100,6 +102,46 @@ export function activate(context: vscode.ExtensionContext) {
   // ── activate subsystems ──
   annotationService.activate(context);
   statusBar.activate(context);
+
+  // ── sign-in nudge — shown once if no account token found ──
+  const nudgeKey = 'redivivus.signInNudged.v1';
+  setTimeout(async () => {
+    try {
+      const { getAccountToken } = await import('./services/api/apiClient.js');
+      const token = await getAccountToken();
+      if (!token && !context.globalState.get(nudgeKey)) {
+        context.globalState.update(nudgeKey, true);
+        const choice = await vscode.window.showInformationMessage(
+          'Connect your Redivivus account to enable cloud features and usage analytics.',
+          'Sign In', 'Dismiss'
+        );
+        if (choice === 'Sign In') { vscode.commands.executeCommand('redivivus.signIn'); }
+      }
+    } catch { /* never block over nudge failure */ }
+  }, 5_000);
+
+  // ── update check — runs once 10s after startup, non-blocking ──
+  setTimeout(async () => {
+    try {
+      const pkg = require('../package.json');
+      const currentVersion: string = pkg.version;
+      const cfg = vscode.workspace.getConfiguration('redivivus');
+      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus.dev';
+      const webBase = apiBase.replace('/api/v1', '');
+      const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(5000) });
+      if (!res.ok) return;
+      const { version: latestVersion } = await res.json() as { version: string };
+      if (latestVersion && latestVersion !== currentVersion) {
+        const choice = await vscode.window.showInformationMessage(
+          `Redivivus v${latestVersion} is available (you have v${currentVersion}). Download the update from redivivus.dev/download.`,
+          'Open Download Page', 'Dismiss'
+        );
+        if (choice === 'Open Download Page') {
+          vscode.env.openExternal(vscode.Uri.parse(`${webBase}/download`));
+        }
+      }
+    } catch { /* never block extension over update check failure */ }
+  }, 10_000);
 
   // ── dispose stale chat panel when workspace closes ──
   context.subscriptions.push(

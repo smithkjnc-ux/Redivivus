@@ -13,6 +13,7 @@ import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestra
 import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
 import { redivivusLog } from '../logging/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
+import { cloudPrompt, logTelemetry } from '../api/apiClient.js';
 
 interface SwPair { supervisor: string; worker: string | null; }
 let _swCache: { pair: SwPair; settingsKey: string } | null = null;
@@ -104,6 +105,12 @@ export class RoutingService {
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
 
   async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string): Promise<AIResponse & { usingFallback?: string }> {
+    // Cloud-first: route through redivivus.dev when no image (image support is direct-only for now)
+    if (!imageBase64) {
+      const cloudResult = await cloudPrompt(text, { systemMessage, tier: 'flash' });
+      if (cloudResult.success) return cloudResult;
+    }
+
     const keyMap = this.getKeyMap();
     // Build ranked list of available AIs
     const ranked = Object.entries(AI_RANK)
@@ -128,6 +135,10 @@ export class RoutingService {
       const result = await callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage);
 
       if (result.success) {
+        // Fire-and-forget telemetry so admin analytics reflect direct calls too
+        logTelemetry('ai_prompt', {
+          model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens, success: true,
+        });
         return { ...result, usingFallback: i > 0 ? ai : undefined };
       }
 

@@ -17,6 +17,10 @@ export interface AutoCreateResult {
   blueprintContext: string;
 }
 
+// Tracks the most recently auto-created project folder so handleCreateFile can save there
+// instead of the projects container when the user hasn't switched workspace yet.
+export let lastAutoCreatedDir: string | undefined;
+
 export async function autoCreateProject(task: string, deps: BuildRequestDeps): Promise<AutoCreateResult> {
   // AI extracts all 5W fields from the user's request — no guess left in config as '?'
   const extracted = await extractBlueprintFromPrompt(task, deps.routing);
@@ -27,6 +31,7 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
     .replace('~', os.homedir());
   const dir = path.join(projectsDir, slug);
   fs.mkdirSync(path.join(dir, '.redivivus'), { recursive: true });
+  lastAutoCreatedDir = dir;
 
   const bp = {
     what:  extracted.what  || task.slice(0, 200),

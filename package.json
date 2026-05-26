@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.3.6",
+  "version": "0.3.15",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -326,6 +326,16 @@
       {
         "command": "redivivus.webSearch",
         "title": "Redivivus: Web Search"
+      },
+      {
+        "command": "redivivus.signIn",
+        "title": "Redivivus: Sign In / Connect Account",
+        "category": "Redivivus"
+      },
+      {
+        "command": "redivivus.reportIssue",
+        "title": "Redivivus: Report an Issue",
+        "category": "Redivivus"
       }
     ],
     "viewsWelcome": [
@@ -492,6 +502,11 @@
     "configuration": {
       "title": "Redivivus",
       "properties": {
+        "redivivus.apiBase": {
+          "type": "string",
+          "default": "",
+          "description": "Override the Redivivus cloud API base URL (leave blank for production). Example: http://localhost:3001/api/v1"
+        },
         "redivivus.defaultAI": {
           "type": "string",
           "default": "gemini",

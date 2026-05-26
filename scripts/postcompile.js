@@ -62,6 +62,7 @@ if (fs.existsSync(outDataDir)) { fs.writeFileSync(path.join(outDataDir, 'build-i
 
 // Sync brand media overrides (letterpress SVGs, code-icon) into the build shell.
 // Stored in resources/media/ so they survive a fresh build deploy.
+const home = require('os').homedir();
 const mediaSrc = path.join(workspaceRoot, 'resources', 'media');
 const mediaDest = path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'out', 'media');
 if (fs.existsSync(mediaSrc) && fs.existsSync(mediaDest)) {
@@ -75,7 +76,6 @@ if (fs.existsSync(mediaSrc) && fs.existsSync(mediaDest)) {
 
 // Deploy compiled out/ to all known extension locations — runs unconditionally so every compile stays in sync.
 // Prevents zombie bugs where a source fix is compiled but never reaches the running build.
-const home = require('os').homedir();
 const deployTargets = [
   // Baked extension (custom VSCode build)
   path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'extensions', 'redivivus'),
@@ -112,6 +112,55 @@ if (deployed > 0) {
 } else {
   console.log('ℹ  No extension locations found — skipping deploy (non-fatal)');
 }
+
+// Copy Redivivus icon into the Linux resources folder of the build shell
+const iconSrc = path.join(workspaceRoot, 'resources', 'redivivus-icon-512.png');
+const iconDest = path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'resources', 'linux', 'redivivus.png');
+if (fs.existsSync(iconSrc)) {
+  try { fs.copyFileSync(iconSrc, iconDest); } catch {}
+}
+
+// Write install.sh into the build root so users get a desktop shortcut
+// Uses a stable symlink at ~/.local/opt/redivivus so future re-installs don't break the .desktop file
+const installSh = `#!/bin/bash
+# Redivivus install — creates a stable symlink + desktop shortcut
+set -e
+INSTALL_DIR="$(cd "$(dirname "$0")" && pwd)"
+STABLE_LINK="$HOME/.local/opt/redivivus"
+ICON_DEST="$HOME/.local/share/icons/redivivus.png"
+DESKTOP_FILE="$HOME/.local/share/applications/redivivus.desktop"
+
+mkdir -p "$HOME/.local/opt" "$HOME/.local/share/icons" "$HOME/.local/share/applications"
+
+# Point stable link to this extracted directory — survives version bumps
+rm -f "$STABLE_LINK"
+ln -s "$INSTALL_DIR" "$STABLE_LINK"
+
+# Copy icon to a stable path so the .desktop file never breaks
+ICON_SRC="$INSTALL_DIR/resources/app/resources/linux/redivivus.png"
+if [ -f "$ICON_SRC" ]; then cp "$ICON_SRC" "$ICON_DEST"; fi
+
+cat > "$DESKTOP_FILE" <<EOF
+[Desktop Entry]
+Name=Redivivus IDE
+Comment=AI-powered code editor
+Exec=$STABLE_LINK/redivivus
+Icon=$ICON_DEST
+Terminal=false
+Type=Application
+Categories=Development;IDE;
+StartupWMClass=redivivus
+EOF
+chmod +x "$DESKTOP_FILE"
+update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+echo "✓ Redivivus installed! Launch from your application menu."
+echo "  To update: extract the new tarball and run ./install.sh again."
+`;
+const installShDest = path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'install.sh');
+try {
+  fs.writeFileSync(installShDest, installSh);
+  fs.chmodSync(installShDest, 0o755);
+} catch {}
 
 // Auto-commit logic
 try {

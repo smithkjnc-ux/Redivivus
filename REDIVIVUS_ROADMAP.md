@@ -1,7 +1,30 @@
 # Redivivus — Roadmap Index
 > **Rule:** Every AI working on Redivivus MUST read this file first AND update `docs/REDIVIVUS_FIXES.md` before ending any session. No exceptions.
 
-*Last updated:* May 24, 2026 (Session 11BG)
+*Last updated:* May 26, 2026 (Session 11BH)
+
+---
+
+## Thin Client Architecture + Bug Fixes — May 26, 2026 (Session 11BH)
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelBuildRunner.ts` | Complete rewrite (~125 lines). Removed all local build pipeline imports (`runSingleFileBuild`, `runChunkedBuild`, `handleComplexityRoutedBuild`, etc.). Hard auth gate: no token → show sign-in message + trigger `redivivus.signIn` command, no fallback. Delegates to `callCloudBuild()`. Generates result card with `__RESULT_CARD__`, `__OPEN_WORKSPACE__`, `__PREVIEW_BROWSER__` tokens. Handles `NOT_AUTHENTICATED` mid-build (session expiry). | All build logic (system prompts, worker rules, prompt assembly) was shipping in compiled JS — fully reverse-engineerable. Moving all logic to cloud makes the IDE a thin client: cannot build without an active authenticated account. | High — replaces entire build path. Old local pipeline still compiles but is no longer reachable. |
+| `src/services/build/cloudBuildClient.ts` | NEW (~100 lines). `callCloudBuild(task, root, deps, opts)` — collects context, POSTs to `/api/v1/build` with 120s timeout, writes returned files, creates snapshots, records build history, signals `ChatPanel.onBuildFinished`. | Bridge between IDE context collection and the cloud build API. | Low — additive only. |
+| `src/services/build/buildContextCollector.ts` | NEW (~137 lines). `collectBuildContext()` — reads blueprint, vault items (top 20 by text relevance), dead ends, project rules, recent build history, git context, project map, existing target file content. Caps file reads at 8KB (12KB for target), git context at 3KB, project map at 80 entries. | Cloud build endpoint needs local context (user data, project state) packaged and sent per-request. | Low — read-only. |
+| `src/services/api/apiClient.ts` | Exported `getApiBase()`, `collectKeys()`, `getPreferred()`. Added `logTelemetry()` fire-and-forget function for usage logging. | `cloudBuildClient.ts` needs these. `logTelemetry` enables analytics when direct AI calls are made. | Low. |
+| `src/services/ai/routingService.ts` | Added `logTelemetry('ai_prompt', ...)` after successful direct AI calls. | Analytics dashboard was showing all zeros — direct calls bypassed cloud logging. | Low. |
+| `src/extension.ts` | One-time sign-in nudge 5s after activation if no account token. Stored in `globalState` so it shows once. | Users who never signed in see builds silently fail after thin client migration. | Low. |
+| `src/core/build/chatPanelBuildAutoCreate.ts` | Exported `lastAutoCreatedDir` module-level variable. Set inside `autoCreateProject()` after dir is created. | `handleCreateFile` needed this to save loose files to the auto-created project folder. | Low. |
+| `src/core/project/chatPanelMsgFileOps.ts` | `handleCreateFile` now checks `isProjectsContainer()` — if workspace is `~/projects/`, uses `lastAutoCreatedDir` or creates subfolder from filename stem instead of saving loose file. | Building "tic-tac-toe game" created `toe.html` directly in `~/projects/` instead of a proper subfolder. | Low. |
+
+### Cloud (redivivus-web)
+
+| File | What Changed | Why |
+|---|---|---|
+| `src/lib/v1/buildPipeline.ts` | NEW — all secret sauce: `WORKER_RULES` (9-rule annotation system), `inferTargetFile()`, `assembleWorkerPrompt()`, `buildVaultBlock()`, `extractCode()`, `applySurgicalEdits()`, `cleanCode()`. | This is the IP — never ships to client. Worker rules, prompt assembly logic, surgical edit application all live only server-side. |
+| `src/app/api/v1/build/route.ts` | NEW — `POST /api/v1/build`. Verifies Bearer token (401 if not authenticated), runs full build pipeline, logs to `activity_logs`, returns `{ files, narration, model, inputTokens, outputTokens }`. Edge runtime (Cloudflare Workers). | The only build endpoint. IDE cannot produce code without a valid account token. |
+| `src/app/api/v1/telemetry/route.ts` | NEW — `POST /api/v1/telemetry`. Accepts usage events from the IDE for direct AI calls. Logs to `activity_logs`. | Analytics was empty because direct calls (when user has own keys) were never logged. |
 
 ---
 

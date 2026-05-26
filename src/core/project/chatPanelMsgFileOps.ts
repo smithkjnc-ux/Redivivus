@@ -3,6 +3,8 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as path from 'path';
+import * as os from 'os';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import type { MessageHandlerDeps } from '../routing/chatPanelMessages';
 
@@ -92,16 +94,56 @@ export async function handlePreviewBrowser(msg: any): Promise<void> {
   }
 }
 
+export async function handleOpenHtmlByName(msg: any): Promise<void> {
+  const { filename } = msg;
+  if (!filename) { return; }
+  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!root) {
+    vscode.window.showInformationMessage(`Can't open ${filename} — no workspace folder is open. Use File → Open Folder first.`);
+    return;
+  }
+  const filePath = require('path').join(root, filename);
+  if (fs.existsSync(filePath)) {
+    await vscode.env.openExternal(vscode.Uri.file(filePath));
+  } else {
+    vscode.window.showErrorMessage(`File not found: ${filePath}`);
+  }
+}
+
+function isProjectsContainer(root: string): boolean {
+  const cfg = vscode.workspace.getConfiguration('redivivus')
+    .get<string>('projectsDirectory', '~/projects')!
+    .replace('~', os.homedir());
+  return path.resolve(root) === path.resolve(cfg);
+}
+
 export async function handleCreateFile(msg: any): Promise<void> {
   const { code, filename } = msg;
   if (!code || !filename) { return; }
   try {
-    const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
-    if (!rootPath) { vscode.window.showErrorMessage('No workspace open'); return; }
-    const filePath = vscode.Uri.file(`${rootPath}/${filename}`);
+    let rootPath = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
+
+    // If workspace is the projects container (~/projects), save to the last auto-created
+    // project folder so the file lands inside a proper project rather than as a loose file.
+    if (!rootPath || isProjectsContainer(rootPath)) {
+      const { lastAutoCreatedDir } = await import('../build/chatPanelBuildAutoCreate.js');
+      if (lastAutoCreatedDir && fs.existsSync(lastAutoCreatedDir)) {
+        rootPath = lastAutoCreatedDir;
+      } else if (!rootPath) {
+        vscode.window.showErrorMessage('No workspace open');
+        return;
+      } else {
+        // Projects container but no auto-created dir — create a subfolder from the filename stem
+        const stem = path.basename(filename, path.extname(filename)).replace(/[^a-z0-9_-]/gi, '_') || 'project';
+        rootPath = path.join(rootPath, stem);
+        fs.mkdirSync(rootPath, { recursive: true });
+      }
+    }
+
+    const filePath = vscode.Uri.file(path.join(rootPath, filename));
     await vscode.workspace.fs.writeFile(filePath, Buffer.from(code));
     await vscode.window.showTextDocument(filePath);
-    vscode.window.showInformationMessage(`Created ${filename}`);
+    vscode.window.showInformationMessage(`Created ${filename} in ${path.basename(rootPath)}/`);
   } catch (err) {
     vscode.window.showErrorMessage(`Failed to create file: ${err instanceof Error ? err.message : 'unknown'}`);
   }
