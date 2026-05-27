@@ -62,12 +62,23 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // [Redivivus] Design triage — ask clarifying questions BEFORE routing so all modes get user preferences
   // [FIX] Bypass clarify if message comes from the Live Preview overlay. The overlay blocks the main chat,
   // so any interactive clarify questions would be invisible to the user, causing a silent hang.
+  // [FIX] Also bypass clarify for clear bug / visual issue reports — the user already described the problem.
+  const _BUG_KEYWORDS = /\b(fix|broken|bug|doesn't work|not working|error|crash|fail|cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|glitch|stuck|missing|wrong)\b/i;
+  const isClearBugReport = _BUG_KEYWORDS.test(lowerText);
   let clarify = { cancelled: false, routedText: userText };
-  if (!msg.fromPreview) {
+  if (!msg.fromPreview && !isClearBugReport) {
     clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
     if (clarify.cancelled) { return; }
   }
   const routedText = clarify.routedText;
+
+  // [FIX] Clear bug reports bypass clarify, adaptive, and intent classification — route straight to fix.
+  // Require a problem keyword AND that the message doesn't start with a build keyword (avoids false positives).
+  const _BUILD_KEYWORDS = /^\s*(make|create|build|add|give|put|set)\b/i;
+  if (isClearBugReport && !_BUILD_KEYWORDS.test(userText) && deps.redivivus?.isInitialized?.()) {
+    await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
+    return;
+  }
 
   // [Redivivus] Early Exit: Hardcoded Command Overrides (bypasses Adaptive/Agent Mode)
   const { checkHardcodedOverrides } = await import('../ai/chatPanelClassifierOverrides.js');

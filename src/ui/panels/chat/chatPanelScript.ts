@@ -40,6 +40,8 @@ export function buildChatScript(): string {
       const text = input.value;
       if (!text.trim() && !window._pendingImage) { return; }
       setInputBusy(true);
+      // [FIX] Hide preview overlay so user can see the chat conversation unfold
+      if (window.__redivivusPreviewHide) { window.__redivivusPreviewHide(); }
       vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined });
       input.value = ''; input.style.height = 'auto'; window._pendingImage = null; window._pendingImageType = null;
       const _ip = document.getElementById('img-prev'); if (_ip) _ip.remove();

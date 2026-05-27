@@ -5,7 +5,7 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: Fresh chat screen on project open + fix-request routing)*
+*Last updated: May 27, 2026 (Session 11BI: Preview auto-focus + bug report routing fixes)*
 
 ---
 
@@ -40,6 +40,43 @@
 | `src/ui/panels/chat/chatPanel.ts` | Removed `restoreConversation()` from `onDidChangeWorkspaceFolders`; added globalState cleanup | Multi-root workspace change path | Low — panel reopen within same session still restores |
 | `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | Sets `skipConversationRestore` flag before `vscode.openFolder`; removed `pendingRescueConversation` save | Triggers the skip on intentional project open | Low — only affects button-click open |
 | `src/extensionResumeState.ts` | Removed `rescueOnly` conversation restore path | Dead code after removing the save side | None — path was already isolated |
+
+---
+
+## May 27, 2026 — Session 11BI (Preview stayed visible when sending messages + bug reports asked too many questions)
+
+**Issue 1 — Preview overlay blocks chat:** When the user was in the Live Preview tab and sent a message from the chat input at the bottom, the preview overlay stayed visible, hiding the chat conversation. The user had to manually click "← Chat" to see responses.
+
+**Fix 1 — `chatPanelScript.ts`:**
+- In `doSend()`, call `window.__redivivusPreviewHide()` before posting `send-message`
+
+**Fix 2 — `chatPanelPreviewScript.ts`:**
+- In `sendPreviewChat()`, call `hidePreview()` before posting `send-message`
+
+**Issue 2 — Bug reports routed to Agent Pipeline:** The message "the game is cut off at the bottom...it needs to be autosize to fit any screen size" went through:
+1. `runChatClarifyStep` → asked "Would you like me to proceed?"
+2. `evaluateTaskComplexity` → AI classified as 'complex' → routed to Agent Pipeline
+3. Agent Pipeline → asked "What would you like me to do?" with a list of suggestions
+
+The adaptive classifier's `SIMPLE_TASK_FAST_PATHS` regex is too narrow — it only catches `fix (the)? (typo|spelling|indent|alignment|css)` and missed "cut off" / "autosize" / "responsive".
+
+**Fix 3 — `chatPanelMsgSendMessage.ts`:**
+- Added `_BUG_KEYWORDS` regex to detect clear bug reports (cut off, cropped, overflow, autosize, responsive, etc.)
+- Skip `runChatClarifyStep` when `isClearBugReport` is true — the user already described the problem
+- Added early exit after `routedText`: if `isClearBugReport` and message doesn't start with a build keyword, route directly to `handleFixRequest`
+- This bypasses both clarify AND adaptive/agent routing entirely
+
+**Fix 4 — `adaptiveClassifier.ts`:**
+- Added `VISUAL_BUG_FAST_PATHS` regex matching layout/bug keywords
+- Added fast-path check before AI classifier: if visual bug keywords match, return 'simple'
+- Ensures visual bug reports never accidentally route to Agent Pipeline
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/ui/panels/chat/chatPanelScript.ts` | `doSend()` calls `__redivivusPreviewHide()` before sending | User needs to see chat responses, not stay on preview | None — only affects preview-visible state |
+| `src/ui/panels/chat/chatPanelPreviewScript.ts` | `sendPreviewChat()` calls `hidePreview()` before sending | Same fix for preview chat strip input | None |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Added `isClearBugReport` detection; skips clarify; early routes to `handleFixRequest` | Bug reports should fix, not ask questions | Low — requires problem keyword + not a build keyword |
+| `src/services/ai/adaptiveClassifier.ts` | Added `VISUAL_BUG_FAST_PATHS` returning 'simple' | Layout/visual fixes are code-only, not agent tasks | Low — conservative keyword list |
 
 ---
 

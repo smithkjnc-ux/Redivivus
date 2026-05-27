@@ -96,6 +96,8 @@ export function buildPreviewScript(): string {
     if (!inp) { return; }
     var text = (inp.value || '').trim();
     if (!text) { return; }
+    // [FIX] Hide preview so user can see the chat response; update preview strip status
+    hidePreview();
     var lastEl = document.getElementById('preview-chat-last');
     if (lastEl) { lastEl.textContent = '⏳ Asking Redivivus…'; }
     var btn = document.getElementById('preview-chat-send-btn');

@@ -10,6 +10,9 @@ const COMPLEX_TASK_FAST_PATHS = /\b(npm\s+(install|run|start|test|build)|yarn\s+
 
 const SIMPLE_TASK_FAST_PATHS = /\b(make|create|build)\s+(me\s+)?(a\s+)?(?:[a-zA-Z0-9\-_]+\s+)*(game|app)|change\s+(the\s+)?(color|font|size|text|style|margin|padding|border|background)|fix\s+(the\s+)?(typo|spelling|indent|alignment|css)|add\s+a\s+comment|rename\s+(the\s+)?(variable|function|class|file)|update\s+(the\s+)?(import|export|version)|remove\s+(the\s+)?(unused|dead|old)\b/i;
 
+// [FIX] Visual / layout bug reports are simple code edits — never route to agent
+const VISUAL_BUG_FAST_PATHS = /\b(cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|center|align|position|margin|padding|width|height|layout)\b/i;
+
 /**
  * Evaluates a user prompt to determine whether it should route to the simple pipeline
  * or the complex (agent) pipeline. Uses fast-path regex for obvious cases, then falls 
@@ -26,6 +29,11 @@ export async function evaluateTaskComplexity(
 
   // Fast-path: obvious code-only edits → simple
   if (SIMPLE_TASK_FAST_PATHS.test(userText)) {
+    return 'simple';
+  }
+
+  // [FIX] Visual / layout bug reports are always simple code edits — never agent
+  if (VISUAL_BUG_FAST_PATHS.test(userText)) {
     return 'simple';
   }
 
