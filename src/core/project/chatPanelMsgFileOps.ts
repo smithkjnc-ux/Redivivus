@@ -123,20 +123,21 @@ export async function handleCreateFile(msg: any): Promise<void> {
   try {
     let rootPath = vscode.workspace.workspaceFolders?.[0]?.uri?.fsPath;
 
-    // If workspace is the projects container (~/projects), save to the last auto-created
-    // project folder so the file lands inside a proper project rather than as a loose file.
+    // If workspace is the projects container (~/projects) or nothing open,
+    // create a proper project folder with full Redivivus scaffold.
     if (!rootPath || isProjectsContainer(rootPath)) {
       const { lastAutoCreatedDir } = await import('../build/chatPanelBuildAutoCreate.js');
       if (lastAutoCreatedDir && fs.existsSync(lastAutoCreatedDir)) {
         rootPath = lastAutoCreatedDir;
-      } else if (!rootPath) {
-        vscode.window.showErrorMessage('No workspace open');
-        return;
       } else {
-        // Projects container but no auto-created dir — create a subfolder from the filename stem
         const stem = path.basename(filename, path.extname(filename)).replace(/[^a-z0-9_-]/gi, '_') || 'project';
-        rootPath = path.join(rootPath, stem);
+        const projectsDir = vscode.workspace.getConfiguration('redivivus')
+          .get<string>('projectsDirectory', '~/projects')!
+          .replace('~', require('os').homedir());
+        rootPath = path.join(projectsDir, stem);
         fs.mkdirSync(rootPath, { recursive: true });
+        const { scaffoldAt } = await import('../../services/project/redivivusInit.js');
+        await scaffoldAt(rootPath, stem);
       }
     }
 

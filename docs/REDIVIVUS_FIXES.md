@@ -5,7 +5,23 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: Cloud Vault + Templates + Doc Restructure)*
+*Last updated: May 27, 2026 (Session 11BI: Auto-save + Create-file scaffold fix)*
+
+---
+
+## May 27, 2026 — Session 11BI (Auto-save & Create File handlers now scaffold project folders)
+
+**Root cause:** The previous fix added `scaffoldAt()` to the cloud build path (`cloudBuildClient.ts` → `processBuildResults`) and the auto-create path (`chatPanelBuildAutoCreate.ts`). But TWO other file-creation paths were still dumping files loose into `~/projects/` without creating a project folder or `.redivivus/` structure:
+
+1. **`autoSaveAndOpen`** in `chatPanelAutoSave.ts` — triggers when AI returns a single dominant code block (e.g., a standalone HTML game). When no workspace was open, it showed a folder picker dialog that let the user save directly to `~/projects/`. When a workspace WAS open but WAS the `~/projects/` container itself, it wrote the file directly there.
+2. **`handleCreateFile`** in `chatPanelMsgFileOps.ts` — the "+ Create File" button in the chat panel. When no workspace was open, it showed "No workspace open" error and gave up. When the workspace was the projects container, it created a subfolder but only did `fs.mkdirSync`, skipping `scaffoldAt` entirely.
+
+The result: `toe.html` ended up directly in `~/projects/` with no `.redivivus/` folder, no `src/`/`tests/`/`docs/`, no README, no shim files.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelAutoSave.ts` | `autoSaveAndOpen()` now auto-creates a project subfolder (derived from filename stem) and calls `scaffoldAt()` when `root` is empty, `'none'`, or the projects container. Removed the folder-picker fallback that allowed dumping files loose. | Auto-save was the primary path for single-file builds (HTML games, snippets) and it never created project structure | Low — `scaffoldAt` is idempotent; folder name derived from filename stem |
+| `src/core/project/chatPanelMsgFileOps.ts` | `handleCreateFile()` now creates a project folder + `scaffoldAt()` BOTH when no workspace is open (was error) AND when workspace is the projects container (was `mkdirSync` only). | "Create File" button was the second path that bypassed the build pipeline | Low — same `scaffoldAt`; no longer errors on "no workspace open" |
 
 ---
 

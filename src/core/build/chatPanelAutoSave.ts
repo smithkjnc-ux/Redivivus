@@ -107,17 +107,17 @@ function deriveFilenameFromMessage(message: string, ext: string): string {
 
 /** Writes code to disk, opens in editor, returns confirmation message */
 export async function autoSaveAndOpen(code: string, filename: string, root: string): Promise<string> {
-  // [WARN] If no workspace is open, ask the user where to save instead of silently failing
-  if (!root || root === 'none') {
-    const picked = await vscode.window.showOpenDialog({
-      canSelectFolders: true,
-      canSelectFiles: false,
-      canSelectMany: false,
-      openLabel: 'Save here',
-      title: `Choose where to save ${filename}`,
-    });
-    if (!picked || picked.length === 0) { return '⚠️ No folder selected — file was not saved.'; }
-    root = picked[0].fsPath;
+  const projectsDir = vscode.workspace.getConfiguration('redivivus')
+    .get<string>('projectsDirectory', '~/projects')!
+    .replace('~', require('os').homedir());
+
+  // If no workspace or projects container, create a proper project folder with full scaffold
+  const isProjectsContainer = (r: string) => path.resolve(r) === path.resolve(projectsDir);
+  if (!root || root === 'none' || isProjectsContainer(root)) {
+    const stem = path.basename(filename, path.extname(filename)).replace(/[^a-z0-9_-]/gi, '_') || 'project';
+    root = path.join(projectsDir, stem);
+    const { scaffoldAt } = await import('../../services/project/redivivusInit.js');
+    await scaffoldAt(root, stem);
   }
 
   const absPath = path.join(root, filename);
