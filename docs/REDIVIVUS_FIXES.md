@@ -5,7 +5,7 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: Preview auto-focus + bug report routing fixes)*
+*Last updated: May 27, 2026 (Session 11BI: AI fix quality + responsive CSS height fix)*
 
 ---
 
@@ -40,6 +40,30 @@
 | `src/ui/panels/chat/chatPanel.ts` | Removed `restoreConversation()` from `onDidChangeWorkspaceFolders`; added globalState cleanup | Multi-root workspace change path | Low — panel reopen within same session still restores |
 | `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | Sets `skipConversationRestore` flag before `vscode.openFolder`; removed `pendingRescueConversation` save | Triggers the skip on intentional project open | Low — only affects button-click open |
 | `src/extensionResumeState.ts` | Removed `rescueOnly` conversation restore path | Dead code after removing the save side | None — path was already isolated |
+
+---
+
+## May 27, 2026 — Session 11BI (AI fix incomplete — responsive CSS only used vw, not vh)
+
+**User report:** "first I asked it fix it, it was the same, the second time, it made it a white screen...is the AI not working correctly?"
+
+**Investigation:**
+1. **Original file** (snapshot): Had fixed pixel dimensions (`width: 314px; height: 314px`)
+2. **First AI fix**: Correctly rewrote to `clamp(240px, 80vw, 314px)` for width/height. **BUT** it used `80vw` for BOTH dimensions. On short screens, `80vw` can exceed viewport height, so the game still gets cut off at the bottom.
+3. **White screen**: The preview dev server on port 5580 was not running. The `toe.html` file was intact and valid. This was a server/infrastructure issue, not AI file corruption.
+4. **Root cause of incomplete fix**: The AI only considered viewport WIDTH (`vw`) but not HEIGHT (`vh`). The correct fix needs `min(80vw, calc(100vh - 160px))` so the game fits within the available screen space.
+
+**Manual fix applied to `toe.html`:**
+- Replaced `width: clamp(240px, 80vw, 314px); height: clamp(240px, 80vw, 314px);`
+- With CSS custom property: `--max-size: min(80vw, calc(100vh - 160px), 314px); width: max(240px, var(--max-size)); height: max(240px, var(--max-size));`
+- Same fix applied to mobile media query (`90vw, calc(100vh - 140px), 280px`)
+- `160px` / `140px` accounts for title, status, button, and padding
+
+**Lesson:** The fix pipeline works (file was rewritten correctly), but the AI's CSS solution was incomplete. For responsive layout bugs, the Supervisor prompt may need to explicitly remind the Worker to check BOTH `vw` and `vh` constraints.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `toe.html` (project file) | Added `vh`-constrained sizing with CSS custom property `--max-size` | Game now fits within both width and height of any screen | None — manual fix verified |
 
 ---
 
