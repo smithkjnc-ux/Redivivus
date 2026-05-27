@@ -53,7 +53,10 @@ export function detectProjectKind(root: string): ProjectKind {
       if (pkg.bin) { return 'node-cli'; }
     } catch {}
   }
-  if (fs.existsSync(path.join(root, 'index.html'))) { return 'web'; }
+  try {
+    const hasHtml = fs.readdirSync(root).some(f => f.endsWith('.html'));
+    if (hasHtml) { return 'web'; }
+  } catch {}
   return 'unknown';
 }
 
@@ -71,6 +74,9 @@ export function getNoPreviewMessage(kind: ProjectKind): string {
 
 export function detectDevServer(root: string): DevServerInfo | null {
   const pkgPath = path.join(root, 'package.json');
+  let hasHtml = false;
+  try { hasHtml = fs.readdirSync(root).some(f => f.endsWith('.html')); } catch {}
+
   if (fs.existsSync(pkgPath)) {
     try {
       const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
@@ -83,7 +89,7 @@ export function detectDevServer(root: string): DevServerInfo | null {
       // Static HTML project with package.json (TypeScript tooling, etc.) — serve files directly.
       // Must come before generic dev/start checks so "tsc -w" or "http-server -p 8080" projects
       // don't get misdetected as a web server on port 3000.
-      if (fs.existsSync(path.join(root, 'index.html'))) {
+      if (hasHtml) {
         return { port: 5500, command: '', type: 'static', loadingMsg: 'Serving files...' };
       }
       // Generic npm server (Express, etc.) — only when no index.html exists
@@ -91,7 +97,7 @@ export function detectDevServer(root: string): DevServerInfo | null {
       if (scripts['start'])  { return { port: 3000, command: 'npm start',   type: 'express', loadingMsg: 'Starting server...' }; }
     } catch { /* fall through */ }
   }
-  if (fs.existsSync(path.join(root, 'index.html'))) {
+  if (hasHtml) {
     return { port: 5500, command: '', type: 'static', loadingMsg: 'Serving files...' };
   }
   return null;
@@ -159,7 +165,12 @@ function _buildStaticServer(root: string, port: number): http.Server {
       res.end(content);
     } catch {
       try {
-        const indexHtml = _injectInspector(fs.readFileSync(path.join(root, 'index.html'), 'utf-8'));
+        let fallbackPath = path.join(root, 'index.html');
+        if (!fs.existsSync(fallbackPath)) {
+          const htmlFiles = fs.readdirSync(root).filter(f => f.endsWith('.html') && !f.startsWith('.'));
+          if (htmlFiles.length > 0) { fallbackPath = path.join(root, htmlFiles[0]); }
+        }
+        const indexHtml = _injectInspector(fs.readFileSync(fallbackPath, 'utf-8'));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
         res.end(indexHtml);
       } catch {

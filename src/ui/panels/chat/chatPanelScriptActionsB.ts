@@ -50,8 +50,9 @@ export function buildActionsScriptB(): string {
     }
 
     document.addEventListener('click', (e) => {
-      const target = e.target; if (!target) return;
-      var feedbackBtn = target.closest ? target.closest('[data-feedback]') : (target.getAttribute&&target.getAttribute('data-feedback')?target:null);
+      const target = (e.target && e.target.nodeType === 3) ? e.target.parentNode : e.target;
+      if (!target || !target.closest) return;
+      var feedbackBtn = target.closest('[data-feedback]');
       if (feedbackBtn) {
         var fbRating = feedbackBtn.getAttribute('data-feedback');
         var fbId = feedbackBtn.getAttribute('data-feedback-id');
@@ -65,21 +66,21 @@ export function buildActionsScriptB(): string {
         }
         return;
       }
-      const autoOpenEl = target.closest ? target.closest('[data-action="toggle-auto-open"]') : (target.getAttribute&&target.getAttribute('data-action')==='toggle-auto-open'?target:null);
+      const autoOpenEl = target.closest('[data-action="toggle-auto-open"]');
       if (autoOpenEl) {
         const checkbox = autoOpenEl.querySelector('input[type="checkbox"]') || autoOpenEl;
         const isChecked = checkbox.checked !== undefined ? checkbox.checked : checkbox.getAttribute('checked');
         try { vscode.postMessage({type:'toggle-setting', setting:'startupBehavior', value:isChecked ? 'lastProject' : 'launcher'}); } catch(e) {}
         return;
       }
-      const recentItem = target.closest ? target.closest('[data-recent-path]') : (target.getAttribute&&target.getAttribute('data-recent-path')?target:null);
+      const recentItem = target.closest('[data-recent-path]');
       if (recentItem) {
         const projectPath = recentItem.getAttribute('data-recent-path');
         if (projectPath) { vscode.postMessage({type:'open-recent-project', folderPath: projectPath}); }
         return;
       }
       // Clarify: Next / Submit button — advances one question at a time
-      var clarifyNextBtn = target.closest ? target.closest('.clarify-next-btn') : null;
+      var clarifyNextBtn = target.closest('.clarify-next-btn');
       if (clarifyNextBtn) {
         var card = clarifyNextBtn.closest('.clarify-card'); if (!card) return;
         var curIdx = parseInt(card.getAttribute('data-current-q')||'0', 10);

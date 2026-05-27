@@ -69,20 +69,23 @@ export function buildChatScript(): string {
     // [FIX] Also handles launcher buttons (start-new-project, open-existing-project)
     // so they work even if buildActionsScript listener fails to fire.
     document.addEventListener('click', (e) => {
-      const target = e.target.closest('[data-action="set-mode"]');
+      const el = (e.target && e.target.nodeType === 3) ? e.target.parentNode : e.target;
+      if (!el || !el.closest) return;
+
+      const target = el.closest('[data-action="set-mode"]');
       if (target) {
         const mode = target.getAttribute('data-mode');
         if (mode) { window._buildMode = mode; vscode.postMessage({ type: 'set-mode', mode }); input.focus(); }
         return;
       }
-      const switchTarget = e.target.closest('[data-action="switch-mode"]');
+      const switchTarget = el.closest('[data-action="switch-mode"]');
       if (switchTarget) {
         const nextMode = window._buildMode === 'plan' ? 'direct' : 'plan';
         window._buildMode = nextMode;
         vscode.postMessage({ type: 'switch-mode', mode: nextMode });
         return;
       }
-      const agentTarget = e.target.closest('[data-action="show-agent-info"]');
+      const agentTarget = el.closest('[data-action="show-agent-info"]');
       if (agentTarget) {
         showAgentInfoPanel();
         return;
@@ -90,14 +93,14 @@ export function buildChatScript(): string {
       // Generic data-cmd handler: header buttons, sidebar pills, onboarding pills
       // [FIX] All button/pill elements use data-cmd — previous ID-based handlers (map-btn, blueprint-btn)
       // referenced elements that no longer exist. All header buttons were silently dead.
-      const cmdEl = e.target.closest ? e.target.closest('[data-cmd]') : null;
+      const cmdEl = el.closest('[data-cmd]');
       if (cmdEl) {
         const cmd = cmdEl.getAttribute('data-cmd');
         if (cmd) { try { vscode.postMessage({ type: 'run-command', command: cmd }); } catch(err) {} }
         return;
       }
       // Launcher buttons: Start New Project (Plan It Out / Just Build) and Open Existing
-      const launcherBtn = e.target.closest ? e.target.closest('[data-action]') : null;
+      const launcherBtn = el.closest('[data-action]');
       if (launcherBtn) {
         const action = launcherBtn.getAttribute('data-action');
         if (action === 'start-new-project') {
@@ -106,7 +109,7 @@ export function buildChatScript(): string {
           try { vscode.postMessage({ type: 'start-new-project', mode: mode || undefined, assistMode }); } catch(err) {}
           return;
         }
-        if (action === 'open-existing-project') {
+        if (action === 'open-existing-project') { alert("Open Project button clicked!"); 
           try { vscode.postMessage({ type: 'open-existing-project' }); } catch(err) {}
           return;
         }
@@ -151,9 +154,14 @@ export function buildChatScript(): string {
     var _phraseInterval = null;
     var _phrases = ['torquing bolts...','checking clearances...','aligning tolerances...','reading the blueprint...','pressure testing...','calibrating sensors...','welding joints...','inspecting welds...','routing wiring...','load testing frame...'];
     function startPhraseTicker() {
-      stopPhraseTicker(); const statusEl = document.getElementById('redivivus-status'); if (!statusEl) return;
+      stopPhraseTicker(); 
+      const statusEl = document.getElementById('redivivus-status'); 
+      const previewEl = document.getElementById('preview-chat-last');
+      if (!statusEl && !previewEl) return;
       _phraseInterval = setInterval(() => {
-        statusEl.textContent = ' ' + _phrases[Math.floor(Math.random()*_phrases.length)];
+        const phrase = _phrases[Math.floor(Math.random()*_phrases.length)];
+        if (statusEl) statusEl.textContent = ' ' + phrase;
+        if (previewEl) previewEl.textContent = '⏳ ' + phrase;
       }, 2800);
     }
     function stopPhraseTicker() { if(_phraseInterval){ clearInterval(_phraseInterval); _phraseInterval=null; } }

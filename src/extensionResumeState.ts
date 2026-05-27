@@ -97,6 +97,36 @@ export function resumePendingState(
     })();
   }
 
+  // ── show build result card after auto-save triggered vscode.openFolder ──
+  const pendingBuildResult = context.globalState.get<{
+    filename: string; root: string; model?: string; tokens?: number; absPath: string; timestamp: number;
+  }>('redivivus.pendingBuildResult');
+  if (pendingBuildResult) {
+    context.globalState.update('redivivus.pendingBuildResult', undefined);
+    const { filename, model, tokens, absPath } = pendingBuildResult;
+    const modelLabel = model ?? 'AI';
+    const tokenStr = tokens ? ` (~${tokens.toLocaleString()} tokens)` : '';
+    const previewToken = filename.endsWith('.html')
+      ? `\n__PREVIEW_BROWSER__${absPath}|||END_PREVIEW_BROWSER__`
+      : '';
+    const resultMsg = `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__${previewToken}`;
+    (async () => {
+      await openPanel(showArgs, 100, 250);
+      const cp = ChatPanel.currentPanel;
+      if (cp) {
+        cp.getConversation().push({ role: 'assistant', content: resultMsg, timestamp: Date.now() });
+        (cp as any).refresh();
+        // Also open the built file in the editor
+        try {
+          const vscodeUri = (await import('vscode')).Uri.file(absPath);
+          const doc = await (await import('vscode')).workspace.openTextDocument(vscodeUri);
+          await (await import('vscode')).window.showTextDocument(doc, { preview: false });
+        } catch { /* best-effort */ }
+      }
+    })();
+    return;
+  }
+
   // ── clear stale flags from old code paths ──
   context.globalState.update('redivivus.pendingNewProjectMode', undefined);
   context.globalState.update('redivivus.pendingNewProjectTask', undefined);

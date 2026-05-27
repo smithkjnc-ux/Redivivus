@@ -60,9 +60,8 @@ export function panelSetLastModel(panel: any, model: string): void {
   panel.refresh();
 }
 
-/** Key for persisting conversation. Project-specific so switching workspaces restores the right history. */
 export function chatHistoryKey(root?: string): string {
-  return `redivivus.chatHistory.${root || 'global'}`;
+  return `redivivus.chatHistory.${process.pid}.${root || 'global'}`;
 }
 
 /** Restore saved conversation from globalState. Call in ChatPanel constructor before refresh(). */
@@ -131,11 +130,33 @@ export async function panelRefresh(panel: any): Promise<void> {
   saveConversation(state, root2);
 }
 
+const _writtenMessages = new Set<string>();
+
 function saveConversation(state: any, root?: string): void {
   try {
     const ctx = ChatPanel.extensionContext;
     if (!ctx || !root || !state.conversation.length) { return; }
     ctx.globalState.update(chatHistoryKey(root), JSON.stringify(state.conversation.slice(-100)));
+    
+    // Append new messages to project folder log
+    const fs = require('fs');
+    const path = require('path');
+    const redDir = path.join(root, '.redivivus');
+    if (fs.existsSync(redDir)) {
+      const logPath = path.join(redDir, 'chat_history.md');
+      let toAppend = '';
+      for (const m of state.conversation) {
+        const key = `${m.timestamp}_${m.role}`;
+        if (!_writtenMessages.has(key)) {
+          toAppend += `### ${m.role === 'user' ? 'User' : 'Redivivus'} (${new Date(m.timestamp || Date.now()).toLocaleString()})\n\n${m.content}\n\n---\n\n`;
+          _writtenMessages.add(key);
+        }
+      }
+      if (toAppend) {
+        if (!fs.existsSync(logPath)) { fs.writeFileSync(logPath, '# Project Chat History\n\n', 'utf8'); }
+        fs.appendFileSync(logPath, toAppend, 'utf8');
+      }
+    }
   } catch {}
 }
 

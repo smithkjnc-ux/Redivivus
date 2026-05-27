@@ -68,7 +68,7 @@ export async function handleBuildOutput(args: OutputArgs): Promise<void> {
       await ctx.globalState.update('redivivus.suppressAutoOpen', dirPath);
     }
   } catch { /* not available */ }
-  await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dirPath), false);
+  await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(dirPath), { forceNewWindow: false });
 }
 
 function postChatSummary(text: string): void {

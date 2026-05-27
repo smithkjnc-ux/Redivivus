@@ -51,6 +51,20 @@ export async function handleRunIntent(intent: any, deps: MessageHandlerDeps, con
 export async function handleScaffoldIntent(userText: string, deps: MessageHandlerDeps, conversation: Conv, refresh: () => void): Promise<void> {
   let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   let autoOpened = false;
+
+  // [FIX] Force modification requests to bypass scaffold and go straight to fix pipeline
+  if (root) {
+    const isInit = deps.redivivus?.isInitialized?.() || require('fs').existsSync(require('path').join(root, '.redivivus', 'config.json'));
+    if (isInit) {
+      const { isModificationRequest } = await import('../build/chatPanelBuildInference.js');
+      if (await isModificationRequest(userText, deps.routing)) {
+        const { handleFixRequest } = await import('./chatPanelMsgFix.js');
+        await handleFixRequest(userText, deps);
+        return;
+      }
+    }
+  }
+
   if (!root) {
     try {
       const { autoCreateProject } = await import('../build/chatPanelBuildAutoCreate.js');

@@ -5,7 +5,39 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: R2 download hosting + web download route fix)*
+*Last updated: May 27, 2026 (Session 11BI: Security audit — fixed GitHub token leak + internal URL exposure)*
+
+---
+
+## May 27, 2026 — Session 11BI (Security audit — no secrets in extension, fixed two leaks)
+
+**Context:** User requested a full audit of the Redivivus extension archive to ensure no "secret sauce" (credentials, internal URLs, hardcoded secrets) is distributed to end users.
+
+**Findings:**
+
+| Category | Result | Details |
+|---|---|---|
+| Hardcoded API keys | **Clean** — None found | All AI provider keys are stored in user VS Code settings or `process.env`. No keys embedded in source. |
+| Account auth token | **Clean** — Stored in `SecretStorage` | Token is encrypted by OS keychain, never written to disk plain-text. |
+| GitHub PAT | **LEAKED** — Fixed | Token was embedded in git remote URL (`https://user:TOKEN@github.com/...`), which leaks to `.git/config` on disk. |
+| Internal backend URL | **EXPOSED** — Fixed | `apiClient.ts` hardcoded `redivivus-backend.pages.dev` as a rewrite target, exposing the internal Cloudflare Pages domain. |
+| Supabase secrets | **Clean** — None in extension | All Supabase credentials are in the `redivivus-web` backend only. Extension never sees them. |
+
+**Fix 1 — GitHub token leak (`githubBackupService.ts`):**
+- Removed token from remote URL. Remote is now `https://github.com/${user}/${repo}.git` (clean).
+- Push now uses a temporary `GIT_ASKPASS` script that provides the token on demand.
+- Script is created with `0o700` permissions and deleted immediately after push.
+- Token never touches `.git/config`, shell history, or process lists.
+
+**Fix 2 — Internal URL exposure (`apiClient.ts`):**
+- Removed the `.replace('redivivus.dev', 'redivivus-backend.pages.dev')` rewrite.
+- Extension now uses the public `redivivus.dev/api/v1` endpoint exclusively.
+- Cloudflare proxy handles routing to the backend — internal domains stay invisible.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/githubBackupService.ts` | Remote URL no longer contains token; push uses `GIT_ASKPASS` temp script | Prevent PAT leakage to `.git/config` and disk | Low — standard git credential pattern |
+| `src/services/api/apiClient.ts` | Removed hardcoded rewrite to `redivivus-backend.pages.dev` | Hide internal infrastructure from distributed extension | Low — only affects URL resolution |
 
 ---
 

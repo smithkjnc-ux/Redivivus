@@ -23,17 +23,30 @@ export async function handleBuildIntent(
   refresh: () => void,
 ): Promise<void> {
   const { panel } = deps;
+  const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const isInitFallback = wsRoot && require('fs').existsSync(path.join(wsRoot, '.redivivus', 'config.json'));
+  const isInit = deps.redivivus?.isInitialized?.() || isInitFallback;
+
+  // [FIX] Force modification requests to bypass build and go straight to fix pipeline
+  if (wsRoot && !isProjectsContainer(wsRoot) && isInit) {
+    const { isModificationRequest } = await import('../build/chatPanelBuildInference.js');
+    if (await isModificationRequest(routedText, deps.routing)) {
+      await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType);
+      return;
+    }
+  }
+
   if (!deps.buildMode) {
-    const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     // No project open OR workspace is just the projects container → build directly (auto-create project folder)
     if (!wsRoot || isProjectsContainer(wsRoot)) { await deps.handleBuildRequest(routedText); return; }
-    if (deps.redivivus?.isInitialized?.()) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
+    if (isInit) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
     panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
     return;
   }
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  
+  const root = wsRoot;
   if (root) {
-    const config = deps.redivivus?.isInitialized?.() ? deps.redivivus?.loadConfig?.() : null;
+    const config = isInit ? deps.redivivus?.loadConfig?.() : null;
     const gapResult = detectBlueprintGaps(config?.blueprint);
     if (gapResult.hasGaps) {
       _pendingGuidedBuilds.set(gapResult.sessionId, userText);
@@ -41,11 +54,11 @@ export async function handleBuildIntent(
       refresh(); return;
     }
   }
-  if (deps.buildMode === 'plan' && !deps.redivivus?.isInitialized?.()) {
+  if (deps.buildMode === 'plan' && !isInit) {
     const wiz = await runTemplateWizard(userText, (m) => panel.webview.postMessage(m), deps.routing);
     if (wiz.handled && wiz.customizationPrompt) { await deps.handleBuildRequest(wiz.customizationPrompt); return; }
   }
-  await (deps.redivivus?.isInitialized?.()
+  await (isInit
     ? handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType)
     : deps.handleBuildRequest(routedText));
 }

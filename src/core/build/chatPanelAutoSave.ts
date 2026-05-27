@@ -32,38 +32,51 @@ interface AutoSaveTarget {
 
 /** Checks if the AI response has a single dominant code block worth auto-saving */
 export async function shouldAutoSave(aiResponse: string, userMessage: string, routing: RoutingService): Promise<boolean> {
-  // [RULE 18] AI classifier decides whether the user asked to build/generate a file
-  try {
-    const prompt = `User message: "${userMessage.slice(0, 200)}"\nDid the user ask to build, create, generate, modify, or update code/files? Reply with one word: yes or no`;
-    const res = await routing.prompt(prompt, 12_000);
-    if (res.success && res.text && !res.text.trim().toLowerCase().startsWith('yes')) { return false; }
-  } catch {
-    if (!/\b(build|create|make|generate|write|implement|code|produce|rewrite|rebuild)\b/i.test(userMessage)) { return false; }
-  }
   // [WARN] Handle BOTH closed (```...```) and truncated (```... with no closing fence) code blocks.
   // AI responses often get truncated when hitting output token limits.
-  const closedBlocks = aiResponse.match(/```\w*\s*\n[\s\S]*?```/g) || [];
+  const closedBlocks = aiResponse.match(/```\w*[^\S\r\n]*\r?\n[\s\S]*?```/g) || [];
   // Check for unclosed block: starts with ``` but never closes
-  const hasUnclosedBlock = /```\w*\s*\n[\s\S]{100,}$/.test(aiResponse) && !aiResponse.trim().endsWith('```');
+  const hasUnclosedBlock = /```\w*[^\S\r\n]*\r?\n[\s\S]{100,}$/.test(aiResponse) && !aiResponse.trim().endsWith('```');
   const totalBlocks = closedBlocks.length + (hasUnclosedBlock ? 1 : 0);
   if (totalBlocks === 0) { return false; }
-  // Count substantial blocks (>= MIN_AUTO_SAVE_LINES)
+
   let substantialCount = closedBlocks.filter(b => b.split('\n').length - 2 >= MIN_AUTO_SAVE_LINES).length;
   if (hasUnclosedBlock) {
     const unclosedContent = aiResponse.slice(aiResponse.lastIndexOf('```'));
     if (unclosedContent.split('\n').length >= MIN_AUTO_SAVE_LINES) { substantialCount++; }
   }
-  // Auto-save single dominant block (closed or truncated)
-  return substantialCount === 1;
+
+  // Fast-path: if the AI explicitly added a [SCOPE] tag, or outputted a massive file (>40 lines),
+  // it's definitively writing a file, regardless of what the user's prompt literally said.
+  const hasScopeTag = /\[SCOPE\]/.test(aiResponse);
+  const hasMassiveBlock = closedBlocks.some(b => b.split('\n').length > 40) || 
+    (hasUnclosedBlock && aiResponse.slice(aiResponse.lastIndexOf('```')).split('\n').length > 40);
+  
+  if ((hasScopeTag || hasMassiveBlock) && substantialCount > 0) {
+    return true;
+  }
+
+  // [RULE 18] AI classifier decides whether the user asked to build/generate a file
+  // Only used if the block is small and ambiguous
+  try {
+    const prompt = `User message: "${userMessage.slice(0, 200)}"\nDid the user ask to build, create, generate, modify, or update code/files? Reply with one word: yes or no`;
+    const res = await routing.prompt(prompt, 12_000);
+    const cleanText = (res?.text || '').replace(/[^a-zA-Z]/g, '').toLowerCase();
+    if (res.success && res.text && !cleanText.startsWith('yes')) { return false; }
+  } catch {
+    if (!/\b(build|create|make|generate|write|implement|code|produce|rewrite|rebuild)\b/i.test(userMessage)) { return false; }
+  }
+
+  return substantialCount > 0;
 }
 
 /** Extracts the auto-save target (code + filename) from an AI response */
 export function extractAutoSaveTarget(aiResponse: string, userMessage: string): AutoSaveTarget | null {
   // Try closed block first, then unclosed (truncated) block
-  let match = aiResponse.match(/```(\w*)\s*\n([\s\S]*?)```/);
+  let match = aiResponse.match(/```(\w*)[^\S\r\n]*\r?\n([\s\S]*?)```/);
   if (!match) {
     // [WARN] Handle truncated response — AI hit output token limit before closing the fence
-    const unclosedMatch = aiResponse.match(/```(\w*)\s*\n([\s\S]+)$/);
+    const unclosedMatch = aiResponse.match(/```(\w*)[^\S\r\n]*\r?\n([\s\S]+)$/);
     if (unclosedMatch) { match = unclosedMatch; }
   }
   if (!match) { return null; }
@@ -106,7 +119,10 @@ function deriveFilenameFromMessage(message: string, ext: string): string {
 }
 
 /** Writes code to disk, opens in editor, returns confirmation message */
-export async function autoSaveAndOpen(code: string, filename: string, root: string): Promise<string> {
+export async function autoSaveAndOpen(
+  code: string, filename: string, root: string,
+  meta?: { model?: string; tokens?: number },
+): Promise<string> {
   const projectsDir = vscode.workspace.getConfiguration('redivivus')
     .get<string>('projectsDirectory', '~/projects')!
     .replace('~', require('os').homedir());
@@ -137,61 +153,51 @@ export async function autoSaveAndOpen(code: string, filename: string, root: stri
   if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
   fs.writeFileSync(absPath, finalCode, 'utf8');
 
-  // Open in editor
+  // Open in editor — only if we already have a workspace open (openFolder reloads the window)
+  const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (currentRoot && currentRoot === root) {
+    try {
+      const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath));
+      await vscode.window.showTextDocument(doc, { preview: false });
+    } catch { /* best-effort */ }
+  }
+
+  // Signal build finished so vault capture, session recording, etc. all fire
   try {
-    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath));
-    await vscode.window.showTextDocument(doc, { preview: false });
+    const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
+    ChatPanel.onBuildFinished?.('auto-save', [absPath], root);
   } catch { /* best-effort */ }
 
-  // [Redivivus] Show full path so non-technical users know exactly where the file went
-  const friendlyDir = root.replace(/^\/home\/\w+/, '~');
-  return `✅ Saved: \`${filename}\` → \`${friendlyDir}/\``;
-}
-
-// [DONE] DELETE_RE replaced with AI classifier per Rule 18.
-const FILE_EXT_RE = /\b(\w+\.\w{2,5})\b/g;
-
-/** Check if user is asking to delete files from the project */
-export async function shouldDeleteFiles(userText: string, routing: RoutingService): Promise<boolean> {
-  // Fast-path: if no deletion-adjacent word appears at all, skip AI call
-  if (!/\b(delete|remove|clean|trash|wipe|erase|get rid)\b/i.test(userText)) { return false; }
-  // [RULE 18] AI classifier — "remove the button" ≠ "remove the file"
-  try {
-    const prompt = `User message: "${userText.slice(0, 200)}"\nIs the user asking to delete or remove project files? Reply with one word: yes or no`;
-    const res = await routing.prompt(prompt, 12_000);
-    return res.success && !!res.text && res.text.trim().toLowerCase().startsWith('yes');
-  } catch {
-    return false; // never accidentally delete on AI failure
-  }
-}
-
-/** Delete files matching user request */
-export async function deleteRequestedFiles(userText: string, root: string): Promise<string> {
-  const matches: string[] = [];
-  let m;
-  while ((m = FILE_EXT_RE.exec(userText)) !== null) {
-    const filename = m[1];
-    // Only delete files that exist in the project
-    const absPath = path.join(root, filename);
-    if (fs.existsSync(absPath)) { matches.push(filename); }
-  }
-  if (matches.length === 0) {
-    // Try to find files by extension mentioned in the message
-    const extMatch = userText.match(/\b(html|js|ts|css|json)\b.*files?/i);
-    if (extMatch) {
-      const ext = '.' + extMatch[1].toLowerCase();
-      const files = fs.readdirSync(root).filter(f => f.endsWith(ext) && !f.startsWith('.'));
-      matches.push(...files);
-    }
-  }
-  if (matches.length === 0) { return ''; }
-  const deleted: string[] = [];
-  for (const file of matches) {
+  // [Redivivus] Rich result card with AI attribution
+  const modelLabel = meta?.model ?? 'AI';
+  const tokenStr = meta?.tokens ? ` (~${meta.tokens.toLocaleString()} tokens)` : '';
+  // [FIX] Open the project folder in a NEW window if no folder is currently open or it's different.
+  // We use forceNewWindow = true to guarantee we bypass the "Save Workspace" dialog entirely.
+  // The user is trapped in a dirty "Untitled (Workspace)" state, and opening in a new window is the only programmatic escape.
+  if (!currentRoot || currentRoot !== root) {
     try {
-      fs.unlinkSync(path.join(root, file));
-      deleted.push(file);
-    } catch { /* skip */ }
+      const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
+      const ctx = ChatPanel.extensionContext;
+      if (ctx) {
+        // Persist the build result so it shows after the new window opens
+        ctx.globalState.update('redivivus.pendingBuildResult', {
+          filename, root, model: meta?.model, tokens: meta?.tokens,
+          absPath, timestamp: Date.now(),
+        });
+      }
+    } catch { /* best-effort */ }
+    
+    // Fire and forget. The new window will open instantly.
+    vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: true });
+    
+    // Explicitly inform the user that a new window was opened
+    return `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__\n\n> [!TIP]\n> **Project opened in a new window!**\n> Please switch to the new VS Code window to see your files and use the Live Preview button.`;
   }
-  if (deleted.length === 0) { return ''; }
-  return `🗑️ Deleted: ${deleted.map(f => `\`${f}\``).join(', ')}`;
+
+  const resultMsg = `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__\n__BUILD_RESULT__${filename}|||${absPath}|||END__`;
+  return resultMsg;
 }
+// [DONE] DELETE_RE replaced with AI classifier per Rule 18.
+// Delete helpers extracted to chatPanelAutoSaveDelete.ts (Rule 9 split)
+export { shouldDeleteFiles, deleteRequestedFiles } from './chatPanelAutoSaveDelete';
+

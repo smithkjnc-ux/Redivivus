@@ -101,7 +101,7 @@ export function buildPreviewScript(): string {
     var btn = document.getElementById('preview-chat-send-btn');
     if (btn) { btn.disabled = true; btn.style.opacity = '0.4'; }
     inp.value = '';
-    vscode.postMessage({ type: 'send-message', text: text });
+    vscode.postMessage({ type: 'send-message', text: text, fromPreview: true });
   }
 
   function showAndRefresh() {

@@ -60,8 +60,13 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (deps.buildMode === 'direct' && !deps.redivivus?.isInitialized?.() && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing|done for now|done for today|end session|stop session|finish session|start session)\b/i.test(userText)) { await deps.handleBuildRequest(userText); return; }
 
   // [Redivivus] Design triage — ask clarifying questions BEFORE routing so all modes get user preferences
-  const clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
-  if (clarify.cancelled) { return; }
+  // [FIX] Bypass clarify if message comes from the Live Preview overlay. The overlay blocks the main chat,
+  // so any interactive clarify questions would be invisible to the user, causing a silent hang.
+  let clarify = { cancelled: false, routedText: userText };
+  if (!msg.fromPreview) {
+    clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
+    if (clarify.cancelled) { return; }
+  }
   const routedText = clarify.routedText;
 
   // [Redivivus] Early Exit: Hardcoded Command Overrides (bypasses Adaptive/Agent Mode)

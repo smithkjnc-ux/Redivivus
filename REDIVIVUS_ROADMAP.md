@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 27, 2026 — R2 download hosting + web download route fix
+*Last updated:* May 27, 2026 — Security audit: fixed GitHub token leak + internal URL exposure
 
 ---
 

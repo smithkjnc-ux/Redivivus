@@ -25,7 +25,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
     conversation.push({ role: 'assistant', content: 'No project folder open -- open your project first.', timestamp: Date.now() });
-    refresh(); return;
+    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
   // [LOG] Initialize file-based logging for this fix session
@@ -73,7 +73,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       content: `No source files found. ${detail}\n\nIf your project is inside a wrapper folder, make sure the correct subfolder is opened as the workspace.`,
       timestamp: Date.now()
     });
-    refresh(); return;
+    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
   const allowedRels = new Set(sourceFiles.map(f => f.rel));
   let fileNames = sourceFiles.map(f => f.rel).join(', ');

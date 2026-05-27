@@ -56,12 +56,8 @@ export async function handleWizardMessage(
           if (!fs.existsSync(state.wizardData.folder)) {fs.mkdirSync(state.wizardData.folder, { recursive: true });}
           await redivivus.scaffoldAt(state.wizardData.folder, state.wizardData.projectName, state.wizardData.blueprint);
           if (context) {await context.globalState.update('pendingRedivivusInit', undefined);}
-          const _wsFile = path.join(state.wizardData.folder, `${state.wizardData.projectName}.code-workspace`);
-          if (!fs.existsSync(_wsFile)) {
-            try { fs.writeFileSync(_wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { /* best-effort */ }
-          }
-          const _wsUri = vscode.Uri.file(_wsFile);
-          await vscode.commands.executeCommand('vscode.openFolder', _wsUri, false);
+          const _wsUri = vscode.Uri.file(state.wizardData.folder);
+          await vscode.commands.executeCommand('vscode.openFolder', _wsUri, { forceNewWindow: false });
         }
       } catch (err) {
         vscode.window.showErrorMessage('Failed to create project: ' + (err as Error).message);

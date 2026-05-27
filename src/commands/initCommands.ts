@@ -47,7 +47,7 @@ export function registerInitCommands(
           await context.globalState.update('pendingRedivivusInit', { folder: targetFolder, name });
           const _ef = vscode.workspace.workspaceFolders || [];
           if (!vscode.workspace.updateWorkspaceFolders(0, _ef.length, { uri: vscode.Uri.file(targetFolder) })) {
-            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetFolder), false);
+            await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(targetFolder), { forceNewWindow: false });
           }
           return;
         }

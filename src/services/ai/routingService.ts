@@ -15,14 +15,15 @@ import { redivivusLog } from '../logging/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
 import { cloudPrompt, logTelemetry } from '../api/apiClient.js';
 
-interface SwPair { supervisor: string; worker: string | null; }
-let _swCache: { pair: SwPair; settingsKey: string } | null = null;
-
-function _settingsKey(): string {
-  const cfg = vscode.workspace.getConfiguration('redivivus');
-  const keys = ['gemini','claude','openai','groq','xai','kimi'];
-  return keys.map(k => cfg.get<string>(k + 'ApiKey') ? k : '').join(',') + '|' + (cfg.get<string>('defaultAI') || 'gemini');
-}
+import {
+  selectSupervisorAndWorker,
+  buildRoster,
+  getRosterDisplay,
+  getPreferredAI,
+  getAvailableAI,
+  getModelName,
+  type SwPair
+} from './routingServiceRoster.js';
 
 export class RoutingService {
   private vaultContext?: VaultContextService;
@@ -30,70 +31,27 @@ export class RoutingService {
   setVaultContextService(svc: VaultContextService): void { this.vaultContext = svc; }
 
   selectSupervisorAndWorker(): SwPair {
-    const key = _settingsKey();
-    if (_swCache && _swCache.settingsKey === key) { return _swCache.pair; }
-    const keyMap = this.getKeyMap();
-    const ranked = Object.entries(AI_RANK)
-      .filter(([ai]) => keyMap[ai]?.())
-      .sort(([, a], [, b]) => (b as number) - (a as number))
-      .map(([ai]) => ai);
-    const pair: SwPair = { supervisor: ranked[0] || 'gemini', worker: ranked.length >= 2 ? ranked[1] : null };
-    _swCache = { pair, settingsKey: key };
-    return pair;
+    return selectSupervisorAndWorker(this.getKeyMap());
   }
 
   buildRoster(): { supervisor: string; workers: string[]; guardian: string | null } {
-    const keyMap = this.getKeyMap();
-    const ranked = Object.entries(AI_RANK)
-      .filter(([ai]) => keyMap[ai]?.())
-      .sort(([, a], [, b]) => b - a)
-      .map(([ai]) => ai);
-    if (ranked.length === 0) {return { supervisor: 'gemini', workers: [], guardian: null };}
-    return { supervisor: ranked[0], workers: ranked.slice(1), guardian: ranked.length >= 1 ? ranked[0] : null };
+    return buildRoster(this.getKeyMap());
   }
 
   getRosterDisplay(): Array<{ ai: string; label: string; role: 'Supervisor' | 'Worker' | 'Guardian'; emoji: string }> {
-    const roster = this.buildRoster();
-    const labelMap: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
-    const result: Array<{ ai: string; label: string; role: 'Supervisor' | 'Worker' | 'Guardian'; emoji: string }> = [];
-    result.push({ ai: roster.supervisor, label: labelMap[roster.supervisor] || roster.supervisor, role: 'Supervisor', emoji: '🎯' });
-    for (const w of roster.workers) { result.push({ ai: w, label: labelMap[w] || w, role: 'Worker', emoji: '⚙️' }); }
-    if (roster.guardian && roster.guardian !== roster.supervisor) {
-      result.push({ ai: roster.guardian, label: labelMap[roster.guardian] || roster.guardian, role: 'Guardian', emoji: '🛡️' });
-    }
-    return result;
+    return getRosterDisplay(this.getKeyMap());
   }
 
-  /** Returns the user's explicitly selected AI (from the header chip / settings), or '' if none set. */
   getPreferredAI(): string {
-    return vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '';
+    return getPreferredAI();
   }
 
   getModelName(): string {
-    const ai = this.getAvailableAI().ai;
-    const modelMap: Record<string, string> = {
-      gemini: 'gemini-2.5-flash', claude: 'claude-sonnet-4-20250514',
-      openai: 'gpt-4o-mini', groq: 'llama-3.3-70b-versatile',
-      xai: 'grok-2-1212', kimi: 'moonshot-v1-8k',
-    };
-    return modelMap[ai] || ai;
+    return getModelName();
   }
 
   getAvailableAI(): { ai: string; source: 'redivivus-settings' | 'env' | 'none'; label: string } {
-    const config = vscode.workspace.getConfiguration('redivivus');
-    const defaultAI = config.get<string>('defaultAI') || 'gemini';
-    const checks = [
-      { id: 'gemini', label: 'Gemini', key: getGeminiKey },
-      { id: 'claude', label: 'Claude', key: getClaudeKey },
-      { id: 'openai', label: 'GPT-4o', key: getOpenAIKey },
-      { id: 'groq', label: 'Groq', key: getGroqKey },
-      { id: 'xai', label: 'Grok', key: getXAIKey },
-      { id: 'kimi', label: 'Kimi', key: getKimiKey },
-    ];
-    const preferred = checks.find(c => c.id === defaultAI);
-    if (preferred && preferred.key()) { return { ai: preferred.id, source: 'redivivus-settings', label: preferred.label }; }
-    for (const c of checks) { if (c.key()) {return { ai: c.id, source: 'redivivus-settings', label: c.label + ' (fallback)' };} }
-    return { ai: 'none', source: 'none', label: 'No AI' };
+    return getAvailableAI();
   }
 
   async analyzeFile(filePath: string, content: string, instruction: string, cancelToken?: import('vscode').CancellationToken): Promise<AIResponse> {
@@ -105,9 +63,8 @@ export class RoutingService {
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
 
   async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string): Promise<AIResponse & { usingFallback?: string }> {
-    // Cloud-first: route through redivivus.dev when no image (image support is direct-only for now)
     if (!imageBase64) {
-      const cloudResult = await cloudPrompt(text, { systemMessage, tier: 'flash' });
+      const cloudResult = await cloudPrompt(text, { systemMessage, tier: 'flash', timeoutMs });
       if (cloudResult.success) return cloudResult;
     }
 

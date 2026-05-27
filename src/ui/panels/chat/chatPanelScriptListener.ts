@@ -18,7 +18,19 @@ export function buildListenerScript(): string {
       }
       if (msg.type === 'set-status') {
         const s = document.getElementById('redivivus-status');
-        if (s) { if (msg.status === 'working') { s.classList.add('redivivus-working'); startPhraseTicker(); setInputBusy(true); } else { s.classList.remove('redivivus-working'); stopPhraseTicker(); s.textContent = ' ready'; setInputBusy(false); } }
+        const pLast = document.getElementById('preview-chat-last');
+        if (msg.status === 'working') { 
+          if (s) { s.classList.add('redivivus-working'); }
+          startPhraseTicker(); setInputBusy(true); 
+        } else { 
+          if (s) { s.classList.remove('redivivus-working'); s.textContent = ' ready'; }
+          stopPhraseTicker(); setInputBusy(false); 
+          if (pLast) {
+            var lastMsg = conv.querySelector('.msg-assistant:last-child') || conv.querySelector('.msg-assistant');
+            if (lastMsg) { pLast.textContent = (lastMsg.textContent || '').trim().slice(0, 220); }
+            else { pLast.textContent = ''; }
+          }
+        }
         var stripBtn = document.getElementById('preview-chat-send-btn');
         if (stripBtn) { stripBtn.disabled = msg.status === 'working'; stripBtn.style.opacity = msg.status === 'working' ? '0.4' : '1'; }
       }

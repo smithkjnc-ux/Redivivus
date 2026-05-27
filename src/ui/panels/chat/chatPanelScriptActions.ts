@@ -4,7 +4,8 @@
 export function buildActionsScript(): string {
   return `
     document.addEventListener('click', (e) => {
-      const target = e.target; if (!target) return;
+      const target = (e.target && e.target.nodeType === 3) ? e.target.parentNode : e.target;
+      if (!target || !target.closest) return;
       if (target.classList&&target.classList.contains('create-file-btn')) {
         var c64=target.getAttribute('data-code')||'',ext=target.getAttribute('data-ext')||'txt';
         // [FIX] Use pre-computed suggested filename from data-suggested attribute (set by renderer)

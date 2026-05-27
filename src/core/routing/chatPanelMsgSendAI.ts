@@ -139,7 +139,10 @@ export async function handleAIChat(
     if (await shouldAutoSave(finalText, userText, routing)) {
       const target = extractAutoSaveTarget(finalText, userText);
       if (target) {
-        const confirmation = await autoSaveAndOpen(target.code, target.filename, root);
+        const confirmation = await autoSaveAndOpen(target.code, target.filename, root, {
+          model: answeredBy,
+          tokens: estimatedTokens,
+        });
         if (confirmation) { conversation.push({ role: 'assistant', content: confirmation, timestamp: Date.now() }); refresh(); }
       }
     }

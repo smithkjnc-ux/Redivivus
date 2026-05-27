@@ -73,13 +73,7 @@ export class ProjectOperations {
       return false;
     }
 
-    // [WARN] Use openWorkspace with the .code-workspace file — openFolder creates "Untitled (Workspace)" and skips activation.
-    const wsFile = path.join(projectPath, `${projectName}.code-workspace`);
-    if (!fs.existsSync(wsFile)) {
-      try { fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); }
-      catch { /* best-effort */ }
-    }
-    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), false);
+    await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectPath), { forceNewWindow: false });
     return true;
   }
 

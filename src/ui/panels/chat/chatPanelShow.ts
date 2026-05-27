@@ -51,10 +51,6 @@ export function doShowChatPanel(
       const mostRecent = valid.sort((a: any, b: any) => (b.timestamp || 0) - (a.timestamp || 0))[0];
       const folderPath = mostRecent.path;
       const folderName = path.basename(folderPath);
-      const wsFile = path.join(folderPath, `${folderName}.code-workspace`);
-      if (!fs.existsSync(wsFile)) {
-        try { fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { }
-      }
       const existing = recent.findIndex((p: any) => p.path === folderPath);
       if (existing >= 0) {
         const item = recent.splice(existing, 1)[0];
@@ -62,7 +58,7 @@ export function doShowChatPanel(
         recent.unshift(item);
         ctx.globalState.update('redivivus.recentProjects', recent.slice(0, 10));
       }
-      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), false);
+      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), { forceNewWindow: false });
     }
   }
   if (ctx && !vscode.workspace.workspaceFolders?.length && startupBehavior === 'launcher') {

@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as os from 'os';
 import { execSync, exec } from 'child_process';
 
 export interface GitHubConfig {
@@ -93,9 +94,12 @@ export class GitHubBackupService {
         const err = await createRes.json() as { message?: string };
         return { success: false, message: `GitHub API error: ${err.message || createRes.status}` };
       }
-      const remoteUrl = `https://${cfg.username}:${token}@github.com/${cfg.username}/${repoName}.git`;
+      // [WARN] Never embed the token in the remote URL — it leaks to .git/config on disk.
+      // Use a clean HTTPS remote and provide the token via GIT_ASKPASS at push time.
+      const remoteUrl = `https://github.com/${cfg.username}/${repoName}.git`;
       try { execSync('git remote remove origin', { cwd: root, stdio: 'ignore' }); } catch { }
       execSync(`git remote add origin ${remoteUrl}`, { cwd: root, stdio: 'ignore' });
+      // Configure git to use our token via environment during push (see commitFiles)
       await this.commitFiles('Initial Redivivus commit', []);
       await this._context.globalState.update(CFG_KEY, { ...cfg, repoName });
       return { success: true, message: `Repo "${repoName}" created on GitHub.` };
@@ -116,8 +120,17 @@ export class GitHubBackupService {
           ? files.map(f => `git add -- "${(path.isAbsolute(f) ? f : path.join(root, f)).replace(/"/g, '\\"')}"`).join(' && ')
           : 'git add -A';
         const safeMsg = message.replace(/"/g, "'").replace(/\n/g, ' ').slice(0, 150);
-        const cmd = `${addParts} && git diff --cached --quiet || (git commit -m "${safeMsg}" && git push origin main --force-with-lease)`;
-        exec(cmd, { cwd: root }, (err, _stdout, stderr) => {
+
+        // [WARN] Use GIT_ASKPASS to provide the token without embedding it in remote URL.
+        // This prevents the PAT from leaking into .git/config or shell history.
+        const askPassScript = path.join(os.tmpdir(), `redivivus_askpass_${Date.now()}.sh`);
+        fs.writeFileSync(askPassScript, `#!/bin/sh\necho "${token}"\n`, { mode: 0o700 });
+
+        const cfg = this.getConfig();
+        const cmd = `${addParts} && git diff --cached --quiet || (git commit -m "${safeMsg}" && GIT_ASKPASS="${askPassScript}" git push origin main --force-with-lease)`;
+        exec(cmd, { cwd: root, env: { ...process.env, GIT_ASKPASS: askPassScript, GIT_USERNAME: cfg.username ?? 'token' } }, (err, _stdout, stderr) => {
+          // Clean up the temporary askpass script immediately
+          try { fs.unlinkSync(askPassScript); } catch { /* best-effort cleanup */ }
           if (err && !stderr?.includes('nothing to commit')) {
             resolve({ success: false, message: stderr || err.message });
           } else {

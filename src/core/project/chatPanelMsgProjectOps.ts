@@ -27,7 +27,7 @@ export async function handleOpenProject(msg: any): Promise<void> {
     ctx.globalState.update('redivivus.recentProjects', recent.slice(0, 10));
   }
   // Open the folder directly; Redivivus auto-initializes via onDidChangeWorkspaceFolders
-  await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), false);
+  await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), { forceNewWindow: false });
 }
 
 export async function handleOpenExistingProject(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
@@ -68,12 +68,9 @@ export async function handleOpenExistingProject(msg: any, conversation: ChatMess
     recent.unshift({ path: folderPath, name: folderName, timestamp: Date.now() });
     ctx.globalState.update('redivivus.recentProjects', recent.slice(0, 10));
   }
-  const wsFile = path.join(folderPath, `${folderName}.code-workspace`);
-  if (!fs.existsSync(wsFile)) {
-    try { fs.writeFileSync(wsFile, JSON.stringify({ folders: [{ path: '.' }], settings: {} }, null, 2)); } catch { }
-  }
-  require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[open-existing-project] opening wsFile=${wsFile}\n`);
-  vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsFile), false);
+  require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[open-existing-project] opening folderPath=${folderPath}\n`);
+  vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), { forceNewWindow: true });
+  setTimeout(() => vscode.commands.executeCommand('workbench.action.closeWindow'), 1000);
 }
 
 export async function handleOpenRecentProject(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {
@@ -96,8 +93,9 @@ export async function handleOpenRecentProject(msg: any, conversation: ChatMessag
     if (existing >= 0) { const item = recent.splice(existing, 1)[0]; item.timestamp = Date.now(); recent.unshift(item); }
     ctx.globalState.update('redivivus.recentProjects', recent.slice(0, 10));
   }
-  // [FIX] Use vscode.openFolder — vscode.openWorkspace requires .code-workspace files and silently fails
-  vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), false);
+  // [FIX] Always use forceNewWindow: true to bypass VSCodium silent failures and "Untitled (Workspace)" duplicate chat bugs
+  vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(folderPath), { forceNewWindow: true });
+  setTimeout(() => vscode.commands.executeCommand('workbench.action.closeWindow'), 1000);
 }
 
 export async function handleToggleSetting(msg: any, conversation: ChatMessage[], refresh: () => void): Promise<void> {

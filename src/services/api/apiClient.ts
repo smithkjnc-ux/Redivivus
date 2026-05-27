@@ -7,8 +7,10 @@ import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKim
 const SECRET_KEY = 'redivivus.account.token';
 const API_BASE_DEFAULT = 'https://redivivus.dev/api/v1';
 export function getApiBase(): string {
-  const base = vscode.workspace.getConfiguration('redivivus').get<string>('apiBase') || API_BASE_DEFAULT;
-  return base.replace('redivivus.dev', 'redivivus-backend.pages.dev');
+  // [WARN] Never hardcode or rewrite to internal backend domains.
+  // The extension always hits the public redivivus.dev domain.
+  // Cloudflare proxies /api/v1 to the backend — internal URLs stay internal.
+  return vscode.workspace.getConfiguration('redivivus').get<string>('apiBase') || API_BASE_DEFAULT;
 }
 
 let _ctx: vscode.ExtensionContext | null = null;
@@ -95,7 +97,7 @@ export interface AIResponse {
 
 export async function cloudPrompt(
   text: string,
-  opts: { systemMessage?: string; tier?: 'flash' | 'pro' } = {}
+  opts: { systemMessage?: string; tier?: 'flash' | 'pro'; timeoutMs?: number } = {}
 ): Promise<AIResponse> {
   try {
     // Step 1: Get routing instructions from backend (SECRET SAUCE)
@@ -114,7 +116,7 @@ export async function cloudPrompt(
       const response = await callProvider(
         instructions.instructions.routing.selectedProvider,
         instructions.instructions.prompt,
-        createFetchWithTimeout(),
+        createFetchWithTimeout(opts.timeoutMs),
         undefined, // geminiModel
         undefined, // imageBase64
         undefined, // imageType
@@ -139,10 +141,10 @@ export async function cloudPrompt(
 }
 
 // Helper: Create fetch with timeout for AI calls
-function createFetchWithTimeout() {
+function createFetchWithTimeout(baseTimeoutMs?: number) {
   return async (url: string, options: RequestInit, timeoutMs?: number) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs || 60000);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs || baseTimeoutMs || 60000);
     
     try {
       const response = await fetch(url, {

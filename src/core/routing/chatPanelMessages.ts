@@ -16,25 +16,8 @@ import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPrevi
 import { handleMapContext } from '../../ui/panels/chat/chatPanelMsgMapContext';
 import { handleExpandedInterviewSubmit } from '../../ui/panels/chat/chatPanelMsgExpandedInterview';
 
-export interface MessageHandlerDeps {
-  redivivus: RedivivusService;
-  routing: RoutingService;
-  usageTracker?: UsageTracker;
-  conversation: ChatMessage[];
-  panel: vscode.WebviewPanel;
-  isBuildRequest: (text: string) => Promise<boolean>;
-  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service'; command?: string; subtype?: string }>;
-  handleBuildRequest: (task: string, skipComplex?: boolean, isFixRequest?: boolean) => Promise<void>;
-  buildFromVaultPrefill: () => { task?: string; targetFile?: string };
-  refresh: () => void;
-  setLastModel?: (model: string) => void;
-  onStartSession?: (goal: string, ai: string) => Promise<void>;
-  onSwitchAI?: (ai: string) => Promise<void>;
-  onNewProject?: (name: string, answers: Record<string, string>, folderPath?: string) => Promise<void>;
-  buildMode?: 'plan' | 'direct'; assistMode?: boolean; vault?: import('../../services/vault/vaultService').VaultService;
-  planInterview?: import('../../ui/panels/chat/chatPanelPlanInterview').PlanInterviewState;
-  setBlueprintContext?: (ctx: string) => void;
-}
+import type { MessageHandlerDeps } from './chatPanelMessageDeps.js';
+export type { MessageHandlerDeps };
 
 
 export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Promise<void> {

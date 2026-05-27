@@ -88,7 +88,7 @@ export async function runBuildAfterGates(
       : '';
     const htmlFile = files.find(f => f.path.endsWith('.html'));
     const previewToken = htmlFile
-      ? `\n__PREVIEW_BROWSER__${path.join(root, htmlFile.path)}|||END_PREVIEW__`
+      ? `\n__PREVIEW_BROWSER__${path.join(root, htmlFile.path)}|||END_PREVIEW_BROWSER__`
       : '';
 
     const modelLabel = result.model ?? 'AI';
