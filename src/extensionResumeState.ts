@@ -45,24 +45,9 @@ export function resumePendingState(
     return; // skip other resume paths — this takes priority
   }
 
-  // ── conversation restore after intentional __OPEN_WORKSPACE__ reload (no rebuild) ──
-  // [FIX] pendingRescueConversation without pendingResumeTask = user clicked Open Workspace button.
-  // Restore the chat history and stop — do NOT call resumeBuildTask / handleBuildRequest.
-  // [FIX] Use short delay (100ms) so rescue fires BEFORE the 500ms auto-open timer, preventing
-  // a window where the timer creates an empty panel that the user sees before conversation is restored.
-  const rescueOnly = context.globalState.get<any[]>('redivivus.pendingRescueConversation');
-  if (rescueOnly && rescueOnly.length > 0) {
-    context.globalState.update('redivivus.pendingRescueConversation', undefined);
-    (async () => {
-      await openPanel(showArgs, 100, 250);
-      if (ChatPanel.currentPanel) {
-        const conv = ChatPanel.currentPanel.getConversation();
-        conv.splice(0, conv.length, ...rescueOnly);
-        (ChatPanel.currentPanel as any).refresh();
-      }
-    })();
-    return;
-  }
+  // [DEAD] Removed conversation restore after intentional workspace open.
+  // User wants a fresh project chat screen, not the old conversation history.
+  // Build-result cards are shown via pendingBuildResult, not rescued conversation.
 
   // ── resume build task (wizard path — shows new-project panel) ──
   const pendingBuildTask = context.globalState.get<string>('redivivus.pendingBuildTask');

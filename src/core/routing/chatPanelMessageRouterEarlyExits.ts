@@ -94,12 +94,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
 
   if (msg.type === 'open-workspace-btn' && msg.path) {
-    // [FIX] Save conversation right before the intentional reload so extensionResumeState can restore it.
-    // This is the only place that should save pendingRescueConversation — NOT the build-finish callback.
-    const _ctx = require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext;
-    if (_ctx && panel) {
-      _ctx.globalState.update('redivivus.pendingRescueConversation', (panel as any).state?.conversation ?? []);
-    }
+    // Open workspace without preserving chat history — user wants a fresh project chat screen
     vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(msg.path));
     return true;
   }
