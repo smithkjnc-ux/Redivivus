@@ -70,7 +70,14 @@ export class ChatPanel {
     this.usageTracker = usageTracker;
     this._panel = panel;
     this.loadBlueprintContext();
-    restoreConversation(this);
+    // [FIX] Skip restoring old conversation when a new project was just opened.
+    // The open-workspace-btn handler sets this flag before vscode.openFolder reloads the window.
+    const skipRestore = ChatPanel.extensionContext?.globalState.get<boolean>('redivivus.skipConversationRestore');
+    if (skipRestore) {
+      ChatPanel.extensionContext?.globalState.update('redivivus.skipConversationRestore', undefined);
+    } else {
+      restoreConversation(this);
+    }
     if (this.state.conversation.length === 0) { loadLastSessionContext(this.redivivus, this.state.conversation); }
     this._panel.webview.options = { enableScripts: true };
     this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('../../../core/routing/chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);

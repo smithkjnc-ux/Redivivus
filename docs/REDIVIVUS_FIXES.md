@@ -11,27 +11,34 @@
 
 ## May 27, 2026 — Session 11BI (Opening a project restored old chat history instead of fresh screen)
 
-**Root cause:** When a workspace folder changed (user opened a project), the `onDidChangeWorkspaceFolders` handler in `chatPanel.ts` cleared the conversation array but then immediately called `restoreConversation()`, which loaded the previously saved chat history for that project root from VS Code `globalState`. Additionally, the `open-workspace-btn` handler saved `pendingRescueConversation` before `vscode.openFolder`, and `extensionResumeState.ts` restored it after reload.
+**Root cause:** When `vscode.openFolder` is called, VS Code reloads the entire window. After reload, the extension activates, the auto-open timer creates a new `ChatPanel` instance, and the constructor calls `restoreConversation()`, which loads previously saved chat history from VS Code `globalState` using the project root as the key. Two additional mechanisms also restored history: `onDidChangeWorkspaceFolders` in `chatPanel.ts` and a `pendingRescueConversation` save/restore pair.
 
-**Two mechanisms were restoring history:**
-1. `chatPanel.ts:79` — `restoreConversation(this)` inside `onDidChangeWorkspaceFolders`
-2. `extensionResumeState.ts:48-65` — `rescueOnly` path restoring `pendingRescueConversation`
+**Three mechanisms were restoring history:**
+1. `chatPanel.ts:73` — `restoreConversation(this)` in the constructor (fires on every reload)
+2. `chatPanel.ts:79` — `restoreConversation(this)` inside `onDidChangeWorkspaceFolders`
+3. `chatPanelMessageRouterEarlyExits.ts` + `extensionResumeState.ts` — `pendingRescueConversation` save/restore
 
-**Fix 1 — `chatPanel.ts`:**
-- Removed `restoreConversation(this)` from the workspace change handler
-- Added cleanup: clears the persisted chat history key for the new workspace from `globalState`
-- Conversation array is cleared and stays empty → fresh chat screen
+**Fix 1 — Flag-based skip in constructor (`chatPanel.ts`):**
+- Before `vscode.openFolder`, set `redivivus.skipConversationRestore = true`
+- In the constructor, check the flag: if set, skip `restoreConversation()` and clear the flag
+- This is the primary fix — it stops history restore on the window-reload path
 
-**Fix 2 — `chatPanelMessageRouterEarlyExits.ts`:**
+**Fix 2 — `chatPanel.ts` workspace change handler:**
+- Removed `restoreConversation(this)` from `onDidChangeWorkspaceFolders`
+- Added cleanup: clears the persisted chat history key for the new workspace
+
+**Fix 3 — `chatPanelMessageRouterEarlyExits.ts`:**
 - Removed the `pendingRescueConversation` save before `vscode.openFolder`
+- Added `skipConversationRestore` flag set before `vscode.openFolder`
 
-**Fix 3 — `extensionResumeState.ts`:**
+**Fix 4 — `extensionResumeState.ts`:**
 - Removed the `rescueOnly` restore path entirely
 
 | File | What Changed | Why | Risk |
 |---|---|---|---|
-| `src/ui/panels/chat/chatPanel.ts` | Removed `restoreConversation()` from `onDidChangeWorkspaceFolders`; added globalState cleanup for new workspace | User wants fresh chat when opening a project | Low — panel reopen within same session still restores via constructor |
-| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | Removed `pendingRescueConversation` save in `open-workspace-btn` handler | Stop preserving history across workspace open | Low — only affects button-click open |
+| `src/ui/panels/chat/chatPanel.ts` | Constructor checks `skipConversationRestore` flag before calling `restoreConversation()` | Primary fix — window reload path | Low — flag is cleared immediately after read |
+| `src/ui/panels/chat/chatPanel.ts` | Removed `restoreConversation()` from `onDidChangeWorkspaceFolders`; added globalState cleanup | Multi-root workspace change path | Low — panel reopen within same session still restores |
+| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | Sets `skipConversationRestore` flag before `vscode.openFolder`; removed `pendingRescueConversation` save | Triggers the skip on intentional project open | Low — only affects button-click open |
 | `src/extensionResumeState.ts` | Removed `rescueOnly` conversation restore path | Dead code after removing the save side | None — path was already isolated |
 
 ---

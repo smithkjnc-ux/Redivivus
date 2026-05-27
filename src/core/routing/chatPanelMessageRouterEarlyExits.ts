@@ -94,7 +94,9 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
 
   if (msg.type === 'open-workspace-btn' && msg.path) {
-    // Open workspace without preserving chat history — user wants a fresh project chat screen
+    // [FIX] Set flag so ChatPanel constructor skips conversation restore for this new project
+    const _ctx = require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext;
+    if (_ctx) { _ctx.globalState.update('redivivus.skipConversationRestore', true); }
     vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(msg.path));
     return true;
   }

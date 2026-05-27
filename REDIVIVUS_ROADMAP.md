@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 27, 2026 — Opening a project now shows fresh chat screen (no history restore)
+*Last updated:* May 27, 2026 — Fresh chat screen on project open via skipConversationRestore flag
 
 ---
 
