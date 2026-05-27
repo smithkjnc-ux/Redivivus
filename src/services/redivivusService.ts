@@ -14,6 +14,24 @@ export class RedivivusService {
 
   constructor(root?: string) {
     this.paths = new RedivivusPaths(root);
+    
+    // Auto-migrate legacy Chassis projects to Redivivus
+    const wsRoot = this.paths.getWorkspaceRoot();
+    if (wsRoot) {
+      try {
+        const legacyDir = path.join(wsRoot, '.chassis');
+        const legacyConfig = path.join(legacyDir, 'config.json');
+        const legacyRoadmap = path.join(wsRoot, 'CHASSIS_ROADMAP.md');
+        
+        // Use cpSync instead of renameSync because the logger creates .redivivus/logs early
+        if (require('fs').existsSync(legacyConfig) && !require('fs').existsSync(this.paths.configPath)) {
+          require('fs').cpSync(legacyDir, this.paths.redivivusDir, { recursive: true, force: false });
+        }
+        if (require('fs').existsSync(legacyRoadmap) && !require('fs').existsSync(this.paths.roadmapPath)) {
+          require('fs').renameSync(legacyRoadmap, this.paths.roadmapPath);
+        }
+      } catch { /* ignore migration permission errors */ }
+    }
   }
 
   // ── path helpers (delegated to RedivivusPaths)

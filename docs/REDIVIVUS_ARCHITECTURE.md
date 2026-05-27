@@ -4,15 +4,18 @@
 
 ---
 
-*Last updated: May 11, 2026*
+*Last updated: May 27, 2026 (Session 11BI)*
 
 ---
 
 ## Project Info
-- **Version:** 0.3.4
+- **Version:** 0.3.19
 - **Extension ID:** papajoe.redivivus
 - **Engine compat:** `vscode ^1.70.0` (for Windsurf compatibility)
 - **GitHub:** `https://github.com/smithkjnc-ux/Redivivus.git` (private)
+- **Backend:** `https://redivivus-backend.pages.dev` (Cloudflare Pages)
+- **Website:** `https://redivivus.dev` (Cloudflare Pages — `redivivus-web` repo)
+- **Database:** Supabase (`nadcrknbzsbhpnnvhtir` instance)
 - **Dogfood project:** `~/projects/doaidream/`
 
 ## Deployment (VSCodium ONLY)

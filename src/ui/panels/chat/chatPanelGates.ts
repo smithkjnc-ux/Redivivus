@@ -2,7 +2,7 @@
 // Extracted from chatPanelIntent.ts
 
 import type { BuildRequestDeps} from '../../../core/ai/chatPanelIntent';
-import { _pendingPlacements, _pendingBuildConfirms } from '../../../core/ai/chatPanelIntent';
+import { _pendingPlacements, _pendingBuildConfirms } from '../../../core/ai/chatPanelResolvers.js';
 import { estimateBuild } from '../../../core/ai/costEstimatorService';
 
 export async function awaitPlacementConfirmation(

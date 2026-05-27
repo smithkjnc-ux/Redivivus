@@ -7,7 +7,8 @@ import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKim
 const SECRET_KEY = 'redivivus.account.token';
 const API_BASE_DEFAULT = 'https://redivivus.dev/api/v1';
 export function getApiBase(): string {
-  return vscode.workspace.getConfiguration('redivivus').get<string>('apiBase') || API_BASE_DEFAULT;
+  const base = vscode.workspace.getConfiguration('redivivus').get<string>('apiBase') || API_BASE_DEFAULT;
+  return base.replace('redivivus.dev', 'redivivus-backend.pages.dev');
 }
 
 let _ctx: vscode.ExtensionContext | null = null;
@@ -16,16 +17,37 @@ export function initApiClient(ctx: vscode.ExtensionContext): void {
   _ctx = ctx;
 }
 
+let _cachedToken: string | null = null;
+
 export async function getAccountToken(): Promise<string | null> {
-  return _ctx ? (await _ctx.secrets.get(SECRET_KEY) ?? null) : null;
+  if (_ctx && _ctx.globalState.get('redivivus.signedOut') === true) {
+    _cachedToken = null;
+    return null;
+  }
+  if (_cachedToken) return _cachedToken;
+  const token = _ctx ? (await _ctx.secrets.get(SECRET_KEY) ?? null) : null;
+  if (token && token.trim() !== '') {
+    _cachedToken = token;
+    return token;
+  }
+  return null;
 }
 
 export async function setAccountToken(token: string): Promise<void> {
-  if (_ctx) { await _ctx.secrets.store(SECRET_KEY, token.trim()); }
+  if (_ctx) { 
+    await _ctx.globalState.update('redivivus.signedOut', false);
+    _cachedToken = token.trim();
+    try { await _ctx.secrets.store(SECRET_KEY, token.trim()); } catch (e) { console.error('Failed to store secret:', e); }
+  }
 }
 
 export async function clearAccountToken(): Promise<void> {
-  if (_ctx) { await _ctx.secrets.delete(SECRET_KEY); }
+  if (_ctx) { 
+    await _ctx.globalState.update('redivivus.signedOut', true); // Bulletproof override
+    _cachedToken = null;
+    try { await _ctx.secrets.store(SECRET_KEY, ''); } catch {}
+    try { await _ctx.secrets.delete(SECRET_KEY); } catch {}
+  }
 }
 
 export function collectKeys(): Record<string, string> {
@@ -76,16 +98,64 @@ export async function cloudPrompt(
   opts: { systemMessage?: string; tier?: 'flash' | 'pro' } = {}
 ): Promise<AIResponse> {
   try {
-    return await post<AIResponse>('/prompt', {
+    // Step 1: Get routing instructions from backend (SECRET SAUCE)
+    const instructions = await post<any>('/prompt', {
       text,
       keys: collectKeys(),
       preferred: getPreferred(),
       systemMessage: opts.systemMessage,
       tier: opts.tier ?? 'flash',
     });
+
+    if (instructions.requiresClientExecution) {
+      // Step 2: Execute AI call client-side using backend routing instructions
+      const { callProvider } = await import('../../core/ai/providers/providerFactory.js');
+      
+      const response = await callProvider(
+        instructions.instructions.routing.selectedProvider,
+        instructions.instructions.prompt,
+        createFetchWithTimeout(),
+        undefined, // geminiModel
+        undefined, // imageBase64
+        undefined, // imageType
+        instructions.instructions.systemMessage
+      );
+
+      return {
+        text: response.text,
+        model: response.model || instructions.instructions.routing.model,
+        success: response.success,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+        usingFallback: response.usingFallback
+      };
+    } else {
+      // Fallback to legacy behavior
+      return instructions as AIResponse;
+    }
   } catch (err: any) {
     return { text: '', model: 'none', success: false, error: err.message };
   }
+}
+
+// Helper: Create fetch with timeout for AI calls
+function createFetchWithTimeout() {
+  return async (url: string, options: RequestInit, timeoutMs?: number) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs || 60000);
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      throw error;
+    }
+  };
 }
 
 export interface IntentResult {

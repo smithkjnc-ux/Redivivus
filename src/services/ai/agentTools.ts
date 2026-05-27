@@ -101,14 +101,17 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     execute: async (args: any, ctx: AgentContext) => {
       ctx.log(`🖥️ Running: \`${args.command}\``);
       try {
-        const { stdout, stderr } = await execAsync(args.command, { cwd: ctx.root });
+        const { stdout, stderr } = await execAsync(args.command, { cwd: ctx.root, timeout: 15000 });
         let result = '';
         if (stdout) {result += `STDOUT:\n${stdout}\n`;}
         if (stderr) {result += `STDERR:\n${stderr}\n`;}
         if (!result) {result = 'Command completed successfully with no output.';}
         return result;
       } catch (e: any) {
-        return `Command failed:\nSTDOUT:\n${e.stdout}\nSTDERR:\n${e.stderr}\nERROR:\n${e.message}`;
+        if (e.killed && e.signal === 'SIGTERM') {
+          return `Command timed out after 15 seconds and was killed.\nSTDOUT:\n${e.stdout || ''}\nSTDERR:\n${e.stderr || ''}\nIf you are trying to start a server or long-running process, you MUST run it in the background and detach output, e.g.: \`python3 -m http.server > server.log 2>&1 &\``;
+        }
+        return `Command failed:\nSTDOUT:\n${e.stdout || ''}\nSTDERR:\n${e.stderr || ''}\nERROR:\n${e.message}`;
       }
     }
   },

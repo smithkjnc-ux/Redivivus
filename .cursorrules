@@ -22,15 +22,21 @@ You are not permitted to edit, create, or delete any file until you complete all
 3. Read `.redivivus/blueprint.md` — confirm your change fits the project scope
 4. Read the `[SCOPE]` tag at the top of every file you plan to touch
 5. Read every `[WARN]` tag near code you plan to change
-6. Check `REDIVIVUS_ROADMAP.md` for `[DEAD]` entries matching your planned approach
+6. Check `.redivivus/dead_ends.md` for `[DEAD]` entries matching your planned approach
 
 ## HARD STOP — AFTER EVERY SINGLE FILE CHANGE
 
 After any file touch — one line, one comment, one rename, anything:
-1. Add an entry to `REDIVIVUS_ROADMAP.md` under "Recent Fixes": file, what changed, why, risk
-2. Update the `*Last updated:*` line with today's date
+1. Add an entry to `docs/REDIVIVUS_FIXES.md` (NOT `REDIVIVUS_ROADMAP.md`): file, what changed, why, risk
+2. Update the `*Last updated:*` line in `REDIVIVUS_ROADMAP.md` with today's date
 
 A typo fix gets logged. A comment reword gets logged. No exceptions.
+
+**Documentation routing — Rule 21:**
+- Fix made this session -> `docs/REDIVIVUS_FIXES.md`
+- Planned feature -> `docs/REDIVIVUS_FEATURES.md`
+- Architecture/design rule -> `docs/REDIVIVUS_ARCHITECTURE.md`
+- `REDIVIVUS_ROADMAP.md` -> INDEX ONLY, max 80 lines. Growing it past 80 = wrong file.
 
 ## File Size Hard Stop
 
@@ -101,6 +107,12 @@ Every new file needs [SCOPE]. Every feature must trace to the blueprint. If outs
 
 ### Rule 13: NO FLAT FILES
 Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects Redivivus builds and to Redivivus itself. No exceptions, no matter what vibe editor is being used.
+
+### Rule 21: Documentation Routing — HARD STOP
+- Fix made this session -> `docs/REDIVIVUS_FIXES.md`
+- Planned feature -> `docs/REDIVIVUS_FEATURES.md`
+- Architecture/design rule -> `docs/REDIVIVUS_ARCHITECTURE.md`
+- `REDIVIVUS_ROADMAP.md` -> INDEX ONLY, max 80 lines. If it grows past 80, you are writing in the wrong file.
 
 
 *Rules enforced via: `CLAUDE.md` · `.windsurf/rules.md` · `.cursor/rules` · `.cursorrules` · `.github/copilot-instructions.md` · `GEMINI.md` · `.redivivus/rules.md` — removing one does not remove the rules.*

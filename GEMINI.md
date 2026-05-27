@@ -13,7 +13,7 @@ You are not permitted to edit, create, or delete any file until you complete all
 3. Read `.redivivus/blueprint.md` — confirm your change fits the project scope
 4. Read the `[SCOPE]` tag at the top of every file you plan to touch
 5. Read every `[WARN]` tag near code you plan to change
-6. Check `REDIVIVUS_ROADMAP.md` for `[DEAD]` entries matching your planned approach
+6. Check `.redivivus/dead_ends.md` for `[DEAD]` entries matching your planned approach
 
 If any step is incomplete: stop. Finish it. Then proceed.
 
@@ -23,11 +23,17 @@ If any step is incomplete: stop. Finish it. Then proceed.
 
 After any file touch — one line, one comment, one rename, anything:
 
-1. Add an entry to `REDIVIVUS_ROADMAP.md` under "Recent Fixes":
+1. Add an entry to `docs/REDIVIVUS_FIXES.md` (NOT `REDIVIVUS_ROADMAP.md`):
    - File changed, what changed, why, any risk introduced
-2. Update the `*Last updated:*` line with today's date
+2. Update the `*Last updated:*` line in `REDIVIVUS_ROADMAP.md` with today's date
 
 A typo fix gets logged. A comment reword gets logged. No exceptions.
+
+**Documentation routing:**
+- Fix made this session -> `docs/REDIVIVUS_FIXES.md`
+- Planned feature -> `docs/REDIVIVUS_FEATURES.md`
+- Architecture/design rule -> `docs/REDIVIVUS_ARCHITECTURE.md`
+- `REDIVIVUS_ROADMAP.md` -> INDEX ONLY, max 80 lines. If it grows past 80, you are in the wrong file.
 
 ---
 

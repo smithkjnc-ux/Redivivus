@@ -81,6 +81,17 @@ const deployTargets = [
   path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'extensions', 'redivivus'),
 ];
 
+// [WARN] Resolve the actual running IDE via the stable symlink — this is where the user's desktop icon points.
+// Without this, postcompile deploys to the wrong location and fixes never reach the running IDE.
+try {
+  const stableLink = path.join(home, '.local', 'opt', 'redivivus');
+  const resolved = fs.realpathSync(stableLink);
+  const symlinkExt = path.join(resolved, 'resources', 'app', 'extensions', 'redivivus');
+  if (fs.existsSync(symlinkExt) && !deployTargets.includes(symlinkExt)) {
+    deployTargets.unshift(symlinkExt); // Highest priority — this is the running IDE
+  }
+} catch {}
+
 // Also sync to any installed redivivus extension in ~/.vscode/extensions/ (takes priority over baked in VS Code/Cursor)
 const vscodeExts = path.join(home, '.vscode', 'extensions');
 if (fs.existsSync(vscodeExts)) {
@@ -116,8 +127,12 @@ if (deployed > 0) {
 // Copy Redivivus icon into the Linux resources folder of the build shell
 const iconSrc = path.join(workspaceRoot, 'resources', 'redivivus-icon-512.png');
 const iconDest = path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'resources', 'linux', 'redivivus.png');
+const codeIconDest = path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'resources', 'linux', 'code.png');
 if (fs.existsSync(iconSrc)) {
-  try { fs.copyFileSync(iconSrc, iconDest); } catch {}
+  try { 
+    fs.copyFileSync(iconSrc, iconDest); 
+    fs.copyFileSync(iconSrc, codeIconDest);
+  } catch {}
 }
 
 // Write install.sh into the build root so users get a desktop shortcut
@@ -144,7 +159,7 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Name=Redivivus IDE
 Comment=AI-powered code editor
-Exec=$STABLE_LINK/redivivus --no-sandbox %U
+Exec=$STABLE_LINK/redivivus --no-sandbox --new-window %U
 Icon=$ICON_DEST
 Terminal=false
 Type=Application

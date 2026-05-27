@@ -163,7 +163,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
   if (msg.type?.startsWith('placement-') && msg.choice) {
     const placementId = msg.type.slice('placement-'.length);
-    const { resolvePlacement } = require('./chatPanelIntent.js');
+    const { resolvePlacement } = require('../ai/chatPanelResolvers.js');
     resolvePlacement(placementId, msg.choice);
     return true;
   }

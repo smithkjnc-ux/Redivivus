@@ -4,7 +4,7 @@
 
 ---
 
-*Last updated: May 13, 2026*
+*Last updated: May 27, 2026 (Session 11BI)*
 
 ---
 
@@ -180,3 +180,37 @@ See `REDIVIVUS_VISION.md` for full spec.
 1. "I understand what's being built" — Story narration in plain English
 2. "I'm in control" — Every change is reversible (Undo Everything)
 3. "This is getting smarter" — Vault counter goes up, costs go down
+
+---
+
+## What's Working (DO NOT BREAK)
+- [x] Close project — `updateWorkspaceFolders()`, no file picker, stale panel disposed
+- [x] Open vault — hardcoded override, never routes to file picker
+- [x] Vault — only reads `~/.redivivus-vault/`, never Windsurf globalStorage
+- [x] Vault scan — folder picker, user selects any project
+- [x] Save to Vault — confirmation modal, saves pending scan results
+- [x] Chat AI context — full conversation history (14 turns), file tree, 150-line preview
+- [x] Blueprint form, sessions, status bar, intent classifier
+- [x] Build pipeline (single-file + chunked), Undo Everything, Story Mode
+- [x] Supervisor/Worker AI chain, Vault-hit gate, Guardian health scoring
+- [x] Architecture Map, Save Points, Learned Memory
+- [x] Auto-commit after compile (`postcompile.js`)
+- [x] Gemini Pro for Supervisor+Guardian, Flash for Worker — same key, split model
+- [x] Task-aware routing: Kimi (large context), Groq (speed), Gemini (medium)
+- [x] NeverDo loop: Guardian → learned.md → Supervisor prompt injection
+- [x] Build feedback buttons — bad feedback writes to NeverDo
+- [x] Single chat panel — postMessage swap prevents duplicate tab on refresh
+- [x] "Who Did What & Why" card open by default in every build result
+- [x] Cloud vault API — `vault_items`, `templates`, `vault_community` in Supabase (Session 11BI)
+- [x] Templates — 10 starters migrated from GitHub to Supabase (Session 11BI)
+
+---
+
+## Competitive Gap — Next Sprint
+- [ ] **Deploy to Vercel** — detect workspace, run `vercel --prod`, post URL to chat
+- [ ] **Single-key starter mode** — "Quick Start: paste one Claude key" path in Setup Hub
+- [ ] **Supabase scaffold** — keyword trigger "add auth" / "add a database"
+- [ ] **Screenshot-to-build** — dropped image → "build this UI"
+- [ ] **Template library expansion** — grow from 10 → 50+ starters
+- [ ] **Community vault** — opt-in sharing, admin-approved patterns, community pulls on install
+- [ ] **Vault sync command** — `redivivus.syncVaultToCloud` wired to palette + Setup Hub

@@ -34,20 +34,6 @@ export async function runBuildAfterGates(
 ): Promise<void> {
   deps.postToWebview({ type: 'set-status', status: 'working' });
 
-  // Hard auth gate — no fallback to local builds
-  const token = await getAccountToken();
-  if (!token) {
-    deps.postToWebview({ type: 'set-status', status: 'ready' });
-    deps.conversation.push({
-      role: 'assistant',
-      content: '🔒 **Sign in to use Redivivus**\n\nOpen the command palette and run **Redivivus: Sign In** to connect your account.',
-      timestamp: Date.now(),
-    });
-    deps.refresh();
-    vscode.commands.executeCommand('redivivus.signIn');
-    return;
-  }
-
   let root = getLiveRoot(deps);
 
   // No project open — auto-create a folder

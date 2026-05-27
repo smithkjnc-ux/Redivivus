@@ -22,6 +22,18 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const userText = msg.text?.trim();
   if (!userText) { return; }
 
+  const { getAccountToken } = await import('../../services/api/apiClient.js');
+  if (!(await getAccountToken())) {
+    conversation.push({
+      role: 'assistant',
+      content: '🔒 **Sign in to use Redivivus**\n\nOpen the command palette and run **Redivivus: Sign In** to connect your account.',
+      timestamp: Date.now(),
+    });
+    refresh();
+    vscode.commands.executeCommand('redivivus.signIn');
+    return;
+  }
+
   const _lastSm = conversation[conversation.length - 1];
   if (!_lastSm || _lastSm.role !== 'user' || _lastSm.content !== userText) {
     conversation.push({ role: 'user', content: userText, timestamp: Date.now() });

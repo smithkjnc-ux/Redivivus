@@ -6,7 +6,7 @@ import type { RoutingService } from '../../services/ai/routingService';
 import type { UsageTracker } from '../../services/usageTracker';
 import type { RedivivusService } from '../../services/redivivusService';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
-import { resolveBuildConfirm, resolvePlacement } from '../ai/chatPanelIntent';
+import { resolveBuildConfirm, resolvePlacement } from '../ai/chatPanelResolvers.js';
 import { resolveVaultHit } from '../build/chatPanelBuild';
 import { handleSendMessage } from './chatPanelMsgSendMessage';
 import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser, handleOpenHtmlByName } from '../project/chatPanelMsgFileOps';

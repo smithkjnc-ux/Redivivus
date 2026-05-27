@@ -26,7 +26,7 @@
         {
           "id": "redivivusView",
           "title": "Redivivus",
-          "icon": "resources/redivivus-icon.svg"
+          "icon": "resources/redivivus-icon-v2.svg"
         }
       ]
     },
@@ -36,7 +36,7 @@
           "id": "redivivusSidebar",
           "name": "Redivivus",
           "type": "webview",
-          "icon": "resources/redivivus-icon.svg"
+          "icon": "resources/redivivus-icon-v2.svg"
         }
       ]
     },

@@ -50,10 +50,18 @@ export class StatusBar {
 
   async refreshConnection(): Promise<void> {
     try {
-      const { getAccountToken } = await import('../../services/api/apiClient.js');
-      this._isConnected = !!(await getAccountToken());
+      const { getAccountToken, getApiBase, clearAccountToken } = await import('../../services/api/apiClient.js');
+      const token = await getAccountToken();
+      if (!token) {
+        this._isConnected = false;
+        this.updateConnectionItem();
+        return;
+      }
+      
+      // Token exists locally. Assume valid unless an actual AI request returns 401.
+      this._isConnected = true;
     } catch {
-      this._isConnected = false;
+      // Ignore transient failures
     }
     this.updateConnectionItem();
   }

@@ -28,13 +28,13 @@ If you skip any item: **stop. Complete it first. Then proceed.**
 
 After touching any file — one line, one comment, one variable rename, anything:
 
-1. Open `REDIVIVUS_ROADMAP.md`
-2. Add an entry under "Recent Fixes" containing:
+1. Open `docs/REDIVIVUS_FIXES.md` (NOT `REDIVIVUS_ROADMAP.md`)
+2. Add an entry under the current date containing:
    - **File changed:** exact filename
    - **What changed:** specific description
    - **Why:** the reason
    - **Risk:** any fragility introduced, or "none"
-3. Update the `*Last updated:*` line with today's date and a one-line summary
+3. Update the `*Last updated:*` line in `REDIVIVUS_ROADMAP.md` with today's date and a one-line summary
 
 **A typo fix gets logged. A comment reword gets logged. A variable rename gets logged. There is no change too small.**
 
@@ -186,5 +186,14 @@ Hardcoded redirect: "I'm a coding assistant — I can help you build, fix, expla
   cp -r out/* $BAKED/out/
   cp package.json $BAKED/package.json
 - Never copy out/ without package.json — commands, settings, and activation events live in package.json
-- Version in package.json must match the current release (currently 0.3.6)
+- Version in package.json must match the current release (currently 0.3.19)
 - When adding new commands, settings, or activation events, they MUST be registered in package.json contributes section or they will silently fail
+
+### Rule 21: Documentation Routing — HARD STOP
+Every change gets logged. It goes in the RIGHT file:
+- **Session fix (code changed this session)** -> `docs/REDIVIVUS_FIXES.md`
+- **Planned feature / backlog item** -> `docs/REDIVIVUS_FEATURES.md`
+- **Design rule / architecture decision** -> `docs/REDIVIVUS_ARCHITECTURE.md`
+- **REDIVIVUS_ROADMAP.md** -> INDEX ONLY. Last 3 sessions + doc pointers. Max 80 lines.
+
+If REDIVIVUS_ROADMAP.md grows past 80 lines, you are writing in the wrong file.

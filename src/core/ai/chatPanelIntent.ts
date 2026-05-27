@@ -24,23 +24,7 @@ import { estimateBuild } from './costEstimatorService';
 import { checkBuildPlacement } from '../../services/build/buildPlacementCheck';
 import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor';
 
-// [Redivivus] Pending build-confirm resolvers — keyed by buildId. Resolved by confirm-build / cancel-build messages.
-export const _pendingBuildConfirms = new Map<string, (confirmed: boolean) => void>();
-
-// [Redivivus] Pending placement resolvers — keyed by placementId. Resolved by placement-* messages.
-export const _pendingPlacements = new Map<string, (choice: 'here' | 'new-project' | 'cancel') => void>();
-
-/** Called by the message handler when the user responds to the placement modal. */
-export function resolvePlacement(placementId: string, choice: 'here' | 'new-project' | 'cancel'): void {
-  const resolve = _pendingPlacements.get(placementId);
-  if (resolve) { _pendingPlacements.delete(placementId); resolve(choice); }
-}
-
-/** Called by the message handler when the user responds to the cost estimate modal. */
-export function resolveBuildConfirm(buildId: string, confirmed: boolean): void {
-  const resolve = _pendingBuildConfirms.get(buildId);
-  if (resolve) { _pendingBuildConfirms.delete(buildId); resolve(confirmed); }
-}
+// [Redivivus] Moved resolvers to chatPanelResolvers.ts
 
 /** Shows placement modal and waits for user choice. Returns 'here' | 'new-project' | 'cancel'. */
 import { awaitPlacementConfirmation, awaitCostConfirmation } from '../../ui/panels/chat/chatPanelGates';
@@ -74,6 +58,22 @@ export { classifyIntent, isBuildRequest, IntentType, IntentResult, AvailableComm
 /** Handles a build request — shows choice dialog for complex requests, runs pipeline for simple ones. */
 export async function handleBuildRequest(task: string, deps: BuildRequestDeps, skipComplex: boolean = false, isFixRequest: boolean = false): Promise<void> {
   deps.postToWebview({ type: 'set-status', status: 'working' });
+  
+  // Hard auth gate — check FIRST before asking scope questions
+  const { getAccountToken } = await import('../../services/api/apiClient.js');
+  const token = await getAccountToken();
+  if (!token) {
+    deps.postToWebview({ type: 'set-status', status: 'ready' });
+    deps.conversation.push({
+      role: 'assistant',
+      content: '🔒 **Sign in to use Redivivus**\n\nOpen the command palette and run **Redivivus: Sign In** to connect your account.',
+      timestamp: Date.now(),
+    });
+    deps.refresh();
+    vscode.commands.executeCommand('redivivus.signIn');
+    return;
+  }
+
   // [FIX] No workspace open → skip all gates (scope, vault, cost). Auto-create handles project setup.
   if (!vscode.workspace.workspaceFolders?.length) { skipComplex = true; }
   if (!skipComplex) {tracer.start(task);}

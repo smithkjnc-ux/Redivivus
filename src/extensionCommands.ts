@@ -38,6 +38,7 @@ import { registerVaultBrowseCommand } from './commands/vaultBrowse.js';
 import { registerVaultTranslateCommand } from './commands/vaultTranslate.js';
 import { registerBuildFromVaultCommand } from './commands/buildFromVault.js';
 import { registerMiscCommands } from './commands/misc.js';
+import { registerAuthHandler } from './services/api/authHandler.js';
 import { registerApiSetupCommand } from './commands/apiSetup.js';
 import { registerUsageCommands } from './commands/usageCommands.js';
 import { registerSetupProgressCommand } from './commands/setupProgressCommand.js';
@@ -163,4 +164,7 @@ export function registerAllCommands(
     }
     runCompilePipeline(target.pipeline, target.root);
   }));
+
+  // Register deep link handler
+  registerAuthHandler(context, statusBar);
 }

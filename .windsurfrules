@@ -21,20 +21,20 @@
 1. Read `REDIVIVUS_ROADMAP.md` in full.
 
 ### AFTER EVERY change — no matter how small:
-2. Open `REDIVIVUS_ROADMAP.md` and add an entry under "Recent Fixes":
+2. Open `docs/REDIVIVUS_FIXES.md` (NOT `REDIVIVUS_ROADMAP.md`) and add an entry:
    - Which file was changed and exactly what was changed
    - Why the change was made
    - Any risk introduced
-3. Update the `*Last updated:*` line at the bottom with today's date and what you did.
+3. Update the `*Last updated:*` line in `REDIVIVUS_ROADMAP.md` with today's date and what you did.
 
 ### This means:
-- Fixed a typo in a comment? Update the roadmap.
-- Changed a variable name? Update the roadmap.
-- Added a single log line? Update the roadmap.
+- Fixed a typo in a comment? -> `docs/REDIVIVUS_FIXES.md`.
+- Changed a variable name? -> `docs/REDIVIVUS_FIXES.md`.
+- Added a single log line? -> `docs/REDIVIVUS_FIXES.md`.
 - **There is no change too small to skip this step.**
 
 > If Redivivus is installed: "Done for Now" writes this automatically.
-> If Redivivus is NOT installed: update `REDIVIVUS_ROADMAP.md` manually before you stop.
+> If Redivivus is NOT installed: update `docs/REDIVIVUS_FIXES.md` manually before you stop.
 > **Failure to do this breaks the project history chain for every future AI and human working on this project.**
 
 ---
@@ -130,3 +130,13 @@ Code handles: file operations, command execution, data storage, UI rendering, AP
 Never answer questions unrelated to software development, coding, architecture, or the user's project. Offtopic requests get one hardcoded polite redirect — no AI tokens spent on the response.
 
 Hardcoded redirect: "I'm a coding assistant — I can help you build, fix, explain, or review code and projects. For anything else, I'm not the right tool. What are you building today?"
+
+### Rule 21: Documentation Routing — HARD STOP
+Every change gets logged. It goes in the RIGHT file:
+- **Session fix (code changed this session)** -> `docs/REDIVIVUS_FIXES.md`
+- **Planned feature / backlog item** -> `docs/REDIVIVUS_FEATURES.md`
+- **Design rule / architecture decision** -> `docs/REDIVIVUS_ARCHITECTURE.md`
+- **REDIVIVUS_ROADMAP.md** -> INDEX ONLY. Last 3 sessions + doc pointers. Max 80 lines.
+
+If REDIVIVUS_ROADMAP.md grows past 80 lines, you are writing in the wrong file.
+The test: "Am I logging a fix I just made?" -> REDIVIVUS_FIXES.md. Every time.
