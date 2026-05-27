@@ -1,7 +1,7 @@
-# CHASSIS Self-Compliance Report
+# Redivivus Self-Compliance Report
 
 **Generated:** May 3, 2026
-**Scope:** Extreme check of all chassis files against CHASSIS rules
+**Scope:** Extreme check of all redivivus files against Redivivus rules
 **Total Files Checked:** 100 TypeScript/JavaScript files
 
 ---
@@ -10,7 +10,7 @@
 
 **Overall Status:** ✅ **COMPLIANT**
 
-All 100 files pass the critical CHASSIS rules. The codebase is as clean as it claims to be, with proper [SCOPE] annotations, file sizes under 200 lines, correct comment syntax, and appropriate use of annotation tags.
+All 100 files pass the critical Redivivus rules. The codebase is as clean as it claims to be, with proper [SCOPE] annotations, file sizes under 200 lines, correct comment syntax, and appropriate use of annotation tags.
 
 ---
 
@@ -79,7 +79,7 @@ All [WARN] tags represent legitimate warnings about fragile or risky code. No vi
 **Total Instances:** 19
 
 **Breakdown:**
-- 16 instances in documentation (chassisRules.ts, rulesContent.ts, guideContent.ts)
+- 16 instances in documentation (redivivusRules.ts, rulesContent.ts, guideContent.ts)
 - 3 instances in code as genuine future work markers:
   - `retrofitService.ts:3` — "Further split: extract runRetrofit into retrofitRunner.ts if it grows past 200 lines"
   - `init.ts:70` — "Split auto-init logic from command registration"
@@ -156,9 +156,9 @@ All remaining 95 files are well under the 200-line limit with healthy margins.
 
 ## Conclusion
 
-**CHASSIS is as clean as it says it is.**
+**Redivivus is as clean as it says it is.**
 
-The codebase demonstrates excellent adherence to CHASSIS rules:
+The codebase demonstrates excellent adherence to Redivivus rules:
 - ✅ All files have [SCOPE] annotations
 - ✅ All files under 200 lines
 - ✅ Correct comment syntax throughout

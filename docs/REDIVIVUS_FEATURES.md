@@ -82,7 +82,7 @@ Non-Redivivus folders now show branching dialog with "Open Anyway" option. Exist
 - [ ] Phase 3: Full agent chaining — "refactor, split, commit, update roadmap" as one instruction
 
 ### Redivivus Sidebar Chat Panel
-- [x] Registered in Activity Bar with `chassisSidebar` viewType. DONE (May 13).
+- [x] Registered in Activity Bar with `redivivusSidebar` viewType. DONE (May 13).
 - [x] Live status header: project name, blueprint badge, session badge, AI badge. DONE (May 13).
 - [x] All commands wired correctly including `redivivus.openChatPanel`, `vaultDedup`, `injectTerminalError`. DONE (May 13).
 

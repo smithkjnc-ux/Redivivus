@@ -1,4 +1,4 @@
-# CHASSIS Recommendations
+# Redivivus Recommendations
 
 *Based on project analysis*
 
@@ -12,8 +12,8 @@ Every main file should have a `// [SCOPE]` tag explaining what it does and what 
 
 ### 2. Establish File Size Discipline
 
-Going forward, aim for **200 lines max per file**. When a file exceeds this, split it by responsibility. CHASSIS will flag violations automatically in future versions.
+Going forward, aim for **200 lines max per file**. When a file exceeds this, split it by responsibility. Redivivus will flag violations automatically in future versions.
 
 ---
 
-*These recommendations are structural. Deep code analysis requires CHASSIS Phase 2 (AI routing).*
+*These recommendations are structural. Deep code analysis requires Redivivus Phase 2 (AI routing).*

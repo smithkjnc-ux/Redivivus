@@ -1,4 +1,4 @@
-# CHASSIS Retrofit Report
+# Redivivus Retrofit Report
 
 *Retrofit completed: 2026-05-03*
 
@@ -9,7 +9,7 @@
 - Files processed: 8
 - Successful: 8
 - Failed: 0
-- Backup location: `.chassis/backup/`
+- Backup location: `.redivivus/backup/`
 
 ## Results
 
@@ -29,5 +29,5 @@
 ## Next Steps
 
 1. **Test your project** — make sure everything still works
-2. If good: run **CHASSIS: Confirm Retrofit** to delete the backup
-3. If bad: run **CHASSIS: Revert Retrofit** to restore original files
+2. If good: run **Redivivus: Confirm Retrofit** to delete the backup
+3. If bad: run **Redivivus: Revert Retrofit** to restore original files

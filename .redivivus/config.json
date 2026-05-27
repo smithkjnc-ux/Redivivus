@@ -1,5 +1,5 @@
 {
-  "projectName": "chassis",
+  "projectName": "redivivus",
   "createdAt": "2026-05-03T00:13:38.848Z",
   "version": "0.1.0",
   "blueprint": {
@@ -7,7 +7,7 @@
     "what": "VS Code extension that enforces project structure, tracks sessions, and makes AI-generated code consistent across editors through a Universal Project Protocol",
     "where": "VS Code / Windsurf / Cursor extension, TypeScript, Node.js, WebView UI",
     "when": "Active development, v0.2.0, targeting v1.0 stable release",
-    "why": "No standard exists for structuring AI-assisted projects. Every AI starts from scratch every session. CHASSIS gives the AI a frame to bolt to so projects stay organized regardless of which AI or editor is used.",
+    "why": "No standard exists for structuring AI-assisted projects. Every AI starts from scratch every session. Redivivus gives the AI a frame to bolt to so projects stay organized regardless of which AI or editor is used.",
     "health": {
       "confirmed": 5,
       "assumed": 0,

@@ -1,6 +1,6 @@
-# WORK_LOG — chassis
+# WORK_LOG — redivivus
 
-Auto-managed by CHASSIS. Append-only session history.
+Auto-managed by Redivivus. Append-only session history.
 
 ---
 

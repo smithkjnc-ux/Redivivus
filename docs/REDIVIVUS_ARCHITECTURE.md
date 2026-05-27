@@ -66,7 +66,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 ### Services
 | File | Purpose |
 |------|---------|
-| `src/services/chassisService.ts` | Core init, config load/save, paths |
+| `src/services/redivivusService.ts` | Core init, config load/save, paths |
 | `src/services/routingService.ts` | Multi-AI routing, Supervisor/Worker/Guardian chain |
 | `src/services/vaultService.ts` | Vault CRUD, categorization, duplicate detection |
 | `src/services/vaultStorage.ts` | Vault file I/O — reads/writes `~/.redivivus-vault/` ONLY |
@@ -81,7 +81,7 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 | `src/services/snapshotService.ts` | File snapshots before every build (Undo Everything) |
 | `src/services/buildLedgerService.ts` | Per-AI token/cost tracking for result card breakdown |
 | `src/services/savePointService.ts` | Git-backed save point create/restore |
-| `src/services/diagnosticLogger.ts` | Debug log writer (`~/chassis_debug.log`) |
+| `src/services/diagnosticLogger.ts` | Debug log writer (`~/redivivus_debug.log`) |
 
 ### Data Files
 | File | Purpose |
