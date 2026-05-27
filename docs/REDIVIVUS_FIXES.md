@@ -5,7 +5,46 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: Build result card summary restored)*
+*Last updated: May 27, 2026 (Session 11BI: R2 download hosting + web download route fix)*
+
+---
+
+## May 27, 2026 — Session 11BI (Download hosting moved to Cloudflare R2 — 404 on GitHub release link fixed)
+
+**Root cause:** The download page on `redivivus.dev/download` linked directly to `https://github.com/smithkjnc-ux/Redivivus/releases/latest/download/redivivus-0.3.19.tar.gz`. The GitHub release asset existed (220MB `.tar.gz`), but the direct download URL returned **404** for unauthenticated users because the repo is **private** — GitHub blocks release asset downloads for private repos unless the user is authenticated. The user's son saw a blank/black page when clicking download.
+
+**Initial attempt:** Uploaded the `.tar.gz` to Cloudflare R2 bucket `redivivus-downloads` and rewrote `/api/download` to stream the file from R2 via the `DOWNLOADS` Worker binding. This worked for the first ~50MB, then hit Cloudflare Workers' **50MB response body limit** on the free plan. The download truncated at 57MB.
+
+**Final solution:** Added a **custom domain** (`downloads.redivivus.dev`) to the R2 bucket. Files served via a custom domain bypass the Worker entirely — no size limits, global CDN edge caching. The `/api/download` route now does a simple 302 redirect to `https://downloads.redivivus.dev/redivivus-0.3.19.tar.gz`.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `redivivus-web/wrangler.jsonc` | Added `r2_buckets` binding: `redivivus-downloads` → `DOWNLOADS` | Enables Worker access to R2 bucket (used for future features, not downloads) | None — standard Cloudflare binding |
+| `redivivus-web/src/app/api/download/route.ts` | Rewrote to return 302 redirect to R2 custom domain URL instead of proxying GitHub or streaming from R2 binding | Private GitHub repo blocks unauthenticated downloads; Worker streaming hits 50MB limit; R2 custom domain bypasses both issues | None — simple redirect, no logic |
+| `redivivus-web/src/lib/latest-release.ts` | `DOWNLOAD_URL` changed from GitHub direct URL to `/api/download` | Routes all downloads through the API endpoint | None — same route, different backend |
+| (Dashboard) | R2 bucket `redivivus-downloads` custom domain: `downloads.redivivus.dev` | Serves files directly from R2 edge, no Worker limit, zero egress cost | None — Cloudflare-managed |
+
+**Cost:** R2 free tier covers 10GB storage + 10M requests/month. The 221MB file costs approximately **$0.003/month** in storage, $0 in bandwidth (R2 has zero egress fees).
+
+---
+
+## May 27, 2026 — Session 11BJ (Remove Workspace Creation + Auto-Save Fixes)
+
+**Root cause 1:** Redivivus was unconditionally creating `.code-workspace` files and opening them instead of just opening the project folder directory. This caused VS Code to display `(Workspace)` in the title bar.
+
+**Root cause 2:** The auto-save path (`autoSaveAndOpen`) created the project directory and wrote the file, but (a) never called `vscode.openFolder` to open the project in the Explorer, leaving the sidebar at "NO FOLDER OPENED", (b) returned a bare `✅ Saved:` string instead of a `__RESULT_CARD__` token, so no rich build summary card was rendered, and (c) never fired `ChatPanel.onBuildFinished` so vault capture and session recording didn't trigger.
+
+**Root cause 3:** The cloud build runner (`chatPanelBuildRunner.ts`) used `END_PREVIEW__` as the preview token delimiter, but the renderer regex expects `END_PREVIEW_BROWSER__`. The preview button never rendered for cloud builds.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/project/chatPanelMsgProjectOps.ts` | Removed `.code-workspace` creation; use direct `vscode.openFolder` on directory. | Workspace files were unnecessary noise. | Low |
+| `src/ui/messageRouterWizard.ts` | Same as above for wizard. | Same. | Low |
+| `src/ui/panels/chat/chatPanelShow.ts` | Same as above for startup. | Same. | Low |
+| `src/services/project/projectOperations.ts` | Same as above for project ops. | Same. | Low |
+| `src/core/build/chatPanelAutoSave.ts` | Added `vscode.openFolder` after writing file when no folder is open; added `ChatPanel.onBuildFinished` call; return rich `__RESULT_CARD__` + `__OPEN_WORKSPACE__` + `__PREVIEW_BROWSER__` tokens instead of bare text. | Explorer never opened, no build summary card, no vault capture after auto-save builds. | Medium — auto-save now triggers folder reload when no folder is open |
+| `src/core/build/chatPanelAutoSaveDelete.ts` | NEW — extracted `shouldDeleteFiles` and `deleteRequestedFiles` from `chatPanelAutoSave.ts`. | Rule 9 split — parent file was 215 lines. | None |
+| `src/core/build/chatPanelBuildRunner.ts` | Fixed preview token: `END_PREVIEW__` → `END_PREVIEW_BROWSER__` | Renderer regex never matched, preview button was invisible for cloud builds. | None |
 
 ---
 
@@ -3379,3 +3418,23 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 
 ---
 
+- **UI Responsiveness Fix (chatPanelScript*.ts):** Normalized `e.target` for text-node clicks to prevent `.closest()` from throwing exceptions in Chrome/Electron, which was silently swallowing project open and recent item click events.
+
+### Session 11BK — May 27, 2026: Webview Click Handler Stability Fix
+- **Issue:** The chat panel UI would sporadically become unresponsive, preventing users from opening projects or using recent project buttons. The buttons appeared "dead".
+- **Cause:** In Chrome/Electron, if a user clicked precisely on the text node *inside* a button, `e.target` evaluated to the text node rather than the wrapper element. The recent addition of `.closest()` calls directly on `e.target` (e.g., `e.target.closest(...)`) threw an unhandled `TypeError` because text nodes do not have a `.closest` method. This exception caused the main event listener to crash, swallowing the click event entirely before it could be routed to `vscode.postMessage`.
+- **Fix:** Added a normalization check at the beginning of the `click` event listeners in `chatPanelScript.ts`, `chatPanelScriptActions.ts`, and `chatPanelScriptActionsB.ts`: `const el = (e.target && e.target.nodeType === 3) ? e.target.parentNode : e.target;`. This guarantees `el` is always an `Element`, restoring `.closest()` functionality for all interactive tags.
+- **Risk:** None. Fixes a critical regression where the UI would silently break user interactions.
+- `src/core/project/chatPanelMsgProjectOps.ts`, `src/core/routing/chatPanelMessageRouterEarlyExits.ts`, `src/ui/messageRouterWizard.ts` etc.: Updated `vscode.commands.executeCommand('vscode.openFolder', ...)` calls to pass the modern `{ forceNewWindow: false }` options object instead of a raw boolean, fixing silent failures when opening folders from the webview buttons in recent VSCodium builds.
+- `src/core/project/chatPanelMsgProjectOps.ts`: Replaced `vscode.commands.executeCommand('vscode.openFolder')` with native `vscode.workspace.updateWorkspaceFolders` API to prevent silent folder open failures in "Untitled (Workspace)" or empty workspace states on newer VSCodium versions.
+- `src/core/project/chatPanelMsgProjectOps.ts`: Reverted `updateWorkspaceFolders` and implemented a workaround for VSCodium silent failure: when no folder is open, we launch the project in a new window using `forceNewWindow: true` and then close the current window. This prevents "Untitled (Workspace)" states and duplicate chat tabs.
+- `src/core/project/chatPanelMsgProjectOps.ts`: Hardcoded folder opening to *always* use `forceNewWindow: true` followed by `workbench.action.closeWindow`, regardless of the current workspace state. This completely bypasses the VSCodium bug where `forceNewWindow: false` silently fails in Untitled Workspaces, guaranteeing a clean single-folder project load every time.
+- `src/ui/panels/chat/chatPanelPublicAPI.ts`: Scoped chat history globalState keys to `process.pid` so that chat sessions start completely fresh whenever a project is opened, but still survive accidental tab closures during the same active session.
+- `src/ui/panels/chat/chatPanelPublicAPI.ts`: Implemented persistent chat logging: all new messages are now automatically appended to `.redivivus/chat_history.md` inside the project folder so that history isn't lost when the chat screen resets.
+- `src/ui/panels/chat/chatPanelScript.ts`: Added the animated phrase ticker to the Live Preview chat bar. Previously, it would display a static "Asking Redivivus..." while routing the intent to the AI (which can take 5-15 seconds), giving the false impression that the IDE was frozen.
+- `src/services/api/apiClient.ts`: Plumbed the timeout parameters through to the cloud API endpoints so that AI routing won't stall the UI indefinitely if the API response is delayed.
+
+### Session 11BL — May 27, 2026: Agentic Edit Pipeline Hardening & Modularization
+- **Issue:** The AI intent classifier mistakenly labeled natural language surgical edit requests (like "make the game resize automatically") as new project scaffold tasks when the local configuration check (`deps.redivivus.isInitialized()`) briefly lost its absolute context across window reloads, resulting in the creation of redundant new files. Monolithic files were also violating Rule 9.
+- **Fix:** Added a robust `isModificationRequest` inference check directly into `chatPanelMsgSendBuildIntent.ts` and `chatPanelMsgIntentActions.ts`. If the inference detects a modification task and the project directory is valid, it forcibly intercepts the scaffold/build requests and routes them directly to `handleFixRequest()`. This guarantees in-place editing. Extracted `MessageHandlerDeps` to `chatPanelMessageDeps.ts` and roster logic to `routingServiceRoster.ts` to reduce `chatPanelMessages.ts` and `routingService.ts` to under 200 lines.
+- **Risk:** Low. Tightens the validation of build intents to prioritize editing existing files.

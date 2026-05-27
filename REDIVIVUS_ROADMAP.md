@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 27, 2026 (Session 11BI — Cloud Vault + Templates + Architecture diagram)
+*Last updated:* May 27, 2026 — R2 download hosting + web download route fix
 
 ---
 
@@ -25,6 +25,11 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
+### Session 11BJ — May 27, 2026: Remove Workspace Creation
+- Stopped creating `.code-workspace` files when opening or scaffolding projects
+- Replaced `vscode.openFolder` on `.code-workspace` with `vscode.openFolder` directly on directory paths
+- Affected files: `chatPanelMsgProjectOps.ts`, `messageRouterWizard.ts`, `chatPanelShow.ts`, `projectOperations.ts`
+
 ### Session 11BI — May 27, 2026: Cloud Vault + Templates + Architecture Diagram
 - Migrated 10 templates from GitHub to Supabase `templates` table
 - New backend endpoints: `GET/POST /api/v1/vault`, `GET /api/v1/templates`
@@ -41,11 +46,10 @@
 - Fixed SecretStorage silent failure on Linux with in-memory `_cachedToken` fallback
 - Renamed CHASSIS → Redivivus across all 430 source files
 
-### Session 11BG — May 24, 2026: Project Rename CHASSIS → Redivivus
-- All `chassis.*` commands → `redivivus.*` across 430 files
-- 13 source files renamed via `git mv`
-- Root docs renamed: `CHASSIS_ROADMAP.md` → `REDIVIVUS_ROADMAP.md`
-- `.chassis/` → `.redivivus/`, auto-migration on boot for legacy users
+### Session 11BK — May 27, 2026: Webview Click Handler Stability Fix
+- Fixed text-node click target normalization in `chatPanelScript*.ts` to prevent `.closest()` exceptions
+- Restored functionality of the "Open Project" button and Recent Projects list inside the empty state
+- Resolved silent click swallowing across all Chat Panel interactive elements
 
 ---
 
