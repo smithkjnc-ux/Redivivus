@@ -15,6 +15,9 @@ export interface CloudBuildResult {
   success: boolean
   files?: Array<{ path: string; content: string; isNew: boolean }>
   narration?: string
+  model?: string
+  inputTokens?: number
+  outputTokens?: number
   error?: string
 }
 
@@ -254,7 +257,7 @@ async function processBuildResults(
   const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
   ChatPanel.onBuildFinished?.(task, writtenPaths, root);
 
-  return { success: true, files: data.files, narration: data.narration };
+  return { success: true, files: data.files, narration: data.narration, model: data.model, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
 }
 
 // Helper: Handle legacy build responses (fallback)

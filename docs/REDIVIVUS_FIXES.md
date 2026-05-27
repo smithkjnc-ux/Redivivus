@@ -5,7 +5,7 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: Auto-save + Create-file scaffold fix)*
+*Last updated: May 27, 2026 (Session 11BI: Build result card summary restored)*
 
 ---
 
@@ -22,6 +22,19 @@ The result: `toe.html` ended up directly in `~/projects/` with no `.redivivus/` 
 |---|---|---|---|
 | `src/core/build/chatPanelAutoSave.ts` | `autoSaveAndOpen()` now auto-creates a project subfolder (derived from filename stem) and calls `scaffoldAt()` when `root` is empty, `'none'`, or the projects container. Removed the folder-picker fallback that allowed dumping files loose. | Auto-save was the primary path for single-file builds (HTML games, snippets) and it never created project structure | Low — `scaffoldAt` is idempotent; folder name derived from filename stem |
 | `src/core/project/chatPanelMsgFileOps.ts` | `handleCreateFile()` now creates a project folder + `scaffoldAt()` BOTH when no workspace is open (was error) AND when workspace is the projects container (was `mkdirSync` only). | "Create File" button was the second path that bypassed the build pipeline | Low — same `scaffoldAt`; no longer errors on "no workspace open" |
+
+---
+
+## May 27, 2026 — Session 11BI (Build result card — Who Did What & Why + AI metadata restored)
+
+**Root cause:** When the cloud build path replaced the local pipeline, the success result card was rewritten from scratch but only included a bare file list. The backend returns `narration` (Who Did What & Why), `model`, `inputTokens`, and `outputTokens` — but `runBuildAfterGates` never displayed them. The old local pipeline had a rich result card with the Guardian's explanation, AI model label, token count, and cost estimate.
+
+Additionally, the `CloudBuildResult` type only had `success`, `files`, `narration`, and `error` — `model`, `inputTokens`, and `outputTokens` were dropped on the floor by `processBuildResults`.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/build/cloudBuildClient.ts` | Added `model`, `inputTokens`, `outputTokens` to `CloudBuildResult` interface; `processBuildResults` now passes them through | Backend sends this data but it was never returned to the caller | None — type-safe, optional fields |
+| `src/core/build/chatPanelBuildRunner.ts` | Result card now includes `result.narration` under **Who Did What & Why** heading, plus `*Built with {model} (~{tokens} tokens)*` footer | Summary was completely missing from build results | None — string formatting only; falls back gracefully if fields are empty |
 
 ---
 

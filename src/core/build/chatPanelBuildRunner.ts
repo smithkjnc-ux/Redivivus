@@ -91,9 +91,14 @@ export async function runBuildAfterGates(
       ? `\n__PREVIEW_BROWSER__${path.join(root, htmlFile.path)}|||END_PREVIEW__`
       : '';
 
+    const modelLabel = result.model ?? 'AI';
+    const tokens = (result.inputTokens ?? 0) + (result.outputTokens ?? 0);
+    const cost = tokens > 0 ? ` (~${tokens.toLocaleString()} tokens)` : '';
+    const narration = result.narration ? `\n\n**Who Did What & Why**\n${result.narration}` : '';
+
     deps.conversation.push({
       role: 'assistant',
-      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''}\n\n${fileList}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}`,
+      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''}\n\n${fileList}${narration}\n\n*Built with ${modelLabel}${cost}*\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}`,
       timestamp: Date.now(),
     });
     deps.refresh();
