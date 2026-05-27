@@ -36,7 +36,21 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
       state.conversation.push({ role: 'user', content: msg.text, timestamp: Date.now() });
     }
     panel.refresh();
-    await (panel as any)._handleBuildRequest(msg.text, true, true);
+    // [FIX] Use the local fix pipeline (handleFixRequest) which modifies existing files in-place.
+    // The cloud build pipeline (_handleBuildRequest) creates new projects and returns full files,
+    // which is wrong for fix requests on existing code.
+    const { handleFixRequest } = await import('./chatPanelMsgFix.js');
+    await handleFixRequest(msg.text, {
+      redivivus,
+      routing,
+      conversation: state.conversation,
+      refresh: () => panel.refresh(),
+      panel: _panel,
+      vault: (panel as any).vault,
+      isBuildRequest: async (t: string) => (panel as any)._isBuildRequest(t),
+      handleBuildRequest: (t: string, s?: boolean, f?: boolean) => (panel as any)._handleBuildRequest(t, s, f),
+      buildFromVaultPrefill: () => (panel as any)._buildFromVaultPrefill(),
+    } as any);
     return true;
   }
 

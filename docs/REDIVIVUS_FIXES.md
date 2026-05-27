@@ -5,7 +5,25 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: Security audit — fixed GitHub token leak + internal URL exposure)*
+*Last updated: May 27, 2026 (Session 11BI: Fix-request routing + security audit fixes)*
+
+---
+
+## May 27, 2026 — Session 11BI (Fix-request routed to cloud build instead of local fix pipeline)
+
+**Root cause:** When a user clicked the "Fix" button (sending `msg.type === 'fix-request'`), the early exit handler in `chatPanelMessageRouterEarlyExits.ts` called `_handleBuildRequest(msg.text, true, true)`. This routes through the **cloud build** pipeline (`runBuildAfterGates` → `callCloudBuild`), which:
+1. Calls `autoCreateProject()` when `getLiveRoot()` returns falsy (creating a brand new project folder)
+2. Returns complete files from the AI instead of surgical edits to existing files
+
+The local fix pipeline (`handleFixRequest`) already existed and correctly modifies files in-place, but the `fix-request` message type was bypassing it.
+
+**The normal chat flow was correct:** `chatPanelMsgSendMessage.ts` line 111 already routes `intent.type === 'fix'` to `handleFixRequest`. The bug only affected the UI button path (`fix-request` message type).
+
+**Fix:** Changed `chatPanelMessageRouterEarlyExits.ts` to call `handleFixRequest` (local 3-phase Supervisor/Worker/Guardian pipeline) instead of `_handleBuildRequest` (cloud build pipeline) for `fix-request` messages.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | `fix-request` handler now calls `handleFixRequest` with full `MessageHandlerDeps` instead of `_handleBuildRequest` | Cloud build creates new projects; local fix pipeline modifies existing files in-place | Low — only changes the button-click fix path, chat text path was already correct |
 
 ---
 
