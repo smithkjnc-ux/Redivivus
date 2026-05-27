@@ -108,6 +108,36 @@ export const KNOWN_PATTERNS: FailurePattern[] = [
     whyFails: 'height:100vh is a hard cap at exactly one viewport height. Content taller than the viewport overflows, and overflow:hidden clips it. The top portion disappears with no way to scroll to it.',
     doInstead: 'body { min-height: 100vh; overflow: auto } — lets the body grow while keeping flex centering intact',
   },
+  {
+    id: 'responsive-vw-only-forgets-vh',
+    name: 'Responsive layout uses vw units but forgets vh constraint',
+    relevanceTest: /fit.*screen|screen.*fit|cut.*off|overflow|responsive|all.*size|any.*size|resize|autosize|scale|viewport/i,
+    detect: [/width:\s*clamp\([^)]+vw/i, /width:\s*\d+(?:\.\d+)?vw/i, /width:\s*\d+%/i],
+    outputFail: [/width:\s*clamp\([^)]*vw[^)]*\)[\s\S]{0,300}height:\s*clamp\([^)]*vw[^)]*\)/i],
+    supervisorNote:
+`- Responsive layout using vw-only (CRITICAL -- must constrain BOTH width and height):
+  The AI fixed fixed-pixel widths/heights by switching to viewport-width units (vw), but forgot that
+  on short screens the element can still exceed viewport HEIGHT. The game/tool gets cut off at the bottom.
+  CORRECT FIX: the element's width AND height must BOTH be constrained by the SMALLER of width and height space.
+  Use CSS custom property: --max-size: min(80vw, calc(100vh - 160px), 314px);
+  Then width: max(240px, var(--max-size)); height: max(240px, var(--max-size));
+  The 160px offset accounts for title, status, button, and padding above/below the element.
+  For mobile: --max-size: min(90vw, calc(100vh - 140px), 280px);`,
+    workerRule:
+`RESPONSIVE SIZING RULE (must use BOTH vw AND vh, not vw alone):
+  When making a layout element responsive to fit any screen, NEVER use vw units for height.
+  The element must fit within BOTH viewport width AND viewport height.
+  CORRECT pattern:
+    --max-size: min(80vw, calc(100vh - 160px), ORIGINAL_PX);
+    width: max(MIN_PX, var(--max-size));
+    height: max(MIN_PX, var(--max-size));
+  Where ORIGINAL_PX is the old fixed pixel value (e.g., 314px) and MIN_PX is the minimum size (e.g., 240px).
+  The 160px accounts for title + status + button + padding. Adjust to 140px for mobile media queries.
+  WRONG pattern (do NOT do this): height: clamp(240px, 80vw, 314px) — this uses vw for height!`,
+    triedWhat: 'width/height: clamp(240px, 80vw, 314px) — vw units used for both dimensions',
+    whyFails: 'On short screens, 80vw can exceed viewport height, so the element overflows vertically and gets cut off at the bottom. vw only considers width; height needs vh consideration too.',
+    doInstead: 'Use --max-size: min(80vw, calc(100vh - 160px), 314px) so the element is constrained by whichever dimension is smaller.',
+  },
 ];
 
 /** Returns patterns whose detect regexes match the source AND whose relevanceTest (if any) matches userText. */

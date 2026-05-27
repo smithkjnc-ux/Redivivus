@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 27, 2026 — AI fix quality investigation: responsive CSS needs both vw and vh constraints
+*Last updated:* May 27, 2026 — Added KNOWN_PATTERN for vw-only responsive layout to prevent repeat AI mistakes
 
 ---
 

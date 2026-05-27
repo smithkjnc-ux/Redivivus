@@ -5,7 +5,7 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI: AI fix quality + responsive CSS height fix)*
+*Last updated: May 27, 2026 (Session 11BI: Added KNOWN_PATTERN for vw-only responsive layout fixes)*
 
 ---
 
@@ -40,6 +40,26 @@
 | `src/ui/panels/chat/chatPanel.ts` | Removed `restoreConversation()` from `onDidChangeWorkspaceFolders`; added globalState cleanup | Multi-root workspace change path | Low — panel reopen within same session still restores |
 | `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | Sets `skipConversationRestore` flag before `vscode.openFolder`; removed `pendingRescueConversation` save | Triggers the skip on intentional project open | Low — only affects button-click open |
 | `src/extensionResumeState.ts` | Removed `rescueOnly` conversation restore path | Dead code after removing the save side | None — path was already isolated |
+
+---
+
+## May 27, 2026 — Session 11BI (Added KNOWN_PATTERN: responsive layout using vw-only forgets vh)
+
+**Context:** The tic-tac-toe fix used `clamp(240px, 80vw, 314px)` for BOTH width and height. On short screens, `80vw` exceeded viewport height, so the game was still cut off.
+
+**Fix:** Added a new `FailurePattern` to `chatPanelMsgFixPatterns.ts` (`KNOWN_PATTERNS` array):
+
+- `id: 'responsive-vw-only-forgets-vh'`
+- **Detects:** Source has fixed pixel widths/heights AND user mentions screen-fit keywords
+- **outputFail:** Output uses `clamp(...vw)` for height (only checks width)
+- **supervisorNote:** Tells Supervisor to flag this and instruct Worker to use `min(80vw, calc(100vh - 160px))`
+- **workerRule:** Hard rule injected into Worker prompt — NEVER use vw for height; use `--max-size: min(80vw, calc(100vh - 160px), ORIGINAL_PX)`
+
+This pattern will now auto-activate on any responsive layout fix where the source has pixel dimensions and the user mentions fitting the screen.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMsgFixPatterns.ts` | Added `responsive-vw-only-forgets-vh` to `KNOWN_PATTERNS` | Prevents AI from making the same vw-only mistake in future responsive fixes | None — pattern only activates when source has pixel dims + user mentions fit/screen |
 
 ---
 
