@@ -3,13 +3,13 @@
 // Returns enriched { dir, blueprint, blueprintContext } so the caller can refresh state.
 
 import * as vscode from 'vscode';
-import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { BuildRequestDeps } from '../ai/chatPanelIntent';
 import type { ExtractedBlueprint } from '../../services/blueprint/blueprintExtractor';
 import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor';
 import { deriveFileBase } from './chatPanelBuildInference';
+import { scaffoldAt } from '../../services/project/redivivusInit.js';
 
 export interface AutoCreateResult {
   dir: string;
@@ -30,7 +30,6 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
     .get<string>('projectsDirectory', '~/projects')!
     .replace('~', os.homedir());
   const dir = path.join(projectsDir, slug);
-  fs.mkdirSync(path.join(dir, '.redivivus'), { recursive: true });
   lastAutoCreatedDir = dir;
 
   const bp = {
@@ -39,17 +38,15 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
     where: extracted.where || '',
     when:  extracted.when  || 'now',
     why:   extracted.why   || '',
+    health: { confirmed: 0, assumed: 0, unknown: 5, confidence: 'low' as const },
+    locked: false,
+    version: '1.0',
   };
-  const config = { projectName: slug, initialized: true, blueprint: bp };
-  fs.writeFileSync(path.join(dir, '.redivivus', 'config.json'), JSON.stringify(config, null, 2));
 
-  const bpLines = [`# ${slug}`, '', `**What:** ${bp.what}`,
-    bp.who   ? `**Who:** ${bp.who}`   : '',
-    bp.where ? `**Where:** ${bp.where}` : '',
-    bp.when  ? `**When:** ${bp.when}`  : '',
-    bp.why   ? `**Why:** ${bp.why}`   : '',
-  ].filter(Boolean).join('\n');
-  fs.writeFileSync(path.join(dir, '.redivivus', 'blueprint.md'), bpLines + '\n');
+  // Full scaffold: .redivivus/{config,blueprint,work_log,dead_ends,sessions/},
+  // src/, tests/, docs/, README.md, .gitignore, and all AI-editor shim files
+  // (.windsurfrules, .cursorrules, CLAUDE.md, GEMINI.md, etc.)
+  await scaffoldAt(dir, slug, bp);
 
   const blueprintContext = [
     `Project: ${slug}`,

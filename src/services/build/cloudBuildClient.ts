@@ -205,8 +205,18 @@ async function processBuildResults(
   root: string,
   deps: BuildRequestDeps
 ): Promise<CloudBuildResult> {
+  // Ensure .redivivus/ structure exists — always, even for single-file builds.
+  // scaffoldAt is idempotent: it skips files that already exist.
+  if (!fs.existsSync(path.join(root, '.redivivus', 'config.json'))) {
+    try {
+      const { scaffoldAt } = await import('../project/redivivusInit.js');
+      const slug = path.basename(root);
+      await scaffoldAt(root, slug);
+    } catch { /* non-fatal — build continues even if scaffold fails */ }
+  }
+
   const writtenPaths: string[] = [];
-  
+
   for (const file of data.files) {
     const absPath = path.join(root, file.path);
     const snapshotId = createSnapshot(root, task, file.path);

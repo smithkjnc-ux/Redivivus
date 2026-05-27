@@ -9,6 +9,22 @@
 
 ---
 
+## May 27, 2026 — Session 11BI (Project Scaffold Fix — cloud build path missing .redivivus/ structure)
+
+**Root cause:** When the cloud build path (`callCloudBuild` → `processBuildResults`) was introduced (Session 11BH), it replaced the local build pipeline's file-writing code but didn't carry over the `scaffoldAt()` call. The local pipeline called `scaffoldAt()` before writing files, creating the `.redivivus/` folder structure, `src/`/`tests/`/`docs/` dirs, `README.md`, `.gitignore`, and all AI-editor shim files (`.windsurfrules`, `CLAUDE.md`, etc.). The cloud path wrote files directly to disk with none of this — even single-file HTML builds got no project folder or Redivivus structure.
+
+Additionally, `chatPanelBuildAutoCreate.ts` (the "no folder open" path) had been manually writing a minimal 2-file scaffold instead of calling `scaffoldAt()`, so it also missed `work_log.md`, `dead_ends.md`, `sessions/`, shim files, and project directories.
+
+`scaffoldAt()` was already fully idempotent for `README.md`, `src/`, `tests/`, `docs/` — but `config.json`, `work_log.md`, `dead_ends.md`, and `blueprint.md` had unconditional writes that would overwrite user data on re-scaffold. Added `existsSync` guards to all four.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/build/cloudBuildClient.ts` | Added `scaffoldAt()` call in `processBuildResults()` before writing files — only fires when `.redivivus/config.json` does not exist | Cloud path was never creating `.redivivus/` structure | Low — guarded by `existsSync`, `scaffoldAt` is async-imported, failure is non-fatal (try/catch) |
+| `src/core/build/chatPanelBuildAutoCreate.ts` | Replaced manual minimal scaffold (2 raw file writes) with `scaffoldAt()` call; added full `Blueprint` type fields (`health`, `locked`, `version`) | Was creating only `config.json` + `blueprint.md`, missing 90% of the project structure | Low — same `scaffoldAt` function used by all other init paths |
+| `src/services/project/redivivusInit.ts` | Added `existsSync` guards to `config.json`, `work_log.md`, `dead_ends.md`, `blueprint.md` writes in `scaffoldAt()` | Without guards, calling `scaffoldAt` on an existing project overwrote user-edited files | Low — purely additive guards; new projects are unaffected |
+
+---
+
 ## May 27, 2026 — Session 11BI (CHASSIS Reference Audit + Cleanup)
 
 | File | What Changed | Why | Risk |

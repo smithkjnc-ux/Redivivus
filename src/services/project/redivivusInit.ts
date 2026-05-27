@@ -117,16 +117,30 @@ export async function scaffoldAt(targetPath: string, projectName: string, bluepr
     sessions: [],
   };
 
-  fs.writeFileSync(path.join(redivivusDir, 'config.json'), JSON.stringify(config, null, 2));
+  // [WARN] All writes below are guarded — scaffoldAt must be idempotent so calling it on
+  // an existing project never overwrites config, logs, or blueprint the user has edited.
+  const configPath = path.join(redivivusDir, 'config.json');
+  if (!fs.existsSync(configPath)) {
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+  }
 
-  const worklogHeader = `# WORK_LOG — ${projectName}\n\nAuto-managed by Redivivus. Append-only session history.\n\n---\n\n`;
-  fs.writeFileSync(path.join(redivivusDir, 'work_log.md'), worklogHeader);
+  const worklogPath = path.join(redivivusDir, 'work_log.md');
+  if (!fs.existsSync(worklogPath)) {
+    const worklogHeader = `# WORK_LOG — ${projectName}\n\nAuto-managed by Redivivus. Append-only session history.\n\n---\n\n`;
+    fs.writeFileSync(worklogPath, worklogHeader);
+  }
 
-  const deadendsHeader = `# Dead End Log — ${projectName}\n\nThings that didn't work and why. Learn from these.\n\n---\n\n`;
-  fs.writeFileSync(path.join(redivivusDir, 'dead_ends.md'), deadendsHeader);
+  const deadendsPath = path.join(redivivusDir, 'dead_ends.md');
+  if (!fs.existsSync(deadendsPath)) {
+    const deadendsHeader = `# Dead End Log — ${projectName}\n\nThings that didn't work and why. Learn from these.\n\n---\n\n`;
+    fs.writeFileSync(deadendsPath, deadendsHeader);
+  }
 
-  const bpMd = `# Blueprint — ${projectName}\n\n## WHO\n${bp.who}\n\n## WHAT\n${bp.what}\n\n## WHERE\n${bp.where}\n\n## WHEN\n${bp.when}\n\n## WHY\n${bp.why}\n`;
-  fs.writeFileSync(path.join(redivivusDir, 'blueprint.md'), bpMd);
+  const bpFilePath = path.join(redivivusDir, 'blueprint.md');
+  if (!fs.existsSync(bpFilePath)) {
+    const bpMd = `# Blueprint — ${projectName}\n\n## WHO\n${bp.who}\n\n## WHAT\n${bp.what}\n\n## WHERE\n${bp.where}\n\n## WHEN\n${bp.when}\n\n## WHY\n${bp.why}\n`;
+    fs.writeFileSync(bpFilePath, bpMd);
+  }
 
   // scaffold basic project structure
   const scaffoldDirs = [
