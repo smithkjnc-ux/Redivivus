@@ -24,7 +24,7 @@ export let lastAutoCreatedDir: string | undefined;
 export async function autoCreateProject(task: string, deps: BuildRequestDeps): Promise<AutoCreateResult> {
   // AI extracts all 5W fields from the user's request — no guess left in config as '?'
   const extracted = await extractBlueprintFromPrompt(task, deps.routing);
-  const slug = extracted.suggestedName || await deriveFileBase(task, deps.routing);
+  const slug = extracted.suggestedName || await deriveFileBase(task, deps.routing, deps.usageTracker);
 
   const projectsDir = vscode.workspace.getConfiguration('redivivus')
     .get<string>('projectsDirectory', '~/projects')!

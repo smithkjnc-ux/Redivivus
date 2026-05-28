@@ -6,6 +6,45 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { getRecentBuildContext } from './chatPanelMsgFixUtils';
 import { getLastTerminalError } from '../../services/workspace/terminalErrorService';
+import { listSourceFiles } from '../../services/workspace/codebaseSearch';
+
+// [FIX] Smart file selection: when userText is provided, send only files relevant to the bug
+// rather than all 50 source files. Mentioned files + their importers come first; others fill to 12.
+// [FIX] Include src/ folder files and content-matched files, not just filename mentions.
+// [FIX] Prioritize files with [SCOPE] or [ANNOTATION] tags - they have self-documenting info.
+export function collectSourceFiles(root: string, userText?: string): { rel: string; content: string }[] {
+  const all = listSourceFiles(root, true, 50)
+    .filter(f => f.content)
+    .map(f => ({ rel: f.rel, content: f.content! }));
+  if (!userText || all.length <= 15) { return all; }
+  const textLower = userText.toLowerCase();
+
+  // Include files whose basename is mentioned in user text
+  const mentioned = all.filter(f => textLower.includes(path.basename(f.rel).toLowerCase()));
+  const mentionedSet = new Set(mentioned.map(f => f.rel));
+
+  // Include files in src/ folder (likely contains core logic)
+  const srcFiles = all.filter(f => f.rel.startsWith('src/') && !mentionedSet.has(f.rel));
+  const srcSet = new Set(srcFiles.map(f => f.rel));
+
+  // Include files whose CONTENT contains keywords from user text (semantic match)
+  const keywords = textLower.split(/\s+/).filter(w => w.length > 3 && !['this', 'that', 'with', 'from', 'they', 'have', 'were', 'been', 'have', 'game', 'make', 'code', 'file'].includes(w));
+  const contentMatched = all.filter(f => !mentionedSet.has(f.rel) && !srcSet.has(f.rel) && keywords.some(k => f.content.toLowerCase().includes(k)));
+  const contentMatchedSet = new Set(contentMatched.map(f => f.rel));
+
+  // Files that import the mentioned files
+  const importers = all.filter(f => !mentionedSet.has(f.rel) && !srcSet.has(f.rel) && mentioned.some(m => f.content.includes(path.basename(m.rel, path.extname(m.rel)))));
+  const importersSet = new Set(importers.map(f => f.rel));
+
+  // [Redivivus CORE] Prioritize files with ANNOTATIONS - they have [SCOPE]/[ANNOTATION] tags
+  const hasAnnotations = (f: {content: string}) => /\[?(?:SCOPE|ANNOTATION|TODO|WARN|DONE)\]?\s*[:\-]/.test(f.content);
+  const annotatedFiles = all.filter(f => !mentionedSet.has(f.rel) && !srcSet.has(f.rel) && !contentMatchedSet.has(f.rel) && !importersSet.has(f.rel) && hasAnnotations(f));
+
+  const selected = [...mentioned, ...srcFiles, ...contentMatched, ...importers, ...annotatedFiles];
+  if (selected.length >= 12) { return selected.slice(0, 12); }
+  const rest = all.filter(f => !selected.some(s => s.rel === f.rel)).sort((a, b) => a.content.length - b.content.length);
+  return [...selected, ...rest].slice(0, 12);
+}
 
 /** Collect all available context signals: build history + live editor diagnostics + last terminal error. */
 export function collectFixContext(root: string, sourceFiles: { rel: string; content: string }[]): string {

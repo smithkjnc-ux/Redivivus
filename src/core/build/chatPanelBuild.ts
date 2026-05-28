@@ -10,7 +10,8 @@ import * as Inf from './chatPanelBuildInference';
 import * as Writer from './chatPanelBuildWriter';
 import { tracer } from '../../services/pipelineTracer';
 import { formatVaultContext, isVaultEnabled } from '../../services/vault/vaultContextService';
-import { readProjectDeadEnds, readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils';
+import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds';
+import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils';
 import { buildSingleFileResult } from './chatPanelBuildResult';
 import type { BuildContext } from './chatPanelBuildHelpers';
 import { updateLastMsg, appendMsg } from './chatPanelBuildHelpers';
@@ -47,7 +48,7 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   redivivusLog({ operation: 'build', phase: 'vault_search', message: `Found ${searchResult.items.length} vault matches`, data: { vaultMatches: searchResult.items.length } });
   if (vaultOn) { updateLastMsg(ctx, `🔍 Found ${searchResult.items.length} useful match${searchResult.items.length !== 1 ? 'es' : ''} in your code library`); }
 
-  const { relPath, absPath, existingTarget, isCrossLang, isMod, ext } = await inferBuildTarget(task, root, blueprintContext, routing);
+  const { relPath, absPath, existingTarget, isCrossLang, isMod, ext } = await inferBuildTarget(task, root, blueprintContext, routing, { usageTracker: ctx.usageTracker });
 
   appendMsg(ctx, `📋 Planning \`${relPath}\`...`);
   const _supT0 = Date.now(); const _supSid = tracer.step('SUPERVISOR', supervisorAI, task.slice(0, 80));

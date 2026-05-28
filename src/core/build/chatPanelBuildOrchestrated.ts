@@ -10,7 +10,8 @@ import { callProvider } from '../ai/providers/providerFactory';
 import type { BuildPlan, BuildPhase } from '../../services/build/buildOrchestrator';
 import type { OrchestratorDeps } from './chatPanelOrchestrator';
 import { writeBuiltFile } from './chatPanelBuildWriter';
-import { readProjectDeadEnds, readProjectRules } from '../routing/chatPanelMsgFixUtils';
+import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
+import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils.js';
 
 const AI_LABELS: Record<string, string> = {
   gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi',

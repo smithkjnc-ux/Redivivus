@@ -13,16 +13,27 @@ export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; l
     messages: p.messages.toLocaleString(),
   });
 
-  const formatAIBreakdown = (byAI: { aiProvider: string; tokens: number; cost: number; messages: number }[], periodRoster?: typeof roster) => {
+  const formatAIBreakdown = (byAI: { aiProvider: string; tokens: number; cost: number; messages: number; byRole?: { role: string; tokens: number; cost: number; messages: number }[] }[], periodRoster?: typeof roster) => {
     const displayRoster = periodRoster || roster;
+    const roleEmoji: Record<string, string> = { supervisor: '&#x1F50D; Supervisor', worker: '&#x2699;&#xFE0F; Worker', guardian: '&#x1F6E1;&#xFE0F; Guardian', qa: '&#x1F4AC; Q&amp;A', solo: '&#x1F3AF; Solo', unknown: '&#x2753; Unknown' };
+    
     if (!displayRoster || displayRoster.length === 0) {
       if (!byAI || byAI.length === 0) {return '';}
-      const lines = byAI.map(ai =>
-        `        <div class="ai-breakdown">
-          <span class="ai-name">&#x21B3; ${aiLabels[ai.aiProvider] || ai.aiProvider}</span>
-          <span class="ai-stats">${ai.tokens.toLocaleString()} tokens ($${ai.cost.toFixed(4)})</span>
-        </div>`
-      ).join('');
+      const lines = byAI.map(ai => {
+        const roleLines = ai.byRole ? ai.byRole.map(r => `
+          <div class="ai-role-breakdown" style="display:flex;justify-content:space-between;font-size:0.9em;opacity:0.8;margin-left:15px;margin-top:2px;">
+            <span>${roleEmoji[r.role] || r.role}</span>
+            <span>${r.tokens.toLocaleString()} tokens ($${r.cost.toFixed(4)})</span>
+          </div>
+        `).join('') : '';
+        return `        <div class="ai-breakdown-wrapper" style="margin-bottom:8px;">
+          <div class="ai-breakdown">
+            <span class="ai-name">&#x21B3; ${aiLabels[ai.aiProvider] || ai.aiProvider}</span>
+            <span class="ai-stats">${ai.tokens.toLocaleString()} tokens ($${ai.cost.toFixed(4)})</span>
+          </div>
+          ${roleLines}
+        </div>`;
+      }).join('');
       return `<div class="ai-breakdown-container">${lines}</div>`;
     }
     const usageMap = new Map(byAI?.map(u => [u.aiProvider, u]) || []);
@@ -30,10 +41,19 @@ export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; l
       const usage = usageMap.get(member.ai);
       const tokens = usage?.tokens ?? 0;
       const cost = usage?.cost ?? 0;
-      return `        <div class="ai-breakdown">
+      const roleLines = usage?.byRole ? usage.byRole.map(r => `
+        <div class="ai-role-breakdown" style="display:flex;justify-content:space-between;font-size:0.9em;opacity:0.8;margin-left:15px;margin-top:2px;">
+          <span>${roleEmoji[r.role] || r.role}</span>
+          <span>${r.tokens.toLocaleString()} tokens ($${r.cost.toFixed(4)})</span>
+        </div>
+      `).join('') : '';
+      return `        <div class="ai-breakdown-wrapper" style="margin-bottom:8px;">
+        <div class="ai-breakdown">
           <span class="ai-name">${member.emoji} ${member.label} <small style="opacity:0.7">(${member.role})</small></span>
           <span class="ai-stats">${tokens.toLocaleString()} tokens ($${cost.toFixed(4)})</span>
-        </div>`;
+        </div>
+        ${roleLines}
+      </div>`;
     }).join('');
     return `<div class="ai-breakdown-container">${lines}</div>`;
   };

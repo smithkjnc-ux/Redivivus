@@ -34,24 +34,32 @@ mv VSCode-linux-x64 "$FOLDER"
 tar -czf "$TARBALL" "$FOLDER"
 mv "$FOLDER" VSCode-linux-x64
 
+cd "$PROJECT_DIR"
+echo "▶  Building Windows zip..."
+./scripts/build-windows.sh --skip-compile
+WIN_ZIP="$HOME/redivivus-win32-x64-v$NEW_VERSION.zip"
+
 TAG="v$NEW_VERSION"
 echo "▶  Creating GitHub release $TAG..."
-gh release create "$TAG" "$TARBALL" \
+gh release create "$TAG" "$TARBALL" "$WIN_ZIP" \
   --repo "$REPO" \
   --title "Redivivus IDE $TAG" \
-  --notes "Standalone Linux x64 build. Download, extract, and run.
+  --notes "Standalone builds for Linux and Windows. Download, extract, and run.
 
-## Install
+## Linux Install
 \`\`\`
 tar -xzf redivivus-${NEW_VERSION}.tar.gz
 cd redivivus-${NEW_VERSION} && ./redivivus
-\`\`\`"
+\`\`\`
+
+## Windows Install
+Extract the zip and double-click \`redivivus.exe\`"
 
 echo "▶  Updating web app download link to $NEW_VERSION..."
 node -e "
 const fs = require('fs');
 const file = '$WEB_DIR/src/lib/latest-release.ts';
-const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOWNLOAD_URL = \\\`https://github.com/smithkjnc-ux/Redivivus/releases/latest/download/redivivus-\\\${LATEST_VERSION}.tar.gz\\\`\n\`;
+const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOWNLOAD_URL_LINUX = \\\`https://downloads.redivivus.dev/redivivus-\\\${LATEST_VERSION}.tar.gz\\\`\nexport const DOWNLOAD_URL_WINDOWS = \\\`https://downloads.redivivus.dev/redivivus-win32-x64-v\\\${LATEST_VERSION}.zip\\\`\n\`;
 fs.writeFileSync(file, content);
 "
 cd "$WEB_DIR" && npm run deploy 2>&1 | grep -E "✨|Deployed|Error|error" | tail -5

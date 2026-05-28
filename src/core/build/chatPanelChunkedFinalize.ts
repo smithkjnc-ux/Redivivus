@@ -44,13 +44,14 @@ export async function runChunkedBuildFinalize(
   if (!ctx.assistMode) { await autoCommitIfEnabled(root, `Redivivus added ${builtFiles.length} files: ${task.slice(0, 60)}`, builtFiles); }
   // Auto-open project in Explorer — no button required
   const _wsf = vscode.workspace.workspaceFolders ?? [];
-  if (!_wsf.some(f => f.uri.fsPath === root)) {
+  const _normRoot = path.resolve(root).toLowerCase();
+  if (!_wsf.some(f => path.resolve(f.uri.fsPath).toLowerCase() === _normRoot)) {
     if (_wsf.length > 0) {
       vscode.workspace.updateWorkspaceFolders(_wsf.length, null, { uri: vscode.Uri.file(root) });
       vscode.commands.executeCommand('workbench.view.explorer').then(() => { vscode.commands.executeCommand('workbench.files.action.focusFilesExplorer'); }, () => {});
     } else {
       try { const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); } } catch {}
-      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root));
+      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
     }
   }
   refreshSetupProgressIfOpen().catch(() => {});

@@ -30,48 +30,10 @@ interface AutoSaveTarget {
   lang: string;
 }
 
-/** Checks if the AI response has a single dominant code block worth auto-saving */
-export async function shouldAutoSave(aiResponse: string, userMessage: string, routing: RoutingService): Promise<boolean> {
-  // [WARN] Handle BOTH closed (```...```) and truncated (```... with no closing fence) code blocks.
-  // AI responses often get truncated when hitting output token limits.
-  const closedBlocks = aiResponse.match(/```\w*[^\S\r\n]*\r?\n[\s\S]*?```/g) || [];
-  // Check for unclosed block: starts with ``` but never closes
-  const hasUnclosedBlock = /```\w*[^\S\r\n]*\r?\n[\s\S]{100,}$/.test(aiResponse) && !aiResponse.trim().endsWith('```');
-  const totalBlocks = closedBlocks.length + (hasUnclosedBlock ? 1 : 0);
-  if (totalBlocks === 0) { return false; }
-
-  let substantialCount = closedBlocks.filter(b => b.split('\n').length - 2 >= MIN_AUTO_SAVE_LINES).length;
-  if (hasUnclosedBlock) {
-    const unclosedContent = aiResponse.slice(aiResponse.lastIndexOf('```'));
-    if (unclosedContent.split('\n').length >= MIN_AUTO_SAVE_LINES) { substantialCount++; }
-  }
-
-  // Fast-path: if the AI explicitly added a [SCOPE] tag, or outputted a massive file (>40 lines),
-  // it's definitively writing a file, regardless of what the user's prompt literally said.
-  const hasScopeTag = /\[SCOPE\]/.test(aiResponse);
-  const hasMassiveBlock = closedBlocks.some(b => b.split('\n').length > 40) || 
-    (hasUnclosedBlock && aiResponse.slice(aiResponse.lastIndexOf('```')).split('\n').length > 40);
-  
-  if ((hasScopeTag || hasMassiveBlock) && substantialCount > 0) {
-    return true;
-  }
-
-  // [RULE 18] AI classifier decides whether the user asked to build/generate a file
-  // Only used if the block is small and ambiguous
-  try {
-    const prompt = `User message: "${userMessage.slice(0, 200)}"\nDid the user ask to build, create, generate, modify, or update code/files? Reply with one word: yes or no`;
-    const res = await routing.prompt(prompt, 12_000);
-    const cleanText = (res?.text || '').replace(/[^a-zA-Z]/g, '').toLowerCase();
-    if (res.success && res.text && !cleanText.startsWith('yes')) { return false; }
-  } catch {
-    if (!/\b(build|create|make|generate|write|implement|code|produce|rewrite|rebuild)\b/i.test(userMessage)) { return false; }
-  }
-
-  return substantialCount > 0;
-}
+export { shouldAutoSave } from './chatPanelAutoSaveInference';
 
 /** Extracts the auto-save target (code + filename) from an AI response */
-export function extractAutoSaveTarget(aiResponse: string, userMessage: string): AutoSaveTarget | null {
+export function extractAutoSaveTarget(aiResponse: string, userMessage: string, root?: string): AutoSaveTarget | null {
   // Try closed block first, then unclosed (truncated) block
   let match = aiResponse.match(/```(\w*)[^\S\r\n]*\r?\n([\s\S]*?)```/);
   if (!match) {
@@ -100,14 +62,26 @@ export function extractAutoSaveTarget(aiResponse: string, userMessage: string): 
     filename = fnMatch[1];
   } else {
     // Derive from user message or fall back to default
-    filename = deriveFilenameFromMessage(userMessage, ext);
+    filename = deriveFilenameFromMessage(userMessage, ext, root);
   }
 
   return { code, filename, lang };
 }
 
-/** Derives a sensible filename from the user's message */
-function deriveFilenameFromMessage(message: string, ext: string): string {
+/** Derives a sensible filename from the user's message or the existing directory contents */
+function deriveFilenameFromMessage(message: string, ext: string, root?: string): string {
+  // Check if there is exactly one matching file in the root directory
+  if (root) {
+    try {
+      if (fs.existsSync(root)) {
+        const files = fs.readdirSync(root).filter(f => !f.startsWith('.') && f.endsWith('.' + ext) && fs.statSync(path.join(root, f)).isFile());
+        if (files.length === 1) {
+          return files[0];
+        }
+      }
+    } catch { /* best effort */ }
+  }
+
   // "convert the flappy-bird game to HTML" -> "flappy-bird.html"
   const nameMatch = message.match(/\b([\w-]+)\s+(game|app|page|site|component|widget|tool)\b/i);
   if (nameMatch) {
@@ -155,7 +129,9 @@ export async function autoSaveAndOpen(
 
   // Open in editor — only if we already have a workspace open (openFolder reloads the window)
   const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (currentRoot && currentRoot === root) {
+  const isSameRoot = currentRoot && path.resolve(currentRoot).toLowerCase() === path.resolve(root).toLowerCase();
+  
+  if (isSameRoot) {
     try {
       const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath));
       await vscode.window.showTextDocument(doc, { preview: false });
@@ -174,7 +150,7 @@ export async function autoSaveAndOpen(
   // [FIX] Open the project folder in a NEW window if no folder is currently open or it's different.
   // We use forceNewWindow = true to guarantee we bypass the "Save Workspace" dialog entirely.
   // The user is trapped in a dirty "Untitled (Workspace)" state, and opening in a new window is the only programmatic escape.
-  if (!currentRoot || currentRoot !== root) {
+  if (!isSameRoot) {
     try {
       const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
       const ctx = ChatPanel.extensionContext;
@@ -187,11 +163,14 @@ export async function autoSaveAndOpen(
       }
     } catch { /* best-effort */ }
     
-    // Fire and forget. The new window will open instantly.
-    vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: true });
+    // If they have NO workspace open, replace the current window.
+    // If they have a DIFFERENT workspace open, open a new window to preserve their current work.
+    const shouldNewWindow = !!currentRoot;
+    vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: shouldNewWindow });
     
     // Explicitly inform the user that a new window was opened
-    return `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__\n\n> [!TIP]\n> **Project opened in a new window!**\n> Please switch to the new VS Code window to see your files and use the Live Preview button.`;
+    const windowMsg = shouldNewWindow ? '\n\n> [!TIP]\n> **Project opened in a new window!**\n> Please switch to the new VS Code window to see your files.' : '\n\n> [!TIP]\n> **Project opened!**';
+    return `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__${windowMsg}`;
   }
 
   const resultMsg = `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__\n__BUILD_RESULT__${filename}|||${absPath}|||END__`;

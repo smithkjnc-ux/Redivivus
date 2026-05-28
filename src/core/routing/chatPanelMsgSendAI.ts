@@ -125,25 +125,32 @@ export async function handleAIChat(
     conversation.push({ role: 'assistant', content: finalContent + `\n\n---\n*-- ${answeredBy}*`, timestamp: Date.now(), tokens: estimatedTokens, cost: estimatedCost });
     refresh();
 
-    let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-    // Don't auto-save into the projects container — land in an auto-created subfolder instead
-    if (root) {
-      const os = require('os') as typeof import('os');
-      const path = require('path') as typeof import('path');
-      const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
-      if (path.resolve(root) === path.resolve(cfg)) {
-        const { lastAutoCreatedDir } = await import('../build/chatPanelBuildAutoCreate.js');
-        root = (lastAutoCreatedDir && require('fs').existsSync(lastAutoCreatedDir)) ? lastAutoCreatedDir : '';
+    // [FIX] Auto-save ONLY fires on explicit build/convert paths (isConvert=true).
+    // Q&A answers stay in the chat — questions get answers, not actions.
+    // The user can copy the code or say "save this" / "apply this" to trigger the build pipeline.
+    // [DEAD] Previous behavior: auto-saved ANY substantial code block from Q&A into a new file,
+    // causing garbage files like "the.html" when users asked conversational questions.
+    if (isConvert) {
+      let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+      // Don't auto-save into the projects container — land in an auto-created subfolder instead
+      if (root) {
+        const os = require('os') as typeof import('os');
+        const path = require('path') as typeof import('path');
+        const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
+        if (path.resolve(root) === path.resolve(cfg)) {
+          const { lastAutoCreatedDir } = await import('../build/chatPanelBuildAutoCreate.js');
+          root = (lastAutoCreatedDir && require('fs').existsSync(lastAutoCreatedDir)) ? lastAutoCreatedDir : '';
+        }
       }
-    }
-    if (await shouldAutoSave(finalText, userText, routing)) {
-      const target = extractAutoSaveTarget(finalText, userText);
-      if (target) {
-        const confirmation = await autoSaveAndOpen(target.code, target.filename, root, {
-          model: answeredBy,
-          tokens: estimatedTokens,
-        });
-        if (confirmation) { conversation.push({ role: 'assistant', content: confirmation, timestamp: Date.now() }); refresh(); }
+      if (await shouldAutoSave(finalText, userText, routing)) {
+        const target = extractAutoSaveTarget(finalText, userText, root);
+        if (target) {
+          const confirmation = await autoSaveAndOpen(target.code, target.filename, root, {
+            model: answeredBy,
+            tokens: estimatedTokens,
+          });
+          if (confirmation) { conversation.push({ role: 'assistant', content: confirmation, timestamp: Date.now() }); refresh(); }
+        }
       }
     }
     if (PREFERENCE_RE.test(userText)) {

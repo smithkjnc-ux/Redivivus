@@ -30,7 +30,7 @@ export async function handleBuildIntent(
   // [FIX] Force modification requests to bypass build and go straight to fix pipeline
   if (wsRoot && !isProjectsContainer(wsRoot) && isInit) {
     const { isModificationRequest } = await import('../build/chatPanelBuildInference.js');
-    if (await isModificationRequest(routedText, deps.routing)) {
+    if (await isModificationRequest(routedText, deps.routing, deps.usageTracker)) {
       await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType);
       return;
     }

@@ -210,6 +210,11 @@
         "title": "View Usage Stats in Chat"
       },
       {
+        "command": "redivivus.refreshChat",
+        "title": "Redivivus: Refresh Chat",
+        "category": "Redivivus"
+      },
+      {
         "command": "redivivus.openSetupHub",
         "title": "Redivivus: Open Setup Hub",
         "category": "Redivivus"

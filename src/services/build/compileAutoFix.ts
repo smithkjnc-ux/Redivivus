@@ -8,7 +8,8 @@ import * as cp from 'child_process';
 import type { BuildContext} from '../../core/build/chatPanelBuildHelpers';
 import { updateLastMsg, appendMsg } from '../../core/build/chatPanelBuildHelpers';
 import { runCompileCheck, CompileResult } from './compileRunner.js';
-import { appendProjectDeadEnd } from '../../core/routing/chatPanelMsgFixUtils.js';
+import { appendProjectDeadEnd } from '../../core/routing/chatPanelMsgFixDeadEnds.js';
+import { parseFixResponse } from '../../core/routing/chatPanelMsgFixUtils.js';
 
 const MAX_RETRIES = 3;
 const MISSING_NODE_PKG_RE = /Cannot find module '([^'./@][^']*)'/;

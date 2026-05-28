@@ -87,7 +87,7 @@ export const MAP_SCRIPT_ACTIONS = `
     const n=window._selectedNode;
     const list = tag==='WARN'?n.warnTexts:tag==='TODO'?n.todoTexts:n.deadTexts;
     const text = (list&&list[idx])||'';
-    const prompt = '['+tag+'] in \`'+n.id+'\`: '+text+'\n\nPlease address this annotation. Read the file, understand the context, and fix or resolve it.';
+    const prompt = '['+tag+'] in \`'+n.id+'\`: '+text+'\\n\\nPlease address this annotation. Read the file, understand the context, and fix or resolve it.';
     vs.postMessage({type:'delegateAnnotation',nodeId:n.id,tag:tag,text:text,prompt:prompt});
     showToast('Delegating to AI...');
   };

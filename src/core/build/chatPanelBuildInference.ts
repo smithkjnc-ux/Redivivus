@@ -6,6 +6,8 @@ import * as path from 'path';
 import { getWorkspaceContextService } from '../../services/workspace/workspaceContext';
 import type { RoutingService } from '../../services/ai/routingService';
 
+import type { UsageTracker } from '../../services/usageTracker';
+
 export function isWebPageTask(taskLow: string): boolean {
   return /\bweb\s*page\b|\bwebsite\b|\bhtml\s*page\b|\bstatic\s*site\b/.test(taskLow)
     || (taskLow.includes('html') && !taskLow.includes('component') && !taskLow.includes('template'));
@@ -13,7 +15,7 @@ export function isWebPageTask(taskLow: string): boolean {
 
 // [RULE 18] AI classifier — regex cannot reliably detect modification phrasing.
 // Fast paths handle obvious cases; AI handles "make them realistic", "improve the sounds", etc.
-export async function isModificationRequest(taskLow: string, routing: RoutingService): Promise<boolean> {
+export async function isModificationRequest(taskLow: string, routing: RoutingService, usageTracker?: UsageTracker): Promise<boolean> {
   // Fast path: unambiguous modification verbs
   if (/\b(modify|update|change\s+(in|the)|fix\s+(in|the)|extend\s+(the|this)|this\s+(program|file|code|app)|existing|current\s+(file|code)|add\s+(to|another|more))\b/.test(taskLow)) {
     return true;
@@ -26,8 +28,41 @@ export async function isModificationRequest(taskLow: string, routing: RoutingSer
   try {
     const prompt = `Is this a request to MODIFY an existing file, or BUILD something new?\nTask: "${taskLow.slice(0, 200)}"\nReply with exactly one word: modify or new`;
     const res = await routing.prompt(prompt, 12_000);
+    if (usageTracker && res.inputTokens) {
+      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, res.model || routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
+    }
     if (res.success && res.text) { return res.text.trim().toLowerCase().startsWith('modify'); }
   } catch { /* fall through to safe default */ }
+  return false;
+}
+
+export async function isConversationalQuestion(taskLow: string, routing: RoutingService, usageTracker?: UsageTracker): Promise<boolean> {
+  // Fast path: obvious WH-questions that aren't masking build/fix commands
+  const _buildFix = /\b(build|create|make|write|generate|add|update|remove|delete|edit|change|fix|repair|broken|bug)\b/i;
+  if (/^(why|what|how|explain|tell\s+me|where\s+is|who\s+is)\b/i.test(taskLow) && !_buildFix.test(taskLow)) {
+    return true;
+  }
+  
+  // Fast path: capability questions based on grammatical interrogatives (Modal + Subject)
+  // This gracefully catches "can you", "can a AI", "could we", "will the system", "should I", "are you"
+  if (/^(can|could|would|will|should|are)\s+(you|we|i|an?|the|this|that|someone|anyone)\b/i.test(taskLow)) {
+    return true;
+  }
+  
+  // Fast path: complex hypothetical and capability wrappers
+  if (/^(are\s+you\s+able\s+to|do\s+you\s+know\s+how\s+to|is\s+it\s+possible\s+to|are\s+you\s+capable\s+of|do\s+you\s+think\s+you\s+can|how\s+would\s+you|how\s+do\s+(you|i)|how\s+can\s+(you|i)|what\s+if\s+i|what\s+would\s+happen|if\s+i\s+asked)\b/i.test(taskLow)) {
+    return true;
+  }
+  
+  // AI classifier for nuance: "can you make a checkers game?" vs "make a checkers game"
+  try {
+    const prompt = `Analyze this user message: "${taskLow.slice(0, 200)}"\nIs the user asking a conversational question (e.g., asking about your capabilities, asking "can you do X?"), or are they giving an explicit command to take action right now? Reply with exactly one word: question or command`;
+    const res = await routing.prompt(prompt, 10000);
+    if (usageTracker && res.inputTokens) {
+      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, res.model || routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
+    }
+    if (res.success && res.text) { return res.text.trim().toLowerCase().startsWith('question'); }
+  } catch { /* fall through */ }
   return false;
 }
 
@@ -100,10 +135,13 @@ export function inferExtension(taskLow: string, where: string): string {
 // [RULE 18] AI for understanding, code for execution.
 // Uses a 50-token AI call to derive a semantic filename from the task description.
 // Falls back to word-filter regex only if the AI call fails.
-export async function deriveFileBase(task: string, routing: RoutingService): Promise<string> {
+export async function deriveFileBase(task: string, routing: RoutingService, usageTracker?: UsageTracker): Promise<string> {
   try {
     const prompt = `Task: "${task.slice(0, 200)}"\n\nReply with ONLY a snake_case filename base (no extension, no path, 1-3 words) that describes what this code does — its PURPOSE, not the request verbs. Example: profit_calculator, todo_app, file_sorter. Reply with nothing else.`;
     const res = await routing.prompt(prompt, 12_000);
+    if (usageTracker && res.inputTokens) {
+      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, res.model || routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
+    }
     if (res.success && res.text) {
       const cleaned = res.text.trim().toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '');
       if (cleaned.length >= 2 && cleaned.length <= 40) {return cleaned;}

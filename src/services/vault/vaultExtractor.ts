@@ -51,10 +51,10 @@ export function extractFromFile(filePath: string, content: string): { items: Vau
     case '.py': rawBlocks = extractPython(lines, filePath); break;
     case '.md': rawBlocks = extractMarkdown(lines, filePath); break;
     case '.html': case '.htm': case '.css': case '.svg': {
-      // [Redivivus] Skip entry files (index.*) and large files — whole-app files aren't reusable snippets
       const baseName = path.basename(filePath, ext).toLowerCase();
-      const isEntryFile = ['index','main','app','home','page','style','styles','global'].includes(baseName);
-      if (!isEntryFile && content.trim().length > 50 && lines.length <= 150) {
+      // Allow single-file HTML apps (like games) up to 400 lines.
+      const isLargeEntryFile = ['index','main','app','home','page','style','styles','global'].includes(baseName) && lines.length > 400;
+      if (!isLargeEntryFile && content.trim().length > 50 && lines.length <= 400) {
         rawBlocks = [{ name: baseName, type: 'component', code: content, lines: [1, lines.length], filePath, language: ext.replace('.', '') }];
       }
       break;

@@ -70,10 +70,10 @@ Reply with ONLY: yes or no`;
 
   try {
     const triageRes = await routing.prompt(triagePrompt, 12_000, undefined, undefined, triageSystem);
-    if (!triageRes.success) { return [metaQ, freeQ]; }
+    if (!triageRes.success) { return []; }
     const answer = triageRes.text.trim().toLowerCase();
-    if (!answer.startsWith('yes')) { return [metaQ, freeQ]; }
-  } catch { return [metaQ, freeQ]; }
+    if (!answer.startsWith('yes')) { return []; }
+  } catch { return []; }
 
   // Step 2: Generate targeted design questions (only runs if triage said YES)
   const questionSystem = `You are the Supervisor AI generating design questions for a build request. You must identify what is AMBIGUOUS and ask ONLY about those things.
@@ -142,7 +142,8 @@ Return ONLY a valid JSON array -- no markdown, no explanation:
     const arrMatch = raw.match(/\[[\s\S]*\]/);
     if (arrMatch) { raw = arrMatch[0]; }
     const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed) || parsed.length === 0) { return [metaQuestion, freeTextQuestion]; }
+    if (!Array.isArray(parsed)) { return [metaQuestion, freeTextQuestion]; }
+    if (parsed.length === 0) { return []; } // Fast-path: no ambiguity remains
     const detail = (parsed as ClarifyQuestion[]).slice(0, 4);
     return [metaQuestion, ...detail, freeTextQuestion];
   } catch {

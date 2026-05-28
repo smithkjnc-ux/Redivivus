@@ -54,7 +54,13 @@ export async function runEscalationLoop(params: {
       const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
       // Inject accumulated critiques into the worker context for retries
       const enrichedDeps = attempt > 0 ? enrichDepsWithCritiques(deps, accumulatedCritiques) : deps;
-      const p2 = await runPhase2Worker(diagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root);
+      let streamAccum = '';
+      const onChunk = (chunk: string) => {
+        streamAccum += chunk;
+        updateStatus(conversation, supervisorLabel, `generating fix${retryLabel}...`, attempt, escalated, streamAccum);
+        refresh();
+      };
+      const p2 = await runPhase2Worker(diagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk);
       if (!p2) { throw new Error('Worker returned null'); }
       workerResponse = p2.workerResponse;
       workerLabel = p2.workerLabel;
@@ -62,12 +68,20 @@ export async function runEscalationLoop(params: {
       throw new Error(`Worker phase failed${retryLabel}: ${err instanceof Error ? err.message : String(err)}`);
     }
 
+    // ── Check for Trivial Fast-Path ──
+    const isTrivial = diagnosis.includes('[TRIVIAL: SKIP REVIEW]');
+    if (isTrivial) {
+      fixLog(`Supervisor flagged fix as trivial — skipping Verify and Guardian`);
+      guardianNote = `Guardian: Skipped (trivial fix)`;
+      return { finalResponse: workerResponse, workerLabel, guardianLabel: 'none', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated };
+    }
+
     // ── Phase 2.5: Supervisor verifies Worker logic ──
     updateStatus(conversation, supervisorLabel, `verifying logic${retryLabel}...`, attempt, escalated);
     refresh();
 
     try {
-      const { runSupervisorVerify } = await import('./chatPanelMsgFixPhases.js');
+      const { runSupervisorVerify } = await import('./chatPanelMsgFixVerify.js');
       const userRequest = conversation.map(m => m.role === 'user' ? m.content : '').filter(Boolean).pop() || 'Fix the issue';
       fixLog(`Supervisor verify (attempt ${attempt + 1}): Starting...`);
       const verifyResult = await runSupervisorVerify(diagnosis, workerResponse, userRequest, deps, root);
@@ -158,10 +172,10 @@ export async function runEscalationLoop(params: {
 }
 
 /** Updates the status line in the last conversation message */
-function updateStatus(conversation: any[], supervisorLabel: string, phase2Status: string, attempt: number, escalated: boolean): void {
+function updateStatus(conversation: any[], supervisorLabel: string, phase2Status: string, attempt: number, escalated: boolean, streamContent = ''): void {
   const lastMsg = conversation[conversation.length - 1];
   if (lastMsg) {
-    lastMsg.content = `[1/4] Supervisor (${supervisorLabel}): done\n[2/4] Worker: ${phase2Status}\n[4/4] Guardian: pending...`;
+    lastMsg.content = `[1/4] Supervisor (${supervisorLabel}): done\n[2/4] Worker: ${phase2Status}\n[4/4] Guardian: pending...${streamContent ? '\n\n```\n' + streamContent + '\n```' : ''}`;
   }
 }
 

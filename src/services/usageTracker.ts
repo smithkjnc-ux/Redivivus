@@ -25,12 +25,20 @@ export interface UsagePeriod {
   endTime: number;
 }
 
+export interface RoleBreakdown {
+  role: string;
+  tokens: number;
+  cost: number;
+  messages: number;
+}
+
 // Per-AI breakdown for a time period
 export interface AIBreakdown {
   aiProvider: string;
   tokens: number;
   cost: number;
   messages: number;
+  byRole: RoleBreakdown[];
 }
 
 // Extended period with AI breakdowns
@@ -128,9 +136,9 @@ export class UsageTracker {
   }
 
   // Generate comprehensive usage report with per-AI breakdowns
-  getReport(): UsageReport {
+  getReport(projectName?: string): UsageReport {
     const { buildUsageReport } = require('./usageTrackerReport.js');
-    return buildUsageReport(this);
+    return buildUsageReport(this, projectName);
   }
 
   async reset(period: 'session' | 'day' | 'week' | 'month' | 'all-resettable'): Promise<void> {
@@ -138,8 +146,8 @@ export class UsageTracker {
     return resetUsagePeriod(this, period);
   }
 
-  getUsageSummary(): string {
-    const report = this.getReport();
+  getUsageSummary(projectName?: string): string {
+    const report = this.getReport(projectName);
     return `Session: ${report.session.tokens.toLocaleString()} tokens · $${report.session.cost.toFixed(4)} · ${report.session.messages} msgs`;
   }
 

@@ -48,15 +48,20 @@ export const AI_CAPABILITIES: Record<string, AICapability> = {
   groq:   { rank: 5, label: 'Groq', strengths: ['speed', 'simple completions', 'quick iterations'], bestFor: 'Fast simple completions, rapid iteration', contextLimit: 32_000 },
 };
 
-// [FIX] Guardian picks cheapest first — scope review needs accuracy, not reasoning power.
-// [DEAD] Old: sorted by AI_RANK DESC (most capable) → used expensive Sonnet for every guardian pass.
-// Cost order: groq ($0.09/1M) → kimi ($0.15) → gemini ($0.30) → openai ($5) → xai ($5) → claude ($0.80–$3)
-const GUARDIAN_COST_ORDER = ['groq', 'kimi', 'gemini', 'openai', 'xai', 'claude'];
+// [DEAD] Cost-first guardian selection — Groq ($0.09/1M) reviewing Claude's work caused vague
+// style critiques ("could be simplified"), wasting 4-6 retry calls. Net cost was HIGHER than
+// one capable guardian call. Reverted to capability-first (same ranking as Supervisor).
+// [WARN] Guardian and Supervisor MUST use the same smartest-first ranking. They are the
+// quality gate — the user's best AI reviews the worker's output.
 
-/** Returns the cheapest available guardian AI that is not the worker. */
+/** Returns the most capable available guardian AI that is not the worker.
+ *  Uses AI_RANK descending (same logic as Supervisor selection). */
 export function selectGuardianAI(workerAI: string, keyMap: Record<string, () => string | null>): string | null {
-  const cheap = GUARDIAN_COST_ORDER.filter(ai => ai !== workerAI && keyMap[ai]?.());
-  if (cheap[0]) { return cheap[0]; }
+  const ranked = Object.entries(AI_RANK)
+    .filter(([ai]) => ai !== workerAI && keyMap[ai]?.())
+    .sort(([, a], [, b]) => b - a)
+    .map(([ai]) => ai);
+  if (ranked[0]) { return ranked[0]; }
   return keyMap[workerAI]?.() ? workerAI : null; // solo mode — same AI as skeptical reviewer
 }
 

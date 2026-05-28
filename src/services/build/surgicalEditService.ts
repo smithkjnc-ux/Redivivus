@@ -33,7 +33,47 @@ export interface EditResult {
  */
 export function parseSurgicalEdits(response: string, defaultFilePath: string = 'default'): SurgicalEdit[] {
   const edits: SurgicalEdit[] = [];
-  // Match file headers: ## Edit: path or ## Fix: path (backward compat)
+
+  // 1. Primary path: XML Structured Format (Gap 4 update)
+  const xmlFileRe = /<file\s+path="([^"]+)">([\s\S]*?)<\/file>/g;
+  let xmlFileMatch: RegExpExecArray | null;
+  let foundXml = false;
+
+  while ((xmlFileMatch = xmlFileRe.exec(response)) !== null) {
+    foundXml = true;
+    const filePath = xmlFileMatch[1].trim();
+    const fileContent = xmlFileMatch[2];
+
+    const xmlEditRe = /<edit>[\s\S]*?<search>\n?([\s\S]*?)\n?<\/search>[\s\S]*?<replace>\n?([\s\S]*?)\n?<\/replace>[\s\S]*?<\/edit>/g;
+    let xmlEditMatch: RegExpExecArray | null;
+    let foundEdits = false;
+    
+    while ((xmlEditMatch = xmlEditRe.exec(fileContent)) !== null) {
+      foundEdits = true;
+      edits.push({
+        filePath,
+        searchBlock: xmlEditMatch[1],
+        replaceBlock: xmlEditMatch[2],
+      });
+    }
+
+    // If it was a full file output in XML format
+    if (!foundEdits) {
+      const xmlContentRe = /<content>\n?([\s\S]*?)\n?<\/content>/;
+      const contentMatch = xmlContentRe.exec(fileContent);
+      if (contentMatch) {
+        // Technically a full file replacement, but we can treat it as a surgical edit that replaces everything
+        // Wait, chatPanelMsgFixApply needs full-file parsing. 
+        // We'll let chatPanelMsgFixApply handle <content> tags in its fallback.
+      }
+    }
+  }
+
+  if (foundXml) {
+    return edits;
+  }
+
+  // 2. Legacy path: Markdown Headers + SEARCH/REPLACE blocks
   const filePattern = /^##\s+(?:Edit|Fix):\s*(.+?)\s*$/gm;
   let fileMatch: RegExpExecArray | null;
   const filePositions: Array<{ path: string; start: number }> = [];
@@ -42,7 +82,6 @@ export function parseSurgicalEdits(response: string, defaultFilePath: string = '
     filePositions.push({ path: fileMatch[1].trim(), start: fileMatch.index + fileMatch[0].length });
   }
 
-  // If no file headers are found, treat the entire response as belonging to the default file path
   if (filePositions.length === 0) {
     filePositions.push({ path: defaultFilePath, start: 0 });
   }
@@ -52,7 +91,6 @@ export function parseSurgicalEdits(response: string, defaultFilePath: string = '
     const end = i + 1 < filePositions.length ? filePositions[i + 1].start : response.length;
     const section = response.slice(fp.start, end);
 
-    // Parse all SEARCH/REPLACE blocks in this file section
     const editBlockRe = /<<<SEARCH\n([\s\S]*?)\n===\n([\s\S]*?)\nREPLACE>>>/g;
     let editMatch: RegExpExecArray | null;
     while ((editMatch = editBlockRe.exec(section)) !== null) {
@@ -132,42 +170,10 @@ export function applySurgicalEdits(edits: SurgicalEdit[], root: string): EditRes
  * Detect whether an AI response contains surgical edits, a unified diff, or full-file output.
  */
 export function detectResponseFormat(response: string): 'surgical' | 'unified' | 'fullfile' {
+  if (/<file\s+path=".*?">[\s\S]*?<edit>/m.test(response)) { return 'surgical'; }
   if (/<<<SEARCH\n[\s\S]*?\n===\n[\s\S]*?\nREPLACE>>>/m.test(response)) { return 'surgical'; }
   if (/^---\s+\S+\n\+\+\+\s+\S+/m.test(response)) { return 'unified'; }
   return 'fullfile';
 }
 
-/**
- * Parse a unified diff response (--- a/path / +++ b/path / @@ hunks) into SurgicalEdit objects.
- * Line numbers in @@ headers are intentionally ignored — AI models often get them wrong.
- * Instead each hunk becomes a SEARCH/REPLACE pair using context+changed lines as the anchor.
- */
-export function parseUnifiedDiff(response: string): SurgicalEdit[] {
-  const edits: SurgicalEdit[] = [];
-  const sections = response.split(/^(?=---\s)/m).filter(s => /^---\s+\S+\n\+\+\+/.test(s));
-  for (const section of sections) {
-    const fm = section.match(/^---\s+\S+\n\+\+\+\s+(?:b\/)?(.+?)(?:\s|$)/m);
-    if (!fm) { continue; }
-    const filePath = fm[1].trim().replace(/^b\//, '');
-    // Parse hunks line-by-line — avoids the \s*$ multiline regex bug where $ matches end of every line
-    let inHunk = false;
-    let searchLines: string[] = [];
-    let replaceLines: string[] = [];
-    const flushHunk = () => {
-      const searchBlock = searchLines.join('\n').trimEnd();
-      const replaceBlock = replaceLines.join('\n').trimEnd();
-      if (searchBlock && searchBlock !== replaceBlock) { edits.push({ filePath, searchBlock, replaceBlock }); }
-      searchLines = []; replaceLines = [];
-    };
-    for (const line of section.split('\n')) {
-      if (line.startsWith('@@')) { if (inHunk) { flushHunk(); } inHunk = true; }
-      else if (inHunk && !line.startsWith('---') && !line.startsWith('+++')) {
-        if (line.startsWith('-')) { searchLines.push(line.slice(1)); }
-        else if (line.startsWith('+')) { replaceLines.push(line.slice(1)); }
-        else { const ctx = line.startsWith(' ') ? line.slice(1) : line; searchLines.push(ctx); replaceLines.push(ctx); }
-      }
-    }
-    if (inHunk) { flushHunk(); }
-  }
-  return edits;
-}
+export { parseUnifiedDiff } from './surgicalEditDiff.js';

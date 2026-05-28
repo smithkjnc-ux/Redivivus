@@ -71,4 +71,25 @@ export function doShowChatPanel(
     }
   }
   (ChatPanel as any)._instance = instance;
+
+  // Fetch unread announcements
+  import('../../../services/api/apiClient.js').then(async ({ fetchAnnouncements }) => {
+    const announcements = await fetchAnnouncements();
+    if (announcements.length > 0 && ctx) {
+      const seen = ctx.globalState.get<string[]>('redivivus.seenAnnouncements', []);
+      let newAnnouncements = false;
+      // Reverse to add oldest first, so the absolute newest is at the bottom of the chat
+      for (const a of [...announcements].reverse()) {
+        if (!seen.includes(a.id)) {
+          instance.getConversation().push({ role: 'system', text: `📢 **Announcement: ${a.title}**\n\n${a.body}` });
+          seen.push(a.id);
+          newAnnouncements = true;
+        }
+      }
+      if (newAnnouncements) {
+        await ctx.globalState.update('redivivus.seenAnnouncements', seen);
+        instance.refresh();
+      }
+    }
+  }).catch(() => {});
 }

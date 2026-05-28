@@ -129,8 +129,9 @@ export async function guardianReviewImpl(
     return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
   }
   const fetch = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, 20_000);
-  // [FIX] Guardian uses default (flash/haiku) tier — scope review needs accuracy not Sonnet reasoning
-  // [DEAD] Was: callProvider(..., 'pro') → every guardian pass cost Sonnet rates ($3/$15 per 1M)
-  const caller = (ai: string, prompt: string) => callProvider(ai, prompt, fetch);
+  // [WARN] Guardian uses 'pro' tier (Sonnet/Pro) — it IS the quality gate, same as Supervisor.
+  // [DEAD] Was: default tier (flash/haiku) — cheap model produced vague style critiques that
+  // wasted 4-6 retry calls, costing MORE than one pro-tier guardian call.
+  const caller = (ai: string, prompt: string) => callProvider(ai, prompt, fetch, 'pro');
   return runGuardianReview(originalTask, workerResponse, workerAI, guardianAI, blueprintContext, caller);
 }

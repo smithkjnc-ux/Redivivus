@@ -78,5 +78,43 @@ export async function applyFixContent(finalResponse: string, root: string, allow
     }
   }
 
+  // [FIX] Last-resort fallback: Worker wrapped code in prose/narrative headers (no ## Fix: format).
+  // Extract the largest fenced code block and write it to the best-matching allowed file.
+  // [WARN] Only triggers when ALL other parsers found zero files — never overwrites successful parses.
+  if (written.length === 0 && failed.length === 0 && allowedRels.size > 0) {
+    fixLog(`Apply: Trying last-resort code block extraction`);
+    const codeBlockRe = /```[a-z]*\n([\s\S]*?)```/g;
+    let largest = ''; let blockMatch: RegExpExecArray | null;
+    while ((blockMatch = codeBlockRe.exec(finalResponse)) !== null) {
+      const block = blockMatch[1].trimEnd();
+      if (block.length > largest.length) { largest = block; }
+    }
+    // Also try unclosed fence (AI sometimes omits closing ```)
+    if (!largest) {
+      const fenceIdx = finalResponse.indexOf('```');
+      if (fenceIdx !== -1) {
+        largest = finalResponse.slice(fenceIdx).replace(/^```[a-zA-Z0-9]*\n?/, '').trimEnd();
+      }
+    }
+    if (largest && largest.length > 50) {
+      // Pick the best target file: prefer single-file projects, else match by extension
+      const rels = [...allowedRels];
+      let targetRel = rels[0];
+      if (rels.length > 1) {
+        // Try to match from response text — look for filename mentions
+        const mentioned = rels.find(r => finalResponse.includes(path.basename(r)));
+        if (mentioned) { targetRel = mentioned; }
+      }
+      fixLog(`Apply: Last-resort extracted code block`, { targetRel, codeLength: largest.length });
+      const absTarget = path.join(root, targetRel);
+      fixSnapId = takeSnapshot(root, [targetRel], userText);
+      try {
+        fs.mkdirSync(path.dirname(absTarget), { recursive: true });
+        fs.writeFileSync(absTarget, stripSeparatorArtifacts(largest), 'utf-8');
+        written.push(targetRel);
+      } catch (e) { failed.push(`${targetRel}: ${e instanceof Error ? e.message : String(e)}`); }
+    }
+  }
+
   return { written, failed, skipped, fixSnapId, usedSurgical };
 }

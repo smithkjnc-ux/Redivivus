@@ -67,12 +67,10 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
     return { type: 'run' };
   }
 
-  // WH-questions and explain patterns — force 'question' before AI classifier fires.
-  // [RULE 18] Structural: starting with why/what/how/explain with no build/fix verbs is unambiguously a question.
-  const _buildFix = /\b(build|create|make|write|generate|add|update|remove|delete|edit|change|fix|repair|broken|bug)\b/i;
-  if (/^(why|what|how|explain|tell\s+me|do\s+you|does|can\s+you|is\s+(it|there|a)|are\s+(there|you)|should\s+i|when\s+do|where\s+is|who\s+is)\b/i.test(t) && !_buildFix.test(t)) {
-    return { type: 'question' };
-  }
+  // [RULE 18] Natural language understanding belongs in the AI classifier.
+  // We removed the hardcoded WH-question and capability question regexes here
+  // because relying on strict punctuation (like "?") or specific keyword lists
+  // is brittle and anti-vibe. The LLM handles natural language nuance much better.
 
   return null;
 }
@@ -82,11 +80,15 @@ export function fallbackClassify(text: string): IntentResult {
   const t = text.toLowerCase().trim();
   // Fix verbs: user is describing a problem with existing code
   const fixVerbs = /\b(fix|debug|repair|patch|solve|resolve|broken|doesn.t work|not working|isn.t working|no sound|no audio|crash|error|bug|wrong|off|broken)\b/i;
-  const buildVerbs = /\b(build|create|make|write|generate|implement|scaffold|code|develop|produce|split|refactor|reorganize|restructure|add|update|modify|extend|improve|change|edit|remove|delete|swap|replace|convert|correct|refine|rebuild|rewrite|redesign)\b/i;
-  const isPureWhQuestion = /^(what|how|why|when|where|who|which)\b/i.test(t) && !buildVerbs.test(t) && !fixVerbs.test(t);
-  const isTrailingQuestion = /\?$/i.test(t) && !buildVerbs.test(t) && !fixVerbs.test(t);
-  if (fixVerbs.test(t)) { return { type: 'fix' }; }
-  if (buildVerbs.test(t)) { return { type: 'build' }; }
+  const buildVerbs = /^\s*(now|please|can\s+you|could\s+you|just|go\s+ahead\s+and)?\s*(build|create|make|write|generate|implement|scaffold|code|develop|produce|split|refactor|reorganize|restructure|add|update|modify|extend|improve|change|edit|remove|delete|swap|replace|convert|correct|refine|rebuild|rewrite|redesign)\b/i;
+  // [FIX] Detect implicit modification requests that don't start with a verb:
+  // "the AI opponent isn't working", "it keeps doing X", "the game doesn't have Y"
+  const implicitFix = /\b(it\s+(doesn.t|isn.t|won.t|can.t|shouldn.t|keeps|still)|the\s+\w+\s+(doesn.t|isn.t|won.t|doesn't|isn't|won't|not)\s+(work|show|display|appear|move|respond|function|load|render|play))/i;
+  const implicitBuild = /\b(i\s+(want|need|would like)|it\s+(needs?|should|must)\s+(to\s+)?(have|be|include|support)|make\s+it|give\s+it|have\s+it)\b/i;
+  const isPureWhQuestion = /^(what|how|why|when|where|who|which)\b/i.test(t) && !buildVerbs.test(t) && !fixVerbs.test(t) && !implicitFix.test(t);
+  const isTrailingQuestion = /\?$/i.test(t) && !buildVerbs.test(t) && !fixVerbs.test(t) && !implicitFix.test(t);
+  if (fixVerbs.test(t) || implicitFix.test(t)) { return { type: 'fix' }; }
+  if (buildVerbs.test(t) || implicitBuild.test(t)) { return { type: 'build' }; }
   if (isPureWhQuestion || isTrailingQuestion) { return { type: 'question' }; }
   return { type: 'question' };
 }

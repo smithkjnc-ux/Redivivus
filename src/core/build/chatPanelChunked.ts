@@ -14,7 +14,8 @@ import { BuildLedger } from '../../services/build/buildLedgerService';
 import { runFileBuildLoop } from './chatPanelChunkedLoop';
 import { tracer } from '../../services/pipelineTracer';
 import { formatVaultContext, isVaultEnabled } from '../../services/vault/vaultContextService';
-import { readProjectDeadEnds, readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils';
+import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
+import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils.js';
 import { getWorkspaceContextService } from '../../services/workspace/workspaceContext';
 import { runChunkedBuildFinalize } from './chatPanelChunkedFinalize';
 

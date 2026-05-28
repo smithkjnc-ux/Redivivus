@@ -18,7 +18,7 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
 
   // [Redivivus] Auto-create project directory if no workspace is open — prevents files being written to extension dir
   if (!rootPath) {
-    const slug = await deriveFileBase(userText, deps.routing);
+    const slug = await deriveFileBase(userText, deps.routing, deps.usageTracker);
     const projectsDir = vscode.workspace.getConfiguration('redivivus')
       .get<string>('projectsDirectory', '~/projects')!
       .replace('~', os.homedir());

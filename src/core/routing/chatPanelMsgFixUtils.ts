@@ -36,21 +36,35 @@ export function parseFixResponse(
   allowedRels: Set<string>,
 ): { fixes: { rel: string; abs: string; content: string }[]; skipped: string[] } {
   const all: { rel: string; abs: string; content: string }[] = [];
-  const fixPattern = /^## Fix:\s*(.+?)\s*\n```[a-z]*\n([\s\S]*?)```/gm;
-  let match: RegExpExecArray | null;
-  while ((match = fixPattern.exec(text)) !== null) {
-    const rel = match[1].trim().replace(/^\.?\//, '');
-    const content = match[2].trimEnd();
+  
+  // 1. XML Structured Format
+  const xmlFileRe = /<file\s+path="([^"]+)">[\s\S]*?<content>\n?([\s\S]*?)\n?<\/content>[\s\S]*?<\/file>/g;
+  let xmlMatch: RegExpExecArray | null;
+  while ((xmlMatch = xmlFileRe.exec(text)) !== null) {
+    const rel = xmlMatch[1].trim().replace(/^\.?\//, '');
+    const content = xmlMatch[2].trimEnd();
     if (rel && content) { all.push({ rel, abs: path.join(root, rel), content }); }
   }
+
+  // 2. Legacy fallback
   if (all.length === 0) {
-    const alt = /^## Fix:\s*(.+?)\s*\n([\s\S]*?)(?=^## Fix:|$)/gm;
-    while ((match = alt.exec(text)) !== null) {
+    const fixPattern = /^## Fix:\s*(.+?)\s*\n```[a-z]*\n([\s\S]*?)```/gm;
+    let match: RegExpExecArray | null;
+    while ((match = fixPattern.exec(text)) !== null) {
       const rel = match[1].trim().replace(/^\.?\//, '');
-      const content = match[2].replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trimEnd();
-      if (rel && content && content.length > 10) { all.push({ rel, abs: path.join(root, rel), content }); }
+      const content = match[2].trimEnd();
+      if (rel && content) { all.push({ rel, abs: path.join(root, rel), content }); }
+    }
+    if (all.length === 0) {
+      const alt = /^## Fix:\s*(.+?)\s*\n([\s\S]*?)(?=^## Fix:|$)/gm;
+      while ((match = alt.exec(text)) !== null) {
+        const rel = match[1].trim().replace(/^\.?\//, '');
+        const content = match[2].replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trimEnd();
+        if (rel && content && content.length > 10) { all.push({ rel, abs: path.join(root, rel), content }); }
+      }
     }
   }
+
   const fixes = all.filter(f => allowedRels.has(f.rel));
   const skipped = all.filter(f => !allowedRels.has(f.rel)).map(f => f.rel);
   return { fixes, skipped };
@@ -100,20 +114,6 @@ export function collectSourceFiles(root: string, userText?: string): { rel: stri
   return [...selected, ...rest].slice(0, 12);
 }
 
-const DEAD_ENDS_PATH = (root: string) => path.join(root, '.redivivus', 'dead_ends.md');
-const DEAD_ENDS_HEADER = '# Dead End Log\nApproaches tried and failed in this project. Read before suggesting a fix.\n\n---\n\n';
-const MAX_DEAD_ENDS_BYTES = 8_000;
-
-/** Returns the project's dead_ends.md content (truncated), or empty string if absent. */
-export function readProjectDeadEnds(root: string): string {
-  try {
-    const p = DEAD_ENDS_PATH(root);
-    if (!fs.existsSync(p)) { return ''; }
-    let text = fs.readFileSync(p, 'utf-8');
-    if (text.length > MAX_DEAD_ENDS_BYTES) { text = text.slice(0, MAX_DEAD_ENDS_BYTES) + '\n// (truncated)'; }
-    return text;
-  } catch { return ''; }
-}
 
 const MAX_RULES_BYTES = 4_000;
 
@@ -182,14 +182,3 @@ export function getRecentBuildsContext(root: string): string {
   } catch { return ''; }
 }
 
-/** Appends a dead-end entry to the project's .redivivus/dead_ends.md. Best-effort. */
-export function appendProjectDeadEnd(root: string, patternName: string, triedWhat: string, whyFails: string, doInstead: string): void {
-  try {
-    const p = DEAD_ENDS_PATH(root);
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    const existing = fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : DEAD_ENDS_HEADER;
-    const date = new Date().toISOString().slice(0, 10);
-    const entry = `## [DEAD] ${patternName} (logged ${date})\n- **What was tried:** ${triedWhat}\n- **Why it fails:** ${whyFails}\n- **Do this instead:** ${doInstead}\n\n---\n\n`;
-    fs.writeFileSync(p, existing + entry, 'utf-8');
-  } catch { /* best-effort */ }
-}

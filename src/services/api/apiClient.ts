@@ -79,86 +79,18 @@ async function post<T>(path: string, body: unknown): Promise<T> {
     body: JSON.stringify(body),
   });
   if (!res.ok) {
+    if (res.status === 401 && token) {
+      // Auto-logout: if server rejected our token, we are signed out.
+      await clearAccountToken();
+      vscode.commands.executeCommand('redivivus.refreshChat');
+    }
     const err = await res.json().catch(() => ({ error: res.statusText })) as any;
     throw new Error(err.error || `API ${res.status}`);
   }
   return res.json() as Promise<T>;
 }
 
-export interface AIResponse {
-  text: string;
-  model: string;
-  success: boolean;
-  error?: string;
-  inputTokens?: number;
-  outputTokens?: number;
-  usingFallback?: string;
-}
 
-export async function cloudPrompt(
-  text: string,
-  opts: { systemMessage?: string; tier?: 'flash' | 'pro'; timeoutMs?: number } = {}
-): Promise<AIResponse> {
-  try {
-    // Step 1: Get routing instructions from backend (SECRET SAUCE)
-    const instructions = await post<any>('/prompt', {
-      text,
-      keys: collectKeys(),
-      preferred: getPreferred(),
-      systemMessage: opts.systemMessage,
-      tier: opts.tier ?? 'flash',
-    });
-
-    if (instructions.requiresClientExecution) {
-      // Step 2: Execute AI call client-side using backend routing instructions
-      const { callProvider } = await import('../../core/ai/providers/providerFactory.js');
-      
-      const response = await callProvider(
-        instructions.instructions.routing.selectedProvider,
-        instructions.instructions.prompt,
-        createFetchWithTimeout(opts.timeoutMs),
-        undefined, // geminiModel
-        undefined, // imageBase64
-        undefined, // imageType
-        instructions.instructions.systemMessage
-      );
-
-      return {
-        text: response.text,
-        model: response.model || instructions.instructions.routing.model,
-        success: response.success,
-        inputTokens: response.inputTokens,
-        outputTokens: response.outputTokens,
-        usingFallback: response.usingFallback
-      };
-    } else {
-      // Fallback to legacy behavior
-      return instructions as AIResponse;
-    }
-  } catch (err: any) {
-    return { text: '', model: 'none', success: false, error: err.message };
-  }
-}
-
-// Helper: Create fetch with timeout for AI calls
-function createFetchWithTimeout(baseTimeoutMs?: number) {
-  return async (url: string, options: RequestInit, timeoutMs?: number) => {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs || baseTimeoutMs || 60000);
-    
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
-  };
-}
 
 export interface IntentResult {
   type: 'build' | 'fix' | 'convert' | 'run' | 'scaffold' | 'service' | 'question' | 'command' | 'offtopic';
@@ -176,6 +108,10 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ event, ...data }),
+    }).then(res => {
+      if (res.status === 401) {
+        clearAccountToken().then(() => vscode.commands.executeCommand('redivivus.refreshChat'));
+      }
     }).catch(() => {});
   }).catch(() => {});
 }
@@ -193,5 +129,25 @@ export async function cloudClassify(
     });
   } catch {
     return { type: 'question' };
+  }
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  body: string;
+  created_at: string;
+}
+
+export async function fetchAnnouncements(): Promise<Announcement[]> {
+  try {
+    const res = await fetch(`${getApiBase()}/announcements`);
+    if (res.ok) {
+      const data = await res.json() as { announcements: Announcement[] };
+      return data.announcements ?? [];
+    }
+    return [];
+  } catch {
+    return [];
   }
 }

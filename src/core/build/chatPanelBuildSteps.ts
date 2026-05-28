@@ -32,14 +32,15 @@ export async function inferBuildTarget(
   root: string,
   blueprintContext: string,
   routing: RoutingService,
+  deps: { usageTracker: any },
 ): Promise<BuildTarget> {
   const explicitPathMatch = task.match(/(?:called|named|file|path)\s+[`"']?([\w./-]+\.\w{1,5})[`"']?/i)
     || task.match(/\b(src\/[\w./-]+\.\w{1,5})\b/);
 
-  const isMod = explicitPathMatch ? false : await Inf.isModificationRequest(task.toLowerCase(), routing);
+  const isMod = explicitPathMatch ? false : await Inf.isModificationRequest(task.toLowerCase(), routing, deps.usageTracker);
   const existingTarget = isMod ? await Inf.findExistingTarget(root, task) : null;
   const ext = Inf.inferExtension(task.toLowerCase(), blueprintContext);
-  const fileBase = explicitPathMatch ? '' : await Inf.deriveFileBase(task, routing);
+  const fileBase = explicitPathMatch ? '' : await Inf.deriveFileBase(task, routing, deps.usageTracker);
   const isCrossLang = !!existingTarget && path.extname(existingTarget) !== ext;
 
   let relPath: string;
@@ -147,7 +148,8 @@ export async function runPostBuildActions(opts: {
   ctx.onBuildFinished?.(task, [relPath]);
   if (!ctx.assistMode) { await autoCommitIfEnabled(root, `Redivivus added: ${task.slice(0, 80)}`, allFiles); }
   const wsf = vscode.workspace.workspaceFolders ?? [];
-  if (!wsf.some(f => f.uri.fsPath === root)) {
+  const _normRoot = path.resolve(root).toLowerCase();
+  if (!wsf.some(f => path.resolve(f.uri.fsPath).toLowerCase() === _normRoot)) {
     if (wsf.length > 0) {
       vscode.workspace.updateWorkspaceFolders(wsf.length, null, { uri: vscode.Uri.file(root) });
       vscode.commands.executeCommand('workbench.view.explorer').then(
@@ -159,7 +161,7 @@ export async function runPostBuildActions(opts: {
         const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
         if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); }
       } catch {}
-      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root));
+      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
     }
   }
   refreshSetupProgressIfOpen().catch(() => {});

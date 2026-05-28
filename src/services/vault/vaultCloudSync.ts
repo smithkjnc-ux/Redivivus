@@ -33,6 +33,12 @@ export async function syncVaultToCloud(vaultService: VaultService): Promise<{ sy
     });
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const { clearAccountToken } = await import('../api/apiClient.js');
+        await clearAccountToken();
+        const vscode = require('vscode');
+        vscode.commands.executeCommand('redivivus.refreshChat');
+      }
       const err = await res.json().catch(() => ({ error: res.statusText })) as any;
       return { synced: 0, error: err.error || `API ${res.status}` };
     }
@@ -70,6 +76,12 @@ export async function fetchCommunityVault(language?: string): Promise<{ items: C
     });
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const { clearAccountToken } = await import('../api/apiClient.js');
+        await clearAccountToken();
+        const vscode = require('vscode');
+        vscode.commands.executeCommand('redivivus.refreshChat');
+      }
       const err = await res.json().catch(() => ({ error: res.statusText })) as any;
       return { items: [], error: err.error || `API ${res.status}` };
     }
@@ -93,6 +105,12 @@ export async function fetchMyCloudVault(): Promise<{ items: CloudVaultItem[]; er
     });
 
     if (!res.ok) {
+      if (res.status === 401) {
+        const { clearAccountToken } = await import('../api/apiClient.js');
+        await clearAccountToken();
+        const vscode = require('vscode');
+        vscode.commands.executeCommand('redivivus.refreshChat');
+      }
       const err = await res.json().catch(() => ({ error: res.statusText })) as any;
       return { items: [], error: err.error || `API ${res.status}` };
     }

@@ -139,6 +139,11 @@ export function registerAllCommands(
   try { registerCheckForUpdatesCommand(context); } catch (e) { console.error('Failed to register checkForUpdates command', e); }
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
 
+  // Blueprint Interview
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.blueprintInterview', () => {
+    openBlueprintPanel(context, redivivusService, routingService);
+  }));
+
   // redivivus.compileProject — triggered by "Package as Executable" action card button
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.compileProject', async () => {
     const { _lastCompileTarget, runCompilePipeline, getCompilePipeline } = require('./ui/chat/chatPanelBuildPipeline.js');

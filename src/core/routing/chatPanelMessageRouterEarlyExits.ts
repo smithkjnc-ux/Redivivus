@@ -97,7 +97,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     // [FIX] Set flag so ChatPanel constructor skips conversation restore for this new project
     const _ctx = require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext;
     if (_ctx) { _ctx.globalState.update('redivivus.skipConversationRestore', true); }
-    vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(msg.path));
+    vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(msg.path), { forceNewWindow: false });
     return true;
   }
 

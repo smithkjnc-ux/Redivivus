@@ -51,7 +51,12 @@ export async function callCloudBuild(
       signal: AbortSignal.timeout(30_000),
     });
 
-    if (instructionRes.status === 401) return { success: false, error: 'NOT_AUTHENTICATED' };
+    if (instructionRes.status === 401) {
+      const { clearAccountToken } = await import('../api/apiClient.js');
+      await clearAccountToken();
+      vscode.commands.executeCommand('redivivus.refreshChat');
+      return { success: false, error: 'NOT_AUTHENTICATED' };
+    }
     if (!instructionRes.ok) {
       const err = await instructionRes.json().catch(() => ({ error: instructionRes.statusText })) as any;
       return { success: false, error: err.error || `Build API ${instructionRes.status}` };
@@ -103,6 +108,11 @@ export async function callCloudBuild(
     });
 
     if (!completionRes.ok) {
+      if (completionRes.status === 401) {
+        const { clearAccountToken } = await import('../api/apiClient.js');
+        await clearAccountToken();
+        vscode.commands.executeCommand('redivivus.refreshChat');
+      }
       const err = await completionRes.json().catch(() => ({ error: completionRes.statusText })) as any;
       return { success: false, error: err.error || `Build completion API ${completionRes.status}` };
     }

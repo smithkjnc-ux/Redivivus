@@ -30,6 +30,43 @@ export function registerUsageCommands(context: vscode.ExtensionContext, usageTra
     })
   );
 
+  // View Project Usage Report (in separate panel)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redivivus.viewProjectUsage', async () => {
+      const projectName = vscode.workspace.workspaceFolders?.[0] ? require('path').basename(vscode.workspace.workspaceFolders[0].uri.fsPath) : undefined;
+      if (!projectName) {
+        vscode.commands.executeCommand('redivivus.viewUsage');
+        return;
+      }
+      const report = usageTracker.getReport(projectName);
+      const roster = routing?.getRosterDisplay?.();
+      const history = usageTracker.getHistory().filter((e) => e.project === projectName);
+      const panel = vscode.window.createWebviewPanel(
+        'redivivusUsage',
+        `Redivivus Usage: ${projectName}`,
+        vscode.ViewColumn.One,
+        { enableScripts: true }
+      );
+      // Change title inside HTML
+      let html = getUsageHtml(report, roster, history);
+      html = html.replace('<h1>&#x1F4CA; Redivivus Usage Report</h1>', `<h1>&#x1F4CA; Project Usage: ${projectName}</h1>`);
+      html = html.replace('<div class="subtitle">AI token usage and cost breakdown</div>', `<div class="subtitle">AI token usage and cost breakdown specifically for project: <strong>${projectName}</strong></div>`);
+      panel.webview.html = html;
+      panel.webview.onDidReceiveMessage(async (msg) => {
+        if (msg.type === 'reset') {
+          const map: Record<string, Parameters<typeof usageTracker.reset>[0]> = { session: 'session', day: 'day', week: 'week', month: 'month', all: 'all-resettable' };
+          if (map[msg.period]) { 
+            await usageTracker.reset(map[msg.period]); 
+            let refreshedHtml = getUsageHtml(usageTracker.getReport(projectName), roster, usageTracker.getHistory().filter((e) => e.project === projectName));
+            refreshedHtml = refreshedHtml.replace('<h1>&#x1F4CA; Redivivus Usage Report</h1>', `<h1>&#x1F4CA; Project Usage: ${projectName}</h1>`);
+            refreshedHtml = refreshedHtml.replace('<div class="subtitle">AI token usage and cost breakdown</div>', `<div class="subtitle">AI token usage and cost breakdown specifically for project: <strong>${projectName}</strong></div>`);
+            panel.webview.html = refreshedHtml;
+          }
+        }
+      });
+    })
+  );
+
   // View Usage Report (in chat panel)
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.viewUsageInChat', async () => {

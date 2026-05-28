@@ -17,9 +17,10 @@ export interface PostBuildInfo {
 export function detectPostBuildInfo(root: string, builtFiles: string[]): PostBuildInfo {
   const all = builtFiles.map(f => f.toLowerCase());
 
-  // HTML — open in browser (check built files first, then scan root for index.html)
+  // HTML — open in browser (check built files first, then scan root for index.html, then any .html)
   const htmlFile = builtFiles.find(f => f.endsWith('.html'))
     || ['index.html', 'src/index.html', 'public/index.html'].find(f => fs.existsSync(path.join(root, f)))
+    || (() => { try { return fs.readdirSync(root).find(f => f.endsWith('.html') && fs.statSync(path.join(root, f)).isFile()) || null; } catch { return null; } })()
     || null;
   if (htmlFile) {
     return { type: 'html', entryFile: htmlFile, runCmd: null, needsDeps: false, depsCmd: null };

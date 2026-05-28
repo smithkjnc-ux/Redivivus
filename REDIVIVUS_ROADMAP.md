@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 27, 2026 — Added KNOWN_PATTERN for vw-only responsive layout to prevent repeat AI mistakes
+*Last updated:* May 28, 2026 — Fixed questions routing to build screen (catch block + 'are' regex)
 
 ---
 
@@ -25,6 +25,11 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
+### Session 11BQ — May 27, 2026: Worker XML Structured Output
+- Switched Worker AI from regex-parsed text blocks to XML structured output (`<file>`, `<edit>`, `<search>`, `<replace>`) for rigid parsing without sacrificing streaming UI.
+- Rewrote `surgicalEditService.ts` to parse XML.
+- Resolved Rule 9 compliance in pipeline utilities by splitting files.
+
 ### Session 11BJ — May 27, 2026: Remove Workspace Creation
 - Stopped creating `.code-workspace` files when opening or scaffolding projects
 - Replaced `vscode.openFolder` on `.code-workspace` with `vscode.openFolder` directly on directory paths
@@ -38,28 +43,13 @@
 - New admin pages: `/admin/vault`, `/admin/templates`, `/admin/architecture`
 - 13/13 tests passing
 
-### Session 11BH — May 26, 2026: Thin Client Architecture + Backend Deploy
-- Rewrote `chatPanelBuildRunner.ts` — hard auth gate, delegates to `callCloudBuild()`
-- New cloud: `buildPipeline.ts` (secret sauce), `/api/v1/build`, `/api/v1/telemetry`
-- Lazy-init Supabase client in all 6 backend route files
-- Added `vscode.UriHandler` for deep-link auth (`vscodium://papajoe.redivivus/auth`)
-- Fixed SecretStorage silent failure on Linux with in-memory `_cachedToken` fallback
-- Renamed CHASSIS → Redivivus across all 430 source files
-
-### Session 11BK — May 27, 2026: Webview Click Handler Stability Fix
-- Fixed text-node click target normalization in `chatPanelScript*.ts` to prevent `.closest()` exceptions
-- Restored functionality of the "Open Project" button and Recent Projects list inside the empty state
-- Resolved silent click swallowing across all Chat Panel interactive elements
-
 ---
 
 ## Active Next Steps
 > Full backlog in `docs/REDIVIVUS_FEATURES.md`
-
 - [ ] **Vault sync command** — wire `vaultCloudSync.ts` to `redivivus.syncVaultToCloud` palette command
 - [ ] **Live Preview** — `▶ Preview` tab with device toggle (IN PROGRESS)
 - [ ] **Community vault** — admin approval flow for submitted patterns
-- [ ] **Template library expansion** — grow from 10 → 50+ starters
 
 ---
 

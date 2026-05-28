@@ -57,7 +57,7 @@ export async function handleScaffoldIntent(userText: string, deps: MessageHandle
     const isInit = deps.redivivus?.isInitialized?.() || require('fs').existsSync(require('path').join(root, '.redivivus', 'config.json'));
     if (isInit) {
       const { isModificationRequest } = await import('../build/chatPanelBuildInference.js');
-      if (await isModificationRequest(userText, deps.routing)) {
+      if (await isModificationRequest(userText, deps.routing, deps.usageTracker)) {
         const { handleFixRequest } = await import('./chatPanelMsgFix.js');
         await handleFixRequest(userText, deps);
         return;
@@ -87,7 +87,7 @@ export async function handleScaffoldIntent(userText: string, deps: MessageHandle
   try {
     const { files, guidance } = await runScaffold(null as any, scaffoldInfo.type, root);
     conversation.push({ role: 'assistant', content: `✅ Scaffold complete! Created:\n\n${files.map((f: string) => `- \`${f}\``).join('\n')}\n\n**Next steps:** ${guidance}`, timestamp: Date.now() });
-    if (autoOpened && root) { await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root)); }
+    if (autoOpened && root) { await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false }); }
   } catch (e: any) {
     conversation.push({ role: 'assistant', content: `Scaffold failed: ${e.message}`, timestamp: Date.now() });
   }
@@ -119,7 +119,7 @@ export async function handleServiceIntent(userText: string, deps: MessageHandler
   try {
     const { files, notes } = await runServiceSetup(serviceInfo.type, root);
     conversation.push({ role: 'assistant', content: formatServiceSetupResult(serviceInfo.type, files, notes), timestamp: Date.now() });
-    if (autoOpened && root) { await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root)); }
+    if (autoOpened && root) { await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false }); }
   } catch (e: any) {
     conversation.push({ role: 'assistant', content: `Service setup failed: ${e.message}`, timestamp: Date.now() });
   }

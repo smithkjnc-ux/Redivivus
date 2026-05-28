@@ -77,7 +77,7 @@ export async function runVaultAssemblyBuild(ctx: BuildContext, vaultItems: any[]
     return;
   }
 
-  const fileBase = await deriveFileBase(task, ctx.routing);
+  const fileBase = await deriveFileBase(task, ctx.routing, ctx.usageTracker);
   const relPath = ext === '.html' ? 'index.html' : `src/${fileBase}${ext}`;
   const absPath = path.join(root, relPath);
 

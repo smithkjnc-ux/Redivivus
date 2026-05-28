@@ -6,6 +6,7 @@ import type { MessageHandlerDeps } from './chatPanelMessages';
 import { modelLabel } from './chatPanelMsgFixUtils';
 import { buildSupervisorNotes, buildWorkerRules } from './chatPanelMsgFixPatterns';
 import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
+import { streamProvider } from '../../services/ai/streamingProviders';
 
 export async function runPhase1Supervisor(
   userText: string,
@@ -38,6 +39,7 @@ PRESCRIPTION:
 - [label]: change \`[exact old code]\` → \`[exact new code]\`
 - [label]: add \`[new code]\` [where — e.g. "inside body{} CSS rule", "after function X"]
 Quote exact code. One line per surgical change. Worker will apply PRESCRIPTION verbatim.${buildSupervisorNotes(activePatterns)}
+TRIVIAL FIXES: If the fix is extremely simple (e.g. changing < 10 lines in a single file, fixing a typo, updating a CSS color), append exactly "[TRIVIAL: SKIP REVIEW]" at the very end of your response to bypass the Guardian pipeline.
 CONTEXT EXPANSION: If you need files not in sources, append: NEEDS_FILES:\nrelative/path.ts (max 8, omit section if sufficient).`;
 
   // Blueprint context (who/what/where/when/why) — tells Supervisor what the project is
@@ -91,7 +93,8 @@ export async function runPhase2Worker(
   filesBlock: string,
   activePatterns: any[],
   deps: MessageHandlerDeps,
-  root: string
+  root: string,
+  onChunk?: (chunk: string) => void
 ): Promise<{ workerResponse: string, workerLabel: string } | null> {
   const workerSystem = `You are the Worker AI in the Redivivus code editing system. You make precise, surgical code changes.
 
@@ -106,20 +109,25 @@ ${deps.assistMode ? '' : Redivivus_WORKER_RULES + '\n'}${buildWorkerRules(active
 OUTPUT FORMAT — choose based on scope:
 
 SURGICAL (targeted change ≤ ~30% of file):
-## Edit: relative/path/to/file
-<<<SEARCH
+<file path="relative/path/to/file">
+  <edit>
+    <search>
 [exact existing code — copy verbatim, include 2-3 context lines]
-===
+    </search>
+    <replace>
 [replacement code]
-REPLACE>>>
+    </replace>
+  </edit>
+</file>
 
 UNIFIED DIFF: standard git diff format (--- a/path  +++ b/path  @@ hunks) — use when exact text match would be fragile.
 
 FULL FILE (structural rewrite or >30% of file changed):
-## Fix: relative/path/to/file
-\`\`\`[language]
+<file path="relative/path/to/file">
+  <content>
 [complete new file content]
-\`\`\`
+  </content>
+</file>
 Output ONLY these blocks. No prose, no explanations.`;
 
   const fixPrompt = `SUPERVISOR ANALYSIS:
@@ -129,6 +137,18 @@ PROJECT SOURCE FILES:
 ${fileNames}
 
 ${filesBlock}`;
+
+  const workerAI = deps.routing.selectSupervisorAndWorker().worker || deps.routing.getAvailableAI().ai;
+
+  if (onChunk) {
+    try {
+      const streamRes = await streamProvider(workerAI, fixPrompt, onChunk, 120_000, workerSystem);
+      if (streamRes.success && streamRes.text) {
+        deps.usageTracker?.recordUsage(Math.ceil((fixPrompt.length+streamRes.text.length)/4), 0, streamRes.model||'claude', streamRes.inputTokens, streamRes.outputTokens, 'worker', require('path').basename(root));
+        return { workerResponse: streamRes.text.trim(), workerLabel: modelLabel(streamRes.model) };
+      }
+    } catch { /* fallback to non-streaming */ }
+  }
 
   const fixRes = await deps.routing.prompt(fixPrompt, 90_000, undefined, undefined, workerSystem);
   if (!fixRes.success || !fixRes.text?.trim()) {
@@ -140,56 +160,3 @@ ${filesBlock}`;
   return { workerResponse, workerLabel };
 }
 
-export interface SupervisorVerifyResult {
-  passed: boolean;
-  issues: string[];
-  suggestion?: string;
-}
-
-export async function runSupervisorVerify(
-  diagnosis: string,
-  workerResponse: string,
-  userText: string,
-  deps: MessageHandlerDeps,
-  root: string
-): Promise<SupervisorVerifyResult> {
-  const verifySystem = `You are the Supervisor AI verifying your Worker's output. You wrote the diagnosis. Now check: did the Worker LOGICALLY achieve what you asked for?
-
-VERIFICATION RULES:
-- You are checking LOGIC, not syntax. The code may compile fine but still be wrong.
-- Compare each bug in your diagnosis to the Worker's edit. Did it actually fix the root cause, or just paper over the symptom?
-- Check: Are the variable names, function calls, and logic paths correct for what you intended?
-- Check: Did the Worker misunderstand your diagnosis and fix the wrong thing?
-- If the Worker got it right: respond with ONLY the word PASS
-- If the Worker got it wrong: respond with FAIL followed by a brief explanation of what is logically wrong and what the correct fix should be.`;
-
-  const verifyPrompt = `ORIGINAL USER REPORT: "${userText}"
-
-YOUR DIAGNOSIS (what you asked the Worker to fix):
-${diagnosis}
-
-WORKER'S PROPOSED FIX:
-${workerResponse}
-
-Does this fix LOGICALLY achieve what you diagnosed? Does the code change actually address the root cause you identified?`;
-
-  try {
-    const res = await deps.routing.prompt(verifyPrompt, 45_000, undefined, undefined, verifySystem);
-    if (!res.success || !res.text?.trim()) {
-      // Verification failed to run — pass through (don't block the pipeline)
-      return { passed: true, issues: [] };
-    }
-    deps.usageTracker?.recordUsage(Math.ceil((verifyPrompt.length + (res.text?.length || 0)) / 4), 0, res.model || 'claude', res.inputTokens, res.outputTokens, 'supervisor', require('path').basename(root));
-
-    const answer = res.text.trim();
-    if (answer.startsWith('PASS') || answer.toLowerCase().startsWith('pass')) {
-      return { passed: true, issues: [] };
-    }
-    // Extract the explanation after FAIL
-    const explanation = answer.replace(/^FAIL\s*/i, '').trim();
-    return { passed: false, issues: [explanation], suggestion: explanation };
-  } catch {
-    // Non-blocking — if verification errors out, let the pipeline continue
-    return { passed: true, issues: [] };
-  }
-}

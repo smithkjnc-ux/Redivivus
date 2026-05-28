@@ -4,7 +4,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { MessageHandlerDeps } from './chatPanelMessages';
-import { appendProjectDeadEnd, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils';
+import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds';
+import { parseFixResponse, takeSnapshot, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils';
 import { validateOutputFiles } from './chatPanelMsgFixPatterns';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
@@ -71,10 +72,12 @@ export async function presentFixResult(params: {
   const commitPayload = written.length > 0 ? Buffer.from(JSON.stringify({ files: written, message: plainSummary || `fix: ${userText.slice(0, 80)}` })).toString('base64') : '';
   const commitToken = commitPayload ? `\n__GITHUB_COMMIT__${commitPayload}|||END_GITHUB_COMMIT__` : '';
 
+  const aiLabels = `\n\n*Pipeline: Supervisor (${supervisorLabel}) → Worker (${workerLabel}) → Guardian (${guardianLabel})*`;
+  
   conversation[conversation.length - 1].content =
     (plainSummary ? `**What I found:** ${plainSummary}\n\n` : '') +
     `**What I changed:**\n${fileList}` +
-    `${skipLine}${failLine}${configWarn}${instrWarn}${validWarn}${scopeNote}${previewToken}${techBlock}${commitToken}`;
+    `${skipLine}${failLine}${configWarn}${instrWarn}${validWarn}${scopeNote}${previewToken}${aiLabels}${techBlock}${commitToken}`;
   refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
   // Auto-open/refresh preview after fix if web files were changed and server is running
   const webExts = ['.html', '.css', '.js', '.ts', '.svg'];

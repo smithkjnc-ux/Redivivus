@@ -13,7 +13,7 @@ import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestra
 import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
 import { redivivusLog } from '../logging/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
-import { cloudPrompt, logTelemetry } from '../api/apiClient.js';
+import { logTelemetry } from '../api/apiClient.js';
 
 import {
   selectSupervisorAndWorker,
@@ -63,10 +63,6 @@ export class RoutingService {
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
 
   async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string): Promise<AIResponse & { usingFallback?: string }> {
-    if (!imageBase64) {
-      const cloudResult = await cloudPrompt(text, { systemMessage, tier: 'flash', timeoutMs });
-      if (cloudResult.success) return cloudResult;
-    }
 
     const keyMap = this.getKeyMap();
     // Build ranked list of available AIs

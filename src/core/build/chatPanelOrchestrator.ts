@@ -12,6 +12,7 @@ import { generateVagueWarning } from '../../services/blueprint/expandedInterview
 import { createBuildContext } from './chatPanelPhasedBuild';
 import { runSingleFileBuild, runChunkedBuild, isChunkedBuildRequest, BuildContext } from './chatPanelBuild';
 import type { VaultSearchResult } from '../../services/vault/buildFromVaultSearch';
+import type { UsageTracker } from '../../services/usageTracker';
 import { inspectPhase, PhaseInspection } from '../inspector/phaseInspector';
 import { formatInspectionReport } from '../inspector/phaseInspectorReport';
 import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor';
@@ -22,6 +23,7 @@ export interface OrchestratorDeps {
   redivivus: RedivivusService;
   routing: RoutingService;
   vault?: VaultService;
+  usageTracker?: UsageTracker;
   conversation: ChatMessage[];
   blueprintContext: string;
   refresh: () => void;
@@ -43,7 +45,7 @@ export async function handleComplexityRoutedBuild(
   // Vague-request warnings must NEVER fire on these — they are for brand-new project requests only.
   const taskLow = task.toLowerCase();
   const hasFileMention = /\b[\w/-]+\.(ts|tsx|js|jsx|py|html|css|scss|json|go|rs)\b/i.test(task);
-  const isModify = hasFileMention || await isModificationRequest(taskLow, deps.routing);
+  const isModify = hasFileMention || await isModificationRequest(taskLow, deps.routing, deps.usageTracker);
   if (isModify && !skipInterview) {
     const complexity = await assessComplexity(task, deps.routing);
     return handleNanoBuild(task, deps, complexity);

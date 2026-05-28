@@ -193,6 +193,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── chat panel command ──
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.openChatPanel', () => ChatPanel.show(redivivusService, routingService, usageTracker, vaultService)));
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.refreshChat', () => ChatPanel.currentPanel?.refresh()));
 
   // ── sidebar view with Redivivus functions ──
   const sidebarProvider = new (RedivivusSidebarProvider as any)(redivivusService, sessionService);

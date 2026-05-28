@@ -21,6 +21,13 @@
 - [x] **Project file tree in AI context** — top 2-level file tree injected into system prompt. DONE (May 11)
 - [x] **Work log in AI context** — last 20 lines of `.redivivus/work_log.md` injected. DONE (May 11)
 - [x] **Terminal error awareness** — `terminalErrorService.ts`, `Ctrl+Shift+E`, `redivivus.injectTerminalError` command. DONE (May 13)
+- [x] **Gap 1: Auto-Save Missing** — `src/core/build/chatPanelAutoSave.ts`
+- [x] **Gap 2: Build History Loop Ignored** — `getRecentBuildContext` injects recent builds
+- [x] **Gap 3: Live Signal Blind Spot** — `terminalErrorService.ts` and IDE diagnostics injected into context
+- [x] **Gap 4: Output Format Fragility** — Worker AI uses XML structured output. DONE (May 27)
+- [x] **Gap 5: Supervisor Dead Air** — Chat UI parses and streams code generation chunks live
+- [x] **Gap 6: Pipeline Monolith** — `chatPanelMsgFix.ts` split to comply with Rule 9
+- [x] **Gap 7: Trivial Change Bloat** — Local routing, trivial fixes skip Guardian review
 
 ### 🟢 Priority 3 — Polish & Onboarding
 - [x] **Better first-run onboarding** — 3 empty states: initialized / uninitialized / no workspace. DONE
