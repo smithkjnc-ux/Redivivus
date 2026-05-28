@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 28, 2026 — Fixed questions routing to build screen (catch block + 'are' regex)
+*Last updated:* May 28, 2026 — Removed direct mode bypass; all messages go through LLM for intent classification
 
 ---
 

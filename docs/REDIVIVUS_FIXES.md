@@ -5,7 +5,26 @@
 
 ---
 
-*Last updated: May 28, 2026 (Session 11CJ: Fixed questions routing to build screen - catch block bug + 'are' regex)*
+*Last updated: May 28, 2026 (Session 11CK: Removed direct mode bypass — all messages go through LLM)*
+
+---
+
+## May 28, 2026 — Session 11CK (All messages must go through the LLM)
+
+**User report:** Questions still routing to build. User correctly identified the root cause: "when I say something to you, you send that back to the llm cloud to analyze it... redivivus does not do this."
+
+**Root cause:** The direct mode bypass (lines 58-71) called `handleBuildRequest` directly without ever sending the message to the LLM for intent classification. The `isConversationalQuestion` regex gate was fragile and unreliable.
+
+**Architectural fix:** Removed the direct mode bypass entirely. Now ALL messages flow through `classifyIntent` (an LLM call) which decides routing. Also removed the `isQuestion` downgrade hack. The LLM decides — if it says 'build', we build. If it says 'question', we answer.
+
+- Direct mode still skips the clarify wizard (design triage) so build commands remain fast
+- The `_BUILD_FALLBACK` regex only fires if `classifyIntent` throws, and defaults to 'question' for anything that doesn't start with a build verb
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Removed direct mode bypass (lines 58-71) | Messages were skipping LLM, going straight to build | Low — build still works via classifyIntent → handleBuildIntent |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Removed `isQuestion` downgrade at build intent check | LLM decides routing, no regex second-guessing | Low — LLM handles question vs build distinction |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Added `deps.buildMode !== 'direct'` to clarify skip | Keeps direct mode builds fast without the old bypass | None |
 
 ---
 

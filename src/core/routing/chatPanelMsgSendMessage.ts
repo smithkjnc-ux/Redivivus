@@ -55,34 +55,17 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (await handleRememberIntent(userText, conversation, refresh)) { return; }
   if (await handleReadResult(lowerText, conversation, refresh)) { return; }
 
-  // [FIX] Direct mode bypass only for new projects. Initialized projects fall through so "add X"/"change Y" routes to
-  // the edit pipeline (reads existing files) not build-from-scratch. [DEAD] Was: all direct-mode non-fix text bypassed.
-  if (deps.buildMode === 'direct' && !deps.redivivus?.isInitialized?.() && !/\b(fix|broken|bug|doesn't work|not working|error|crash|fail|no sound|not playing|done for now|done for today|end session|stop session|finish session|start session)\b/i.test(userText)) {
-    try {
-      const { isConversationalQuestion } = await import('../build/chatPanelBuildInference.js');
-      if (!(await isConversationalQuestion(userText, deps.routing, deps.usageTracker))) {
-        await deps.handleBuildRequest(userText);
-        return;
-      }
-    } catch {
-      // [FIX] On error, fall through to normal intent classification instead of defaulting to build.
-      // Questions that fail the check should be answered, not sent to build wizard.
-    }
-  }
+  // [DEAD] Direct mode bypass removed. Was: buildMode==='direct' && !isInitialized -> handleBuildRequest
+  // directly, skipping the LLM. Caused questions like "are you able to make X?" to build instead of
+  // answering. All messages must now reach classifyIntent (LLM call) which decides the routing.
 
   // [Redivivus] Design triage — ask clarifying questions BEFORE routing so all modes get user preferences
-  // [FIX] Bypass clarify if message comes from the Live Preview overlay. The overlay blocks the main chat,
-  // so any interactive clarify questions would be invisible to the user, causing a silent hang.
-  // [FIX] Also bypass clarify for clear bug / visual issue reports — the user already described the problem.
-  // [FIX] Also bypass clarify for conversational questions — "can you make a checker game?" should not trigger design triage.
+  // [FIX] Skip clarify for: preview messages, bug reports, questions, and direct mode (keeps builds fast)
   const _BUG_KEYWORDS = /\b(fix|broken|bug|doesn't work|not working|error|crash|fail|cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|glitch|stuck|missing|wrong)\b/i;
   const isClearBugReport = _BUG_KEYWORDS.test(lowerText);
   let clarify = { cancelled: false, routedText: userText };
-  
-  const { isConversationalQuestion } = await import('../build/chatPanelBuildInference.js');
-  const isQuestion = await isConversationalQuestion(userText, deps.routing, deps.usageTracker).catch(() => false);
 
-  if (!msg.fromPreview && !isClearBugReport && !isQuestion) {
+  if (!msg.fromPreview && !isClearBugReport && deps.buildMode !== 'direct') {
     clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
     if (clarify.cancelled) { return; }
   }
@@ -130,14 +113,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (intent.type === 'fix') { await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType); return; }
   if (intent.type === 'scaffold') { await handleScaffoldIntent(userText, deps, conversation, refresh); return; }
   if (intent.type === 'service') { await handleServiceIntent(userText, deps, conversation, refresh); return; }
-  if (intent.type === 'build') { 
-    if (isQuestion) {
-      intent.type = 'question'; // Downgrade to question, don't trigger build wizard
-    } else {
-      await handleBuildIntent(routedText, userText, msg, deps, conversation, refresh); 
-      return;
-    }
-  }
+  if (intent.type === 'build') { await handleBuildIntent(routedText, userText, msg, deps, conversation, refresh); return; }
 
   // Default: question / unknown → AI chat
   await handleAIChat(msg, userText, deps, conversation, refresh);
