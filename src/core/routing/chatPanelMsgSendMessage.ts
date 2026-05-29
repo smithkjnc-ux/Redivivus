@@ -38,7 +38,15 @@ async function runConfirmedLocalBuild(
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
   let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   let autoCreated = false;
-  if (!root) {
+  // [FIX] Reject extension directory as a build root — must auto-create a real project folder
+  const _isValidRoot = (r: string | undefined): boolean => {
+    if (!r) return false;
+    const lower = r.toLowerCase();
+    if (lower.includes('/extensions/redivivus') || lower.includes('\\extensions\\redivivus')) return false;
+    if (lower.includes('/resources/app/extensions/') || lower.includes('\\resources\\app\\extensions\\')) return false;
+    return true;
+  };
+  if (!_isValidRoot(root)) {
     try {
       const created = await autoCreateProject(task, deps as any);
       root = created.dir;
@@ -60,12 +68,12 @@ async function runConfirmedLocalBuild(
 
   try {
     await runSingleFileBuild(ctx as any);
-    // [FIX] Force-switch to the new project even if another workspace is open.
-    // runPostBuildActions only adds to workspace; we need to switch for new projects.
-    if (autoCreated && root) {
+    // [FIX] Always switch to the project folder after a confirmed local build.
+    // Whether auto-created or not, the user expects to see their new project.
+    if (root) {
       const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
       if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.skipConversationRestore', true); }
-      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
     }
   } finally {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
@@ -141,35 +149,39 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const _AGREEMENT = /\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
   if ((_BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText)) && lowerText.length < 80) {
     // [FIX] Iterate backwards from the current message to find the actual request+plan
-    // pair for THIS thread. Blind .slice() on the conversation array grabs stale messages
-    // from previous sessions (e.g. a snake game from yesterday).
-    let foundRequest = '';
+    // for THIS thread. Collect ALL user messages and the most recent assistant plan.
     let foundPlan = '';
+    const threadRequests: string[] = [];
+    // Find the user's confirmation message (the current one)
     for (let i = conversation.length - 1; i >= 0; i--) {
-      // Find the user's confirmation message (the current one just added)
       if (conversation[i].role === 'user' && conversation[i].content === userText) {
-        // Look backwards for the assistant response just before this confirmation
+        // Collect all assistant/user pairs going backwards until a gap or old session
         for (let j = i - 1; j >= 0; j--) {
           if (conversation[j].role === 'assistant' && conversation[j].content.length > 80 && !conversation[j].content.startsWith('__CLARIFY__')) {
-            foundPlan = conversation[j].content.replace(/\n---\n\*-- .*\*[\s\S]*$/, '').trim();
-            // Now find the user request that triggered this assistant response
-            for (let k = j - 1; k >= 0; k--) {
-              if (conversation[k].role === 'user' && conversation[k].content.length > 15) {
-                foundRequest = conversation[k].content;
-                break;
-              }
-            }
-            break;
+            if (!foundPlan) { foundPlan = conversation[j].content.replace(/\n---\n\*-- .*\*[\s\S]*$/, '').trim(); }
           }
+          if (conversation[j].role === 'user' && conversation[j].content.length > 15) {
+            threadRequests.push(conversation[j].content);
+          }
+          // Stop if we hit an old build result card or result message
+          if (conversation[j].content.includes('__RESULT_CARD__') || conversation[j].content.includes('✅ Done! Built')) { break; }
         }
         break;
       }
+    }
+    // [FIX] Pick the user request with the most build keywords as the primary request.
+    // Follow-ups like "it should have X" lack the subject (checkers game) and confuse the AI.
+    const buildKeywords = /\b(game|app|website|tool|build|make|create|generate|checker|chess|snake|todo|calc|dashboard|api|server|client|html|css|js)\b/i;
+    let foundRequest = threadRequests[0] || '';
+    let bestScore = 0;
+    for (const req of threadRequests) {
+      const score = (req.match(buildKeywords) || []).length;
+      if (score > bestScore) { bestScore = score; foundRequest = req; }
     }
     if (foundRequest && foundPlan) {
       const featureBits = foundPlan.slice(0, 600).replace(/\s+/g, ' ');
       const cleanTask = `${foundRequest} ${featureBits}`.trim();
       const conciseTask = cleanTask.length > 500 ? cleanTask.slice(0, 500) : cleanTask;
-      // [FIX] Bypass backend agent for confirmed builds — use local pipeline instead.
       await runConfirmedLocalBuild(conciseTask, userText, deps, conversation, refresh);
       return;
     }
