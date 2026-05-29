@@ -19,8 +19,8 @@ import { handleBuildIntent } from './chatPanelMsgSendBuildIntent';
 import { autoCreateProject } from '../build/chatPanelBuildAutoCreate';
 import { runSingleFileBuild } from '../build/chatPanelBuild';
 
-// [FIX] Confirmed builds bypass the backend agent (which asks duplicate questions).
-// Uses local supervisor→worker→guardian pipeline instead.
+// [FIX] Confirmed builds use the local supervisor→worker→guardian pipeline
+// with proper Redivivus infrastructure (blueprint extraction, auto-create, post-build actions).
 async function runConfirmedLocalBuild(
   task: string,
   _userText: string,
@@ -36,20 +36,40 @@ async function runConfirmedLocalBuild(
   }
 
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
-  let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+
+  // Step 1: Extract blueprint from the task using Redivivus AI → gets suggestedName + 5W
+  const { extractBlueprintFromPrompt } = await import('../../services/blueprint/blueprintExtractor.js');
+  const extracted = await extractBlueprintFromPrompt(task, deps.routing);
+
+  // Step 2: Use Redivivus autoCreateProject which creates folder + scaffold with proper name
+  let root: string;
+  let blueprintContext: string;
   let autoCreated = false;
-  // [FIX] Reject extension directory as a build root — must auto-create a real project folder
-  const _isValidRoot = (r: string | undefined): boolean => {
+  const existingRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const isValidRoot = (r: string | undefined): boolean => {
     if (!r) return false;
     const lower = r.toLowerCase();
     if (lower.includes('/extensions/redivivus') || lower.includes('\\extensions\\redivivus')) return false;
     if (lower.includes('/resources/app/extensions/') || lower.includes('\\resources\\app\\extensions\\')) return false;
     return true;
   };
-  if (!_isValidRoot(root)) {
+
+  if (isValidRoot(existingRoot)) {
+    root = existingRoot!;
+    // Build blueprint context from extracted data for existing projects
+    blueprintContext = [
+      `Project: ${extracted.suggestedName}`,
+      `Who: ${extracted.who || '?' }`,
+      `What: ${extracted.what || task.slice(0, 120) }`,
+      `Where: ${extracted.where || '?' }`,
+      `When: ${extracted.when || 'now' }`,
+      `Why: ${extracted.why || '?' }`,
+    ].join('\n');
+  } else {
     try {
       const created = await autoCreateProject(task, deps as any);
       root = created.dir;
+      blueprintContext = created.blueprintContext;
       autoCreated = true;
     } catch (e) {
       deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
@@ -58,23 +78,38 @@ async function runConfirmedLocalBuild(
     }
   }
 
+  // Step 3: Build with full Redivivus context (supervisor→worker→guardian)
+  const { readProjectDeadEnds } = await import('../routing/chatPanelMsgFixDeadEnds.js');
+  const { readProjectRules, getRecentBuildsContext } = await import('../routing/chatPanelMsgFixUtils.js');
+  const { buildGitContextBlock } = await import('../../services/workspace/gitContext.js');
+  const deadEnds = readProjectDeadEnds(root);
+  const projectRules = readProjectRules(root);
+  const gitCtx = buildGitContextBlock(root);
+  const fullBlueprintContext = [
+    blueprintContext,
+    deadEnds ? `PREVIOUSLY FAILED APPROACHES (do not repeat):\n${deadEnds}` : '',
+    projectRules ? `PROJECT RULES (must not violate):\n${projectRules}` : '',
+    gitCtx,
+    getRecentBuildsContext(root),
+  ].filter(Boolean).join('\n\n');
+
   const ctx = {
-    task, root: root!, blueprintContext: (deps as any).blueprintContext || '',
+    task, root, blueprintContext: fullBlueprintContext,
     routing: deps.routing, conversation, refresh,
     logError: (_t: string, _p: string, _e: string, _l: number) => {},
     postToWebview: (m: any) => deps.panel.webview.postMessage(m),
     redivivus: deps.redivivus, usageTracker: deps.usageTracker,
+    onBuildFinished: (_t: string, _f?: string[]) => {
+      if (autoCreated && root) {
+        const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+        if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.skipConversationRestore', true); }
+        vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
+      }
+    },
   };
 
   try {
     await runSingleFileBuild(ctx as any);
-    // [FIX] Always switch to the project folder after a confirmed local build.
-    // Whether auto-created or not, the user expects to see their new project.
-    if (root) {
-      const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
-      if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.skipConversationRestore', true); }
-      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
-    }
   } finally {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
   }
