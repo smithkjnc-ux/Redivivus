@@ -70,8 +70,8 @@ export async function handleAIChat(
         finalText = aiResponse.text || '';
       }
     } else {
-      // Question / answer path
-      const aiResponse = await routing.prompt(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
+      // Question / answer path — use cheap models first (Groq/Gemini), save expensive models for code gen
+      const aiResponse = await routing.promptCheap(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
       if (!aiResponse.success) {
         const errMsg = aiResponse.error || 'please try again.';
         conversation.push({ role: 'assistant', content: `Something went wrong -- ${errMsg}`, timestamp: Date.now() });

@@ -5,7 +5,25 @@
 
 ---
 
-*Last updated: May 28, 2026 (Session 11CK: Removed direct mode bypass — all messages go through LLM)*
+*Last updated: May 28, 2026 (Session 11CK: Cheap-first model routing for Q&A)*
+
+---
+
+## May 28, 2026 — Session 11CK (Cheap-first model routing for Q&A)
+
+**Context:** Q&A questions were hitting Claude (most expensive model) via `routing.prompt()` which sorts by AI_RANK descending. Simple questions like "are you able to make a checker game?" don't need a frontier model.
+
+**Fix:** Added `promptCheap()` to `RoutingService` which sorts by AI_RANK **ascending** (Groq -> Kimi -> Gemini -> Grok -> OpenAI -> Claude). Falls back up the chain on errors. Wired `handleAIChat` to use `promptCheap` for Q&A (non-convert) path.
+
+**Model routing is now:**
+- Classification (`classifyIntent`) -> cheap model (already was)
+- Q&A / questions -> `promptCheap` (Groq/Gemini first)
+- Code gen / builds -> `prompt` (Claude/GPT first)
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/ai/routingService.ts` | Added `promptCheap()` method | Tries cheapest AI first for non-code tasks | Low — falls back to expensive models if cheap ones fail |
+| `src/core/routing/chatPanelMsgSendAI.ts` | Q&A path uses `routing.promptCheap()` | Save expensive models for code generation | Low — convert path still uses `routing.prompt()` |
 
 ---
 
