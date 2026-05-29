@@ -80,6 +80,27 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
 
+  // ── Build confirmations: "that sounds perfect, lets build it" after prior conversation ──
+  // These are NOT new tasks — they confirm what was discussed. Carry full conversation context.
+  const _BUILD_CONFIRM = /\b(build\s+it|lets\s+(build|do)\s+it|go\s+ahead|make\s+it|start\s+building|lets\s+go)\b/i;
+  const _AGREEMENT = /\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
+  if ((_BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText)) && lowerText.length < 80) {
+    // Find prior AI discussion to assemble real build context
+    const priorAI = conversation
+      .filter(m => m.role === 'assistant' && m.content.length > 80 && !m.content.startsWith('__CLARIFY__'))
+      .slice(-2)
+      .map(m => m.content.replace(/\n---\n\*-- .*\*[\s\S]*$/, '').trim());
+    const priorUser = conversation
+      .filter(m => m.role === 'user' && m.content.length > 15)
+      .slice(-4, -1)
+      .map(m => m.content);
+    if (priorAI.length > 0) {
+      const fullContext = `Build based on our conversation:\n\nUser requests:\n${priorUser.join('\n')}\n\nAgreed plan:\n${priorAI.join('\n\n')}`;
+      await handleBuildIntent(fullContext, userText, msg, deps, conversation, refresh);
+      return;
+    }
+  }
+
   // ── STEP 2: Clarify step (design triage) — only for short/vague build requests ──
   const _BUG_KEYWORDS = /\b(fix|broken|bug|doesn't work|not working|error|crash|fail|cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|glitch|stuck|missing|wrong)\b/i;
   const isClearBugReport = _BUG_KEYWORDS.test(lowerText);
