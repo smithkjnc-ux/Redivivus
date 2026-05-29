@@ -5,7 +5,58 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11CX: Fix cloudClassify swallowing errors — fallbackClassify never fired)*
+*Last updated: May 29, 2026 (Session 11DB: FIX pipeline HTML guard — Worker prompt + apply-step bypass, stops 3-retry token waste)*
+
+---
+
+## May 29, 2026 — Session 11DB (Fix: FIX pipeline HTML guard — stops 3-retry token waste on HTML surgical edit failures)
+
+**Bug:** Initialized projects route modification requests to the FIX pipeline (`handleBuildIntent` → `handleFixRequest`). The FIX pipeline Worker chose SURGICAL format for HTML files (< 30% change threshold), which always fails. Failure → Guardian rejects → retry × 2 → 3 total AI calls wasted, nothing written.
+
+**Root cause:** Two separate issues: (1) FIX pipeline Worker prompt didn't have an HTML exception; (2) `applyFixContent` had no HTML guard — it attempted surgical edits unconditionally.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMsgFixPhases.ts` | Added explicit IMPORTANT rule to Worker system prompt: HTML files must always use FULL FILE (`<content>`) format, never surgical edits. | Worker chose surgical by default (< 30% change). HTML/inline-JS files are too large for reliable text matching. | None — falls back to existing `<content>` path. |
+| `src/core/routing/chatPanelMsgFixApply.ts` | Added `hasHtmlTarget` check — skips surgical path when any target file is `.html`, falls through to `parseFixResponse` which handles `<content>` full-file tags. | Defensive guard: Worker may output surgical XML regardless of prompt instruction (same behavior seen in BUILD pipeline). | None — `parseFixResponse` at line 41 already handles `<file><content>` format correctly. |
+
+---
+
+## May 29, 2026 — Session 11DA (Fix: HTML files bypass surgical mode at apply step — defensive guard)
+
+**Bug:** Even after Worker prompt was changed to say "Output the COMPLETE file" for HTML, the Worker (GPT-4o) still returned XML surgical-edit format — likely from training patterns. The prompt-side fix in 11CZ is insufficient on its own.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelBuildSteps.ts` | Added `&& !relPath.endsWith('.html')` to the surgical-mode guard in `applyCodeToFile`. HTML responses now always fall through to full-file write regardless of the format the Worker returns. | Worker models may output surgical XML by habit regardless of prompt instructions. This closes the gap at the apply step — if the Worker disobeys the prompt, the result is still written correctly. | None — falls through to existing full-file write path. |
+
+---
+
+## May 29, 2026 — Session 11CZ (Fix: HTML modifications always use full rewrite — surgical edits unreliable on large HTML/JS files)
+
+**Bug:** Surgical edit mode fails on HTML files because LLMs cannot reliably reproduce SEARCH blocks verbatim from large files with inline JS. The Worker hallucinated a section divider comment (`// =================== HTML ===================`) that doesn't exist in the file, causing all surgical edits to fail regardless of whitespace normalization.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelBuildWorker.ts` | `modRules`: changed `isModifying` to `isModifying && !isHtml`. HTML files now always get "Output the COMPLETE file." instead of surgical edit instructions. | HTML with inline JS is self-contained — full rewrite is clean and avoids LLM whitespace/content hallucination in SEARCH blocks. Surgical edit mode requires exact text reproduction which fails on large files. | None — full rewrite for HTML was already the pre-surgical-edit behavior. |
+
+---
+
+## May 29, 2026 — Session 11CY (Fix: surgical edit fails when AI reproduces indentation slightly wrong)
+
+**Bug:** Build pipeline fired correctly for an existing HTML file, but the surgical SEARCH/REPLACE write failed with "Search block not found." The AI reproduced the existing code accurately but with slightly different indentation (tab/space drift or leading space count). The existing matcher had two passes: exact match and `trimEnd` per line. Neither handled leading-whitespace differences.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/build/surgicalEditService.ts` | Added Pass 3 to `applySurgicalEdits`: normalizes tabs→spaces, strips all leading+trailing whitespace per line, then matches by line content. If found, replaces the matched line range with the AI's `replaceBlock` (which has correct indentation). | AI occasionally reproduces search blocks with tab/space drift or wrong leading indent count. The replacement is always used as-is, so output indentation stays correct. | Low — only activates after exact and trimEnd passes both fail. No behavior change for well-formed edits. |
 
 ---
 

@@ -128,6 +128,7 @@ FULL FILE (structural rewrite or >30% of file changed):
 [complete new file content]
   </content>
 </file>
+IMPORTANT: For any .html file, ALWAYS use FULL FILE format with <content> tags — never surgical edits. HTML files with inline JS are too large for reliable text matching.
 Output ONLY these blocks. No prose, no explanations.`;
 
   const fixPrompt = `SUPERVISOR ANALYSIS:

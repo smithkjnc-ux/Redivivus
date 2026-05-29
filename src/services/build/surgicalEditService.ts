@@ -133,21 +133,33 @@ export function applySurgicalEdits(edits: SurgicalEdit[], root: string): EditRes
     for (const edit of fileEdits) {
       const idx = content.indexOf(edit.searchBlock);
       if (idx === -1) {
-        // Try with normalized whitespace (trim trailing spaces per line)
+        // Pass 2: normalize trailing whitespace per line
         const normalizedContent = content.split('\n').map(l => l.trimEnd()).join('\n');
         const normalizedSearch = edit.searchBlock.split('\n').map(l => l.trimEnd()).join('\n');
         const nIdx = normalizedContent.indexOf(normalizedSearch);
-        if (nIdx === -1) {
-          failedSearch = edit.searchBlock.slice(0, 60) + (edit.searchBlock.length > 60 ? '...' : '');
-          break;
+        if (nIdx !== -1) {
+          const linesBefore = normalizedContent.slice(0, nIdx).split('\n').length - 1;
+          const searchLines = normalizedSearch.split('\n').length;
+          const origLines = content.split('\n');
+          const beforeStr = origLines.slice(0, linesBefore).join('\n') + (linesBefore > 0 ? '\n' : '');
+          content = beforeStr + edit.replaceBlock + '\n' + origLines.slice(linesBefore + searchLines).join('\n');
+        } else {
+          // Pass 3: strip all leading+trailing whitespace per line (handles tab/space and indent drift)
+          const normalize = (s: string) => s.replace(/\t/g, '  ').split('\n').map(l => l.trim()).filter(l => l.length > 0);
+          const strippedContent = content.replace(/\t/g, '  ').split('\n').map(l => l.trim());
+          const strippedSearch = normalize(edit.searchBlock);
+          let foundAt = -1;
+          for (let si = 0; si <= strippedContent.length - strippedSearch.length; si++) {
+            if (strippedSearch.every((sl, j) => strippedContent[si + j] === sl)) { foundAt = si; break; }
+          }
+          if (foundAt !== -1) {
+            const origLines = content.split('\n');
+            content = [...origLines.slice(0, foundAt), edit.replaceBlock, ...origLines.slice(foundAt + strippedSearch.length)].join('\n');
+          } else {
+            failedSearch = edit.searchBlock.slice(0, 60) + (edit.searchBlock.length > 60 ? '...' : '');
+            break;
+          }
         }
-        // Find the actual position in original content using line offsets
-        const linesBefore = normalizedContent.slice(0, nIdx).split('\n').length - 1;
-        const searchLines = normalizedSearch.split('\n').length;
-        const origLines = content.split('\n');
-        const beforeStr = origLines.slice(0, linesBefore).join('\n') + (linesBefore > 0 ? '\n' : '');
-        const matchStr = origLines.slice(linesBefore, linesBefore + searchLines).join('\n');
-        content = beforeStr + edit.replaceBlock + '\n' + origLines.slice(linesBefore + searchLines).join('\n');
       } else {
         content = content.slice(0, idx) + edit.replaceBlock + content.slice(idx + edit.searchBlock.length);
       }

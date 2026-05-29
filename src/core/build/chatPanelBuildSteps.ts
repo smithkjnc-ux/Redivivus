@@ -86,7 +86,8 @@ export async function applyCodeToFile(opts: {
   const { code, rawResponse, relPath, absPath, root, existingTarget, isCrossLang, isMod, task } = opts;
   const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits } = await import('../../services/build/surgicalEditService.js');
 
-  if (existingTarget && !isCrossLang && detectResponseFormat(rawResponse) === 'surgical') {
+  // [FIX] HTML files always bypass surgical edit — Worker may output surgical format regardless of prompt instruction
+  if (existingTarget && !isCrossLang && !relPath.endsWith('.html') && detectResponseFormat(rawResponse) === 'surgical') {
     const edits = parseSurgicalEdits(rawResponse);
     if (edits.length > 0) {
       const normalizedEdits = edits.map((e: any) => ({ ...e, filePath: relPath }));

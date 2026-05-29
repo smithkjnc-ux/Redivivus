@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Fix: cloudClassify no longer swallows errors; fallbackClassify now fires correctly (Session 11CX)
+*Last updated:* May 29, 2026 — Fix: FIX pipeline HTML guard stops 3-retry waste — Worker prompt + apply bypass (Session 11DB)
 
 ---
 
@@ -24,6 +24,27 @@
 ---
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
+
+### Session 11DB — May 29, 2026: FIX Pipeline HTML Guard (Token Waste Fix)
+- Initialized projects route modification requests to FIX pipeline — Worker chose SURGICAL for HTML → 3 retries, nothing written
+- Worker prompt: explicit "HTML always uses `<content>` full file format" rule
+- `applyFixContent`: `hasHtmlTarget` check skips surgical path → falls through to `parseFixResponse` → `<content>` tag handled
+- Covers both prompt-side and apply-side so disobedient Workers are caught
+
+### Session 11DA — May 29, 2026: HTML Bypass at Apply Step (Defensive Guard)
+- Worker (GPT-4o) outputs XML surgical format regardless of prompt instruction — training pattern wins
+- Added `!relPath.endsWith('.html')` guard in `applyCodeToFile` — HTML always falls through to full-file write
+- Closes the gap: prompt-side (11CZ) + apply-side (11DA) together = reliable HTML handling
+
+### Session 11CZ — May 29, 2026: HTML Files Skip Surgical Edit Mode
+- Surgical SEARCH blocks hallucinated divider comments that don't exist in the file
+- HTML files with inline JS are large — LLMs can't reliably reproduce exact blocks for SEARCH
+- `buildWorkerPrompt`: `isModifying && !isHtml` — HTML always gets "Output the COMPLETE file."
+
+### Session 11CY — May 29, 2026: Fix Surgical Edit Whitespace Matching
+- Surgical edits failed when AI reproduced SEARCH blocks with tab/space or leading-indent drift
+- Added Pass 3 to `applySurgicalEdits`: strips all leading+trailing whitespace per line, matches by content, replaces by line index
+- Pass 1 (exact) → Pass 2 (trimEnd) → Pass 3 (full strip) — fallback chain catches all common AI whitespace variations
 
 ### Session 11CX — May 29, 2026: Fix cloudClassify Error Swallowing
 - All classify API failures silently returned `question` — fallbackClassify in classifyIntent never fired

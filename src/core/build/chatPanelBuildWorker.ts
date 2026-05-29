@@ -82,7 +82,9 @@ export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifyin
     ? '- COMPLETE, self-contained HTML file. CSS/JS inline. No external files. No modules.\n- Must open via double-click on file://.'
     : '- [SCOPE] comment at top.\n- // NARRATOR: comment on first line describing the file.\n- Use EVERY input variable in the actual computation — if you parse or declare it, it MUST appear in the formula or logic, not just in a comment or unused variable.\n- CLI tools: every command-line argument that is parsed MUST affect the output. If args include distance, pay, and fuelCost, all three must participate in the calculation.';
 
-  const modRules = isModifying 
+  // [FIX] HTML files: always full rewrite. HTML with inline JS is self-contained — surgical SEARCH blocks
+  // require exact whitespace reproduction which LLMs do unreliably on large files.
+  const modRules = (isModifying && !isHtml)
     ? `- SURGICAL EDIT MODE. Output ONLY the changes using this exact format:
 <<<SEARCH
 [exact existing code to find -- copy verbatim, include 2-3 lines of context for uniqueness]
@@ -92,7 +94,7 @@ REPLACE>>>
 - Multiple edits: repeat the <<<SEARCH...REPLACE>>> block for each change.
 - The SEARCH block must match the existing file EXACTLY (same indentation, whitespace).
 - Do NOT output the entire file. Only show the parts that change.`
-    : '- Creating NEW file.';
+    : '- Output the COMPLETE file.';
 
   const vaultBlock = vaultSummary
     ? `VAULT CODE (already written and tested — strict rules apply):\n- If a vault item solves part of the task: COPY IT into your output as-is. Mark it with // [FROM VAULT: name].\n- DO NOT rewrite or duplicate vault code. Do not create a parallel version.\n- Only write NEW code for parts NOT covered by vault items.\n${vaultSummary}`

@@ -19,7 +19,11 @@ export async function applyFixContent(finalResponse: string, root: string, allow
   let written: string[] = []; let failed: string[] = []; let skipped: string[] = []; let fixSnapId: string | undefined;
   let usedSurgical = false;
 
-  if (responseFormat === 'surgical') {
+  // [FIX] Skip surgical for HTML files — text matching is unreliable on large HTML/JS files.
+  // Falls through to parseFixResponse which handles <content> full-file output.
+  const hasHtmlTarget = responseFormat === 'surgical' && parseSurgicalEdits(finalResponse).some((e: any) => e.filePath.endsWith('.html'));
+
+  if (responseFormat === 'surgical' && !hasHtmlTarget) {
     const edits = parseSurgicalEdits(finalResponse);
     const editFiles = [...new Set(edits.map(e => e.filePath))];
     // Validate all edited files exist in project
