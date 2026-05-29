@@ -5,7 +5,22 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11CT: Project export scanner injected into Worker prompt)*
+*Last updated: May 29, 2026 (Session 11CU: Cross-session build decision memory)*
+
+---
+
+## May 29, 2026 — Session 11CU (Cross-session build decision memory)
+
+**Goal:** Decisions made through conversational back-and-forth ("ok, use JWT", "let's go with PostgreSQL") were invisible to future sessions — only explicit preference statements ("I prefer X") were captured. Fix: after every build, AI reviews the full conversation and extracts tech choices, constraints, and naming decisions, storing them as permanent facts in `learned.md`.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/learnedMemoryService.ts` | Added `extractBuildDecisions(conversation, task, routing)` static method. Sends last 20 conversation turns + task to cheap AI, gets back `{permanent, recent}` JSON. Prompt explicitly asks for HOW/WHY decisions, not just what was built. Falls back to empty arrays on AI failure or JSON parse error. | `extractFacts` only ran on messages matching PREFERENCE_RE ("I prefer...", "we decided..."). Implicit agreement decisions ("ok sounds good") were silently dropped. | None — non-blocking, falls back to empty arrays. |
+| `src/core/build/chatPanelBuildSteps.ts` | Added `LearnedMemoryService` import. At the end of `runPostBuildActions`, calls `extractBuildDecisions` non-blocking (`.then().catch()`). Saves permanent facts via `addPermanent`, recent via `addRecent`. | `runPostBuildActions` is the single point where all post-build side effects run. Adding it here means every successful build contributes to long-term memory automatically. | None — fire-and-forget after build completes; never delays the user's response. |
+
+**Architecture note:** `extractFacts` (existing, called from PREFERENCE_RE match in Q&A) and `extractBuildDecisions` (new, called after every build) are complementary. Together they cover: mid-chat explicit preferences + implicit decisions that emerge from build back-and-forth. Both write to `learned.md` via `addPermanent`/`addRecent`. Both read by `getSummaryForPrompt` which feeds into Supervisor context each session.
 
 ---
 

@@ -124,6 +124,39 @@ export class LearnedMemoryService {
     writeLearnedEntries(this.filePath, kept);
   }
 
+  /** Extract decisions from a completed build conversation and persist to learned.md.
+   *  Captures implicit decisions reached through dialogue, not just explicit preference statements.
+   *  Non-blocking — caller should .catch(() => {}) and not await. */
+  static async extractBuildDecisions(
+    conversation: Array<{ role: string; content: string }>,
+    task: string,
+    routing: RoutingService,
+  ): Promise<{ permanent: string[]; recent: string[] }> {
+    if (conversation.length === 0) { return { permanent: [], recent: [] }; }
+    const turns = conversation.slice(-20).map(m => `${m.role}: ${m.content.slice(0, 200)}`).join('\n');
+    const prompt =
+      `A developer just finished a coding task. Extract memory facts from the conversation below.\n\n` +
+      `COMPLETED TASK: "${task.slice(0, 200)}"\n\n` +
+      `CONVERSATION:\n${turns}\n\n` +
+      `Return strict JSON only (no markdown, no explanation):\n` +
+      `- permanent: tech choices, naming decisions, constraints, or architecture that came up. Persist forever. Max 5 items.\n` +
+      `- recent: what was built this session (files, features). Will expire in 30 days. Max 3 items.\n` +
+      `- Skip obvious facts derivable from the task itself. Capture the HOW and WHY that only appear in the conversation.\n\n` +
+      `Format: {"permanent":["..."],"recent":["..."]}\n` +
+      `If nothing qualifies: {"permanent":[],"recent":[]}`;
+    try {
+      const result = await routing.promptCheap(prompt, 10_000);
+      const raw = result.text.trim().replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
+      const parsed = JSON.parse(raw);
+      return {
+        permanent: Array.isArray(parsed.permanent) ? parsed.permanent.slice(0, 5) : [],
+        recent:    Array.isArray(parsed.recent)    ? parsed.recent.slice(0, 3)    : [],
+      };
+    } catch {
+      return { permanent: [], recent: [] };
+    }
+  }
+
   /** AI-powered fact extraction — call at session end with user-only messages.
    *  Falls back to empty arrays if AI call fails — never blocks session end. */
   static async extractFacts(

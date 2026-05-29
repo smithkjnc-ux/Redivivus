@@ -17,6 +17,7 @@ import { autoCommitIfEnabled } from '../../services/gitAutoCommitService';
 import { writeProjectRoadmapEntry } from '../routing/chatPanelMsgFixUtils';
 import { runCompileAutoFix } from '../../services/build/compileAutoFix';
 import { runTestAutoFix } from '../../services/build/testAutoFix';
+import { LearnedMemoryService } from '../../services/learnedMemoryService';
 
 export interface BuildTarget {
   relPath: string;
@@ -167,4 +168,15 @@ export async function runPostBuildActions(opts: {
   refreshSetupProgressIfOpen().catch(() => {});
   await runCompileAutoFix(ctx, allFiles).catch(() => {});
   await runTestAutoFix(ctx, allFiles).catch(() => {});
+  // [DONE] Extract decisions from this build's conversation and persist to learned.md.
+  // Non-blocking — runs after build is complete so it never delays the response.
+  LearnedMemoryService.extractBuildDecisions(
+    ctx.conversation.map(m => ({ role: m.role, content: m.content })),
+    task,
+    ctx.routing,
+  ).then(({ permanent, recent }) => {
+    const learned = new LearnedMemoryService(root);
+    permanent.forEach(f => learned.addPermanent(f));
+    recent.forEach(f => learned.addRecent(f));
+  }).catch(() => { /* never surface memory errors */ });
 }

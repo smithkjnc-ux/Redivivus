@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Project export scanner injected into Worker prompt to prevent import hallucinations (Session 11CT)
+*Last updated:* May 29, 2026 — Cross-session build decision memory: AI extracts decisions after every build (Session 11CU)
 
 ---
 
@@ -25,23 +25,23 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
+### Session 11CU — May 29, 2026: Cross-Session Build Decision Memory
+- Implicit decisions from back-and-forth ("ok, use JWT") were never stored across sessions
+- Added `extractBuildDecisions` to `LearnedMemoryService` — reviews full conversation post-build
+- Wired into `runPostBuildActions` non-blocking — every successful build feeds `learned.md`
+- Complements existing `extractFacts` (mid-chat explicit preferences) — now both paths are covered
+
 ### Session 11CT — May 29, 2026: Project Export Scanner
 - Worker was hallucinating imports because it had no map of what the project actually exports
 - New `projectExportScanner.ts`: static regex scan (no AI), 25 files × 15 names, excludes target file
 - Injected as `PROJECT EXPORTS` block in Worker prompt before vault and existing content
 - Attacks hallucination upstream (prevention) rather than relying solely on Guardian (detection)
 
-### Session 11CS — May 29, 2026: Delete Confirmation Gate
-- File deletion previously fired silently on AI classify → `fs.unlinkSync` with no confirm step
-- `identifyFilesToDelete` extracted from `deleteRequestedFiles` — identify first, delete second
-- `showWarningMessage` modal now shows exact files before any deletion proceeds
-- Also fixed module-level `/g` regex `lastIndex` statefulness in the identification path
-
-### Session 11CR — May 29, 2026: AI-Driven Context Window Selection
-- Replaced hardcoded `slice(-10).map(m.content.slice(0,300))` with `selectRelevantTurns` — AI picks which turns matter
-- New module: `src/core/ai/contextSelector.ts` — short convs skip AI, long convs use cheap AI call, fallback = last 6
-- Wired into Q&A path (`chatPanelAI.ts`) and build Supervisor path (`chatPanelBuild.ts`)
-- Conversation context now reaches the Supervisor for the first time — was zero before this change
+### Session 11CT — May 29, 2026: Project Export Scanner
+- Worker was hallucinating imports because it had no map of what the project actually exports
+- New `projectExportScanner.ts`: static regex scan (no AI), 25 files x 15 names, excludes target file
+- Injected as `PROJECT EXPORTS` block in Worker prompt before vault and existing content
+- Attacks hallucination upstream (prevention) rather than relying solely on Guardian (detection)
 
 ---
 
