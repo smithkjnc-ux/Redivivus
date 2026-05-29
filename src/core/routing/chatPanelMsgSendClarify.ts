@@ -64,6 +64,20 @@ export async function runChatClarifyStep(
     const summary = Object.entries(answers).map(([q, a]) => `  • ${q}: **${a}**`).join('\n');
     conversation[conversation.length - 1].content = `✅ Got it — building with your choices:\n${summary}`;
     refresh();
+
+    // [FIX] When blueprint was verified, assemble routedText from FULL conversation context.
+    // "that sounds good, build it" is a confirmation — the REAL task is what was discussed earlier.
+    if (hasPriorDiscussion && answers['blueprint_verify']) {
+      // Find the original user request that started the discussion (first substantive user message)
+      const userMessages = conversation.filter(m => m.role === 'user' && m.content.length > 10);
+      const originalRequest = userMessages.length >= 2 ? userMessages[userMessages.length - 3]?.content || userMessages[0].content : userText;
+      const featureContext = recentAssistant.join('\n\n');
+      return {
+        routedText: `Build: ${originalRequest}\n\nFEATURES DISCUSSED AND APPROVED BY USER:\n${featureContext}\n\n${answersBlock}`,
+        cancelled: false,
+      };
+    }
+
     return { routedText: `${userText}\n\n${answersBlock}`, cancelled: false };
   }
 

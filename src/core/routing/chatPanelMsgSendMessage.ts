@@ -92,8 +92,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const routedText = clarify.routedText;
 
   // ── STEP 3: Adaptive Mode — auto-route between simple pipeline and agent pipeline ──
+  // [FIX] Skip adaptive when the user already confirmed the blueprint — they said "build this",
+  // so just build it. Don't re-route to agent and ask MORE questions.
+  const blueprintConfirmed = routedText !== userText && routedText.startsWith('Build:');
   const { evaluateTaskComplexity } = await import('../../services/ai/adaptiveClassifier.js');
-  const route = await evaluateTaskComplexity(routedText, deps.routing);
+  const route = blueprintConfirmed ? 'simple' : await evaluateTaskComplexity(routedText, deps.routing);
   if (route === 'complex') {
     conversation.push({ role: 'assistant', content: '🔀 **Adaptive:** Routing to Agent Pipeline (environment task detected)...', timestamp: Date.now() });
     refresh();
