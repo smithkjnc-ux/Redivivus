@@ -55,12 +55,32 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (await handleRememberIntent(userText, conversation, refresh)) { return; }
   if (await handleReadResult(lowerText, conversation, refresh)) { return; }
 
-  // [DEAD] Direct mode bypass removed. Was: buildMode==='direct' && !isInitialized -> handleBuildRequest
-  // directly, skipping the LLM. Caused questions like "are you able to make X?" to build instead of
-  // answering. All messages must now reach classifyIntent (LLM call) which decides the routing.
+  // ── STEP 1: Fast-path classification (instant, no API call) ──
+  // Questions, commands, and run intents are caught here BEFORE anything else.
+  // This prevents the clarify wizard from hijacking questions.
+  const { checkHardcodedOverrides } = await import('../ai/chatPanelClassifierOverrides.js');
+  const fastPath = checkHardcodedOverrides(lowerText);
 
-  // [Redivivus] Design triage — ask clarifying questions BEFORE routing so all modes get user preferences
-  // [FIX] Skip clarify for: preview messages, bug reports, questions, and direct mode (keeps builds fast)
+  // Commands: execute immediately
+  if (fastPath && fastPath.type === 'command' && fastPath.command) {
+    const label = (fastPath.command as string).replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
+    await vscode.commands.executeCommand(fastPath.command as string);
+    conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
+    refresh(); return;
+  }
+
+  // Run intents: execute immediately
+  if (fastPath && fastPath.type === 'run') {
+    await handleRunIntent(fastPath, deps, conversation, refresh); return;
+  }
+
+  // Questions: answer with cheap AI immediately — skip clarify, adaptive, everything
+  if (fastPath && fastPath.type === 'question') {
+    await handleAIChat(msg, userText, deps, conversation, refresh);
+    return;
+  }
+
+  // ── STEP 2: Clarify step (design triage) — only for non-questions ──
   const _BUG_KEYWORDS = /\b(fix|broken|bug|doesn't work|not working|error|crash|fail|cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|glitch|stuck|missing|wrong)\b/i;
   const isClearBugReport = _BUG_KEYWORDS.test(lowerText);
   let clarify = { cancelled: false, routedText: userText };
@@ -71,17 +91,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
   const routedText = clarify.routedText;
 
-  // [Redivivus] Early Exit: Hardcoded Command Overrides (bypasses Adaptive/Agent Mode)
-  const { checkHardcodedOverrides } = await import('../ai/chatPanelClassifierOverrides.js');
-  const hardcodedCmd = checkHardcodedOverrides(lowerText);
-  if (hardcodedCmd && hardcodedCmd.type === 'command' && hardcodedCmd.command) {
-    const label = (hardcodedCmd.command as string).replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
-    await vscode.commands.executeCommand(hardcodedCmd.command as string);
-    conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
-    refresh(); return;
-  }
-
-  // [Redivivus] Adaptive Mode — auto-route between simple pipeline and agent pipeline
+  // ── STEP 3: Adaptive Mode — auto-route between simple pipeline and agent pipeline ──
   const { evaluateTaskComplexity } = await import('../../services/ai/adaptiveClassifier.js');
   const route = await evaluateTaskComplexity(routedText, deps.routing);
   if (route === 'complex') {
@@ -91,8 +101,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
 
-  // [RULE 18] AI intent classification — never use regex to simulate language understanding.
-  // [WARN] If classifyIntent throws (e.g. no API key), fall back to keyword check.
+  // ── STEP 4: AI intent classification (cloud classifier or fallback) ──
   const _BUILD_FALLBACK = /^\s*(add|change|update|remove|delete|rename|replace|fix|edit|make|give|put|set|increase|decrease|toggle|enable|disable|switch|move|style|color)\b/i;
   const intent = deps.classifyIntent ? (await deps.classifyIntent(userText).catch(() => _BUILD_FALLBACK.test(lowerText) ? { type: 'build' as const } : { type: 'question' as const })) : { type: 'question' as const };
 
@@ -100,14 +109,12 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     conversation.push({ role: 'assistant', content: "I'm a coding assistant -- I can help you build, fix, explain, or review code. What are you building today?", timestamp: Date.now() });
     refresh(); return;
   }
-
   if (intent.type === 'command' && intent.command) {
     const label = (intent.command as string).replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
     await vscode.commands.executeCommand(intent.command as string);
     conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
     refresh(); return;
   }
-
   if (intent.type === 'convert') { await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return; }
   if (intent.type === 'run') { await handleRunIntent(intent, deps, conversation, refresh); return; }
   if (intent.type === 'fix') { await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType); return; }
@@ -115,6 +122,6 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (intent.type === 'service') { await handleServiceIntent(userText, deps, conversation, refresh); return; }
   if (intent.type === 'build') { await handleBuildIntent(routedText, userText, msg, deps, conversation, refresh); return; }
 
-  // Default: question / unknown → AI chat
+  // Default: question / unknown → AI chat (cheap model)
   await handleAIChat(msg, userText, deps, conversation, refresh);
 }
