@@ -98,7 +98,10 @@ export async function collectBuildContext(
         const score = task.toLowerCase().split(/\W+/).filter(w => w.length > 3).filter(w => words.includes(w)).length;
         return { item, score };
       });
-      vaultItems = scored.sort((a, b) => b.score - a.score).slice(0, 20).map(s => s.item);
+      // [FIX] Only include vault items with keyword overlap — sending irrelevant items wastes
+      // tokens and can push the request payload over server size limits.
+      const matched = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
+      vaultItems = matched.length > 0 ? matched.map(s => s.item) : undefined;
     } catch {}
   }
 
@@ -118,7 +121,12 @@ export async function collectBuildContext(
     existingFiles,
     vaultItems,
     deadEnds: readFileSafe(path.join(root, '.redivivus', 'dead_ends.md'), 4000) || undefined,
-    projectRules: readFileSafe(path.join(root, '.redivivus', 'rules.md'), 4000) || undefined,
+    // [FIX] Skip generic scaffold rules for brand-new projects (no history, no existing files).
+    // The scaffolded rules.md contains Redivivus meta-protocol, not project-specific coding rules.
+    // Only send rules when the project has build history (meaning rules have been customized).
+    projectRules: (getRecentBuilds(root).length > 0)
+      ? (readFileSafe(path.join(root, '.redivivus', 'rules.md'), 4000) || undefined)
+      : undefined,
     recentBuilds: getRecentBuilds(root),
     gitContext: buildGitContext(root) || undefined,
     projectMap: buildProjectMap(root) || undefined,

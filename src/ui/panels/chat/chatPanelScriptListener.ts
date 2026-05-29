@@ -16,6 +16,11 @@ export function buildListenerScript(): string {
         }
         return;
       }
+      if (msg.type === 'update-building-message' && msg.text) {
+        var buildMsg = conv.querySelector('.msg-assistant:last-child');
+        if (buildMsg) { buildMsg.textContent = msg.text; }
+        return;
+      }
       if (msg.type === 'set-status') {
         const s = document.getElementById('redivivus-status');
         const pLast = document.getElementById('preview-chat-last');

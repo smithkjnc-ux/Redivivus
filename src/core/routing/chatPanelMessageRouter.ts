@@ -18,6 +18,14 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
 
   if (await handleEarlyExits(panel, msg)) { return; }
 
+  // Pre-load buildMode from VS Code setting on first message if the user hasn't chosen yet this session.
+  // Translates the public setting values ('auto'/'guided') to internal values ('direct'/'plan').
+  if (!state.buildMode) {
+    const saved = (require('vscode').workspace.getConfiguration('redivivus').get('buildMode', '') as string);
+    if (saved === 'auto') { state.buildMode = 'direct'; }
+    else if (saved === 'guided') { state.buildMode = 'plan'; }
+  }
+
   // [FIX] start-new-project sets deps.buildMode/planInterview locally in handleChatMessage but never
   // writes back to state. Pre-sync buildMode here; planInterview is synced after handleChatMessage.
   if (msg.type === 'start-new-project') {

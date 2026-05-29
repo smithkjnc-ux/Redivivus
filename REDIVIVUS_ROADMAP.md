@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Fix: FIX pipeline HTML guard stops 3-retry waste — Worker prompt + apply bypass (Session 11DB)
+*Last updated:* May 29, 2026 — Feature: System Health panel with color-coded cards (green/yellow/red) per section (Session 11DH)
 
 ---
 
@@ -25,44 +25,22 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
-### Session 11DB — May 29, 2026: FIX Pipeline HTML Guard (Token Waste Fix)
-- Initialized projects route modification requests to FIX pipeline — Worker chose SURGICAL for HTML → 3 retries, nothing written
-- Worker prompt: explicit "HTML always uses `<content>` full file format" rule
-- `applyFixContent`: `hasHtmlTarget` check skips surgical path → falls through to `parseFixResponse` → `<content>` tag handled
-- Covers both prompt-side and apply-side so disobedient Workers are caught
+### Session 11DF — May 29, 2026: Build UX — Auto-reload, Game Quality, Result Card
+- Removed forced `vscode.openFolder` after new-project builds — result card already has "Open Project" button; auto-reload fired before user could read anything
+- Local fallback SYSTEM prompt now explicitly requires fully playable games (event handlers, game state, win conditions)
+- Local fallback narration now shows Builder/Cloud/Cost clearly
 
-### Session 11DA — May 29, 2026: HTML Bypass at Apply Step (Defensive Guard)
-- Worker (GPT-4o) outputs XML surgical format regardless of prompt instruction — training pattern wins
-- Added `!relPath.endsWith('.html')` guard in `applyCodeToFile` — HTML always falls through to full-file write
-- Closes the gap: prompt-side (11CZ) + apply-side (11DA) together = reliable HTML handling
+### Session 11DE — May 29, 2026: Auto vs Guided Build Modes
+- Renamed `'direct'`/`'plan'` → "Auto"/"Guided" across all UI (popover, badge, launcher cards, empty state)
+- Added `redivivus.buildMode: "auto" | "guided"` VS Code setting — persists mode across sessions
+- Pre-loads setting in message router so mode is applied from first message
+- Guided interview: all 5 W questions rewritten (more detailed), style follow-up added, task string improved
 
-### Session 11CZ — May 29, 2026: HTML Files Skip Surgical Edit Mode
-- Surgical SEARCH blocks hallucinated divider comments that don't exist in the file
-- HTML files with inline JS are large — LLMs can't reliably reproduce exact blocks for SEARCH
-- `buildWorkerPrompt`: `isModifying && !isHtml` — HTML always gets "Output the COMPLETE file."
-
-### Session 11CY — May 29, 2026: Fix Surgical Edit Whitespace Matching
-- Surgical edits failed when AI reproduced SEARCH blocks with tab/space or leading-indent drift
-- Added Pass 3 to `applySurgicalEdits`: strips all leading+trailing whitespace per line, matches by content, replaces by line index
-- Pass 1 (exact) → Pass 2 (trimEnd) → Pass 3 (full strip) — fallback chain catches all common AI whitespace variations
-
-### Session 11CX — May 29, 2026: Fix cloudClassify Error Swallowing
-- All classify API failures silently returned `question` — fallbackClassify in classifyIntent never fired
-- "add a speed boost power-up" → Groq Q&A instead of build pipeline (found during test)
-- Fix: removed try/catch from cloudClassify; errors now propagate to classifyIntent's fallback handler
-- fallbackClassify correctly returns `build` for imperative verbs — pipeline now triggers on API failure
-
-### Session 11CV — May 29, 2026: Similar Code Finder
-- Worker had no awareness of similar logic in other project files — would reimplement existing functions
-- New `similarCodeFinder.ts`: sync regex extraction + cheap AI relevance filter → up to 4 matched snippets
-- Injected as `EXISTING SIMILAR CODE` block in Worker prompt, between exports map and existing content
-- Three-layer defense now: export names (prevention) + function bodies (context) + Guardian (detection)
-
-### Session 11CU — May 29, 2026: Cross-Session Build Decision Memory
-- Implicit decisions from back-and-forth ("ok, use JWT") were never stored across sessions
-- Added `extractBuildDecisions` to `LearnedMemoryService` — reviews full conversation post-build
-- Wired into `runPostBuildActions` non-blocking — every successful build feeds `learned.md`
-- Complements existing `extractFacts` (mid-chat explicit preferences) — now both paths are covered
+### Session 11DD — May 29, 2026: Cloud Build Local Fallback (5xx → Local AI Build)
+- Cloud `/build` returns 500 (server framework crash, empty body — unfixable from client)
+- Solution: on `status >= 500`, call `runLocalBuild()` — builds using user's own AI keys directly
+- `cloudBuildClient.ts` was 291 lines → split into 3 files (170 / 62 / 129)
+- New: `cloudBuildResultProcessor.ts`, `cloudBuildLocalFallback.ts`
 
 ---
 

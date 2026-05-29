@@ -28,10 +28,18 @@ async function refreshPanel(context: vscode.ExtensionContext, githubBackupServic
   const o = cfg2.get<string>('openaiApiKey') || '';
   const a = cfg2.get<string>('anthropicApiKey') || '';
   const k = cfg2.get<string>('kimiApiKey') || '';
+  const gr = cfg2.get<string>('groqApiKey') || '';
+  const x = cfg2.get<string>('xaiApiKey') || '';
   const ghCfg = githubBackupService.getConfig();
   const ghConnected = await githubBackupService.isConnected();
   const vaultEnabled = context.globalState.get<boolean>('redivivus.vaultEnabled', true) !== false;
-  _panel.webview.html = getHubHtml(!!(g||o||a||k), g, o, a, k, ghConnected, ghCfg.username, ghCfg.repoName, false, 'none', 'none', true, vaultEnabled);
+  const { RoutingService } = await import('../services/ai/routingService.js');
+  const tmpR = new RoutingService();
+  const gActive = tmpR.isGuardianActive();
+  const wAI = tmpR.getAvailableAI().ai;
+  const gAI = gActive ? (tmpR.getGuardianFor(wAI) || 'none') : 'none';
+  const gCfg = cfg2.get<boolean>('guardianEnabled') !== false;
+  _panel.webview.html = getHubHtml(!!(g||o||a||k||gr||x), g, o, a, k, ghConnected, ghCfg.username, ghCfg.repoName, gActive, gAI, wAI, gCfg, vaultEnabled, gr, x);
 }
 
 async function showSetupHub(context: vscode.ExtensionContext, githubBackupService: GitHubBackupService): Promise<void> {
@@ -48,9 +56,11 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
   const openaiKey    = cfg.get<string>('openaiApiKey') || '';
   const anthropicKey = cfg.get<string>('anthropicApiKey') || '';
   const kimiKey      = cfg.get<string>('kimiApiKey') || '';
+  const groqKey      = cfg.get<string>('groqApiKey') || '';
+  const xaiKey       = cfg.get<string>('xaiApiKey') || '';
   const githubCfg    = githubBackupService.getConfig();
   const hasGitHub    = await githubBackupService.isConnected();
-  const hasAI        = !!(geminiKey || openaiKey || anthropicKey || kimiKey);
+  const hasAI        = !!(geminiKey || openaiKey || anthropicKey || kimiKey || groqKey || xaiKey);
 
   const { RoutingService } = await import('../services/ai/routingService.js');
   const tmpRouting = new RoutingService();
@@ -60,11 +70,11 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
   const guardianCfg = cfg.get<boolean>('guardianEnabled') !== false;
   const vaultEnabled = context.globalState.get<boolean>('redivivus.vaultEnabled', true) !== false;
 
-  _panel.webview.html = getHubHtml(hasAI, geminiKey, openaiKey, anthropicKey, kimiKey, hasGitHub, githubCfg.username, githubCfg.repoName, guardianActive, guardianAI, workerAI, guardianCfg, vaultEnabled);
+  _panel.webview.html = getHubHtml(hasAI, geminiKey, openaiKey, anthropicKey, kimiKey, hasGitHub, githubCfg.username, githubCfg.repoName, guardianActive, guardianAI, workerAI, guardianCfg, vaultEnabled, groqKey, xaiKey);
 
   _panel.webview.onDidReceiveMessage(async (msg) => {
     if (msg.type === 'open-api-setup') {
-      vscode.commands.executeCommand('redivivus.openSettings');
+      vscode.commands.executeCommand('redivivus.openSettings', msg.providerHint || undefined);
     } else if (msg.type === 'openExternal') {
       vscode.env.openExternal(vscode.Uri.parse(msg.url));
     } else if (msg.type === 'save-github') {

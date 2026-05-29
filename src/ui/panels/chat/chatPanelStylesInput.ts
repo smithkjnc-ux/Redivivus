@@ -58,8 +58,24 @@ export function buildChatCssInput(): string {
       font-size: 18px; cursor: pointer; padding: 0 4px; line-height: 1; transition: color 0.15s;
     }
     .gs-close:hover, .dp-close:hover { color: var(--c-text); }
-    .gs-content, .dp-content { padding: 16px; max-height: 350px; overflow-y: auto; font-size: 13px; line-height: 1.5; }
+    .gs-content, .dp-content { padding: 16px; max-height: 420px; overflow-y: auto; font-size: 13px; line-height: 1.5; }
     .gs-section { margin-bottom: 18px; }
+    .hc-green  { color: #4ade80 !important; font-weight: 600; }
+    .hc-yellow { color: #fbbf24 !important; font-weight: 600; }
+    .hc-red    { color: #f87171 !important; font-weight: 600; }
+    .hc-dim    { color: #64748b !important; }
+    .hc-muted  { color: #94a3b8 !important; }
+    .hc-card { margin-bottom:10px; border:1px solid #1e293b; border-radius:4px; padding:10px 14px; }
+    .hc-card-green  { border-left:4px solid #4ade80; }
+    .hc-card-yellow { border-left:4px solid #fbbf24; }
+    .hc-card-red    { border-left:4px solid #f87171; }
+    .hc-card-dim    { border-left:4px solid #64748b; }
+    .hc-card-title  { font-size:10px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px; }
+    .hc-tbl { width:100%; border-collapse:collapse; }
+    .hc-tbl td { font-size:12px; padding:5px 0; vertical-align:middle; }
+    .hc-tbl tr:not(:last-child) td { border-bottom:1px solid #1e293b; }
+    .hc-label-cell { color:#94a3b8; width:140px; white-space:nowrap; padding-right:16px !important; }
+    .hc-value-cell { text-align:right; }
     .gs-section h3 { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--c-text); }
     .gs-section p { font-size: 12px; line-height: 1.6; color: var(--c-text-dim); margin-bottom: 10px; }
     .gs-section ul, .gs-section ol { margin: 8px 0; padding-left: 18px; font-size: 12px; color: var(--c-text-dim); }

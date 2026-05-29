@@ -9,8 +9,8 @@ import { checkProviderReachable } from '../core/diagnostics/selfDiagnosticChecks
 
 export function registerApiSetupCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('redivivus.openSettings', async () => {
-      ApiSetupPanel.createOrShow(context);
+    vscode.commands.registerCommand('redivivus.openSettings', async (providerHint?: string) => {
+      ApiSetupPanel.createOrShow(context, providerHint);
     })
   );
   context.subscriptions.push(
@@ -114,13 +114,18 @@ class ApiSetupPanel {
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
   }
 
-  public static createOrShow(context: vscode.ExtensionContext): void {
-    if (ApiSetupPanel.currentPanel) { ApiSetupPanel.currentPanel._panel.reveal(vscode.ViewColumn.One); return; }
+  public static createOrShow(context: vscode.ExtensionContext, providerHint?: string): void {
+    if (ApiSetupPanel.currentPanel) {
+      ApiSetupPanel.currentPanel._panel.reveal(vscode.ViewColumn.One);
+      if (providerHint) { setTimeout(() => ApiSetupPanel.currentPanel?._panel.webview.postMessage({ type: 'highlight-provider', provider: providerHint }), 300); }
+      return;
+    }
     const panel = vscode.window.createWebviewPanel(
       'redivivusApiSetup', 'Redivivus API Setup', vscode.ViewColumn.One,
       { enableScripts: true, retainContextWhenHidden: true }
     );
     ApiSetupPanel.currentPanel = new ApiSetupPanel(panel, context);
+    if (providerHint) { setTimeout(() => panel.webview.postMessage({ type: 'highlight-provider', provider: providerHint }), 600); }
   }
 
   public dispose(): void {

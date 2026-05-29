@@ -60,8 +60,8 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
     }
     // [Redivivus] Mode indicator pill — clickable to switch modes mid-session
     if (header.buildMode) {
-      const modeLabel = header.buildMode === 'plan' ? '📋 Plan' : '⚡ Direct';
-      const modeTooltip = header.buildMode === 'plan' ? 'Plan Mode: full blueprint interview before building. Click to switch.' : 'Direct Build: skip interview, execute immediately. Click to switch.';
+      const modeLabel = header.buildMode === 'plan' ? 'Guided' : 'Auto';
+      const modeTooltip = header.buildMode === 'plan' ? 'Guided Mode: full interview before building. Click to switch to Auto.' : 'Auto Mode: AI builds immediately, no questions. Click to switch to Guided.';
       badges.push(`<span class="badge mode mode-${header.buildMode}" data-action="switch-mode" title="${modeTooltip}">${modeLabel}</span>`);
     }
     if (header.assistMode || header.workspaceIsAssistMode) { badges.push(`<span class="badge mode" style="background:#1e3a5f;color:#60a5fa;border-color:#2563eb;" title="Assist Mode: Redivivus runs silently. No code annotations or roadmap. Click to upgrade." data-action="retrofit-project">&#x26A1; Assist Mode</span>`); }
@@ -90,8 +90,9 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       ` : ''}
       ${header && header.projectTokens ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
       <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
+      <button class="header-btn" data-cmd="redivivus.showSystemHealth" title="Network, AI keys, account status, and build log stats">&#x25CE; Health</button>
       <button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.showChatGettingStarted' : 'redivivus.showCapabilities'}" title="${header && header.hasProjectOpen ? 'How to use Redivivus with your project' : 'What is Redivivus?'}">? Help</button>
-      <button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">🐛 Report</button>
+      <button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">&#x1F41B; Report</button>
     </div>
   </div>
   ${headerHtml}

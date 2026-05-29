@@ -68,8 +68,8 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
       </div>
     </div>
     <div class="launcher-actions">
-      <button class="launcher-action-card" data-action="start-new-project" data-mode="plan" title="Start a new project with a blueprint interview -- Redivivus learns what you are building before writing code"><span class="lac-icon">&#x1F680;</span><span class="lac-label">New Project</span><span class="lac-desc">Blueprint first</span></button>
-      <button class="launcher-action-card" data-action="start-new-project" data-mode="direct" title="Skip the interview and start building immediately -- describe what you want and Redivivus writes the code"><span class="lac-icon">&#x26A1;</span><span class="lac-label">Quick Build</span><span class="lac-desc">Build immediately</span></button>
+      <button class="launcher-action-card" data-action="start-new-project" data-mode="plan" title="Guided Mode: full 5 W's interview before building -- Redivivus learns exactly what you need and saves it to a blueprint"><span class="lac-icon">&#x1F3AF;</span><span class="lac-label">Guided</span><span class="lac-desc">Interview first</span></button>
+      <button class="launcher-action-card" data-action="start-new-project" data-mode="direct" title="Auto Mode: describe what you want and Redivivus builds immediately -- no questions, AI decides everything"><span class="lac-icon">&#x26A1;</span><span class="lac-label">Auto</span><span class="lac-desc">Build immediately</span></button>
       <button class="launcher-action-card" data-action="open-existing-project" title="Open an existing folder from your filesystem"><span class="lac-icon">&#x1F4C2;</span><span class="lac-label">Open Project</span><span class="lac-desc">Resume existing</span></button>
     </div>
     <div class="launcher-grid">

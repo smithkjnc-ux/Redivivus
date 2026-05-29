@@ -5,7 +5,232 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11DB: FIX pipeline HTML guard — Worker prompt + apply-step bypass, stops 3-retry token waste)*
+*Last updated: May 29, 2026 (Session 11DK: Health panel — build API check, Cloudflare detection, cloud/local fallback indicator)*
+
+---
+
+## May 29, 2026 — Session 11DK (Feature: Health panel — build API probe, Cloudflare detection, fallback indicator)
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `chatPanelHealthCheck.ts` | Added `checkBuildApi()` — OPTIONS request to `/build` endpoint, reads `cf-ray`/`server` headers to detect Cloudflare. Shows status code, reachable yes/no, and explicit "Cloudflare — origin server down" label. | `/announcements` ping doesn't tell you if `/build` is down. This is the exact endpoint that fails during cloud outages, causing silent local fallback. | Low — OPTIONS is read-only; 8s timeout; try/catch. |
+| `chatPanelHealthCheck.ts` | Network card now shows "Build endpoint" row in red when `/build` returns 5xx, with Cloudflare flag when detected. Network card itself turns red when build endpoint is down. | User had no way to know cloud builds were failing — health panel showed green even during outages. | None. |
+| `chatPanelHealthCheck.ts` | Build Log "Cloud / Local" row now turns red and shows "(all local fallback)" when cloud count is 0 and local count > 0. | Makes it obvious when every build this session used local fallback instead of cloud. | None. |
+
+---
+
+## May 29, 2026 — Session 11DJ (Fix: AI game opponent, primary file shown, workspace auto-added after build)
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `checkers-ai-game/index.html` | `makeAIMove()`: replaced `this.selectedPiece = {...}` with `this.selectPiece(fromRow, fromCol)` | `movePiece()` relies on `this.validMoves` being populated. Setting `selectedPiece` directly skipped that — AI got no valid moves, never moved. | None — direct fix to generated file. |
+| `cloudBuildResultProcessor.ts` | After write loop, opens only the primary file (prefer .html > code > first written, skip .md/.json docs). Added `updateWorkspaceFolders` to add project folder to Explorer without reloading. | Was calling `openBuiltFile` on every file; last one (CLAUDE.md) always won. Explorer showed "NO FOLDER OPENED" after new project builds. | Low — `updateWorkspaceFolders` is non-destructive; no window reload. |
+| `cloudBuildLocalFallback.ts` | Added two AI-opponent rules to SYSTEM prompt: AI must use same move path as human; mentally test AI turn fires after human move. | Generated checkers game had AI that bypassed move validation, causing silent no-op turns. | None — prompt-only change. |
+
+---
+
+## May 29, 2026 — Session 11DI (Fix: health panel colors, local token counts, provider balance checks)
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/ui/panels/chat/chatPanelStylesInput.ts` | Added `.hc-*` CSS classes (green/yellow/red/dim/muted, card, table). Raised dp-content max-height 350→420px. | Inline `color` styles are ignored in this WebView context — nonce-approved classes in the stylesheet are the only reliable way to apply colors. | None. |
+| `src/ui/panels/chat/chatPanelHealthCheck.ts` | Full rewrite of `buildHealthHtml` to use `.hc-*` class names instead of inline color styles. Added `balances: ProviderBalance[]` to `HealthData`. `collectHealthData` now calls `checkProviderBalances` in parallel with the API ping and account check. | Color fix. Balance data added. | None — balance check is best-effort, all failures surface as 'unavailable'. |
+| `src/ui/panels/chat/chatPanelProviderBalance.ts` | New file. `checkProviderBalances(keys)` — Anthropic two-step (orgs → balances endpoint), OpenAI dashboard billing endpoint. Gemini/Groq/xAI/Kimi marked unavailable with reason. 6s timeout per check. | Balance data needs its own file to keep healthCheck under 200 lines. | Low — every check is try/catch; 'unavailable' is always the fallback. |
+| `src/services/build/cloudBuildLocalFallback.ts` | `inputTokens: response.inputTokens ?? 0`, `outputTokens: response.outputTokens ?? 0` — was hardcoded `0`. | All providers already extract token counts from their API responses and return them in `AIResponse`. They were being silently dropped. | None. |
+
+---
+
+## May 29, 2026 — Session 11DH cont. (Fix: Health panel layout and color coding)
+
+**What changed:** Redesigned the health panel HTML from a plain table to card-per-section layout with colored left borders (green/yellow/red) and color-coded values throughout. Also fixed a double `collectKeys()` call in `collectHealthData`.
+
+**Color rules:**
+- Green: API reachable + fast (<300ms), signed in, key configured, 0 failed builds
+- Yellow: API slow (300-800ms), only 1 key configured, <30% build fail rate
+- Red: API unreachable or very slow (>800ms), not signed in, no keys, >30% fail rate
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/ui/panels/chat/chatPanelHealthCheck.ts` | Full rewrite of `buildHealthHtml`. Cards with `border-left:3px solid [color]` for instant section health. Flexbox rows (label left, value right) replace table rows. `&#x25CF;`/`&#x25CB;` circle indicators replace `[OK]`/`[--]` text. Fixed double `collectKeys()` call in `collectHealthData`. | Table layout had no visual hierarchy — all rows looked the same. Left border color = section health at a glance without reading values. | None. |
+
+---
+
+## May 29, 2026 — Session 11DH (Feature: System Health panel)
+
+**What changed:** Added a "Status" button to the chat panel header. Clicking it runs a live health check and displays a panel showing: API reachability and latency, account sign-in state, which local AI keys are configured, and build log stats for the current project (total/success/fail/cloud/local/tokens/last build date).
+
+**Why:** No way to diagnose remote problems without this. When a user's build fails and they're not local, you can share the panel snapshot to immediately rule out network issues, missing keys, or auth problems — before spending time on code.
+
+**Data flow:** Button (`data-cmd="redivivus.showSystemHealth"`) → webview script → `run-command` message → `handleRunCommand` special-case → `collectHealthData()` pings API + reads keys + reads build log → `buildHealthHtml()` renders HTML → `show-panel` message → existing `showContentPanel()` in webview displays it.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/ui/panels/chat/chatPanelHealthCheck.ts` | New file. `collectHealthData()`: pings `/announcements` endpoint (existing, unauthenticated) with 8s timeout to measure latency; reads `collectKeys()` for key presence; reads `.redivivus/build_log.jsonl` for stats. `buildHealthHtml()`: renders table-based panel with color-coded OK/-- indicators. | Keeps health logic out of the run-command handler. | Low — all reads are non-blocking; ping uses AbortSignal.timeout. |
+| `src/core/project/chatPanelMsgRunCommand.ts` | Added `redivivus.showSystemHealth` special case before the generic `executeCommand` fallthrough. Posts `set-status` working/ready around the async health check, then posts `show-panel`. | Avoids registering a VS Code command — no changes to extension.ts (251 lines, over limit). Uses existing `run-command` + `show-panel` plumbing already wired. | None. |
+| `src/ui/panels/chat/chatPanelHtml.ts` | Added `&#x25CE; Status` button (`data-cmd="redivivus.showSystemHealth"`) between Clear and Help buttons. Also replaced emoji literal in Report button with `&#x1F41B;` HTML entity (Rule 13 hygiene). | Central location for the button — visible in all panel states. Entity encoding avoids potential CSP issues. | None. |
+
+---
+
+## May 29, 2026 — Session 11DG cont. (Feature: Failure logging in build audit log)
+
+**What changed:** Failed builds now also write a JSONL entry to `.redivivus/build_log.jsonl`. Previously only successful builds were logged — failures left no trace, making it impossible to debug bad builds or spot error patterns.
+
+**Approach:** Added `failureSource?: 'cloud' | 'local-fallback'` to `CloudBuildResult` so each failure carries its origin. Tagged all non-auth failure returns in `cloudBuildClient.ts` and `cloudBuildLocalFallback.ts`. Single log call in `chatPanelBuildRunner.ts` catches all of them (auth failures — NOT_AUTHENTICATED — are excluded since they're not build errors).
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/build/buildLogger.ts` | Added `error?: string` to `BuildLogEntry`. | Failure and success entries share one type; `error` is absent on success, present on failure. | None. |
+| `src/services/build/cloudBuildClient.ts` | Added `failureSource?` to `CloudBuildResult` interface. Tagged all 4 non-auth failure returns with `failureSource: 'cloud'`. | Without source tag, the runner can't tell cloud from local failures. | None — additive field. |
+| `src/services/build/cloudBuildLocalFallback.ts` | Tagged both failure returns with `failureSource: 'local-fallback'`. | Distinguishes "cloud was down and local also failed" from pure cloud failures. | None. |
+| `src/core/build/chatPanelBuildRunner.ts` | Imported `appendBuildLog`. Added failure log call after the NOT_AUTHENTICATED skip — logs task, project, source, and error message. | Single interception point for all non-auth build failures. | None — try/catch in appendBuildLog means log failure never blocks the error display. |
+
+---
+
+## May 29, 2026 — Session 11DG (Feature: Per-project build audit log)
+
+**What changed:** Every successful build now appends one JSONL entry to `.redivivus/build_log.jsonl` in the project directory. Captures: timestamp, task, project name, cloud vs local, which AI provider, which model, vault items included in the prompt, files written (path, new vs modified, size in bytes), and token counts.
+
+**Why:** No visibility into how projects were built. Impossible to debug bad output, tune vault relevance, or compare cloud vs local quality without a machine-readable record.
+
+**Log location:** `<project-root>/.redivivus/build_log.jsonl` — one JSON object per line, appendable, grep-friendly.
+
+**Example entry:**
+```json
+{"timestamp":"2026-05-29T18:07:00.000Z","task":"Build a chess game","project":"my-chess","source":"cloud","model":"Claude Opus 4","vaultItemsUsed":["chess-board-render"],"files":[{"path":"index.html","isNew":true,"sizeBytes":14230}],"inputTokens":2100,"outputTokens":6800,"totalTokens":8900}
+```
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/build/buildLogger.ts` | New file. `BuildLogEntry` type, `BuildMeta` type, `appendBuildLog(root, entry)` function. Appends JSONL to `.redivivus/build_log.jsonl`, wrapped in try/catch. | Single responsibility file for logging — keeps the result processor clean. | None — try/catch means a log failure never blocks a build. |
+| `src/services/build/cloudBuildResultProcessor.ts` | Added `meta: BuildMeta` optional 5th param (defaults to `{ source: 'cloud' }`). After file writes, calls `appendBuildLog` with full entry. File sizes captured via `fs.statSync` after write. | This is the single exit point for all successful builds — the right place to log. | None — logging runs after files are written; failure is swallowed. |
+| `src/services/build/cloudBuildClient.ts` | Both `processBuildResults` calls now pass `{ source: 'cloud', vaultItemNames: context.vaultItems?.map(v => v.name) }`. | Without this, `meta` would always be the default — no vault or source info in cloud logs. | None — additive only. |
+| `src/services/build/cloudBuildLocalFallback.ts` | `processBuildResults` call now passes `{ source: 'local-fallback', provider, vaultItemNames: context.vaultItems?.map(v => v.name) }`. | Local fallback knows the winning provider — critical data for comparing provider quality. | None — additive only. |
+
+---
+
+## May 29, 2026 — Session 11DF (Fix: Build UX — auto-reload, game quality, result card)
+
+**Problem (3 issues reported):**
+1. Games built by local fallback are not functional (visual board renders, pieces don't move)
+2. After every new-project build, the window reloaded immediately — conversation cleared before user could read the result card
+3. No way to tell which AI did what or what it cost
+
+**Root causes:**
+1. Local fallback SYSTEM prompt didn't specify "fully playable" — AI generated layout HTML without event handlers or game state
+2. `chatPanelBuildRunner.ts` called `vscode.openFolder` immediately after `deps.refresh()`, before the webview rendered the result card. The `__OPEN_WORKSPACE__` button was already in the result card — the forced reload was redundant and harmful.
+3. Local fallback narration was a single line: "Built locally using claude (cloud unavailable)"
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelBuildRunner.ts` | Removed auto-reload block (`vscode.openFolder` for `autoCreated` projects). Result card already contains `__OPEN_WORKSPACE__` button the user clicks. | Auto-reload fired before webview rendered, clearing conversation. User never saw the result. | Low — user now explicitly clicks "Open Project" button. One extra click vs. silent data loss. |
+| `src/services/build/cloudBuildLocalFallback.ts` | SYSTEM prompt: added explicit "GAMES must be fully playable" rule with specifics (click handlers, game state, valid moves, captures, win conditions). Single-file self-contained preferred. | AI defaulted to visual-only HTML without wiring event handlers. Checkers board looked right but pieces didn't move. | None — better prompt, same structure. |
+| `src/services/build/cloudBuildLocalFallback.ts` | Narration now multi-line: "Builder: Claude (local key) · Cloud: unavailable · Cost: $0.00". Provider mapped to friendly label (claude → Claude, openai → GPT-4o, etc.). | User couldn't tell what AI was used or what it cost. Result card "Who Did What" was a single opaque sentence. | None. |
+
+## May 29, 2026 — Session 11DF continued (Fix: build code window + status update)
+
+**Problem:** After a build, no editor window opened to show the written code. User's complaint: "still no 2nd window showing code being written."
+
+**Root causes:**
+1. `openBuiltFile` used `ViewColumn.Beside` — relative to current focus, so with only the chat panel open it opened in an unpredictable column. `preserveFocus: true` meant the window opened silently without drawing attention.
+2. `cloudBuildLocalFallback.ts` had `providerLabel` declared twice (`const` inside the `for` block at line 128, and also at line 109 above the loop) — TypeScript error `TS2448: Block-scoped variable used before declaration`.
+3. `postToWebview({ type: 'update-building-message', ... })` was sent to the webview but no handler existed — update was silently dropped.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelBuildWriter.ts` | `openBuiltFile`: changed `ViewColumn.Beside` → `ViewColumn.Two`, `preserveFocus: true` → `preserveFocus: false`. Added `revealInExplorer` call. | `Beside` is relative to focused pane — with only chat open, it opened in wrong column. `preserveFocus: true` meant the code window opened silently; user had no way to know it existed. | Low — `ViewColumn.Two` always opens right-side split. `preserveFocus: false` shifts focus to the code; user can click back to chat. |
+| `src/services/build/cloudBuildLocalFallback.ts` | Removed duplicate inner `providerLabel` declaration (line 128 shadowed outer line 109). Also added `postToWebview({ type: 'update-building-message', ... })` before each provider attempt to update the "Building..." bubble. | Duplicate `const` in block scope caused `TS2448` compile error. Status update lets user see which provider is being tried during cloud unavailability. | None — outer map already defined; handler added to listener. |
+| `src/ui/panels/chat/chatPanelScriptListener.ts` | Added `update-building-message` handler: finds last `.msg-assistant` in `conv`, updates `textContent`. | Without a handler the `postToWebview` call was a no-op — message silently dropped. | None — only runs when a build is in progress (last assistant message is the "Building..." bubble). |
+
+---
+
+## May 29, 2026 — Session 11DE (Feature: Auto vs Guided build modes)
+
+**What changed:** Renamed the existing `'direct'`/`'plan'` build modes to "Auto" and "Guided" across all UI surfaces. Added a `redivivus.buildMode` VS Code setting so users can set their preferred mode once and have it apply every session. Improved the Guided interview questions to be more detailed and descriptive; added a visual style question as a follow-up.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `package.json` | Added `redivivus.buildMode` setting with `"" | "auto" | "guided"` enum. | Persist mode across sessions so users don't see the popover every time. | None — blank default preserves old behavior. |
+| `src/core/routing/chatPanelMessageRouter.ts` | Pre-loads `redivivus.buildMode` setting on first message: `'auto'` → `'direct'`, `'guided'` → `'plan'`. | Without this, saved mode had no effect — state was always undefined at session start. | Low — only runs when `state.buildMode` is undefined. |
+| `src/ui/panels/chat/chatPanelHtml.ts` | Mode badge: "📋 Plan"/"⚡ Direct" → "Guided"/"Auto". Tooltip text updated. | Clearer user-facing labels matching the spec. | None. |
+| `src/ui/panels/chat/chatPanelScript.ts` | Mode picker popover: "📋 Plan It Out"/"⚡ Just Build" → two-line buttons "Guided / 5 W's interview first" and "Auto / AI decides, builds now". Title updated. | Clearer, more descriptive buttons so users know what they're choosing. | None. |
+| `src/ui/panels/chat/chatPanelEmptyState.ts` | Launcher cards: "New Project / Blueprint first" → "Guided / Interview first" (🎯), "Quick Build" → "Auto / Build immediately" (⚡). | Consistent terminology across all entry points. | None. |
+| `src/ui/panels/chat/chatPanelPlanInterview.ts` | All 5 W questions rewritten to be more detailed and descriptive. `when` question now asks "What does done look like?" instead of just asking for a deadline. Welcome message updated to say "Guided Mode". | Interview was terse — new questions elicit richer answers that produce better builds. | None — same 5-step flow. |
+| `src/ui/panels/chat/chatPanelPlanInterviewHelpers.ts` | `generateFollowups`: added style follow-up question ("How should it look and feel?") for all projects unless style was already mentioned. `buildTaskFromAnswers`: style answers now formatted as a dedicated "Visual style:" directive; `when` answer labeled "Done when:" instead of "Timeline:". | Style question was missing — it meaningfully changes build output. Labeling "done when" correctly signals it's an acceptance criterion, not a deadline. | None. |
+
+---
+
+## May 29, 2026 — Session 11DD (Fix: Cloud build local fallback + cloudBuildClient.ts split)
+
+**Problem:** Cloud `/build` endpoint returns 500 (server-side crash, empty body — framework-level failure). User gets "Build failed: Internal Server Error" every time. Can't fix the server from client side. Previous session's diagnostic fixes confirmed the 500 is a server crash before any error handler runs.
+
+**Solution:** When cloud returns 5xx, automatically fall back to a local build using the user's own AI keys (Claude, Gemini, OpenAI, Groq, etc.). No backend required — generates files directly and writes them to disk through the same `processBuildResults` path.
+
+**Also:** `cloudBuildClient.ts` was 291 lines — split required before adding the fallback.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/build/cloudBuildClient.ts` | Reduced from 291 → 170 lines. On `instructionRes.status >= 500`, now calls `runLocalBuild()` instead of returning an error. Imports `processBuildResults` and `runLocalBuild` from split files. | 5xx = server crash, not client error — local fallback means builds still work. File size was over 200-line limit. | Low — local fallback uses same `processBuildResults` path; 4xx errors still surface normally. |
+| `src/services/build/cloudBuildResultProcessor.ts` | **NEW FILE** — extracted `processBuildResults()` from `cloudBuildClient.ts`. Handles writing built files to disk, recording build history, signalling completion. | 200-line split. Single responsibility: process and write build results. | None — identical logic, new location. |
+| `src/services/build/cloudBuildLocalFallback.ts` | **NEW FILE** — `runLocalBuild()`: builds prompt from context, tries providers in order (claude → gemini → openai → groq → xai → kimi), parses XML file blocks, calls `processBuildResults`. | Cloud is broken; users have their own AI keys. Local build means "make me a checkers game" works even when cloud is down. | Low — if all providers fail, returns clear error message. XML parsing identical to FIX pipeline parser. |
+
+---
+
+## May 29, 2026 — Session 11DC (Fix: Cloud build Internal Server Error — three root causes)
+
+**Bug:** "make me a checkers game" → "Build Setup" clarify modal → user selects "Build it now — AI decides everything" → "Build failed: Internal Server Error".
+
+**Root cause (multi-part):**
+
+1. **`build_approach` in design preferences**: When user selects "Build it now — AI decides everything" (Q1 of clarify), the `answers` object `{ build_approach: 'Build it now...' }` passed through `formatAnswersForPrompt` and got added to the task as a design preference: `"USER DESIGN PREFERENCES:\n- build_approach: Build it now..."`. This sent a nonsensical design instruction to the cloud AI, which may trigger a server-side crash.
+
+2. **`handleLegacyBuild` body-already-consumed bug**: `instructionRes.json()` is called at line 67 to parse routing instructions, consuming the response body. The legacy fallback path then tried to call `.json()` again on the same consumed response → would throw `TypeError: body used already`.
+
+3. **Irrelevant vault items in context**: `buildContextCollector` sent up to 20 vault items regardless of relevance score — if the user had vault items from other projects, these were all included, inflating the request payload unnecessarily.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMsgSendClarify.ts` | Added early return when `answers.build_approach` contains "now" — shows "⚡ Building now..." and returns original `userText` immediately, no design preferences appended. | "Build it now" is a meta-decision, not a design preference. Including it in the task sent nonsensical instructions to the cloud AI. | None — correct semantic behavior. |
+| `src/services/build/cloudBuildClient.ts` | (1) `handleLegacyBuild` signature changed from `(res: Response)` to `(data: any)` — accepts pre-parsed JSON, eliminates double-parse crash. (2) Pre-serialized `requestBody` for reuse in both the fetch and the error log. (3) Improved error log fields. | Prevent latent crash on legacy API path; avoid re-serializing the same body twice. | None — legacy path behavior unchanged. |
+| `src/services/build/buildContextCollector.ts` | Vault items now filtered to `score > 0` only (keyword match required), capped at 10 items. Items with no keyword overlap are excluded. For brand-new projects (no build history), `projectRules` is suppressed — it contains only generic Redivivus scaffolding protocol, not project-specific coding rules. | Prevents sending irrelevant large vault items that inflate payload; avoids confusing the server AI with Redivivus meta-rules when building from scratch. | None — unmatched items and scaffold rules weren't useful anyway. |
+| `src/services/build/cloudBuildClient.ts` (additional) | Removed hardcoded `tier: 'pro'` from request body. Added `.text()` fallback in error handler to capture non-JSON server responses (stack traces, HTML errors). `tier: 'pro'` was hardcoded but server determines tier from account token — sending it could cause 500 if server validates tier against account permissions. | Surface actual server error body in logs; remove a field that may cause unhandled server-side exceptions. | None. |
+
+---
+
+## May 29, 2026 — Session 11DC-B (Fix: "close project" text went to Groq Q&A instead of closing workspace)
+
+**Bug:** User typed "close project" → Groq responded with a session summary; workspace did NOT close. The phrase was not in the keyword shortcuts intercept list, so it fell through to the cloud classifier which returned 'question'.
+
+**Root cause:** `chatPanelMsgSendKeywords.ts` had no handler for "close project" variants. The cloud classifier treats "close project" as a question/chat (it's ambiguous text).
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMsgSendKeywords.ts` | Added regex handler for "close project", "exit project", "leave workspace", "close folder" — fires BEFORE AI classifier. Calls `updateWorkspaceFolders(0, folders.length)` to remove all folders, falls back to `workbench.action.closeFolder`. | "Close project" is an unambiguous UI action — should never go to AI. Pre-classifier intercept guarantees it executes. | Low — regex intercepts exact patterns; won't match build requests. |
 
 ---
 

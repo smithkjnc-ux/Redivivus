@@ -17,7 +17,14 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
   debugLog(_root, 'run-command', `received: ${command}`);
   if (!command) { return; }
   try {
-    if (command === 'redivivus.buildFromVault') {
+    if (command === 'redivivus.showSystemHealth') {
+      const { collectHealthData, buildHealthHtml } = await import('../../ui/panels/chat/chatPanelHealthCheck.js');
+      panel.webview.postMessage({ type: 'set-status', status: 'working' });
+      const data = await collectHealthData();
+      panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+      panel.webview.postMessage({ type: 'show-panel', title: 'System Health', content: buildHealthHtml(data) });
+      return;
+    } else if (command === 'redivivus.buildFromVault') {
       await vscode.commands.executeCommand(command, deps.buildFromVaultPrefill());
     } else if (command === 'redivivus.openVault' && msg.vaultItem) {
       await vscode.commands.executeCommand(command, msg.vaultItem);

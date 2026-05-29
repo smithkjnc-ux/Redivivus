@@ -80,6 +80,16 @@ export async function runChatClarifyStep(
     return { routedText: '', cancelled: true };
   }
 
+  // [FIX] "Build it now — AI decides everything" on Q1 means no design preferences — just build.
+  // Including build_approach in the design preferences block sends nonsensical instructions to the
+  // cloud AI (it would try to implement "build_approach: Build it now" as a feature).
+  const wantsBuildNow = answers['build_approach']?.toLowerCase().includes('now');
+  if (wantsBuildNow) {
+    conversation[conversation.length - 1].content = '⚡ Building now...';
+    refresh();
+    return { routedText: userText, cancelled: false };
+  }
+
   const answersBlock = formatAnswersForPrompt(answers);
   if (answersBlock) {
     const summary = Object.entries(answers).map(([q, a]) => `  • ${q}: **${a}**`).join('\n');

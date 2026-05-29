@@ -10,6 +10,7 @@ import { isValidBuildRoot } from './chatPanelBuildUtils';
 import { autoCreateProject } from './chatPanelBuildAutoCreate';
 import { callCloudBuild } from '../../services/build/cloudBuildClient.js';
 import { getAccountToken } from '../../services/api/apiClient.js';
+import { appendBuildLog } from '../../services/build/buildLogger.js';
 
 function isProjectsContainer(root: string): boolean {
   const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
@@ -71,6 +72,17 @@ export async function runBuildAfterGates(
         vscode.commands.executeCommand('redivivus.signIn');
         return;
       }
+      appendBuildLog(root, {
+        timestamp: new Date().toISOString(),
+        task,
+        project: path.basename(root),
+        source: result.failureSource ?? 'cloud',
+        files: [],
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        error: result.error,
+      });
       deps.conversation.splice(-1, 1);
       deps.conversation.push({
         role: 'assistant',
@@ -104,13 +116,9 @@ export async function runBuildAfterGates(
       timestamp: Date.now(),
     });
     deps.refresh();
-
-    // [FIX] Auto-open workspace for newly created projects — no prior chat to duplicate
-    if (autoCreated && root) {
-      const _ctx = require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext;
-      if (_ctx) { _ctx.globalState.update('redivivus.skipConversationRestore', true); }
-      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
-    }
+    // [FIX] Removed auto-reload for new projects — the result card already contains an
+    // __OPEN_WORKSPACE__ button the user clicks. Auto-reload fired before the card rendered,
+    // clearing the conversation before the user could read what was built.
 
     if (isFixRequest) {
       vscode.commands.executeCommand('redivivus.resolveFix', task, files.map(f => path.join(root!, f.path)));

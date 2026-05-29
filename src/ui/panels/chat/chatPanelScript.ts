@@ -54,13 +54,15 @@ export function buildChatScript(): string {
     function showModePopover(pendingText) {
       const existing = document.getElementById('mode-popover'); if (existing) existing.remove();
       const wrap = document.createElement('div'); wrap.id = 'mode-popover'; wrap.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--vscode-editor-background);color:var(--vscode-foreground);border:1px solid var(--vscode-focusBorder);border-radius:8px;padding:16px 20px;box-shadow:0 8px 32px rgba(0,0,0,0.35);z-index:9999;font-family:sans-serif;min-width:280px;text-align:center;';
-      const title = document.createElement('div'); title.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:12px;'; title.textContent = 'Choose your build approach'; wrap.appendChild(title);
-      const sub = document.createElement('div'); sub.style.cssText = 'font-size:12px;color:var(--vscode-descriptionForeground);margin-bottom:16px;'; sub.textContent = 'Redivivus needs to know how you want to work.'; wrap.appendChild(sub);
+      const title = document.createElement('div'); title.style.cssText = 'font-size:14px;font-weight:600;margin-bottom:6px;'; title.textContent = 'How do you want to work?'; wrap.appendChild(title);
+      const sub = document.createElement('div'); sub.style.cssText = 'font-size:12px;color:var(--vscode-descriptionForeground);margin-bottom:16px;'; sub.textContent = 'You can change this anytime from the mode badge in the header.'; wrap.appendChild(sub);
       const btns = document.createElement('div'); btns.style.cssText = 'display:flex;gap:10px;justify-content:center;';
-      const planBtn = document.createElement('button'); planBtn.textContent = '📋 Plan It Out'; planBtn.style.cssText = 'padding:8px 16px;border:1px solid var(--vscode-input-border);border-radius:6px;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);cursor:pointer;font-size:13px;font-weight:600;';
+      const planBtn = document.createElement('button'); planBtn.style.cssText = 'padding:10px 18px;border:1px solid var(--vscode-input-border);border-radius:6px;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);cursor:pointer;font-size:13px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:130px;';
+      planBtn.innerHTML = '<span>Guided</span><span style="font-size:10px;font-weight:400;opacity:0.8;">5 W\\'s interview first</span>';
       planBtn.addEventListener('click', () => { wrap.remove(); window._buildMode = 'plan'; vscode.postMessage({ type: 'set-mode', mode: 'plan' }); if (_pendingSendText) { vscode.postMessage({ type: 'send-message', text: _pendingSendText, mode: 'plan' }); _pendingSendText = null; input.value = ''; input.style.height = 'auto'; } });
       btns.appendChild(planBtn);
-      const directBtn = document.createElement('button'); directBtn.textContent = '⚡ Just Build'; directBtn.style.cssText = 'padding:8px 16px;border:none;border-radius:6px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer;font-size:13px;font-weight:600;';
+      const directBtn = document.createElement('button'); directBtn.style.cssText = 'padding:10px 18px;border:none;border-radius:6px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);cursor:pointer;font-size:13px;font-weight:600;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:130px;';
+      directBtn.innerHTML = '<span>Auto</span><span style="font-size:10px;font-weight:400;opacity:0.8;">AI decides, builds now</span>';
       directBtn.addEventListener('click', () => { wrap.remove(); window._buildMode = 'direct'; vscode.postMessage({ type: 'set-mode', mode: 'direct' }); if (_pendingSendText) { vscode.postMessage({ type: 'send-message', text: _pendingSendText, mode: 'direct' }); _pendingSendText = null; input.value = ''; input.style.height = 'auto'; } });
       btns.appendChild(directBtn);
       wrap.appendChild(btns);
@@ -156,14 +158,21 @@ export function buildChatScript(): string {
     var _phraseInterval = null;
     var _phrases = ['torquing bolts...','checking clearances...','aligning tolerances...','reading the blueprint...','pressure testing...','calibrating sensors...','welding joints...','inspecting welds...','routing wiring...','load testing frame...'];
     function startPhraseTicker() {
-      stopPhraseTicker(); 
-      const statusEl = document.getElementById('redivivus-status'); 
+      stopPhraseTicker();
+      const statusEl = document.getElementById('redivivus-status');
       const previewEl = document.getElementById('preview-chat-last');
-      if (!statusEl && !previewEl) return;
+      const conv = document.getElementById('conversation');
       _phraseInterval = setInterval(() => {
         const phrase = _phrases[Math.floor(Math.random()*_phrases.length)];
         if (statusEl) statusEl.textContent = ' ' + phrase;
-        if (previewEl) previewEl.textContent = '⏳ ' + phrase;
+        if (previewEl) previewEl.textContent = phrase;
+        // Update the live Building... bubble in the chat so user sees progress
+        if (conv) {
+          const buildBubble = conv.querySelector('.msg-assistant:last-child');
+          if (buildBubble && buildBubble.textContent && buildBubble.textContent.indexOf('Building') !== -1) {
+            buildBubble.textContent = '⚙️ ' + phrase;
+          }
+        }
       }, 2800);
     }
     function stopPhraseTicker() { if(_phraseInterval){ clearInterval(_phraseInterval); _phraseInterval=null; } }

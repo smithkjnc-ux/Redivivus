@@ -81,6 +81,18 @@ export async function handleKeywordShortcuts(
     return true;
   }
 
+  if (/^(close|exit|leave)\s+(this\s+)?(project|folder|workspace)|^close\s*project\s*$/i.test(lowerText.trim())) {
+    const folders = vscode.workspace.workspaceFolders;
+    conversation.push({ role: 'assistant', content: 'Closing project...', timestamp: Date.now() });
+    refresh();
+    if (folders && folders.length > 0) {
+      await vscode.workspace.updateWorkspaceFolders(0, folders.length);
+    } else {
+      await vscode.commands.executeCommand('workbench.action.closeFolder');
+    }
+    return true;
+  }
+
   if (/explain.*files?|what.*files?|what.*folder|why.*extra.*code|what.*all.*this/i.test(lowerText)) {
     const _exRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (_exRoot) {

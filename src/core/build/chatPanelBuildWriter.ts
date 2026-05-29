@@ -54,10 +54,19 @@ export function createSnapshot(root: string, task: string, relPath: string): str
 
 export async function openBuiltFile(absPath: string): Promise<void> {
   try {
-    const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath));
-    await vscode.window.showTextDocument(doc, { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true });
-    await vscode.commands.executeCommand('revealInExplorer', vscode.Uri.file(absPath));
-  } catch {}
+    const uri = vscode.Uri.file(absPath);
+    const doc = await vscode.workspace.openTextDocument(uri);
+    // ViewColumn.Two always opens a right-side split. Beside is relative to current focus
+    // and lands in the wrong column when only the chat panel is open.
+    await vscode.window.showTextDocument(doc, {
+      preview: false,
+      viewColumn: vscode.ViewColumn.Two,
+      preserveFocus: false, // shift focus so the code is actually visible
+    });
+    await vscode.commands.executeCommand('revealInExplorer', uri);
+  } catch (err) {
+    console.error('[Redivivus] openBuiltFile failed:', err);
+  }
 }
 
 // Creates package.json and tsconfig.json for TypeScript Node.js projects if they don't exist.

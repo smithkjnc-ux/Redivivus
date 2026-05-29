@@ -6,3 +6,6 @@ node_modules
 
 # Redivivus session data (blueprints and logs are tracked)
 .redivivus/sessions/
+
+# Cloudflare local dev state
+.wrangler/

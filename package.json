@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.3.20",
+  "version": "0.3.22",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -593,6 +593,21 @@
           },
           "default": [],
           "description": "List of AI provider IDs that are manually disabled by the user."
+        },
+        "redivivus.buildMode": {
+          "type": "string",
+          "default": "",
+          "enum": [
+            "",
+            "auto",
+            "guided"
+          ],
+          "enumDescriptions": [
+            "Ask every time — a mode picker appears on first build in each session",
+            "Auto: AI builds immediately with no questions. Blueprint, snapshots, and history still recorded.",
+            "Guided: full project interview (5 W's + style + constraints) before building. Answers saved to blueprint."
+          ],
+          "description": "Default build mode. Auto skips all questions; Guided runs a structured interview before building. Leave blank to be asked each session."
         }
       }
     }

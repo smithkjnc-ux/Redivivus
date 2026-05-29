@@ -55,6 +55,21 @@ cd redivivus-${NEW_VERSION} && ./redivivus
 ## Windows Install
 Extract the zip and double-click \`redivivus.exe\`"
 
+echo "▶  Uploading to R2 (downloads.redivivus.dev)..."
+# Delete previous version files before uploading new ones
+PREV_VERSION=$(node -e "
+const [major, minor, patch] = '$NEW_VERSION'.split('.').map(Number);
+console.log(major + '.' + minor + '.' + (patch - 1));
+")
+wrangler r2 object delete "redivivus-downloads/redivivus-$PREV_VERSION.tar.gz" --remote 2>/dev/null || true
+wrangler r2 object delete "redivivus-downloads/redivivus-win32-x64-v$PREV_VERSION.zip" --remote 2>/dev/null || true
+echo "   Removed v$PREV_VERSION from R2"
+wrangler r2 object put "redivivus-downloads/redivivus-$NEW_VERSION.tar.gz" \
+  --file="$TARBALL" --content-type="application/gzip" --remote
+wrangler r2 object put "redivivus-downloads/redivivus-win32-x64-v$NEW_VERSION.zip" \
+  --file="$WIN_ZIP" --content-type="application/zip" --remote
+echo "▶  R2 upload complete — https://downloads.redivivus.dev/redivivus-$NEW_VERSION.tar.gz"
+
 echo "▶  Updating web app download link to $NEW_VERSION..."
 node -e "
 const fs = require('fs');
@@ -62,7 +77,7 @@ const file = '$WEB_DIR/src/lib/latest-release.ts';
 const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOWNLOAD_URL_LINUX = \\\`https://downloads.redivivus.dev/redivivus-\\\${LATEST_VERSION}.tar.gz\\\`\nexport const DOWNLOAD_URL_WINDOWS = \\\`https://downloads.redivivus.dev/redivivus-win32-x64-v\\\${LATEST_VERSION}.zip\\\`\n\`;
 fs.writeFileSync(file, content);
 "
-cd "$WEB_DIR" && npm run deploy 2>&1 | grep -E "✨|Deployed|Error|error" | tail -5
+cd "$WEB_DIR" && fly deploy -a redivivus-backend 2>&1 | grep -E "✓|deployed|Error|error|v[0-9]" | tail -5
 
 # Update developer's local stable symlink so the .desktop launcher always works
 STABLE_LINK="$HOME/.local/opt/redivivus"

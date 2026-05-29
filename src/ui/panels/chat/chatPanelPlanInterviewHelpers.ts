@@ -39,6 +39,13 @@ export async function generateFollowups(answers: Record<string, string>, routing
     followups.push("Any idea how many people might use this, or what they're like? Tech-savvy or beginners?");
   }
 
+  // Style question — always ask unless the user already mentioned look/feel in their answers
+  const allAnswerText = Object.values(answers).join(' ').toLowerCase();
+  const mentionedStyle = /\b(minimal|clean|colorful|dark|light|retro|modern|simple|professional|playful|fun|pretty|beautiful|design|style|look|feel|ui|theme|aesthetic)\b/.test(allAnswerText);
+  if (!mentionedStyle) {
+    followups.push("How should it look and feel? For example: minimal and clean, colorful and bold, dark and professional, retro/playful, or just 'functional -- I don't care about looks'.");
+  }
+
   return followups;
 }
 
@@ -72,12 +79,18 @@ export function buildTaskFromAnswers(
   let task = `Build ${answers.what || 'a project'}`;
   if (answers.where) { task += ` for ${answers.where}`; }
   if (answers.who)   { task += ` used by ${answers.who}`; }
-  const followupContext = followupAnswers
-    .filter((a, i) => a && followupQuestions[i])
-    .map((a, i) => `${followupQuestions[i].replace(/\?\s*$/, '')}: ${a}`)
-    .join('. ');
-  if (followupContext) { task += `. Details: ${followupContext}`; }
-  if (answers.when) { task += `. Timeline: ${answers.when}`; }
+  // Separate style answers from other followups so they appear as a dedicated design directive
+  const styleKeywords = /look|feel|style|minimal|clean|colorful|dark|light|retro|modern|functional/i;
+  const styleAnswers: string[] = [];
+  const detailAnswers: string[] = [];
+  followupAnswers.forEach((a, i) => {
+    if (!a || !followupQuestions[i]) { return; }
+    if (styleKeywords.test(followupQuestions[i])) { styleAnswers.push(a); }
+    else { detailAnswers.push(`${followupQuestions[i].replace(/\?\s*$/, '')}: ${a}`); }
+  });
+  if (detailAnswers.length > 0) { task += `. Details: ${detailAnswers.join('. ')}`; }
+  if (styleAnswers.length > 0)  { task += `. Visual style: ${styleAnswers.join(', ')}`; }
+  if (answers.when) { task += `. Done when: ${answers.when}`; }
   if (answers.why)  { task += `. Purpose: ${answers.why}`; }
   return task;
 }

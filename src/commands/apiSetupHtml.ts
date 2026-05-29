@@ -113,7 +113,10 @@ export function getApiSetupHtml(): string {
     document.getElementById('vscode-settings-btn').addEventListener('click', () => { vscode.postMessage({ type: 'open-vscode-settings' }); });
     
     window.addEventListener('message', e => {
-      if (e.data.type === 'saved') {
+      if (e.data.type === 'highlight-provider') {
+        const el = document.getElementById(e.data.provider + '-key');
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); el.style.outline = '2px solid #4a9eff'; setTimeout(() => { el.style.outline = ''; }, 3000); }
+      } else if (e.data.type === 'saved') {
         const btn = document.getElementById('apply-btn');
         btn.innerHTML = '&#x2705; Apply Changes';
         btn.style.opacity = '1';

@@ -7,9 +7,9 @@ function statusBadge(ok: boolean, okLabel: string, notLabel: string): string {
     : `<span style="background:#b85c00;color:#fff;padding:2px 10px;border-radius:12px;font-size:12px;font-weight:600;">${notLabel}</span>`;
 }
 
-export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string, anthropicKey: string, kimiKey: string, hasGitHub: boolean, githubUser: string, githubRepo: string, guardianActive = false, guardianAI = 'none', workerAI = 'none', guardianCfg = true, vaultEnabled = true): string {
+export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string, anthropicKey: string, kimiKey: string, hasGitHub: boolean, githubUser: string, githubRepo: string, guardianActive = false, guardianAI = 'none', workerAI = 'none', guardianCfg = true, vaultEnabled = true, groqKey = '', xaiKey = ''): string {
   const aiDetail = hasAI
-    ? [geminiKey && 'Gemini', openaiKey && 'OpenAI', anthropicKey && 'Anthropic', kimiKey && 'Kimi'].filter(Boolean).join(', ')
+    ? [geminiKey && 'Gemini', openaiKey && 'OpenAI', anthropicKey && 'Anthropic', kimiKey && 'Kimi', groqKey && 'Groq', xaiKey && 'xAI Grok'].filter(Boolean).join(', ')
     : 'No API key set';
   const githubDetail = hasGitHub ? `${githubUser}/${githubRepo || 'auto-named'}` : 'Not connected';
   const githubBtnLabel = hasGitHub ? 'Manage Backup' : 'Connect GitHub';
@@ -72,8 +72,8 @@ export function getHubHtml(hasAI: boolean, geminiKey: string, openaiKey: string,
           : statusBadge(false, '', guardianActive ? 'Disabled' : 'Needs 2+ AI keys')}</div>
         <div class="section-detail">${guardianActive
           ? `<strong>${guardianAI.charAt(0).toUpperCase()+guardianAI.slice(1)}</strong> silently reviews every response from <strong>${workerAI.charAt(0).toUpperCase()+workerAI.slice(1)}</strong> -- catching hallucinations, wrong answers, and blueprint drift before you see them.`
-          : 'Add a second AI key to enable Guardian mode. The higher-ranked AI becomes the reviewer of the other.'}</div>
-        ${guardianActive ? `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;"><input type="checkbox" id="guardian-toggle" ${guardianCfg ? 'checked' : ''} onchange="send('toggle-guardian',{enabled:this.checked})" style="width:auto;" /> Enable Guardian review</label>` : `<button class="btn btn-secondary" onclick="send('open-api-setup')">Add a second AI key &#x2192;</button>`}
+          : 'Add any second AI key to enable Guardian mode -- <strong>Gemini</strong> and <strong>Groq</strong> are both free, no credit card needed.'}</div>
+        ${guardianActive ? `<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;"><input type="checkbox" id="guardian-toggle" ${guardianCfg ? 'checked' : ''} onchange="send('toggle-guardian',{enabled:this.checked})" style="width:auto;" /> Enable Guardian review</label>` : `<div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-primary" onclick="send('open-api-setup',{providerHint:'gemini'})">+ Gemini (Free) &#x2192;</button><button class="btn btn-primary" onclick="send('open-api-setup',{providerHint:'groq'})">+ Groq (Free) &#x2192;</button><button class="btn btn-secondary" onclick="send('open-api-setup')">Other keys &#x2192;</button></div>`}
       </div>
     </div>
     <div class="section">

@@ -1,15 +1,15 @@
-// [SCOPE] Cloud build client — thin client: gets routing instructions from backend, executes AI calls client-side, sends results back
-// Backend provides secret sauce, client handles AI API calls with user keys
+// [SCOPE] Cloud build client — thin client: gets routing instructions from backend, executes AI calls client-side, sends results back.
+// Backend provides secret sauce, client handles AI API calls with user keys.
+// On 5xx: falls back to runLocalBuild() using user's own AI keys directly.
 
-import * as fs from 'fs';
-import * as path from 'path';
 import * as vscode from 'vscode';
 import { getAccountToken, getApiBase, collectKeys, getPreferred } from '../api/apiClient.js';
 import { collectBuildContext } from './buildContextCollector.js';
-import { writeBuiltFile, createSnapshot, openBuiltFile } from '../../core/build/chatPanelBuildWriter.js';
 import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { VaultService } from '../vault/vaultService';
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
+import { processBuildResults } from './cloudBuildResultProcessor.js';
+import { runLocalBuild } from './cloudBuildLocalFallback.js';
 
 export interface CloudBuildResult {
   success: boolean
@@ -19,6 +19,8 @@ export interface CloudBuildResult {
   inputTokens?: number
   outputTokens?: number
   error?: string
+  // Carries failure origin through the call stack so the runner can log it accurately.
+  failureSource?: 'cloud' | 'local-fallback'
 }
 
 export async function callCloudBuild(
@@ -38,16 +40,13 @@ export async function callCloudBuild(
 
   try {
     // Step 1: Get routing instructions from backend (SECRET SAUCE)
+    // [FIX] Removed hardcoded tier:'pro' — server determines tier from the account token.
+    const requestBody = JSON.stringify({ task, context, keys, preferred: getPreferred() });
+    console.log(`[Redivivus] Build request: taskLen=${task.length}, bodyLen=${requestBody.length}, vaultItems=${context.vaultItems?.length ?? 0}, hasRules=${!!context.projectRules}`);
     const instructionRes = await fetch(`${getApiBase()}/build`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        task,
-        context,
-        keys,
-        preferred: getPreferred(),
-        tier: 'pro' as const,
-      }),
+      body: requestBody,
       signal: AbortSignal.timeout(30_000),
     });
 
@@ -57,11 +56,23 @@ export async function callCloudBuild(
       vscode.commands.executeCommand('redivivus.refreshChat');
       return { success: false, error: 'NOT_AUTHENTICATED' };
     }
+
     if (!instructionRes.ok) {
-      const err = await instructionRes.json().catch(() => ({ error: instructionRes.statusText })) as any;
-      const errMsg = err.error || `Build API ${instructionRes.status}`;
-      console.error(`[Redivivus] Build API failed: status=${instructionRes.status}, error=${errMsg}, taskLength=${task.length}, contextFiles=${(context as any)?.files?.length ?? 0}`);
-      return { success: false, error: errMsg };
+      let errMsg = instructionRes.statusText;
+      try {
+        const errBody = await instructionRes.text();
+        console.error(`[Redivivus] Build API ${instructionRes.status} body: ${errBody.slice(0, 500)}`);
+        try { errMsg = (JSON.parse(errBody) as any).error || errMsg; } catch { errMsg = errBody.slice(0, 120) || errMsg; }
+      } catch {}
+      console.error(`[Redivivus] Build API failed: status=${instructionRes.status}, bodyLen=${requestBody.length}`);
+
+      // [FIX] 5xx = server-side crash — fall back to local build using user's own AI keys.
+      // 4xx = client error (bad request, auth, etc.) — don't fall back, surface the error.
+      if (instructionRes.status >= 500) {
+        console.log('[Redivivus] Cloud 5xx — activating local build fallback');
+        return await runLocalBuild(task, root, context, deps);
+      }
+      return { success: false, error: errMsg, failureSource: 'cloud' };
     }
 
     const instructions = await instructionRes.json() as {
@@ -78,34 +89,30 @@ export async function callCloudBuild(
         context: any;
       };
       requiresClientExecution: boolean;
+      files?: Array<{ path: string; content: string; isNew: boolean }>;
+      narration?: string;
+      model?: string;
+      inputTokens?: number;
+      outputTokens?: number;
     };
 
     if (!instructions.requiresClientExecution) {
-      // Fallback to old behavior if backend doesn't require client execution
-      return await handleLegacyBuild(instructionRes, task, root, deps);
+      // [FIX] Legacy path — body already consumed by .json() above; pass parsed data directly
+      return await processBuildResults(instructions as any, task, root, deps,
+        { source: 'cloud', vaultItemNames: context.vaultItems?.map(v => v.name) });
     }
 
     // Step 2: Execute AI call client-side using backend routing instructions
-    const aiResponse = await executeClientAI(
-      instructions.instructions.routing,
-      instructions.instructions.prompt,
-      keys
-    );
-
+    const aiResponse = await executeClientAI(instructions.instructions.routing, instructions.instructions.prompt, keys);
     if (!aiResponse.success) {
-      return { success: false, error: aiResponse.error || 'AI call failed' };
+      return { success: false, error: aiResponse.error || 'AI call failed', failureSource: 'cloud' };
     }
 
     // Step 3: Send AI response back to backend for processing
     const completionRes = await fetch(`${getApiBase()}/build/complete`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        task,
-        aiResponse: aiResponse.text,
-        model: aiResponse.model,
-        context: instructions.instructions.context,
-      }),
+      body: JSON.stringify({ task, aiResponse: aiResponse.text, model: aiResponse.model, context: instructions.instructions.context }),
       signal: AbortSignal.timeout(30_000),
     });
 
@@ -116,169 +123,52 @@ export async function callCloudBuild(
         vscode.commands.executeCommand('redivivus.refreshChat');
       }
       const err = await completionRes.json().catch(() => ({ error: completionRes.statusText })) as any;
-      return { success: false, error: err.error || `Build completion API ${completionRes.status}` };
+      return { success: false, error: err.error || `Build completion API ${completionRes.status}`, failureSource: 'cloud' };
     }
 
     const data = await completionRes.json() as {
       files: Array<{ path: string; content: string; isNew: boolean }>
-      narration: string
-      model: string
-      inputTokens: number
-      outputTokens: number
+      narration: string; model: string; inputTokens: number; outputTokens: number;
     };
 
-    // Step 4: Write returned files to disk (same as before)
-    return await processBuildResults(data, task, root, deps);
+    return await processBuildResults(data, task, root, deps,
+      { source: 'cloud', vaultItemNames: context.vaultItems?.map(v => v.name) });
 
   } catch (err: any) {
-    if (err?.name === 'TimeoutError') return { success: false, error: 'Build timed out — try a simpler request.' };
-    return { success: false, error: err?.message ?? 'Network error' };
+    if (err?.name === 'TimeoutError') return { success: false, error: 'Build timed out — try a simpler request.', failureSource: 'cloud' };
+    return { success: false, error: err?.message ?? 'Network error', failureSource: 'cloud' };
   }
 }
 
-// Helper: Execute AI call client-side using backend routing instructions
 async function executeClientAI(
   routing: any,
   prompt: string,
   keys: Record<string, string>
 ): Promise<{ success: boolean; text: string; model: string; error?: string }> {
+  const fetchFn = createFetchWithTimeout();
   try {
-    const response = await callProvider(
-      routing.selectedProvider,
-      prompt,
-      createFetchWithTimeout(),
-      undefined, // geminiModel
-      undefined, // imageBase64
-      undefined, // imageType
-      routing.systemMessage
-    );
-
-    return {
-      success: true,
-      text: response.text,
-      model: response.model || routing.model
-    };
+    const response = await callProvider(routing.selectedProvider, prompt, fetchFn, undefined, undefined, undefined, routing.systemMessage);
+    return { success: true, text: response.text, model: response.model || routing.model };
   } catch (error: any) {
-    // Try fallback providers if primary fails
     for (const fallbackProvider of routing.fallbackProviders) {
-      if (!keys[fallbackProvider]) continue;
-      
+      if (!keys[fallbackProvider]) { continue; }
       try {
-        const response = await callProvider(
-          fallbackProvider,
-          prompt,
-          createFetchWithTimeout(),
-          undefined,
-          undefined,
-          undefined,
-          routing.systemMessage
-        );
-
-        return {
-          success: true,
-          text: response.text,
-          model: response.model || fallbackProvider
-        };
-      } catch (fallbackError) {
-        continue;
-      }
+        const response = await callProvider(fallbackProvider, prompt, fetchFn, undefined, undefined, undefined, routing.systemMessage);
+        return { success: true, text: response.text, model: response.model || fallbackProvider };
+      } catch { continue; }
     }
-
-    return {
-      success: false,
-      text: '',
-      model: '',
-      error: error?.message || 'All AI providers failed'
-    };
+    return { success: false, text: '', model: '', error: error?.message || 'All AI providers failed' };
   }
 }
 
-// Helper: Create fetch with timeout for AI calls
 function createFetchWithTimeout() {
   return async (url: string, options: RequestInit, timeoutMs?: number) => {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs || 60000);
-    
+    const id = setTimeout(() => controller.abort(), timeoutMs || 60000);
     try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal
-      });
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      clearTimeout(timeoutId);
-      throw error;
-    }
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(id);
+      return res;
+    } catch (e) { clearTimeout(id); throw e; }
   };
-}
-
-// Helper: Process build results (extracted from original function)
-async function processBuildResults(
-  data: any,
-  task: string,
-  root: string,
-  deps: BuildRequestDeps
-): Promise<CloudBuildResult> {
-  // Ensure .redivivus/ structure exists — always, even for single-file builds.
-  // scaffoldAt is idempotent: it skips files that already exist.
-  if (!fs.existsSync(path.join(root, '.redivivus', 'config.json'))) {
-    try {
-      const { scaffoldAt } = await import('../project/redivivusInit.js');
-      const slug = path.basename(root);
-      await scaffoldAt(root, slug);
-    } catch { /* non-fatal — build continues even if scaffold fails */ }
-  }
-
-  const writtenPaths: string[] = [];
-
-  for (const file of data.files) {
-    const absPath = path.join(root, file.path);
-    const snapshotId = createSnapshot(root, task, file.path);
-    writeBuiltFile(absPath, file.content, { root, task });
-    writtenPaths.push(absPath);
-    // Open the file beside current editor
-    openBuiltFile(absPath).catch(() => {});
-    // Track snapshot for undo
-    if (snapshotId) {
-      try {
-        const { BuildHistoryService } = await import('../build/buildHistoryService.js');
-        new BuildHistoryService(root).record({
-          id: snapshotId,
-          timestamp: new Date().toISOString(),
-          task,
-          files: [file.path],
-          tokensUsed: data.outputTokens ?? 0,
-          costUSD: 0,
-          source: 'ai',
-          supervisor: data.model,
-          worker: null,
-          resultCardToken: '',
-        });
-      } catch {}
-    }
-  }
-
-  // Record usage
-  if (deps.usageTracker) {
-    deps.usageTracker.recordUsage(0, 0, data.model, data.inputTokens, data.outputTokens, 'solo',
-      path.basename(root));
-  }
-
-  // Signal build finished (opens workspace, captures vault, etc.)
-  const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
-  ChatPanel.onBuildFinished?.(task, writtenPaths, root);
-
-  return { success: true, files: data.files, narration: data.narration, model: data.model, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
-}
-
-// Helper: Handle legacy build responses (fallback)
-async function handleLegacyBuild(
-  res: Response,
-  task: string,
-  root: string,
-  deps: BuildRequestDeps
-): Promise<CloudBuildResult> {
-  const data = await res.json() as any;
-  return await processBuildResults(data, task, root, deps);
 }

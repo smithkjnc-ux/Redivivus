@@ -30,11 +30,11 @@ function deriveProjectName(what: string): string {
 const W_FIELDS = ['what', 'who', 'where', 'when', 'why'] as const;
 
 const W_QUESTIONS: Record<string, string> = {
-  what:  "First -- what are you trying to build? A website, a game, an app, a tool? Just describe it in your own words, even if it's rough.",
-  who:   "Great! Who's going to use this? Just yourself? A team? Customers? The more specific, the better I can tailor it.",
-  where: "Where should this run? Web browser, desktop app, mobile phone, CLI, server? Or multiple places?",
-  when:  "When do you need this working? Is there a hard deadline, or is it a 'whenever it's ready' kind of thing?",
-  why:   "Last W -- why are you building this? What problem does it solve that nothing else solves well?",
+  what:  "What are we building? Describe it in your own words — a sentence or a whole paragraph is fine. Don't worry about technical details yet, just what it is and what it does.",
+  who:   "Who is this for? Are you building for yourself, for someone specific, for a team, or for the public? And how technical is the audience — beginners, developers, or mixed?",
+  where: "Where should this run? Web browser (as a file you open or something hosted online), desktop app, mobile-friendly web, command line, or somewhere else?",
+  when:  "What does 'done' look like to you? If it's working perfectly, what can someone do with it? What's the one core thing it must do well? (Timeline is optional — add it if there's a deadline.)",
+  why:   "Why are you building this? What problem does it solve, or what goal does it serve? Even a sentence helps me understand what matters most to get right.",
 };
 
 /** Starts the plan interview by initializing state and posting the welcome + first question. */
@@ -44,7 +44,7 @@ export async function startPlanInterview(state: any): Promise<void> {
   };
   state.conversation.push({
     role: 'assistant',
-    content: "Let's plan your project! I'll walk you through a few questions so I understand exactly what you need.\n\n" + W_QUESTIONS.what,
+    content: "**Guided Mode** -- let's design this before we build.\n\nI'll walk you through a few questions so I understand exactly what you need. The more detail you give, the better the first build.\n\n" + W_QUESTIONS.what,
     timestamp: Date.now(),
   });
 }
