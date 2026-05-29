@@ -80,14 +80,21 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
 
-  // ── STEP 2: Clarify step (design triage) — only for non-questions ──
+  // ── STEP 2: Clarify step (design triage) — only for short/vague build requests ──
   const _BUG_KEYWORDS = /\b(fix|broken|bug|doesn't work|not working|error|crash|fail|cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|glitch|stuck|missing|wrong)\b/i;
   const isClearBugReport = _BUG_KEYWORDS.test(lowerText);
+  // [FIX] Skip clarify when user gives detailed specs (>50 chars with requirement words).
+  // "it should have an AI opponent, must take jumps" is explicit — nothing to clarify.
+  const hasDetailedSpecs = userText.length > 50 && /\b(should|must|need|require|include|have|obey|follow|support)\b/i.test(lowerText);
   let clarify = { cancelled: false, routedText: userText };
 
-  if (!msg.fromPreview && !isClearBugReport && deps.buildMode !== 'direct') {
-    clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
-    if (clarify.cancelled) { return; }
+  if (!msg.fromPreview && !isClearBugReport && !hasDetailedSpecs && deps.buildMode !== 'direct') {
+    try {
+      clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
+      if (clarify.cancelled) { return; }
+    } catch (e) {
+      // [FIX] Never silently swallow clarify errors — fall through to build
+    }
   }
   const routedText = clarify.routedText;
 
