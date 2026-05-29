@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Delete confirmation gate: modal dialog before any file deletion (Session 11CS)
+*Last updated:* May 29, 2026 — Project export scanner injected into Worker prompt to prevent import hallucinations (Session 11CT)
 
 ---
 
@@ -25,6 +25,12 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
+### Session 11CT — May 29, 2026: Project Export Scanner
+- Worker was hallucinating imports because it had no map of what the project actually exports
+- New `projectExportScanner.ts`: static regex scan (no AI), 25 files × 15 names, excludes target file
+- Injected as `PROJECT EXPORTS` block in Worker prompt before vault and existing content
+- Attacks hallucination upstream (prevention) rather than relying solely on Guardian (detection)
+
 ### Session 11CS — May 29, 2026: Delete Confirmation Gate
 - File deletion previously fired silently on AI classify → `fs.unlinkSync` with no confirm step
 - `identifyFilesToDelete` extracted from `deleteRequestedFiles` — identify first, delete second
@@ -36,11 +42,6 @@
 - New module: `src/core/ai/contextSelector.ts` — short convs skip AI, long convs use cheap AI call, fallback = last 6
 - Wired into Q&A path (`chatPanelAI.ts`) and build Supervisor path (`chatPanelBuild.ts`)
 - Conversation context now reaches the Supervisor for the first time — was zero before this change
-
-### Session 11BQ — May 27, 2026: Worker XML Structured Output
-- Switched Worker AI from regex-parsed text blocks to XML structured output (`<file>`, `<edit>`, `<search>`, `<replace>`) for rigid parsing without sacrificing streaming UI.
-- Rewrote `surgicalEditService.ts` to parse XML.
-- Resolved Rule 9 compliance in pipeline utilities by splitting files.
 
 ---
 

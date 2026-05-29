@@ -5,7 +5,22 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11CS: Delete confirmation gate)*
+*Last updated: May 29, 2026 (Session 11CT: Project export scanner injected into Worker prompt)*
+
+---
+
+## May 29, 2026 — Session 11CT (Project export scanner injected into Worker prompt)
+
+**Goal:** Worker AI was hallucinating imports because it had no knowledge of what functions/classes actually exist in the user's other project files. Fix: statically scan the project for exported names and inject them into the Worker prompt before generation.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/code/projectExportScanner.ts` | New file. `scanProjectExports(root, excludeRelPath)` walks the project tree (skipping node_modules, out, .git, etc.), extracts exported names from each `.ts/.tsx/.js/.jsx` file using three regex patterns (named exports, brace exports, default exports), caps at 25 files × 15 names. `formatExportsForPrompt(exports)` renders as `file: name, name` lines. All synchronous — no AI, no async. | Rule 18: mechanical file scanning is code's job, not AI's. The AI only needs the result (the name list) to stop inventing things. | Low — purely additive; scan failure produces empty string, no injection. |
+| `src/core/build/chatPanelBuildWorker.ts` | Added import for `scanProjectExports` / `formatExportsForPrompt`. Destructured `root` from `ctx`. Added `exportsBlock` call before prompt assembly. Injected `PROJECT EXPORTS` block between context and vault sections. | Worker now sees what already exists in the codebase before writing a single line. Real function names → real imports. | Low — `root` guard prevents scan on empty paths; empty scan produces no block. |
+
+**Architecture note:** This is purely preventative — it attacks hallucinated imports upstream (before generation) rather than catching them downstream (Guardian import check + repair prompt). Both layers remain active. The scan targets the user's project, not Redivivus itself; when building user projects, the exported names shown are from the user's own codebase.
 
 ---
 

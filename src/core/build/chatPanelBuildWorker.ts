@@ -5,6 +5,7 @@ import type { BuildContext } from './chatPanelBuild';
 import { tracer } from '../../services/pipelineTracer';
 import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { streamProvider } from '../../services/ai/streamingProviders';
+import { scanProjectExports, formatExportsForPrompt } from '../../services/code/projectExportScanner';
 
 // AI display names for user messages
 const AI_LABELS: Record<string, string> = {
@@ -73,7 +74,7 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onCh
 }
 
 export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifying: boolean, existingContent: string, supervisorSpec: string | null, vaultSummary: string, sourceRef?: string): string {
-  const { task, blueprintContext } = ctx;
+  const { task, blueprintContext, root } = ctx;
   const isHtml = relPath.endsWith('.html');
   const role = supervisorSpec ? 'Redivivus Worker AI. Implementation only.' : 'Redivivus AI. Generate complete code.';
   
@@ -99,5 +100,7 @@ REPLACE>>>
   const redivivusRules = ctx.assistMode ? '' : `\n\n${Redivivus_WORKER_RULES}`;
   const ext = relPath.split('.').pop()?.toUpperCase() || 'code';
   const sourceBlock = sourceRef ? `\nSOURCE REFERENCE (existing implementation in a different language -- use this as a guide for game logic, physics, and behavior, but rewrite as native ${ext}):\n${sourceRef}` : '';
-  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${vaultBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${redivivusRules}\n\nReturn ONLY the code.`;
+  // [DONE] Rule 18 complement — static scan (not AI) tells Worker what already exists so it imports real names
+  const exportsBlock = root ? formatExportsForPrompt(scanProjectExports(root, relPath)) : '';
+  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${exportsBlock ? exportsBlock + '\n\n' : ''}${vaultBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${redivivusRules}\n\nReturn ONLY the code.`;
 }
