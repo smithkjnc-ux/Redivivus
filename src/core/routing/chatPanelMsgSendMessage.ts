@@ -56,17 +56,17 @@ async function runConfirmedLocalBuild(
     logError: (_t: string, _p: string, _e: string, _l: number) => {},
     postToWebview: (m: any) => deps.panel.webview.postMessage(m),
     redivivus: deps.redivivus, usageTracker: deps.usageTracker,
-    onBuildFinished: (_t: string, _f?: string[]) => {
-      if (autoCreated && root) {
-        const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
-        if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.skipConversationRestore', true); }
-        vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
-      }
-    },
   };
 
   try {
     await runSingleFileBuild(ctx as any);
+    // [FIX] Force-switch to the new project even if another workspace is open.
+    // runPostBuildActions only adds to workspace; we need to switch for new projects.
+    if (autoCreated && root) {
+      const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+      if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.skipConversationRestore', true); }
+      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
+    }
   } finally {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
   }
@@ -140,29 +140,36 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const _BUILD_CONFIRM = /\b(build\s+it|lets\s+(build|do)\s+it|go\s+ahead|make\s+it|start\s+building|lets\s+go)\b/i;
   const _AGREEMENT = /\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
   if ((_BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText)) && lowerText.length < 80) {
-    // Find prior AI discussion to assemble real build context
-    const priorAI = conversation
-      .filter(m => m.role === 'assistant' && m.content.length > 80 && !m.content.startsWith('__CLARIFY__'))
-      .slice(-2)
-      .map(m => m.content.replace(/\n---\n\*-- .*\*[\s\S]*$/, '').trim());
-    const priorUser = conversation
-      .filter(m => m.role === 'user' && m.content.length > 15)
-      .slice(-4, -1)
-      .map(m => m.content);
-    if (priorAI.length > 0) {
-      // [FIX] Assemble a clean natural-language build request. The build pipeline AI
-      // understands plain English, not structured forms. Keep it under 500 chars.
-      const firstRequest = priorUser[0] || userText;
-      const featureBits = priorAI
-        .map(m => m.replace(/^\s*[-\d\.]\s+/g, '').trim())
-        .map(m => m.slice(0, 300))
-        .join(' ')
-        .slice(0, 1200)
-        .replace(/\s+/g, ' ');
-      const cleanTask = `${firstRequest} ${featureBits}`.trim();
+    // [FIX] Iterate backwards from the current message to find the actual request+plan
+    // pair for THIS thread. Blind .slice() on the conversation array grabs stale messages
+    // from previous sessions (e.g. a snake game from yesterday).
+    let foundRequest = '';
+    let foundPlan = '';
+    for (let i = conversation.length - 1; i >= 0; i--) {
+      // Find the user's confirmation message (the current one just added)
+      if (conversation[i].role === 'user' && conversation[i].content === userText) {
+        // Look backwards for the assistant response just before this confirmation
+        for (let j = i - 1; j >= 0; j--) {
+          if (conversation[j].role === 'assistant' && conversation[j].content.length > 80 && !conversation[j].content.startsWith('__CLARIFY__')) {
+            foundPlan = conversation[j].content.replace(/\n---\n\*-- .*\*[\s\S]*$/, '').trim();
+            // Now find the user request that triggered this assistant response
+            for (let k = j - 1; k >= 0; k--) {
+              if (conversation[k].role === 'user' && conversation[k].content.length > 15) {
+                foundRequest = conversation[k].content;
+                break;
+              }
+            }
+            break;
+          }
+        }
+        break;
+      }
+    }
+    if (foundRequest && foundPlan) {
+      const featureBits = foundPlan.slice(0, 600).replace(/\s+/g, ' ');
+      const cleanTask = `${foundRequest} ${featureBits}`.trim();
       const conciseTask = cleanTask.length > 500 ? cleanTask.slice(0, 500) : cleanTask;
       // [FIX] Bypass backend agent for confirmed builds — use local pipeline instead.
-      // The backend agent asks duplicate questions the user already answered.
       await runConfirmedLocalBuild(conciseTask, userText, deps, conversation, refresh);
       return;
     }
