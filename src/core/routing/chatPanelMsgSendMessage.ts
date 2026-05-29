@@ -95,11 +95,19 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
       .slice(-4, -1)
       .map(m => m.content);
     if (priorAI.length > 0) {
-      // Cap context to prevent oversized payloads hitting the build API
-      const cappedAI = priorAI.map(m => m.slice(0, 800)).join('\n\n').slice(0, 3000);
-      const cappedUser = priorUser.map(m => m.slice(0, 200)).join('\n');
-      const fullContext = `Build based on our conversation:\n\nUser requests:\n${cappedUser}\n\nAgreed plan:\n${cappedAI}`;
-      await handleBuildIntent(fullContext, userText, msg, deps, conversation, refresh);
+      // [FIX] Assemble a clean natural-language build request. The build pipeline AI
+      // understands plain English, not structured forms. Keep it under 500 chars.
+      const firstRequest = priorUser[0] || userText;
+      const featureBits = priorAI
+        .map(m => m.replace(/^\s*[-\d\.]\s+/g, '').trim())
+        .map(m => m.slice(0, 300))
+        .join(' ')
+        .slice(0, 1200)
+        .replace(/\s+/g, ' ');
+      // Extract key requirements as a concise sentence
+      const cleanTask = `${firstRequest} ${featureBits}`.trim();
+      const conciseTask = cleanTask.length > 500 ? cleanTask.slice(0, 500) : cleanTask;
+      await handleBuildIntent(conciseTask, userText, msg, deps, conversation, refresh);
       return;
     }
   }
