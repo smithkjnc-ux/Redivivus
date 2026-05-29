@@ -40,10 +40,12 @@ export function panelBuildRequestDeps(panel: ChatPanel): BuildRequestDeps {
 export async function panelClassifyIntent(panel: ChatPanel, text: string) {
   const workspaceRoot = (panel as any).redivivus.getWorkspaceRoot();
   const projectName = workspaceRoot ? path.basename(workspaceRoot) : 'No Project';
+  // [FIX] blueprintStatus removed — server classifier was returning 'question' for uninitialized
+  // projects regardless of intent, routing imperative build requests to Groq Q&A with no explanation.
+  // Intent classification must be based on the text only, not local project setup state.
   const context = {
     projectName,
     workspacePath: workspaceRoot || 'None',
-    blueprintStatus: (panel as any).redivivus.isInitialized() ? 'Initialized' : 'Not Initialized'
   };
   const ut = (panel as any).usageTracker;
   const onUsage = ut ? (inTok: number, outTok: number, model: string) => {

@@ -5,7 +5,19 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11CV: Similar code finder injected into Worker prompt)*
+*Last updated: May 29, 2026 (Session 11CW: Fix classifier routing imperative builds to Q&A on uninitialized projects)*
+
+---
+
+## May 29, 2026 — Session 11CW (Fix: classifier routes imperative build requests to Q&A on uninitialized projects)
+
+**Bug:** "add a speed boost power-up..." and "add a getProjectStats function..." both triggered Groq Q&A responses instead of the build pipeline. Root cause: `panelClassifyIntent` was passing `blueprintStatus: 'Not Initialized'` to the cloud classifier when no Redivivus session existed. The server-side classifier treated this as a signal to return `question`, routing the user silently to conversational Q&A with no explanation.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelBuildUtils.ts` | Removed `blueprintStatus` from the context object passed to `cloudClassify`. | Intent classification must be based on the text only. `blueprintStatus` is a local project setup concern — the classifier was using it to penalize uninitialized projects by returning `question` regardless of what the user typed. An imperative "add X" in an uninitialized project is still a build request. | Low — cloud classifier still receives `projectName` and `workspacePath` for context. Only the setup-state flag is removed. |
 
 ---
 

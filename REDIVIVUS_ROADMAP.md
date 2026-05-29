@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Similar code finder: AI surfaces relevant existing functions before Worker writes (Session 11CV)
+*Last updated:* May 29, 2026 — Fix: build requests on uninitialized projects no longer silently routed to Q&A (Session 11CW)
 
 ---
 
@@ -25,6 +25,11 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
+### Session 11CW — May 29, 2026: Fix Classifier Routing on Uninitialized Projects
+- "add a speed boost power-up" → Groq Q&A instead of build pipeline (found during test)
+- Root cause: `blueprintStatus: 'Not Initialized'` sent to cloud classifier; server returned `question`
+- Fix: removed `blueprintStatus` from classifier context — intent judged from text only
+
 ### Session 11CV — May 29, 2026: Similar Code Finder
 - Worker had no awareness of similar logic in other project files — would reimplement existing functions
 - New `similarCodeFinder.ts`: sync regex extraction + cheap AI relevance filter → up to 4 matched snippets
@@ -36,12 +41,6 @@
 - Added `extractBuildDecisions` to `LearnedMemoryService` — reviews full conversation post-build
 - Wired into `runPostBuildActions` non-blocking — every successful build feeds `learned.md`
 - Complements existing `extractFacts` (mid-chat explicit preferences) — now both paths are covered
-
-### Session 11CT — May 29, 2026: Project Export Scanner
-- Worker was hallucinating imports because it had no map of what the project actually exports
-- New `projectExportScanner.ts`: static regex scan (no AI), 25 files × 15 names, excludes target file
-- Injected as `PROJECT EXPORTS` block in Worker prompt before vault and existing content
-- Attacks hallucination upstream (prevention) rather than relying solely on Guardian (detection)
 
 ---
 
