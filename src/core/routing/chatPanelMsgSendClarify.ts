@@ -15,13 +15,33 @@ export async function runChatClarifyStep(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<ChatClarifyResult> {
-  // [FIX] Include conversation context so the clarify step can show what was already discussed
-  const recentContext = conversation
-    .filter(m => m.role === 'assistant' && m.content.length > 50)
-    .slice(-3)
-    .map(m => m.content.slice(0, 500))
-    .join('\n');
-  const questions = await generateClarifyQuestions(userText, recentContext, routing);
+  // [FIX] If the conversation already discussed features, show a blueprint summary FIRST
+  // so the user can verify before building. Don't rely on AI to generate this — build it directly.
+  const recentAssistant = conversation
+    .filter(m => m.role === 'assistant' && m.content.length > 80 && !m.content.startsWith('__CLARIFY__'))
+    .slice(-2)
+    .map(m => m.content.replace(/\n---\n\*-- .*\*$/, '').trim());
+  const hasPriorDiscussion = recentAssistant.length > 0 && recentAssistant.some(m => m.length > 100);
+
+  const questions = await generateClarifyQuestions(userText, '', routing);
+
+  // Prepend a blueprint verification question when there was prior discussion
+  if (hasPriorDiscussion) {
+    const planSummary = recentAssistant[recentAssistant.length - 1].slice(0, 600);
+    const blueprintQ: import('../../ui/panels/chat/chatPanelClarify').ClarifyQuestion = {
+      id: 'blueprint_verify',
+      question: `Based on our conversation, here is the plan:\n\n${planSummary}\n\nDoes this look right?`,
+      options: [
+        { label: 'Yes, build this' },
+        { label: 'I want to change some things' },
+      ],
+    };
+    // Replace the generic "How do you want to proceed?" with the blueprint verification
+    const filtered = questions.filter(q => q.id !== 'build_approach');
+    questions.length = 0;
+    questions.push(blueprintQ, ...filtered);
+  }
+
   if (questions.length === 0) { return { routedText: userText, cancelled: false }; }
 
   conversation.push({ role: 'assistant', content: encodeClarifyToken(questions), timestamp: Date.now() });
