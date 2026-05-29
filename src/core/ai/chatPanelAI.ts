@@ -17,7 +17,9 @@ export function buildAIPrefix(redivivus: RedivivusService, recentMessages: strin
   const bp = config?.blueprint;
 
   // [Redivivus] Detect code generation requests — use a focused prompt, not the Redivivus identity prompt
-  if (userText && /\b(convert|turn|transform|rewrite|replace|port|rebuild|build|create|make|generate|write|implement)\b/i.test(userText)) {
+  // [FIX] Do NOT switch to code gen prompt for questions. "Can you make X?" is asking, not commanding.
+  const _isQuestion = /^(are\s+you|can\s+you|could\s+you|would\s+you|will\s+you|should\s+|do\s+you|is\s+it|have\s+you|does\s+|did\s+you|what|how|why|when|where|who|which|explain|tell\s+me)\b/i;
+  if (userText && !_isQuestion.test(userText) && /\b(convert|turn|transform|rewrite|replace|port|rebuild|build|create|make|generate|write|implement)\b/i.test(userText)) {
     return buildCodeGenPrefix(userText, workspaceRoot);
   }
 

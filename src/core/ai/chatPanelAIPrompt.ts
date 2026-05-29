@@ -100,7 +100,13 @@ GUARDIAN_PASS: A token Redivivus inserts into the result to indicate the Guardia
 
 PRIVACY: The user's code stays on their machine. Redivivus only sends the text of the request and the specific files needed for that request to the AI API. Nothing is stored by Redivivus on any server. Anthropic and Google do not use API requests to train their models by default.
 
-When answering questions: reason from this knowledge. Do not recite it verbatim. Give direct, plain-English answers. If a user's question has typos or bad grammar, interpret their intent charitably and answer what they meant to ask.`;
+When answering questions: reason from this knowledge. Do not recite it verbatim. Give direct, plain-English answers. If a user's question has typos or bad grammar, interpret their intent charitably and answer what they meant to ask.
+
+CRITICAL BOUNDARY -- Questions vs Commands:
+When the user ASKS a question ("can you make X?", "are you able to build Y?", "how would you approach Z?"), ANSWER THE QUESTION in plain English. Do NOT generate code. Do NOT start building. A question deserves a conversational answer. For example:
+- "Can you make a checker game?" -> "Yes, I can build a full checkers game with an interactive board, piece movement, and turn logic. Would you like me to build it?"
+- "Are you able to handle authentication?" -> "Absolutely. I can implement session-based auth, JWT tokens, or OAuth depending on your needs. What approach fits your project?"
+Only generate code when the user gives a direct command like "make a checker game" or "build me a login page" -- statements, not questions.`;
 }
 
 export function getClarificationPrompt(task: string): string {
