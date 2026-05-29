@@ -27,13 +27,32 @@ export async function runChatClarifyStep(
 
   // Prepend a blueprint verification question when there was prior discussion
   if (hasPriorDiscussion) {
-    // [FIX] User's current message IS the primary spec. Old AI discussion is supporting context.
-    // Show what the user JUST said first, then reference the earlier discussion.
-    const userSpec = userText.length > 20 ? `Your requirements:\n${userText}\n\n` : '';
-    const priorContext = recentAssistant[recentAssistant.length - 1].slice(0, 400);
+    // [FIX] Format requirements as bullet points for easy reading and verification.
+    // Combine user's explicit requirements + prior AI discussion into a clean list.
+    const bulletize = (text: string): string => {
+      // Split on sentence boundaries, periods, commas with clauses, or newlines
+      const parts = text
+        .replace(/\.\s+/g, '.\n')
+        .split(/\n|(?<=\w)[,;](?=\s+[A-Z])|(?<=\w)[,;](?=\s+(and|with|must|should|it|the|a|an)\s)/i)
+        .map(s => s.replace(/^[-•*]\s*/, '').trim())
+        .filter(s => s.length > 5 && !/^(yes|ok|sure|let|would you|do you|I'd)\b/i.test(s));
+      return parts.map(p => `- ${p}`).join('\n');
+    };
+    const userBullets = userText.length > 20 ? bulletize(userText) : '';
+    const priorBullets = bulletize(recentAssistant[recentAssistant.length - 1].slice(0, 600));
+    const allBullets = [userBullets, priorBullets].filter(Boolean).join('\n');
+    // Deduplicate similar bullets
+    const seen = new Set<string>();
+    const uniqueBullets = allBullets.split('\n').filter(line => {
+      const key = line.toLowerCase().replace(/[^a-z]/g, '').slice(0, 30);
+      if (seen.has(key)) { return false; }
+      seen.add(key);
+      return true;
+    }).join('\n');
+
     const blueprintQ: import('../../ui/panels/chat/chatPanelClarify').ClarifyQuestion = {
       id: 'blueprint_verify',
-      question: `${userSpec}Earlier discussion:\n${priorContext}\n\nBuild with these requirements?`,
+      question: `Build Plan:\n\n${uniqueBullets}\n\nBuild with these requirements?`,
       options: [
         { label: 'Yes, build this' },
         { label: 'I want to change some things' },
