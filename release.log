@@ -1,0 +1,39 @@
+Thu May 28 09:00:01 PM EDT 2026: New commits detected. Triggering release...
+▶  Version bumped to 0.3.20
+▶  Compiling...
+
+> redivivus@0.3.20 compile
+> tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && node scripts/postcompile.js
+
+[Redivivus RULE 9] src/extension.ts is 251 lines -- split required before editing
+[Redivivus RULE 9] src/services/ai/routingService.ts is 204 lines -- split required before editing
+[Redivivus RULE 9] src/services/build/cloudBuildClient.ts is 283 lines -- split required before editing
+[Redivivus RULE 9] src/ui/panels/chat/chatPanel.ts is 220 lines -- split required before editing
+[Redivivus RULE 9] src/ui/panels/chat/chatPanelScriptActions.ts is 216 lines -- split required before editing
+✓ Brand media synced to build
+✓ Deployed out/ → 2 extension location(s)
+Redivivus: Ready to commit
+Message: Redivivus checkpoint: 2026-05-29T01:00:27.851Z — testing chassis
+Run "redivivus.autoCommit" command to complete commit
+▶  Packaging tarball...
+▶  Building Windows zip...
+▶  Building Redivivus Windows v0.3.20 (VSCodium 1.116.0)
+▶  Skipping compilation...
+▶  Fetching VSCodium Windows release...
+   Downloading https://github.com/VSCodium/vscodium/releases/download/1.116.02821/VSCodium-win32-x64-1.116.02821.zip...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  0  178M    0 1486k    0     0  1396k      0  0:02:11  0:00:01  0:02:10 1396k  4  178M    4 8750k    0     0  4239k      0  0:00:43  0:00:02  0:00:41 7264k 15  178M   15 27.6M    0     0  9219k      0  0:00:19  0:00:03  0:00:16 13.0M 34  178M   34 62.2M    0     0  15.3M      0  0:00:11  0:00:04  0:00:07 20.2M 66  178M   66  118M    0     0  23.3M      0  0:00:07  0:00:05  0:00:02 29.1M 97  178M   97  175M    0     0  28.8M      0  0:00:06  0:00:06 --:--:-- 34.7M100  178M  100  178M    0     0  29.0M      0  0:00:06  0:00:06 --:--:-- 41.5M
+▶  Extracting VSCodium...
+▶  Injecting Redivivus extension...
+▶  Applying branding...
+▶  Packaging Windows zip...
+✓  Windows package created at /home/papajoe/redivivus-win32-x64-v0.3.20.zip
+▶  Creating GitHub release v0.3.20...
+a release with the same tag name already exists: v0.3.20
+[master 76a672d] chore: release 0.3.20
+ 3 files changed, 30 insertions(+), 10 deletions(-)
+To https://github.com/smithkjnc-ux/Redivivus.git
+   638af9a..76a672d  master -> master
+Thu May 28 09:02:10 PM EDT 2026: Nightly release complete.
