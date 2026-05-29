@@ -27,16 +27,18 @@ export async function runChatClarifyStep(
 
   // Prepend a blueprint verification question when there was prior discussion
   if (hasPriorDiscussion) {
-    const planSummary = recentAssistant[recentAssistant.length - 1].slice(0, 600);
+    // [FIX] User's current message IS the primary spec. Old AI discussion is supporting context.
+    // Show what the user JUST said first, then reference the earlier discussion.
+    const userSpec = userText.length > 20 ? `Your requirements:\n${userText}\n\n` : '';
+    const priorContext = recentAssistant[recentAssistant.length - 1].slice(0, 400);
     const blueprintQ: import('../../ui/panels/chat/chatPanelClarify').ClarifyQuestion = {
       id: 'blueprint_verify',
-      question: `Based on our conversation, here is the plan:\n\n${planSummary}\n\nDoes this look right?`,
+      question: `${userSpec}Earlier discussion:\n${priorContext}\n\nBuild with these requirements?`,
       options: [
         { label: 'Yes, build this' },
         { label: 'I want to change some things' },
       ],
     };
-    // Replace the generic "How do you want to proceed?" with the blueprint verification
     const filtered = questions.filter(q => q.id !== 'build_approach');
     questions.length = 0;
     questions.push(blueprintQ, ...filtered);
