@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 28, 2026 — Cheap-first model routing for Q&A (promptCheap: Groq/Gemini first)
+*Last updated:* May 29, 2026 — Delete confirmation gate: modal dialog before any file deletion (Session 11CS)
 
 ---
 
@@ -25,23 +25,22 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
+### Session 11CS — May 29, 2026: Delete Confirmation Gate
+- File deletion previously fired silently on AI classify → `fs.unlinkSync` with no confirm step
+- `identifyFilesToDelete` extracted from `deleteRequestedFiles` — identify first, delete second
+- `showWarningMessage` modal now shows exact files before any deletion proceeds
+- Also fixed module-level `/g` regex `lastIndex` statefulness in the identification path
+
+### Session 11CR — May 29, 2026: AI-Driven Context Window Selection
+- Replaced hardcoded `slice(-10).map(m.content.slice(0,300))` with `selectRelevantTurns` — AI picks which turns matter
+- New module: `src/core/ai/contextSelector.ts` — short convs skip AI, long convs use cheap AI call, fallback = last 6
+- Wired into Q&A path (`chatPanelAI.ts`) and build Supervisor path (`chatPanelBuild.ts`)
+- Conversation context now reaches the Supervisor for the first time — was zero before this change
+
 ### Session 11BQ — May 27, 2026: Worker XML Structured Output
 - Switched Worker AI from regex-parsed text blocks to XML structured output (`<file>`, `<edit>`, `<search>`, `<replace>`) for rigid parsing without sacrificing streaming UI.
 - Rewrote `surgicalEditService.ts` to parse XML.
 - Resolved Rule 9 compliance in pipeline utilities by splitting files.
-
-### Session 11BJ — May 27, 2026: Remove Workspace Creation
-- Stopped creating `.code-workspace` files when opening or scaffolding projects
-- Replaced `vscode.openFolder` on `.code-workspace` with `vscode.openFolder` directly on directory paths
-- Affected files: `chatPanelMsgProjectOps.ts`, `messageRouterWizard.ts`, `chatPanelShow.ts`, `projectOperations.ts`
-
-### Session 11BI — May 27, 2026: Cloud Vault + Templates + Architecture Diagram
-- Migrated 10 templates from GitHub to Supabase `templates` table
-- New backend endpoints: `GET/POST /api/v1/vault`, `GET /api/v1/templates`
-- New Supabase tables: `vault_items`, `templates`, `vault_community`
-- New extension files: `vaultCloudSync.ts`, `templateCloudService.ts`
-- New admin pages: `/admin/vault`, `/admin/templates`, `/admin/architecture`
-- 13/13 tests passing
 
 ---
 

@@ -1,81 +1,22 @@
 // [SCOPE] Orchestrated phase build — full multi-AI pipeline for deep complexity phases
-// Flow: Supervisor plans → each step assigned to best-fit AI → Supervisor reviews → files written
-// Imported by chatPanelBuildPhase.ts. Falls back to single-file build when only 1 AI is configured.
+// Flow: Supervisor plans → each step assigned to best-fit AI → user approves → Workers execute → Walkthrough
+// Utilities (AI_LABELS, parseFileMarkers, etc.) extracted to chatPanelBuildOrchestratedUtils.ts (Rule 9).
 
 import * as path from 'path';
-import { AI_RANK, AI_CAPABILITIES } from '../../services/ai/guardianAI';
-import type { PlanStep } from '../../services/ai/supervisorOrchestrator';
+import { AI_RANK } from '../../services/ai/guardianAI';
 import { createPlan, executeStep, reviewOutput } from '../../services/ai/supervisorOrchestrator';
 import { callProvider } from '../ai/providers/providerFactory';
 import type { BuildPlan, BuildPhase } from '../../services/build/buildOrchestrator';
 import type { OrchestratorDeps } from './chatPanelOrchestrator';
 import { writeBuiltFile } from './chatPanelBuildWriter';
 import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
-import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils.js';
+import { readProjectRules } from '../routing/chatPanelMsgFixUtils.js';
+import { generatePlanId, formatOrchestratedPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate';
+import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough';
+import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown } from './chatPanelBuildOrchestratedUtils';
 
-const AI_LABELS: Record<string, string> = {
-  gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi',
-};
-
-/** Returns true when 2+ AI providers are configured (enables full orchestration) */
-export function isOrchestratedAvailable(deps: OrchestratorDeps): boolean {
-  const { worker } = deps.routing.selectSupervisorAndWorker();
-  return !!worker;
-}
-
-/** Builds the phase-specific task description passed to each Worker AI */
-export function buildPhaseTask(
-  phase: { name: string; description: string; outputs: string[] },
-  plan: BuildPlan
-): string {
-  return [
-    `Build the ${phase.name} phase of: ${plan.blueprint.what}`,
-    ``,
-    `Phase description: ${phase.description}`,
-    `Expected output files: ${phase.outputs.join(', ')}`,
-    ``,
-    `Blueprint:`,
-    `- WHO: ${plan.blueprint.who}`,
-    `- WHAT: ${plan.blueprint.what}`,
-    `- WHERE: ${plan.blueprint.where}`,
-    `- WHY: ${plan.blueprint.why}`,
-    ``,
-    `RULES:`,
-    `- If producing multiple files, prefix each file's code block with:  // FILE: relative/path/to/file.ext`,
-    `- Each file must be complete and working. No placeholders.`,
-    `- Leave extension points for later phases. Do not hard-code values future phases will own.`,
-    `- Return ONLY code. No markdown fences. No explanation.`,
-  ].join('\n');
-}
-
-/**
- * Parses // FILE: path markers from assembled code into a map of { relPath → code }.
- * If no markers found, all code goes to primaryOutput.
- */
-function parseFileMarkers(code: string, primaryOutput: string): Map<string, string> {
-  const map = new Map<string, string>();
-  const markerPattern = /^(?:\/\/|#)\s*FILE:\s*(.+)$/m;
-  const parts = code.split(markerPattern);
-
-  if (parts.length <= 1) {
-    map.set(primaryOutput, code.trim());
-    return map;
-  }
-  // parts is: [pre, fileName1, code1, fileName2, code2, ...]
-  for (let i = 1; i < parts.length; i += 2) {
-    const filePath = parts[i]?.trim();
-    const fileCode = (parts[i + 1] || '').trim();
-    if (filePath) { map.set(filePath, fileCode); }
-  }
-  return map;
-}
-
-/** Formats plan steps as a readable breakdown for the chat conversation */
-function formatPlanBreakdown(steps: PlanStep[]): string {
-  return steps.map(s =>
-    `  **Step ${s.stepNumber}** — ${s.assignedLabel}: ${s.description}`
-  ).join('\n');
-}
+// Re-export utilities so existing importers don't break
+export { isOrchestratedAvailable, buildPhaseTask } from './chatPanelBuildOrchestratedUtils';
 
 /**
  * Runs a single phase using the full multi-AI orchestration pipeline.
@@ -120,11 +61,28 @@ export async function runOrchestratedPhaseBuild(
       `**${phase.icon} ${phase.name} — AI Build Plan**`,
       ``,
       formatPlanBreakdown(planSteps),
-      ``,
-      `_Each AI working in sequence..._`,
     ].join('\n'),
     timestamp: Date.now(),
   });
+  deps.refresh();
+
+  // [FIX] Plan Approval Gate — show orchestrated plan to user and wait for approval
+  const planId = generatePlanId();
+  const planCard = formatOrchestratedPlanForApproval(planSteps, phase.name, planId);
+  deps.conversation.push({ role: 'assistant', content: planCard, timestamp: Date.now() });
+  deps.refresh();
+  const decision = await awaitPlanApproval(planId, deps.conversation, deps.refresh);
+  if (decision === 'cancel') {
+    deps.conversation.push({ role: 'assistant', content: '\u274c Build cancelled.', timestamp: Date.now() });
+    deps.refresh();
+    return [];
+  }
+  if (decision === 'revise') {
+    deps.conversation.push({ role: 'assistant', content: '\u270f\ufe0f Revision requested \u2014 please describe what you want changed and resend.', timestamp: Date.now() });
+    deps.refresh();
+    return [];
+  }
+  deps.conversation.push({ role: 'assistant', content: '\u2705 Plan approved \u2014 each AI working in sequence...', timestamp: Date.now() });
   deps.refresh();
 
   // ── Step 2: Execute each step with its assigned AI ────────────────────────
@@ -191,6 +149,18 @@ export async function runOrchestratedPhaseBuild(
     timestamp: Date.now(),
   });
   deps.refresh();
+
+  // [FIX] Walkthrough Handoff — generate a structured summary of the orchestrated build
+  try {
+    await appendWalkthroughToConversation(
+      plan.blueprint.what || phase.name,
+      writtenFiles,
+      root,
+      deps.routing,
+      deps.conversation,
+      deps.refresh,
+    );
+  } catch { /* non-blocking */ }
 
   return writtenFiles;
 }

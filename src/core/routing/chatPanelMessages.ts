@@ -182,5 +182,18 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     let files: string[] = [], commitMsg = '';
     try { const d = JSON.parse(Buffer.from(msg.payload || '', 'base64').toString('utf-8')); files = d.files || []; commitMsg = d.message || ''; } catch {}
     (require('vscode') as typeof import('vscode')).commands.executeCommand('redivivus.githubCommitFiles', files, commitMsg, panel.webview);
+
+  // [FIX] Plan Approval Gate — bridges webview plan buttons to the build pipeline Promise
+  } else if (msg.type === 'plan-approve') {
+    const { resolvePlanApproval } = await import('../build/chatPanelBuildPlanGate.js');
+    if (msg.planId) { resolvePlanApproval(msg.planId, 'approve'); }
+
+  } else if (msg.type === 'plan-revise') {
+    const { resolvePlanApproval } = await import('../build/chatPanelBuildPlanGate.js');
+    if (msg.planId) { resolvePlanApproval(msg.planId, 'revise'); }
+
+  } else if (msg.type === 'plan-cancel') {
+    const { resolvePlanApproval } = await import('../build/chatPanelBuildPlanGate.js');
+    if (msg.planId) { resolvePlanApproval(msg.planId, 'cancel'); }
   }
 }

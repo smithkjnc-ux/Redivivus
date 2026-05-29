@@ -29,6 +29,14 @@ export function renderMessages(conversation: ChatMessage[]): string {
     html = html.replace(/GUARDIAN_PASS\s*/g, '');
     html = html.replace(/📝 (.+)/g, (_m, t) => `<div class="story-line"><span class="story-dot">✅</span><span>${escapeHtml(t)}</span></div>`);
     html = html.replace(/__ACTION_CARD__([^|]+)\|\|\|([^|]+)\|\|\|END__/g, (_m, c, l) => renderActionCard(c, l));
+    // [FIX] Plan Approval Gate buttons — renders Approve/Revise/Cancel for build plan review
+    html = html.replace(/__PLAN_GATE__([^|]+)\|\|\|END_PLAN_GATE__/g, (_m, planId) => {
+      return `<div class="plan-gate-actions" style="display:flex;gap:10px;margin-top:12px;">`
+        + `<button class="plan-approve-btn" data-plan-id="${escapeHtml(planId)}" style="padding:8px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#2563eb,#4d9eff);color:#fff;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(77,158,255,0.3);font-family:inherit;">Approve Plan</button>`
+        + `<button class="plan-revise-btn" data-plan-id="${escapeHtml(planId)}" style="padding:8px 16px;border:1px solid #fbbf24;border-radius:8px;background:transparent;color:#fbbf24;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">Revise</button>`
+        + `<button class="plan-cancel-btn" data-plan-id="${escapeHtml(planId)}" style="padding:8px 16px;border:1px solid #f87171;border-radius:8px;background:transparent;color:#f87171;cursor:pointer;font-size:13px;font-family:inherit;">Cancel</button>`
+        + `</div>`;
+    });
     html = html.replace(/__RESULT_CARD__([\s\S]*?)__END_RESULT_CARD__/g, (_m, s) => renderResultCard(s));
     html = html.replace(/__AI_BREAKDOWN__([\s\S]*?)\|\|\|END_BREAKDOWN__/g, (_m, r) => renderAIByline(r));
     html = html.replace(/__BUILD_FEEDBACK__([^|]+)\|\|\|END_FEEDBACK__/g, (_m, f) => renderFeedbackBlock(f));

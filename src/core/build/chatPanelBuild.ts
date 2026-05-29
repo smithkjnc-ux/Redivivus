@@ -18,6 +18,10 @@ import { updateLastMsg, appendMsg } from './chatPanelBuildHelpers';
 import { buildGitContextBlock } from '../../services/workspace/gitContext';
 import { redivivusLog } from '../../services/logging/redivivusLogger';
 import { inferBuildTarget, runCodeReviewPipeline, applyCodeToFile, runPostBuildActions, resolveWorkerPrompt } from './chatPanelBuildSteps';
+import { generatePlanId, formatPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate';
+import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough';
+import { LearnedMemoryService } from '../../services/learnedMemoryService';
+import { selectRelevantTurns } from '../ai/contextSelector';
 
 export type { BuildContext } from './chatPanelBuildHelpers';
 export { registerVaultHitResolver, resolveVaultHit, isChunkedBuildRequest } from './chatPanelBuildHelpers';
@@ -29,6 +33,11 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const deadEnds = readProjectDeadEnds(root);
   const projectRules = readProjectRules(root);
   const gitCtx = buildGitContextBlock(root);
+  // [DONE] Rule 18 — AI selects which conversation turns are relevant to this build task
+  const convTurns = ctx.conversation
+    ? ctx.conversation.filter(m => m.role === 'user' || m.role === 'assistant').map(m => ({ role: m.role, content: m.content }))
+    : [];
+  const convCtx = convTurns.length > 0 ? await selectRelevantTurns(convTurns, task, routing) : '';
   const blueprintContext = [
     ctx.blueprintContext,
     ctx.clarifyAnswers || '',
@@ -36,6 +45,7 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
     projectRules ? `PROJECT RULES (must not violate):\n${projectRules}` : '',
     gitCtx,
     getRecentBuildsContext(root),
+    convCtx ? `RECENT CONVERSATION:\n${convCtx}` : '',
   ].filter(Boolean).join('\n\n');
   const buildStart = Date.now();
   const ledger = new BuildLedger();
@@ -51,11 +61,31 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   const { relPath, absPath, existingTarget, isCrossLang, isMod, ext } = await inferBuildTarget(task, root, blueprintContext, routing, { usageTracker: ctx.usageTracker });
 
   appendMsg(ctx, `📋 Planning \`${relPath}\`...`);
+  const neverDoContext = await new LearnedMemoryService(root).getNeverDoForTask(task, routing);
   const _supT0 = Date.now(); const _supSid = tracer.step('SUPERVISOR', supervisorAI, task.slice(0, 80));
-  const spec = await routing.supervisorPlan(task, relPath, blueprintContext).catch(() => null);
+  const spec = await routing.supervisorPlan(task, relPath, blueprintContext, neverDoContext || undefined).catch(() => null);
   const _supTok = spec ? Math.ceil((task.length + blueprintContext.length + spec.length) / 4) : 0;
   tracer.done(_supSid, spec ? 'success' : 'fail', Date.now() - _supT0, spec ? `${spec.split('\n').length} steps` : 'no supervisor plan', Math.ceil((task.length + blueprintContext.length) / 4), _supTok);
-  if (spec) { ledger.record(supervisorAI, 'supervisor', 'planned', _supTok); updateLastMsg(ctx, `📋 Plan ready — writing your code...`); }
+  if (spec) { ledger.record(supervisorAI, 'supervisor', 'planned', _supTok); updateLastMsg(ctx, `📋 Plan ready`); }
+
+  // [FIX] Plan Approval Gate — show plan to user and wait for approval (skip for nano/no-spec builds)
+  if (spec && ctx.conversation) {
+    const planId = generatePlanId();
+    const planCard = formatPlanForApproval(spec, relPath, 'standard', planId);
+    appendMsg(ctx, planCard);
+    const decision = await awaitPlanApproval(planId, ctx.conversation, ctx.refresh);
+    if (decision === 'cancel') {
+      appendMsg(ctx, '❌ Build cancelled.');
+      ctx.postToWebview?.({ type: 'set-status', status: 'ready' });
+      return;
+    }
+    if (decision === 'revise') {
+      appendMsg(ctx, '✏️ Revision requested — please describe what you want changed and resend.');
+      ctx.postToWebview?.({ type: 'set-status', status: 'ready' });
+      return;
+    }
+    updateLastMsg(ctx, '✅ Plan approved — writing your code...');
+  }
 
   const vaultSummary = searchResult.items.length > 0 ? formatVaultContext(searchResult.items) : '';
   const prompt = resolveWorkerPrompt(ctx, relPath, existingTarget, isCrossLang, absPath, spec, vaultSummary);
@@ -83,9 +113,16 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
 
   const code = Inf.extractCodeFromResponse(res.text);
   const _grdT0 = Date.now(); const _grdSid = tracer.step('GUARDIAN', undefined, relPath);
-  const { code: reviewedCode } = await runCodeReviewPipeline(ctx, code, relPath, absPath, root, spec);
+  const reviewResult = await runCodeReviewPipeline(ctx, code, relPath, absPath, root, spec);
+  const reviewedCode = reviewResult.code;
   tracer.done(_grdSid, 'success', Date.now() - _grdT0, 'review complete');
-  updateLastMsg(ctx, `✅ Review complete — writing \`${relPath}\`...`);
+  // [FIX] Transparent Guardian — show review result to user instead of swallowing it
+  const guardianVerdict = reviewResult.qualityScore >= 4
+    ? `🛡️ **Guardian:** Approved (quality ${reviewResult.qualityScore}/5)`
+    : reviewResult.qualityScore >= 2
+      ? `🛡️ **Guardian:** Passed with notes (quality ${reviewResult.qualityScore}/5)`
+      : `🛡️ **Guardian:** Issues detected — auto-corrected (quality ${reviewResult.qualityScore}/5)`;
+  updateLastMsg(ctx, `${guardianVerdict} — writing \`${relPath}\`...`);
 
   const snapshotId = Writer.createSnapshot(root, task, relPath);
   const _oldContent = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf8') : '';
@@ -106,6 +143,11 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   tracer.end([relPath, ...scaffoldedFiles], totalTokens, totalCost);
 
   await runPostBuildActions({ ctx, task, relPath, absPath, root, scaffoldedFiles, workerAI, totalTokens, totalCost });
+
+  // [FIX] Walkthrough Handoff — generate a structured summary of the build for the user
+  try {
+    await appendWalkthroughToConversation(task, [relPath, ...scaffoldedFiles], root, routing, ctx.conversation, ctx.refresh);
+  } catch { /* non-blocking — walkthrough failure should never break the build */ }
 }
 export { runChunkedBuild } from './chatPanelChunked';
 export { runVaultAssemblyBuild } from './chatPanelBuildVault';

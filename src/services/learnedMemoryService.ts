@@ -47,19 +47,52 @@ export class LearnedMemoryService {
     }
   }
 
-  /** Returns Never-Do list for injection into Supervisor prompt — sorted by frequency */
-  getNeverDoForPrompt(): string {
-    const entries = readLearnedEntries(this.filePath).filter(e => e.neverDo);
-    if (entries.length === 0) { return ''; }
-    const sorted = entries.sort((a, b) => (b.count || 1) - (a.count || 1)).slice(0, 10);
-    let out = '\n--- NEVER DO (learned from past mistakes) ---\n';
-    out += sorted.map(e => {
+  private _formatNeverDo(entries: LearnedEntry[]): string {
+    const lines = entries.map(e => {
       const times = (e.count || 1) > 1 ? ` [seen ${e.count}x]` : '';
       const ctx = e.context ? ` (${e.context})` : '';
       return `- DO NOT: ${e.text}${ctx}${times}`;
-    }).join('\n');
-    out += '\n---\n';
-    return out;
+    });
+    return '\n--- NEVER DO (learned from past mistakes) ---\n' + lines.join('\n') + '\n---\n';
+  }
+
+  /** Sync fallback — top-10 by frequency, no task filtering. Kept for non-async call sites. */
+  getNeverDoForPrompt(): string {
+    const entries = readLearnedEntries(this.filePath).filter(e => e.neverDo);
+    if (entries.length === 0) { return ''; }
+    const sorted = [...entries].sort((a, b) => (b.count || 1) - (a.count || 1)).slice(0, 10);
+    return this._formatNeverDo(sorted);
+  }
+
+  // [RULE 18] AI selects which NeverDo entries are relevant to the current task.
+  // Replaces blind top-10-by-frequency injection with task-aware filtering.
+  // Falls back to frequency sort when AI is unreachable.
+  async getNeverDoForTask(task: string, routing: RoutingService): Promise<string> {
+    const entries = readLearnedEntries(this.filePath).filter(e => e.neverDo);
+    if (entries.length === 0) { return ''; }
+    if (entries.length <= 3) { return this._formatNeverDo(entries); }
+
+    const numbered = entries.map((e, i) => `${i + 1}. ${e.text}`).join('\n');
+    const prompt =
+      `You are reviewing past coding mistakes for relevance to a new task.\n\n` +
+      `Task: "${task.slice(0, 200)}"\n\n` +
+      `Past mistakes:\n${numbered}\n\n` +
+      `Reply with ONLY the numbers of mistakes that could realistically recur in this task, comma-separated.\n` +
+      `If none apply, reply: NONE`;
+    try {
+      const result = await routing.promptCheap(prompt, 8_000);
+      const raw = result.text.trim().toUpperCase();
+      if (!raw || raw === 'NONE') { return ''; }
+      const indices = raw.split(/[,\s]+/)
+        .map(s => parseInt(s.trim()))
+        .filter(n => !isNaN(n) && n >= 1 && n <= entries.length);
+      const relevant = indices.map(i => entries[i - 1]).filter(Boolean);
+      return relevant.length > 0 ? this._formatNeverDo(relevant) : '';
+    } catch {
+      // Offline fallback: top-10 by frequency
+      const sorted = [...entries].sort((a, b) => (b.count || 1) - (a.count || 1)).slice(0, 10);
+      return this._formatNeverDo(sorted);
+    }
   }
 
   /** Returns a compact string to inject into AI prompts — max ~300 tokens */

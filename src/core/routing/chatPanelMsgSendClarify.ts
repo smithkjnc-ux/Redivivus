@@ -106,3 +106,32 @@ export async function runChatClarifyStep(
   refresh();
   return { routedText: userText, cancelled: false };
 }
+
+// [RULE 18] AI judgment replaces the old bug-keyword regex + spec-length heuristic.
+// Returns true when the request needs clarifying questions, false when it is clear enough to build.
+// Fallback: reproduces the old heuristic when the AI is unreachable.
+export async function shouldClarify(userText: string, routing: RoutingService): Promise<boolean> {
+  const prompt =
+    'A developer sent this build request. Does it have enough detail to start building immediately, or does it need clarifying questions first?\n\n' +
+    'Reply CLEAR if:\n' +
+    '- It describes a specific bug, error, or broken behavior\n' +
+    '- It includes specific requirements (features, behavior, appearance)\n' +
+    '- It names a concrete thing to add or change with enough context to act on\n\n' +
+    'Reply VAGUE if:\n' +
+    '- It is a one-liner with no specifics ("make a game", "build an app")\n' +
+    '- Multiple very different interpretations are equally valid\n' +
+    '- The core details needed to build anything are completely absent\n\n' +
+    'Respond with exactly one word: CLEAR or VAGUE\n\n' +
+    `Request: "${userText.slice(0, 400)}"`;
+
+  try {
+    const result = await routing.promptCheap(prompt, 8_000);
+    return result.text.trim().toUpperCase().startsWith('VAGUE');
+  } catch {
+    // Offline fallback: reproduce prior heuristic so behavior degrades gracefully
+    const lower = userText.toLowerCase();
+    const isBugReport = /\b(fix|broken|bug|doesn't work|not working|error|crash|fail|glitch|stuck|missing|wrong)\b/i.test(lower);
+    const hasSpecs = userText.length > 50 && /\b(should|must|need|require|include|have)\b/i.test(lower);
+    return !isBugReport && !hasSpecs;
+  }
+}

@@ -60,5 +60,5 @@ export async function handleBuildIntent(
   }
   await (isInit
     ? handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType)
-    : deps.handleBuildRequest(routedText));
+    : deps.handleBuildRequest(routedText, deps.buildMode === 'direct'));
 }

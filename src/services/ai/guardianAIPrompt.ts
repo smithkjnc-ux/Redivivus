@@ -51,22 +51,8 @@ The worker often adds import statements for functions that don't exist, or expor
 - CRITICAL: Any import that references a non-existent function is a COMPLETE FIX FAILURE — reject immediately.
 - The worker MUST define functions BEFORE importing them from other files. Adding an import for a function that doesn't exist will cause runtime errors.
 
-DOMAIN GOTCHAS — things junior AIs consistently get wrong (use your judgment, do not treat as a checklist):
-- Canvas animations: trail alpha math '1 - index/max' is almost always inverted — oldest should be most transparent, newest most opaque
-- Canvas animations: calling requestAnimationFrame inside draw() AND inside the main loop creates two simultaneous loops
-- Canvas animations: using setInterval instead of requestAnimationFrame for animation
-- Canvas size: setting only via CSS instead of canvas.width = value in JS
-- Velocity variables: declaring dx/dy/vx/vy as const when they need to change
-- Speed variable computed but never applied: e.g. const speed = Math.hypot(w,h)/180 then dx = (Math.random()-0.5)*2 ignoring speed entirely — check that speed actually multiplies the direction vector
-- Single hardcoded color when task asks for visual interest — if user asked for glowing/colorful trail, a fixed hsl(180,...) for every point is a spec failure; hue should increment each frame
-- Canvas clear alpha too high (e.g. rgba(0,0,0,0.3)) producing teal/colored background instead of dark — trail fading should use rgba(0,0,0,0.1) to rgba(0,0,0,0.15) range
-- ctx.shadowBlur left non-zero after the trail loop — glow bleeds into the fillRect clear making the background appear colored instead of dark; must reset ctx.shadowBlur = 0 after drawing trail points
-- Missing background-color on body/canvas in CSS — without it the page background can appear as browser default white or grey instead of #0a0a0f
-- ageFactor = i / maxTrailLength instead of i / trail.length — when trail is still filling up all early points appear dim/tiny; must divide by trail.length (actual current length)
-- resizeCanvas() called before x/y are initialized, then clamps x/y producing NaN — causes black screen; guard the clamp: only clamp if x and y are already numbers (typeof x === 'number')
-- speed hardcoded as a fixed number instead of Math.hypot(canvas.width, canvas.height) / 180 — ball moves too slow/fast on different screen sizes
-- CLI input shadowing: args parsed into named variables (distance, pay, fuelCost) but formula only uses some — e.g. netProfit = pay - fuelCost while distance was parsed and is never referenced — all parsed argv inputs MUST appear in the output computation
-- File type mismatch: if the file is .js or .ts, the content must be valid JavaScript/TypeScript code. If it is JSON, markdown, or plain text disguised as code, that is a CRITICAL correctness bug.
+DOMAIN GOTCHAS — PROJECT-SPECIFIC:
+The PROJECT BLUEPRINT CONTEXT above may include a "NEVER DO" section listing mistakes this project has made before. If present, treat each entry as a high-priority domain gotcha — check the code against every one before passing. These are real failures from this project's history, not general advice.
 
 NARRATIVE TEXT DETECTION — CRITICAL:
 The worker often starts its response with explanatory sentences like "I need to check...", "Let me fix...", "Here's the solution..." before the actual code. This narrative text MUST be removed — it will break the project if written to files.

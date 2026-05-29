@@ -3,7 +3,7 @@
 
 import type { RoutingService } from '../../services/ai/routingService';
 import { tracer } from '../../services/pipelineTracer';
-import { checkHardcodedOverrides, fallbackClassify } from './chatPanelClassifierOverrides';
+import { fallbackClassify } from './chatPanelClassifierOverrides';
 import { cloudClassify } from '../../services/api/apiClient.js';
 
 export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service';
@@ -40,10 +40,6 @@ export async function classifyIntent(
   onUsage?: (inputTokens: number, outputTokens: number, model: string) => void
 ): Promise<IntentResult> {
   void routing; void onUsage; // kept for call-site compat; classification is now server-side
-  const t = text.toLowerCase().trim();
-  const override = checkHardcodedOverrides(t);
-  if (override) { return override; }
-
   let _sid = '';
   let _t0 = 0;
   try {

@@ -9,7 +9,7 @@ import { buildAIPrefix, processAIResponse } from '../ai/chatPanelAI';
 import { clearPendingScopeQuestion } from '../../services/project/templateScopeService';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
 import { _architectReviews } from '../../ui/panels/chat/chatPanelMsgArchitect';
-import { shouldAutoSave, extractAutoSaveTarget, autoSaveAndOpen, shouldDeleteFiles, deleteRequestedFiles } from '../build/chatPanelAutoSave';
+import { shouldAutoSave, extractAutoSaveTarget, autoSaveAndOpen, shouldDeleteFiles, deleteRequestedFiles, identifyFilesToDelete } from '../build/chatPanelAutoSave';
 import { runChunkedConvert } from './chatPanelMsgSendAIConvert';
 
 // [WARN] PREFERENCE_RE detects user preferences to save to learned memory.
@@ -32,7 +32,7 @@ export async function handleAIChat(
   try {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
     const recentUserMsgs = conversation.filter(m => m.role === 'user').slice(-4, -1).map(m => m.content);
-    const prefix = buildAIPrefix(redivivus, recentUserMsgs, routing, conversation.slice(-14), userText, isConvert);
+    const prefix = await buildAIPrefix(redivivus, recentUserMsgs, routing, conversation.slice(-14), userText, isConvert);
     (routing as any).promptFailoverCallback = (failedAI: string, nextAI: string) => {
       conversation.push({ role: 'assistant', content: `Switching to ${AI_LABEL[nextAI] || nextAI}...`, timestamp: Date.now() });
       refresh();
@@ -40,8 +40,22 @@ export async function handleAIChat(
 
     const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     if (await shouldDeleteFiles(userText, routing) && wsRoot) {
-      const deleteResult = await deleteRequestedFiles(userText, wsRoot);
-      if (deleteResult) { conversation.push({ role: 'assistant', content: deleteResult, timestamp: Date.now() }); refresh(); }
+      const filesToDelete = identifyFilesToDelete(userText, wsRoot);
+      if (filesToDelete.length > 0) {
+        const fileList = filesToDelete.length === 1 ? filesToDelete[0] : `${filesToDelete.length} files: ${filesToDelete.join(', ')}`;
+        const answer = await vscode.window.showWarningMessage(
+          `Permanently delete ${fileList}?`,
+          { modal: true },
+          'Delete',
+        );
+        if (answer === 'Delete') {
+          const deleteResult = deleteRequestedFiles(filesToDelete, wsRoot);
+          if (deleteResult) { conversation.push({ role: 'assistant', content: deleteResult, timestamp: Date.now() }); refresh(); }
+        } else {
+          conversation.push({ role: 'assistant', content: 'Delete cancelled — no files were removed.', timestamp: Date.now() });
+          refresh();
+        }
+      }
     }
 
     let finalText = '';

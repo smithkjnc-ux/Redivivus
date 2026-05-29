@@ -9,10 +9,11 @@ import { LearnedMemoryService } from '../../services/learnedMemoryService';
 import { getSystemPrompt } from './chatPanelAIPrompt';
 import { buildProjectAnnotationContext } from '../project/chatPanelProjectContext';
 import { extractFileMentions } from '../project/chatPanelFileContext';
+import { selectRelevantTurns } from './contextSelector';
 
 /** Builds the AI prompt prefix — question path gets Redivivus identity + annotations, code gen gets focused prompt
  *  isConvert: true = code generation (convert/build). false or undefined = Q&A (always conversational). */
-export function buildAIPrefix(redivivus: RedivivusService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string, isConvert?: boolean): string {
+export async function buildAIPrefix(redivivus: RedivivusService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string, isConvert?: boolean): Promise<string> {
   const config = redivivus.isInitialized() ? redivivus.loadConfig() : null;
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'none';
   const bp = config?.blueprint;
@@ -52,8 +53,10 @@ export function buildAIPrefix(redivivus: RedivivusService, recentMessages: strin
   }
 
   let conversationContext = '';
-  if (fullConversation) {
-    conversationContext = '\n--- HISTORY ---\n' + fullConversation.slice(-10).map(m => `${m.role}: ${m.content.slice(0, 300)}`).join('\n') + '\n';
+  if (fullConversation && routing) {
+    // [DONE] Rule 18 — AI selects relevant turns; short convs skip AI call entirely (≤6 turns)
+    const selected = await selectRelevantTurns(fullConversation, userText || '', routing);
+    if (selected) { conversationContext = '\n--- HISTORY ---\n' + selected + '\n'; }
   }
 
   const prompt = getSystemPrompt(bpStr);

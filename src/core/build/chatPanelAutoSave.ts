@@ -178,5 +178,5 @@ export async function autoSaveAndOpen(
 }
 // [DONE] DELETE_RE replaced with AI classifier per Rule 18.
 // Delete helpers extracted to chatPanelAutoSaveDelete.ts (Rule 9 split)
-export { shouldDeleteFiles, deleteRequestedFiles } from './chatPanelAutoSaveDelete';
+export { shouldDeleteFiles, deleteRequestedFiles, identifyFilesToDelete } from './chatPanelAutoSaveDelete';
 

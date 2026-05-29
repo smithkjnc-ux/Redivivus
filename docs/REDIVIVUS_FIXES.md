@@ -5,7 +5,135 @@
 
 ---
 
-*Last updated: May 28, 2026 (Session 11CK: Question fast-paths in classifier overrides)*
+*Last updated: May 29, 2026 (Session 11CS: Delete confirmation gate)*
+
+---
+
+## May 29, 2026 — Session 11CS (Delete confirmation gate)
+
+**Goal:** File deletion previously fired silently the moment the AI classified a message as a delete request. No confirmation step existed between "AI says yes" and `fs.unlinkSync`. Fixed by gating deletion behind a VS Code modal warning dialog.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelAutoSaveDelete.ts` | Extracted `identifyFilesToDelete(userText, root): string[]` — identifies files without deleting. Rewrote `deleteRequestedFiles` to accept a pre-identified `string[]` instead of re-running identification internally. Fixed module-level `/g` regex statefulness (was reusing `lastIndex` across calls) by moving to a local regex instance. | Identification and deletion need to be separate steps so the confirm dialog can show the user exactly what will be deleted before anything happens. | None — same identification logic, now called once instead of twice. |
+| `src/core/build/chatPanelAutoSave.ts` | Added `identifyFilesToDelete` to the re-export line. | Required so the call site can import it without touching the delete module directly. | None. |
+| `src/core/routing/chatPanelMsgSendAI.ts` | Added `identifyFilesToDelete` to import. Replaced silent `deleteRequestedFiles(userText, wsRoot)` call with: identify files → show `showWarningMessage` modal listing the files → only delete on explicit "Delete" click → post cancel message if dismissed. | Destructive filesystem operations require explicit user confirmation. A misread "clean up the old files" no longer silently deletes. | None — modal is blocking; user must actively click Delete or dismiss. |
+
+---
+
+## May 29, 2026 — Session 11CR (AI-driven context window selection)
+
+**Goal:** Replace the hardcoded `slice(-10).map(m => m.content.slice(0, 300))` conversation context cap with an AI-driven relevance selector. The AI now picks which turns are actually useful for the current task rather than blindly including the last N turns at a character cap.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/ai/contextSelector.ts` | New file. Exports `selectRelevantTurns(conversation, task, routing)`. Short convs (≤6 turns) skip the AI call and return all turns at full length. Long convs: cheap AI call picks the most relevant turns (max 6). Fallback on AI failure: last 6 turns at full length. | Rule 18: AI for understanding. Code was previously making a 300-char truncation decision that degrades context quality on long conversations. | Low — fallback reproduces old behavior if AI unreachable. |
+| `src/core/ai/chatPanelAI.ts` | Made `buildAIPrefix` async. Added import for `selectRelevantTurns`. Replaced `fullConversation.slice(-10).map(m => m.content.slice(0, 300))` block with `await selectRelevantTurns(fullConversation, userText, routing)`. Guard added: only calls when `routing` is present. | Previous cap silently dropped useful early context from long conversations and truncated every turn to 300 chars regardless of importance. | Low — routing guard preserves original empty-string behavior when routing not available. |
+| `src/core/routing/chatPanelMsgSendAI.ts` | Changed `buildAIPrefix(...)` call to `await buildAIPrefix(...)` on the Q&A/convert path. | Required by `buildAIPrefix` now being async. | None — caller is already async. |
+| `src/ui/panels/chat/chatPanelMsgMapContext.ts` | Changed `buildAIPrefix(...)` call to `await buildAIPrefix(...)` on the map context path. | Required by `buildAIPrefix` now being async. | None — caller is already async. |
+| `src/core/build/chatPanelBuild.ts` | Added import for `selectRelevantTurns`. Before assembling `blueprintContext`, calls `selectRelevantTurns` on `ctx.conversation` (user/assistant messages only). Adds result as `RECENT CONVERSATION:` block to blueprintContext. | Build pipeline previously had zero conversation context — the Supervisor never knew what the user had been discussing before issuing the build command. | Low — empty conversation or AI failure produces empty string, no change to blueprintContext. |
+
+**Architecture note:** Conversation context now flows to two places: Q&A path (via `buildAIPrefix`) and build Supervisor path (via `blueprintContext`). Both use AI relevance filtering rather than recency + truncation.
+
+---
+
+## May 29, 2026 — Session 11CQ (Replace Guardian static gotcha list with dynamic NeverDo)
+
+**Goal:** Remove the 15-item hardcoded canvas animation gotcha list from the Guardian prompt and replace it with a dynamic lookup against the project's NeverDo history. Guardian now checks what actually went wrong in this project, not a static list of canvas bugs that is irrelevant to most builds.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/ai/guardianAIPrompt.ts` | Removed 16-line static DOMAIN GOTCHAS section (canvas alpha math, requestAnimationFrame double-loop, velocity const, trail alpha, etc.). Replaced with a 2-line instruction: "if NEVER DO section is present in blueprint context, treat each entry as a high-priority domain gotcha." | Static list was canvas-specific and irrelevant to CLI, API, web, and most other builds. Rule 18: AI for understanding. The Guardian model knows canvas animation basics without being hand-held. | Low — Guardian is a capable model. NeverDo fills the gap for any real repeat failures. |
+| `src/core/build/chatPanelBuildReview.ts` | Calls `getNeverDoForTask` (from session 11CP) before building `guardianContext`. Appends the AI-filtered NeverDo to the blueprint context passed to `routing.guardianReview`. | Feeds the task-relevant past mistakes directly to the Guardian without changing the `guardianReview` signature (avoids touching `routingService.ts` which is at 203 lines). | Low — additive only; no NeverDo entries → no change to guardianContext |
+
+**Architecture note:** NeverDo now flows to BOTH Supervisor (session 11CP) and Guardian (this session). Supervisor gets it to avoid repeating bad plans. Guardian gets it to catch the same failure patterns at review time.
+
+---
+
+## May 29, 2026 — Session 11CP (NeverDo AI filtering + wire into build pipeline)
+
+**Goal:** Replace the blind top-10-by-frequency NeverDo injection with AI task-relevance filtering. Also fixes a silent bug: NeverDo entries were being written but the `supervisorPlan` call never received them.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/learnedMemoryService.ts` | Added `_formatNeverDo` private helper (shared by both methods). Added `getNeverDoForTask(task, routing)` — async, AI-filtered: sends task + all NeverDo entries to cheap model, gets back only the relevant indices. Fallback: top-10 by frequency when AI is unreachable. `getNeverDoForPrompt()` kept for non-async call sites. | Rule 18: AI judges relevance. Stops injecting canvas animation rules into CLI builds. | Low — offline fallback reproduces prior behavior exactly |
+| `src/core/build/chatPanelBuild.ts` | Imported `LearnedMemoryService`. Added `getNeverDoForTask` call before `supervisorPlan`. Passes result as `neverDoContext` (4th arg). | Fixes silent bug: NeverDo entries were written but never reached the Supervisor prompt. Now they do. | Low — additive only; empty string when no entries exist |
+
+**What `neverDoContext` was doing before this change:** nothing. The parameter existed in `supervisorPlanImpl` but was never passed from any build call site.
+
+---
+
+## May 29, 2026 — Session 11CO (Replace clarify skip heuristics with AI)
+
+**Goal:** Remove the two regex heuristics that decided whether to skip the clarify wizard, and replace them with a single cheap AI judgment call.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMsgSendClarify.ts` | Added `shouldClarify(userText, routing)` — 8s cheap AI call returning CLEAR or VAGUE. Fallback reproduces old heuristic when AI is unreachable. | Rule 18: AI for understanding. "Is this request specific enough?" is a language judgment, not a keyword count. | Low — offline fallback preserves prior behavior exactly |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Removed `_BUG_KEYWORDS` regex, `isClearBugReport`, `hasDetailedSpecs`. Clarify gate now calls `shouldClarify` and only runs the wizard if AI returns VAGUE. | Eliminates 30+ hardcoded bug/spec keywords. AI handles edge cases the regex missed. | Low — same gate, smarter signal |
+
+**What stays hardcoded:** `fromPreview` flag and `buildMode !== 'direct'` — these are operational conditions, not language understanding.
+
+---
+
+## May 29, 2026 — Session 11CN (Replace classifier overrides with cloud AI)
+
+**Goal:** Remove all hardcoded regex fast-paths in the intent classifier and route every user message through the cloud AI classifier. Questions, commands, run intents, and offtopic messages are now classified by AI, not keyword matching. Eliminates the need to manually add new regexes when new commands are added.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/ai/chatPanelClassifierOverrides.ts` | Removed `checkHardcodedOverrides` entirely — 80 lines of regex deleted. File now contains only `fallbackClassify` (offline safety net). | Rule 18: AI for understanding, not regex. Cloud classifier handles all intent routing. | Low — `fallbackClassify` still covers offline/error cases |
+| `src/core/ai/chatPanelClassifier.ts` | Removed `checkHardcodedOverrides` import and call. `classifyIntent` now goes straight to `cloudClassify`. | Eliminates double-classification and the regex pre-filter. | Low — same cloud classifier was already handling all ambiguous cases |
+| `src/core/routing/chatPanelMsgSendMessage.ts` | Removed early `checkHardcodedOverrides` fast-path (STEP 1). Moved `classifyIntent` (cloud AI) before the clarify step so commands/questions/run/offtopic exit immediately. Removed duplicate intent routing at bottom of function. Rule 9 split: `runConfirmedLocalBuild` extracted. | Single unified AI classification replaces two-pass regex+cloud flow. | Low — same cloud classifier, same routing outcomes |
+| `src/core/routing/chatPanelMsgSendConfirmedBuild.ts` | [NEW] Extracted `runConfirmedLocalBuild` from `chatPanelMsgSendMessage.ts` | Rule 9 — `chatPanelMsgSendMessage.ts` was 271 lines | None — pure extraction |
+
+**What stays hardcoded and why:**
+- Build confirm regex (`build it / let's go / sounds great`) — the cloud classifier cannot look back through conversation history to find the prior request. That lookup must stay as code.
+- `fallbackClassify` — runs only when the cloud classifier is unreachable. Offline safety net.
+- `_BUILD_FALLBACK` regex — catch-all if `classifyIntent` itself throws. Same role.
+
+---
+
+## May 29, 2026 — Session 11CM (Direct mode wizard bypass fix)
+
+**Goal:** Fix a bug where "AI decides everything" (Direct mode) still asked 5W questions when the project was not initialized.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/routing/chatPanelMsgSendBuildIntent.ts` | Pass `deps.buildMode === 'direct'` as `skipComplex` to `deps.handleBuildRequest` | Forces orchestrator to auto-create the project without showing the 5W wizard | Low — restores intended behavior of "AI decides everything" |
+
+---
+
+## May 29, 2026 — Session 11CL (Supervisor-led Planning Mode with User Approval Gate)
+
+**Goal:** Transform the build pipeline from a silent "head-to-tail" execution into a 4-phase autonomous workflow: Plan → Approve → Execute → Verify → Walkthrough. The Supervisor's plan is now visible to the user, who must explicitly approve it before Workers begin building. The Guardian's review results are now transparent instead of swallowed. A Walkthrough summary is generated after every build.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/build/chatPanelBuildPlanGate.ts` | [NEW] Plan approval gate: resolver map, plan formatting, async approval Promise with 5-min timeout | Bridges webview buttons to build pipeline pause/resume | Low — timeout prevents stale resolvers (dead_ends.md pattern) |
+| `src/core/build/chatPanelBuildWalkthrough.ts` | [NEW] AI-generated walkthrough summary: prompts Supervisor for file list, architecture, next steps | Provides structured handoff after every build | Low — non-blocking, falls back to static summary |
+| `src/core/build/chatPanelBuild.ts` | Plan gate after Supervisor plan, transparent Guardian verdict, walkthrough call after post-build | Shows plan to user for approval; makes Guardian results visible; generates handoff | Medium — core build flow changed, but nano builds bypass gate |
+| `src/core/build/chatPanelBuildOrchestrated.ts` | Plan gate after createPlan, walkthrough after multi-AI build | Same approval gate for orchestrated/deep builds | Medium — orchestrated flow pauses for approval |
+| `src/core/build/chatPanelBuildOrchestratedUtils.ts` | [NEW] Extracted AI_LABELS, buildPhaseTask, parseFileMarkers, formatPlanBreakdown, isOrchestratedAvailable | Rule 9 split — orchestrated file was 227 lines after edits | None — pure extraction |
+| `src/core/routing/chatPanelMessages.ts` | Added plan-approve/plan-revise/plan-cancel message handlers | Bridges webview button clicks to resolvePlanApproval() | Low — async imports, isolated |
+| `src/ui/panels/chat/chatPanelRenderer.ts` | Added __PLAN_GATE__ token renderer with Approve/Revise/Cancel buttons | Renders plan gate UI in chat | Low — same pattern as existing tokens |
+| `src/ui/panels/chat/chatPanelScriptActions.ts` | Added click handlers for plan gate buttons | Wires webview buttons to postMessage | Low — compact handlers |
 
 ---
 

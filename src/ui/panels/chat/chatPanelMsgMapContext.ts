@@ -24,7 +24,7 @@ export async function handleMapContext(msg: any, deps: MessageHandlerDeps): Prom
   // [FIX] Architect review prompt is fully self-contained — skip buildAIPrefix entirely.
   // buildAIPrefix injects an activeFileContext code block that may be empty (no open file),
   // causing the AI to see empty backtick fences and respond "code section appears to be empty".
-  const prefix = isArchitectReview ? '' : buildAIPrefix(deps.redivivus, [], routing);
+  const prefix = isArchitectReview ? '' : await buildAIPrefix(deps.redivivus, [], routing);
   conversation.push({ role: 'user', content: displayMsg, timestamp: Date.now() });
   refresh();
   try {

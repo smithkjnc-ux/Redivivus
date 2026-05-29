@@ -13,7 +13,11 @@ export interface GuardianReviewResult {
 export async function runGuardianReview(ctx: BuildContext, code: string, relPath: string, supervisorSpec: string | null): Promise<GuardianReviewResult> {
   const { routing, blueprintContext, root, task } = ctx;
   try {
-    const guardianContext = supervisorSpec ? `${blueprintContext}\n\nSPEC:\n${supervisorSpec}` : blueprintContext;
+    // [RULE 18] Inject task-relevant NeverDo entries so Guardian checks project-specific gotchas,
+    // not a static hardcoded list. Empty string when no entries match this task.
+    const neverDo = await new LearnedMemoryService(root).getNeverDoForTask(task, routing);
+    const baseContext = supervisorSpec ? `${blueprintContext}\n\nSPEC:\n${supervisorSpec}` : blueprintContext;
+    const guardianContext = neverDo ? `${baseContext}\n${neverDo}` : baseContext;
     const review = await routing.guardianReview(task, code, 'worker', guardianContext);
 
     // [FIX] Compute quality score based on review signals

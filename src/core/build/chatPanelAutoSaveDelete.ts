@@ -5,7 +5,26 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { RoutingService } from '../../services/ai/routingService';
 
-const FILE_EXT_RE = /\b(\w+\.\w{2,5})\b/g;
+/** Identify files in the project matching a delete request — does NOT delete anything */
+export function identifyFilesToDelete(userText: string, root: string): string[] {
+  const matches: string[] = [];
+  // Use local regex instance to avoid /g flag lastIndex statefulness across calls
+  const fileExtRe = /\b(\w+\.\w{2,5})\b/g;
+  let m;
+  while ((m = fileExtRe.exec(userText)) !== null) {
+    const filename = m[1];
+    if (fs.existsSync(path.join(root, filename))) { matches.push(filename); }
+  }
+  if (matches.length === 0) {
+    const extMatch = userText.match(/\b(html|js|ts|css|json)\b.*files?/i);
+    if (extMatch) {
+      const ext = '.' + extMatch[1].toLowerCase();
+      const files = fs.readdirSync(root).filter(f => f.endsWith(ext) && !f.startsWith('.'));
+      matches.push(...files);
+    }
+  }
+  return matches;
+}
 
 /** Check if user is asking to delete files from the project */
 export async function shouldDeleteFiles(userText: string, routing: RoutingService): Promise<boolean> {
@@ -21,33 +40,12 @@ export async function shouldDeleteFiles(userText: string, routing: RoutingServic
   }
 }
 
-/** Delete files matching user request */
-export async function deleteRequestedFiles(userText: string, root: string): Promise<string> {
-  const matches: string[] = [];
-  let m;
-  while ((m = FILE_EXT_RE.exec(userText)) !== null) {
-    const filename = m[1];
-    // Only delete files that exist in the project
-    const absPath = path.join(root, filename);
-    if (fs.existsSync(absPath)) { matches.push(filename); }
-  }
-  if (matches.length === 0) {
-    // Try to find files by extension mentioned in the message
-    const extMatch = userText.match(/\b(html|js|ts|css|json)\b.*files?/i);
-    if (extMatch) {
-      const ext = '.' + extMatch[1].toLowerCase();
-      const files = fs.readdirSync(root).filter(f => f.endsWith(ext) && !f.startsWith('.'));
-      matches.push(...files);
-    }
-  }
-  if (matches.length === 0) { return ''; }
+/** Delete pre-identified files from the project */
+export function deleteRequestedFiles(files: string[], root: string): string {
   const deleted: string[] = [];
-  for (const file of matches) {
-    try {
-      fs.unlinkSync(path.join(root, file));
-      deleted.push(file);
-    } catch { /* skip */ }
+  for (const file of files) {
+    try { fs.unlinkSync(path.join(root, file)); deleted.push(file); } catch { /* skip */ }
   }
   if (deleted.length === 0) { return ''; }
-  return `🗑️ Deleted: ${deleted.map(f => `\`${f}\``).join(', ')}`;
+  return `Deleted: ${deleted.map(f => `\`${f}\``).join(', ')}`;
 }

@@ -202,6 +202,13 @@ export function buildActionsScript(): string {
         try { vscode.postMessage({ type: 'github-commit', payload: cpayload }); } catch(e) {}
         return;
       }
+      // [FIX] Plan Approval Gate button handlers
+      const planApprove = target.closest ? target.closest('.plan-approve-btn') : null;
+      if (planApprove) { var pid = planApprove.getAttribute('data-plan-id'); planApprove.textContent='Building...'; planApprove.setAttribute('disabled','true'); try{vscode.postMessage({type:'plan-approve',planId:pid});}catch(e){} return; }
+      const planRevise = target.closest ? target.closest('.plan-revise-btn') : null;
+      if (planRevise) { var pid2 = planRevise.getAttribute('data-plan-id'); try{vscode.postMessage({type:'plan-revise',planId:pid2});}catch(e){} return; }
+      const planCancel = target.closest ? target.closest('.plan-cancel-btn') : null;
+      if (planCancel) { var pid3 = planCancel.getAttribute('data-plan-id'); try{vscode.postMessage({type:'plan-cancel',planId:pid3});}catch(e){} return; }
     });
     window.addEventListener('message', function(ev) {
       if (!ev.data || ev.data.type !== 'github-commit-result') { return; }
