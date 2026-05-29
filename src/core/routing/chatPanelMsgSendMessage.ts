@@ -38,8 +38,15 @@ async function runConfirmedLocalBuild(
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
 
   // Step 1: Extract blueprint from the task using Redivivus AI → gets suggestedName + 5W
-  const { extractBlueprintFromPrompt } = await import('../../services/blueprint/blueprintExtractor.js');
-  const extracted = await extractBlueprintFromPrompt(task, deps.routing);
+  let extracted: any = { suggestedName: '', who: '', what: '', where: '', when: '', why: '' };
+  try {
+    const { extractBlueprintFromPrompt } = await import('../../services/blueprint/blueprintExtractor.js');
+    extracted = await extractBlueprintFromPrompt(task, deps.routing);
+  } catch {
+    // [WARN] AI extraction failed — use heuristic fallback
+    const slug = task.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').slice(0, 40) || 'project';
+    extracted = { suggestedName: slug, who: '', what: task.slice(0, 120), where: '', when: 'now', why: '' };
+  }
 
   // Step 2: Use Redivivus autoCreateProject which creates folder + scaffold with proper name
   let root: string;
@@ -110,6 +117,10 @@ async function runConfirmedLocalBuild(
 
   try {
     await runSingleFileBuild(ctx as any);
+  } catch (e: any) {
+    const errMsg = e?.message || 'Build failed';
+    conversation.push({ role: 'assistant', content: `❌ **Build failed:** ${errMsg}\n\n_Try rephrasing your request or check your AI keys._`, timestamp: Date.now() });
+    refresh();
   } finally {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
   }
@@ -179,47 +190,28 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
 
   // ── Build confirmations: "that sounds perfect, lets build it" after prior conversation ──
-  // These are NOT new tasks — they confirm what was discussed. Carry full conversation context.
   const _BUILD_CONFIRM = /\b(build\s+it|lets\s+(build|do)\s+it|go\s+ahead|make\s+it|start\s+building|lets\s+go)\b/i;
   const _AGREEMENT = /\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
   if ((_BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText)) && lowerText.length < 80) {
-    // [FIX] Iterate backwards from the current message to find the actual request+plan
-    // for THIS thread. Collect ALL user messages and the most recent assistant plan.
-    let foundPlan = '';
-    const threadRequests: string[] = [];
-    // Find the user's confirmation message (the current one)
-    for (let i = conversation.length - 1; i >= 0; i--) {
-      if (conversation[i].role === 'user' && conversation[i].content === userText) {
-        // Collect all assistant/user pairs going backwards until a gap or old session
-        for (let j = i - 1; j >= 0; j--) {
-          if (conversation[j].role === 'assistant' && conversation[j].content.length > 80 && !conversation[j].content.startsWith('__CLARIFY__')) {
-            if (!foundPlan) { foundPlan = conversation[j].content.replace(/\n---\n\*-- .*\*[\s\S]*$/, '').trim(); }
-          }
-          if (conversation[j].role === 'user' && conversation[j].content.length > 15) {
-            threadRequests.push(conversation[j].content);
-          }
-          // Stop if we hit an old build result card or result message
-          if (conversation[j].content.includes('__RESULT_CARD__') || conversation[j].content.includes('✅ Done! Built')) { break; }
-        }
+    // [FIX] Dead simple: find the most recent user message BEFORE this confirmation.
+    // That's the request. No keyword scoring, no plan stitching, no nested loops.
+    let foundRequest = '';
+    for (let i = conversation.length - 2; i >= 0; i--) {
+      if (conversation[i].role === 'user') {
+        const prior = conversation[i].content.toLowerCase();
+        // Skip if this prior message is itself a confirmation (user double-confirmed)
+        if (_BUILD_CONFIRM.test(prior) || _AGREEMENT.test(prior)) { continue; }
+        foundRequest = conversation[i].content;
         break;
       }
     }
-    // [FIX] Pick the user request with the most build keywords as the primary request.
-    // Follow-ups like "it should have X" lack the subject (checkers game) and confuse the AI.
-    const buildKeywords = /\b(game|app|website|tool|build|make|create|generate|checker|chess|snake|todo|calc|dashboard|api|server|client|html|css|js)\b/i;
-    let foundRequest = threadRequests[0] || '';
-    let bestScore = 0;
-    for (const req of threadRequests) {
-      const score = (req.match(buildKeywords) || []).length;
-      if (score > bestScore) { bestScore = score; foundRequest = req; }
-    }
-    if (foundRequest && foundPlan) {
-      const featureBits = foundPlan.slice(0, 600).replace(/\s+/g, ' ');
-      const cleanTask = `${foundRequest} ${featureBits}`.trim();
-      const conciseTask = cleanTask.length > 500 ? cleanTask.slice(0, 500) : cleanTask;
-      await runConfirmedLocalBuild(conciseTask, userText, deps, conversation, refresh);
+    if (foundRequest) {
+      await runConfirmedLocalBuild(foundRequest, userText, deps, conversation, refresh);
       return;
     }
+    // Fallback: user confirmed but we can't find a prior request
+    conversation.push({ role: 'assistant', content: 'I\'m ready to build — what would you like me to make?', timestamp: Date.now() });
+    refresh(); return;
   }
 
   // ── STEP 2: Clarify step (design triage) — only for short/vague build requests ──
