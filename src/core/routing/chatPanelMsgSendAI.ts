@@ -32,7 +32,7 @@ export async function handleAIChat(
   try {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
     const recentUserMsgs = conversation.filter(m => m.role === 'user').slice(-4, -1).map(m => m.content);
-    const prefix = buildAIPrefix(redivivus, recentUserMsgs, routing, conversation.slice(-14), userText);
+    const prefix = buildAIPrefix(redivivus, recentUserMsgs, routing, conversation.slice(-14), userText, isConvert);
     (routing as any).promptFailoverCallback = (failedAI: string, nextAI: string) => {
       conversation.push({ role: 'assistant', content: `Switching to ${AI_LABEL[nextAI] || nextAI}...`, timestamp: Date.now() });
       refresh();

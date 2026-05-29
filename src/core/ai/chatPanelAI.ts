@@ -10,16 +10,17 @@ import { getSystemPrompt } from './chatPanelAIPrompt';
 import { buildProjectAnnotationContext } from '../project/chatPanelProjectContext';
 import { extractFileMentions } from '../project/chatPanelFileContext';
 
-/** Builds the AI prompt prefix — question path gets Redivivus identity + annotations, code gen gets focused prompt */
-export function buildAIPrefix(redivivus: RedivivusService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string): string {
+/** Builds the AI prompt prefix — question path gets Redivivus identity + annotations, code gen gets focused prompt
+ *  isConvert: true = code generation (convert/build). false or undefined = Q&A (always conversational). */
+export function buildAIPrefix(redivivus: RedivivusService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string, isConvert?: boolean): string {
   const config = redivivus.isInitialized() ? redivivus.loadConfig() : null;
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'none';
   const bp = config?.blueprint;
 
-  // [Redivivus] Detect code generation requests — use a focused prompt, not the Redivivus identity prompt
-  // [FIX] Do NOT switch to code gen prompt for questions. "Can you make X?" is asking, not commanding.
-  const _isQuestion = /^(are\s+you|can\s+you|could\s+you|would\s+you|will\s+you|should\s+|do\s+you|is\s+it|have\s+you|does\s+|did\s+you|what|how|why|when|where|who|which|explain|tell\s+me)\b/i;
-  if (userText && !_isQuestion.test(userText) && /\b(convert|turn|transform|rewrite|replace|port|rebuild|build|create|make|generate|write|implement)\b/i.test(userText)) {
+  // [Redivivus] Code gen prompt ONLY for explicit convert/build paths (isConvert=true).
+  // [FIX] Q&A path (isConvert=false) ALWAYS gets the conversational prompt — no keyword detection.
+  // This prevents typos like "re you able to make X?" from triggering code gen because "make" was in the text.
+  if (isConvert && userText && /\b(convert|turn|transform|rewrite|replace|port|rebuild|build|create|make|generate|write|implement)\b/i.test(userText)) {
     return buildCodeGenPrefix(userText, workspaceRoot);
   }
 
