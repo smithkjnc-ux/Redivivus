@@ -15,15 +15,22 @@ export async function runChatClarifyStep(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<ChatClarifyResult> {
-  const questions = await generateClarifyQuestions(userText, '', routing);
+  // [FIX] Include conversation context so the clarify step can show what was already discussed
+  const recentContext = conversation
+    .filter(m => m.role === 'assistant' && m.content.length > 50)
+    .slice(-3)
+    .map(m => m.content.slice(0, 500))
+    .join('\n');
+  const questions = await generateClarifyQuestions(userText, recentContext, routing);
   if (questions.length === 0) { return { routedText: userText, cancelled: false }; }
 
   conversation.push({ role: 'assistant', content: encodeClarifyToken(questions), timestamp: Date.now() });
   refresh();
 
+  // [FIX] Never auto-build on timeout. If the user walks away, cancel — don't build without consent.
   const answers = await new Promise<Record<string, string>>((resolve) => {
     setPendingClarifyResolve(resolve);
-    setTimeout(() => resolve({}), 120_000);
+    setTimeout(() => resolve({ _cancelled: 'true' } as any), 300_000);
   });
 
   if ((answers as any)._cancelled === 'true') {

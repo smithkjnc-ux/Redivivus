@@ -94,10 +94,13 @@ RULES:
 - Options should be concrete and distinct -- not "Option A" vs "Option B" but "Retro pixel art" vs "Modern cartoon" vs "Minimalist flat".
 - Write questions as a user would understand them, not as a developer would.`;
 
+  const conversationNote = blueprintContext && blueprintContext.length > 100
+    ? `\n\nCONVERSATION CONTEXT (features already discussed with the user — reference these in your first question as a summary):\n${blueprintContext.slice(0, 800)}`
+    : '';
   const questionPrompt = `The user wants to build: "${task}"
-${blueprintContext ? `Project context: ${blueprintContext.slice(0, 300)}` : ''}${prevContext}
+${blueprintContext ? `Project context: ${blueprintContext.slice(0, 300)}` : ''}${prevContext}${conversationNote}
 
-Generate 2-4 design questions about what is AMBIGUOUS and NOT YET ANSWERED.${previousAnswersBlock ? '\nIf all design decisions are already covered by the previous answers above, return an empty array: []' : ''}
+${conversationNote ? 'The user already discussed features with the AI. Your FIRST question MUST be a summary of what was discussed, presented as a build plan the user can verify. Example first question:\n"Based on our conversation, here\'s what I\'ll build:\\n- Feature 1\\n- Feature 2\\n- Feature 3\\nDoes this look right?"\nOptions: ["Yes, build this", "I want to change some things"]\n\nThen ask 1-2 additional design questions about anything still AMBIGUOUS.' : 'Generate 2-4 design questions about what is AMBIGUOUS and NOT YET ANSWERED.'}${previousAnswersBlock ? '\nIf all design decisions are already covered by the previous answers above, return an empty array: []' : ''}
 Return ONLY a valid JSON array -- no markdown, no explanation:
 [
   {
