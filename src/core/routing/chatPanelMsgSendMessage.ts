@@ -16,6 +16,61 @@ import { runAgentMode } from './chatPanelMsgSendAgent';
 import { ChatPanel } from '../../ui/panels/chat/chatPanel';
 import { runChatClarifyStep } from './chatPanelMsgSendClarify';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent';
+import { autoCreateProject } from '../build/chatPanelBuildAutoCreate';
+import { runSingleFileBuild } from '../build/chatPanelBuild';
+
+// [FIX] Confirmed builds bypass the backend agent (which asks duplicate questions).
+// Uses local supervisor→worker→guardian pipeline instead.
+async function runConfirmedLocalBuild(
+  task: string,
+  _userText: string,
+  deps: MessageHandlerDeps,
+  conversation: ChatMessage[],
+  refresh: () => void,
+): Promise<void> {
+  const { getAccountToken } = await import('../../services/api/apiClient.js');
+  const token = await getAccountToken();
+  if (!token) {
+    conversation.push({ role: 'assistant', content: '🔒 **Sign in to use Redivivus**\n\nRun **Redivivus: Sign In** from the command palette.', timestamp: Date.now() });
+    refresh(); vscode.commands.executeCommand('redivivus.signIn'); return;
+  }
+
+  deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
+  let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let autoCreated = false;
+  if (!root) {
+    try {
+      const created = await autoCreateProject(task, deps as any);
+      root = created.dir;
+      autoCreated = true;
+    } catch (e) {
+      deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+      conversation.push({ role: 'assistant', content: `Could not create project folder: ${e instanceof Error ? e.message : String(e)}`, timestamp: Date.now() });
+      refresh(); return;
+    }
+  }
+
+  const ctx = {
+    task, root: root!, blueprintContext: (deps as any).blueprintContext || '',
+    routing: deps.routing, conversation, refresh,
+    logError: (_t: string, _p: string, _e: string, _l: number) => {},
+    postToWebview: (m: any) => deps.panel.webview.postMessage(m),
+    redivivus: deps.redivivus, usageTracker: deps.usageTracker,
+    onBuildFinished: (_t: string, _f?: string[]) => {
+      if (autoCreated && root) {
+        const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+        if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.skipConversationRestore', true); }
+        vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
+      }
+    },
+  };
+
+  try {
+    await runSingleFileBuild(ctx as any);
+  } finally {
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+  }
+}
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { conversation, refresh } = deps;
@@ -104,10 +159,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
         .join(' ')
         .slice(0, 1200)
         .replace(/\s+/g, ' ');
-      // Extract key requirements as a concise sentence
       const cleanTask = `${firstRequest} ${featureBits}`.trim();
       const conciseTask = cleanTask.length > 500 ? cleanTask.slice(0, 500) : cleanTask;
-      await handleBuildIntent(conciseTask, userText, msg, deps, conversation, refresh);
+      // [FIX] Bypass backend agent for confirmed builds — use local pipeline instead.
+      // The backend agent asks duplicate questions the user already answered.
+      await runConfirmedLocalBuild(conciseTask, userText, deps, conversation, refresh);
       return;
     }
   }
