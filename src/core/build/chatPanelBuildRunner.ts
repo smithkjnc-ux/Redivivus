@@ -35,6 +35,7 @@ export async function runBuildAfterGates(
   deps.postToWebview({ type: 'set-status', status: 'working' });
 
   let root = getLiveRoot(deps);
+  let autoCreated = false;
 
   // No project open — auto-create a folder
   if (!root) {
@@ -42,6 +43,7 @@ export async function runBuildAfterGates(
       const created = await autoCreateProject(task, deps);
       root = created.dir;
       deps.blueprintContext = created.blueprintContext;
+      autoCreated = true;
     } catch (e) {
       deps.postToWebview({ type: 'set-status', status: 'ready' });
       deps.conversation.push({ role: 'assistant', content: `Could not create project folder: ${e instanceof Error ? e.message : String(e)}`, timestamp: Date.now() });
@@ -102,6 +104,13 @@ export async function runBuildAfterGates(
       timestamp: Date.now(),
     });
     deps.refresh();
+
+    // [FIX] Auto-open workspace for newly created projects — no prior chat to duplicate
+    if (autoCreated && root) {
+      const _ctx = require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext;
+      if (_ctx) { _ctx.globalState.update('redivivus.skipConversationRestore', true); }
+      vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
+    }
 
     if (isFixRequest) {
       vscode.commands.executeCommand('redivivus.resolveFix', task, files.map(f => path.join(root!, f.path)));
