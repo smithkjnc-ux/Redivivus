@@ -95,7 +95,10 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
       .slice(-4, -1)
       .map(m => m.content);
     if (priorAI.length > 0) {
-      const fullContext = `Build based on our conversation:\n\nUser requests:\n${priorUser.join('\n')}\n\nAgreed plan:\n${priorAI.join('\n\n')}`;
+      // Cap context to prevent oversized payloads hitting the build API
+      const cappedAI = priorAI.map(m => m.slice(0, 800)).join('\n\n').slice(0, 3000);
+      const cappedUser = priorUser.map(m => m.slice(0, 200)).join('\n');
+      const fullContext = `Build based on our conversation:\n\nUser requests:\n${cappedUser}\n\nAgreed plan:\n${cappedAI}`;
       await handleBuildIntent(fullContext, userText, msg, deps, conversation, refresh);
       return;
     }

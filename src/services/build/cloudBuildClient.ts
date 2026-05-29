@@ -59,7 +59,9 @@ export async function callCloudBuild(
     }
     if (!instructionRes.ok) {
       const err = await instructionRes.json().catch(() => ({ error: instructionRes.statusText })) as any;
-      return { success: false, error: err.error || `Build API ${instructionRes.status}` };
+      const errMsg = err.error || `Build API ${instructionRes.status}`;
+      console.error(`[Redivivus] Build API failed: status=${instructionRes.status}, error=${errMsg}, taskLength=${task.length}, contextFiles=${(context as any)?.files?.length ?? 0}`);
+      return { success: false, error: errMsg };
     }
 
     const instructions = await instructionRes.json() as {
