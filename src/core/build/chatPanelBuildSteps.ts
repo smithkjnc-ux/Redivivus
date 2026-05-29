@@ -115,13 +115,14 @@ export function resolveWorkerPrompt(
   absPath: string,
   spec: string | null,
   vaultSummary: string,
+  similarCode?: string,
 ): string {
   const isModify = !!existingTarget && !isCrossLang;
   const existingContent = (isModify && fs.existsSync(absPath)) ? fs.readFileSync(absPath, 'utf8') : '';
   const crossContent = (existingTarget && isCrossLang && fs.existsSync(existingTarget))
     ? fs.readFileSync(existingTarget, 'utf8').slice(0, 6000)
     : '';
-  return Worker.buildWorkerPrompt(ctx, relPath, isModify, existingContent, spec, vaultSummary, crossContent);
+  return Worker.buildWorkerPrompt(ctx, relPath, isModify, existingContent, spec, vaultSummary, crossContent, similarCode);
 }
 
 export async function runPostBuildActions(opts: {

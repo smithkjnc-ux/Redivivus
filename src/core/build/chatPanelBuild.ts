@@ -22,6 +22,7 @@ import { generatePlanId, formatPlanForApproval, awaitPlanApproval } from './chat
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
 import { selectRelevantTurns } from '../ai/contextSelector';
+import { findSimilarCode } from '../../services/code/similarCodeFinder';
 
 export type { BuildContext } from './chatPanelBuildHelpers';
 export { registerVaultHitResolver, resolveVaultHit, isChunkedBuildRequest } from './chatPanelBuildHelpers';
@@ -88,7 +89,9 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
   }
 
   const vaultSummary = searchResult.items.length > 0 ? formatVaultContext(searchResult.items) : '';
-  const prompt = resolveWorkerPrompt(ctx, relPath, existingTarget, isCrossLang, absPath, spec, vaultSummary);
+  // [DONE] Rule 18 — AI identifies which existing functions are relevant so Worker doesn't reimplement them
+  const similarCode = await findSimilarCode(root, task, relPath, routing);
+  const prompt = resolveWorkerPrompt(ctx, relPath, existingTarget, isCrossLang, absPath, spec, vaultSummary, similarCode);
   const _workT0 = Date.now(); const _workSid = tracer.step('WORKER', undefined, `Building ${relPath}`);
 
   let streamAccum = '';

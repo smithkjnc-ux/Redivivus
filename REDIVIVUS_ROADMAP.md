@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Cross-session build decision memory: AI extracts decisions after every build (Session 11CU)
+*Last updated:* May 29, 2026 — Similar code finder: AI surfaces relevant existing functions before Worker writes (Session 11CV)
 
 ---
 
@@ -25,6 +25,12 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
+### Session 11CV — May 29, 2026: Similar Code Finder
+- Worker had no awareness of similar logic in other project files — would reimplement existing functions
+- New `similarCodeFinder.ts`: sync regex extraction + cheap AI relevance filter → up to 4 matched snippets
+- Injected as `EXISTING SIMILAR CODE` block in Worker prompt, between exports map and existing content
+- Three-layer defense now: export names (prevention) + function bodies (context) + Guardian (detection)
+
 ### Session 11CU — May 29, 2026: Cross-Session Build Decision Memory
 - Implicit decisions from back-and-forth ("ok, use JWT") were never stored across sessions
 - Added `extractBuildDecisions` to `LearnedMemoryService` — reviews full conversation post-build
@@ -34,12 +40,6 @@
 ### Session 11CT — May 29, 2026: Project Export Scanner
 - Worker was hallucinating imports because it had no map of what the project actually exports
 - New `projectExportScanner.ts`: static regex scan (no AI), 25 files × 15 names, excludes target file
-- Injected as `PROJECT EXPORTS` block in Worker prompt before vault and existing content
-- Attacks hallucination upstream (prevention) rather than relying solely on Guardian (detection)
-
-### Session 11CT — May 29, 2026: Project Export Scanner
-- Worker was hallucinating imports because it had no map of what the project actually exports
-- New `projectExportScanner.ts`: static regex scan (no AI), 25 files x 15 names, excludes target file
 - Injected as `PROJECT EXPORTS` block in Worker prompt before vault and existing content
 - Attacks hallucination upstream (prevention) rather than relying solely on Guardian (detection)
 

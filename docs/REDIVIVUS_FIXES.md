@@ -5,7 +5,24 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11CU: Cross-session build decision memory)*
+*Last updated: May 29, 2026 (Session 11CV: Similar code finder injected into Worker prompt)*
+
+---
+
+## May 29, 2026 — Session 11CV (Similar code finder injected into Worker prompt)
+
+**Goal:** Worker had no awareness of similar logic elsewhere in the project — it would reimplement `formatDate` when `formatters.ts` already had one, or add caching middleware when `cacheService.ts` already existed. Fix: before generation, scan the project for function snippets and use a cheap AI call to surface the ones most relevant to the current task.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/code/similarCodeFinder.ts` | New file. `findSimilarCode(root, task, excludeRelPath, routing)` — scans project for function snippets (sync regex extraction, 30 files × 6 functions × 8 lines), sends function names to cheap AI for relevance filtering, returns up to 4 matched snippets formatted as `EXISTING SIMILAR CODE` block. Falls back to empty string on AI failure. Skips private functions (`_prefix`) and event handlers (`on[A-Z]`). | Rule 18: code extracts (mechanical), AI judges relevance (understanding). The export scanner shows names; this shows bodies — enough for Worker to see the pattern and reuse it. | Low — empty return on any failure; Worker prompt unchanged if no similar code found. |
+| `src/core/build/chatPanelBuild.ts` | Added import for `findSimilarCode`. Calls it after plan approval (so `relPath` is known), before `resolveWorkerPrompt`. Passes result as optional `similarCode` arg. | After plan approval is the right time — target file is known, plan is approved, Worker is about to write. | Low — one additional cheap AI call per build; non-critical path. |
+| `src/core/build/chatPanelBuildSteps.ts` | Added optional `similarCode?: string` to `resolveWorkerPrompt` signature. Passes it through to `buildWorkerPrompt`. | Required to thread the value from call site to prompt assembly without touching ctx. | None. |
+| `src/core/build/chatPanelBuildWorker.ts` | Added optional `similarCode?: string` to `buildWorkerPrompt` signature. Injected as `similarBlock` between vault items and existing content. | Positioned after exports map and vault, before existing file — Worker sees "what exists globally → what patterns exist → what's in this file" in order of specificity. | None — empty string if no similar code found. |
+
+**Architecture note:** Three layers now prevent duplicate logic: (1) export scanner shows names; (2) similar code finder shows bodies; (3) Guardian IMPORT/EXPORT VALIDATION catches anything that slips through. Together they attack the problem at prevention (upstream), context (mid-prompt), and detection (downstream).
 
 ---
 

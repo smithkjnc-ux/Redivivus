@@ -73,7 +73,7 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onCh
   }
 }
 
-export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifying: boolean, existingContent: string, supervisorSpec: string | null, vaultSummary: string, sourceRef?: string): string {
+export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifying: boolean, existingContent: string, supervisorSpec: string | null, vaultSummary: string, sourceRef?: string, similarCode?: string): string {
   const { task, blueprintContext, root } = ctx;
   const isHtml = relPath.endsWith('.html');
   const role = supervisorSpec ? 'Redivivus Worker AI. Implementation only.' : 'Redivivus AI. Generate complete code.';
@@ -102,5 +102,6 @@ REPLACE>>>
   const sourceBlock = sourceRef ? `\nSOURCE REFERENCE (existing implementation in a different language -- use this as a guide for game logic, physics, and behavior, but rewrite as native ${ext}):\n${sourceRef}` : '';
   // [DONE] Rule 18 complement — static scan (not AI) tells Worker what already exists so it imports real names
   const exportsBlock = root ? formatExportsForPrompt(scanProjectExports(root, relPath)) : '';
-  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${exportsBlock ? exportsBlock + '\n\n' : ''}${vaultBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${redivivusRules}\n\nReturn ONLY the code.`;
+  const similarBlock = similarCode ? `\n\n${similarCode}` : '';
+  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${exportsBlock ? exportsBlock + '\n\n' : ''}${vaultBlock}${similarBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${redivivusRules}\n\nReturn ONLY the code.`;
 }
