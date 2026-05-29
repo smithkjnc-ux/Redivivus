@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Fix: build requests on uninitialized projects no longer silently routed to Q&A (Session 11CW)
+*Last updated:* May 29, 2026 — Fix: cloudClassify no longer swallows errors; fallbackClassify now fires correctly (Session 11CX)
 
 ---
 
@@ -25,10 +25,11 @@
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
 
-### Session 11CW — May 29, 2026: Fix Classifier Routing on Uninitialized Projects
+### Session 11CX — May 29, 2026: Fix cloudClassify Error Swallowing
+- All classify API failures silently returned `question` — fallbackClassify in classifyIntent never fired
 - "add a speed boost power-up" → Groq Q&A instead of build pipeline (found during test)
-- Root cause: `blueprintStatus: 'Not Initialized'` sent to cloud classifier; server returned `question`
-- Fix: removed `blueprintStatus` from classifier context — intent judged from text only
+- Fix: removed try/catch from cloudClassify; errors now propagate to classifyIntent's fallback handler
+- fallbackClassify correctly returns `build` for imperative verbs — pipeline now triggers on API failure
 
 ### Session 11CV — May 29, 2026: Similar Code Finder
 - Worker had no awareness of similar logic in other project files — would reimplement existing functions

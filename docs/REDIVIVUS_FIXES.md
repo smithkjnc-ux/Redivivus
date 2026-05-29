@@ -5,7 +5,19 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11CW: Fix classifier routing imperative builds to Q&A on uninitialized projects)*
+*Last updated: May 29, 2026 (Session 11CX: Fix cloudClassify swallowing errors — fallbackClassify never fired)*
+
+---
+
+## May 29, 2026 — Session 11CX (Fix: cloudClassify was swallowing all API errors — fallbackClassify never fired)
+
+**Bug:** All intent classification failures (API down, timeout, network error, 401) silently returned `{ type: 'question' }`, routing every build request to Groq Q&A with no warning. The `fallbackClassify` in `classifyIntent` was designed to handle this case — but it could never fire because `cloudClassify` caught the error internally first.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/api/apiClient.ts` | Removed `try/catch` from `cloudClassify`. Function now throws on API failure instead of returning `{ type: 'question' }`. | `classifyIntent` in `chatPanelClassifier.ts` already has a catch block that runs `fallbackClassify(text)` — a proper regex fallback that correctly returns `build` for imperative verbs like "add", "build", "create". The internal catch was preventing this from ever running. | Low — `classifyIntent` already handles the error with a robust fallback. No silent failures — errors now propagate one level up to the intended handler. |
 
 ---
 

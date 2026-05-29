@@ -120,16 +120,15 @@ export async function cloudClassify(
   message: string,
   context?: { projectName?: string; workspacePath?: string; blueprintStatus?: string }
 ): Promise<IntentResult> {
-  try {
-    return await post<IntentResult>('/classify', {
-      message,
-      context,
-      keys: collectKeys(),
-      preferred: getPreferred(),
-    });
-  } catch {
-    return { type: 'question' };
-  }
+  // [FIX] Let failures throw — classifyIntent's catch runs fallbackClassify(text) on error.
+  // Previous catch returning { type: 'question' } swallowed all API failures silently,
+  // routing every build request to Q&A when the classify endpoint was unreachable.
+  return post<IntentResult>('/classify', {
+    message,
+    context,
+    keys: collectKeys(),
+    preferred: getPreferred(),
+  });
 }
 
 export interface Announcement {
