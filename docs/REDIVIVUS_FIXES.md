@@ -5,7 +5,24 @@
 
 ---
 
-*Last updated: May 28, 2026 (Session 11CK: Cheap-first model routing for Q&A)*
+*Last updated: May 28, 2026 (Session 11CK: Question fast-paths in classifier overrides)*
+
+---
+
+## May 28, 2026 — Session 11CK (Question fast-paths in classifier — cloud classifier was wrong)
+
+**Problem:** Cloud classifier at `redivivus.dev` returned `build` for "are you able to make a checker game?" because it focused on "make a checker game" and ignored the interrogative framing.
+
+**Fix:** Added question grammar fast-paths to `checkHardcodedOverrides` in `chatPanelClassifierOverrides.ts`. These fire BEFORE the cloud call:
+- `^(are you|can you|could you|would you|do you|is it|...)` → question
+- `^(what|how|why|when|where|who|explain|tell me)` → question (unless "how about we make...")
+- Ends with `?` and doesn't start with a build verb → question
+
+These are unambiguous English grammar patterns, not intent guessing. A sentence starting with "are you able to" is always a question.
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/core/ai/chatPanelClassifierOverrides.ts` | Added 3 question regex fast-paths | Cloud classifier misclassified questions as builds | Low — excludes "how about we make..." and build-verb-first patterns |
 
 ---
 

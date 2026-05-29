@@ -67,10 +67,20 @@ export function checkHardcodedOverrides(t: string): IntentResult | null {
     return { type: 'run' };
   }
 
-  // [RULE 18] Natural language understanding belongs in the AI classifier.
-  // We removed the hardcoded WH-question and capability question regexes here
-  // because relying on strict punctuation (like "?") or specific keyword lists
-  // is brittle and anti-vibe. The LLM handles natural language nuance much better.
+  // [FIX] Question fast-paths — these are unambiguous interrogative grammar, not intent guessing.
+  // A sentence starting with "are you able to" or "can you" is ALWAYS a question regardless of
+  // what follows. The cloud classifier was returning 'build' for "are you able to make a checker
+  // game?" because it focused on "make a checker game" — ignoring the question framing entirely.
+  // These must fire BEFORE the cloud call so questions get answered, not built.
+  if (/^(are\s+you|can\s+you|could\s+you|would\s+you|will\s+you|should\s+(i|we|you)|do\s+you|is\s+it|are\s+there|have\s+you|does\s+(it|this|that)|did\s+you)\b/i.test(t)) {
+    return { type: 'question' };
+  }
+  if (/^(what|how|why|when|where|who|which|explain|tell\s+me)\b/i.test(t) && !/^(how\s+about\s+(you|we)\s+(make|build|create|add))\b/i.test(t)) {
+    return { type: 'question' };
+  }
+  if (/\?\s*$/.test(t) && !/^\s*(make|build|create|add|fix|change|update|remove|delete|write|generate)\b/i.test(t)) {
+    return { type: 'question' };
+  }
 
   return null;
 }
