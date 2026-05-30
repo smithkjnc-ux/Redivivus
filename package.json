@@ -150,6 +150,10 @@
         "title": "Redivivus: Open Vault"
       },
       {
+        "command": "redivivus.syncVaultToCloud",
+        "title": "Redivivus: Sync Vault to Cloud"
+      },
+      {
         "command": "redivivus.validateVault",
         "title": "Redivivus: Validate Vault Categories"
       },

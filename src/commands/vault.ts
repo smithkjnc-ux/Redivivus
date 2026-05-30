@@ -112,6 +112,30 @@ export function registerVaultCommands(
 
   registerVaultValidate(context, vaultService, routing);
 
+  // Sync local vault to cloud (push) and fetch community items (pull)
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redivivus.syncVaultToCloud', async () => {
+      const { syncVaultToCloud, fetchCommunityVault, mergeCloudIntoLocal } = await import('../services/vault/vaultCloudSync.js');
+      await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: 'Redivivus Vault: Syncing...', cancellable: false },
+        async (progress) => {
+          progress.report({ message: 'Pushing local items to cloud...' });
+          const push = await syncVaultToCloud(vaultService);
+          if (push.error) { vscode.window.showWarningMessage(`Vault push: ${push.error}`); return; }
+
+          progress.report({ message: 'Fetching community items...' });
+          const pull = await fetchCommunityVault();
+          if (!pull.error && pull.items.length > 0) {
+            const merge = mergeCloudIntoLocal(vaultService, pull.items);
+            vscode.window.showInformationMessage(`Vault synced — pushed ${push.synced}, pulled ${merge.added} new community items.`);
+          } else {
+            vscode.window.showInformationMessage(`Vault synced — pushed ${push.synced} items to cloud.`);
+          }
+        }
+      );
+    })
+  );
+
   // Enrich existing vault items with AI descriptions and quality scores
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.vault.enrich', async () => {

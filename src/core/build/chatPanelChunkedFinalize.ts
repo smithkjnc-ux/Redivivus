@@ -24,6 +24,12 @@ export async function runChunkedBuildFinalize(
   const absPaths = builtFiles.map(f => path.join(root, f));
   const _callAI = (p: string) => routing.prompt(p, 12_000);
   const capture = vault ? await autoCaptureFiles(absPaths, projectName, vault as VaultService, task, _callAI) : { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
+  // Fire-and-forget cloud sync after every successful capture — keeps cloud vault current
+  if (vault && capture.newItems > 0) {
+    import('../../services/vault/vaultCloudSync.js').then(({ syncVaultToCloud }) => {
+      syncVaultToCloud(vault as VaultService).catch(() => {});
+    }).catch(() => {});
+  }
 
   ctx.conversation[storyMsgIndex].content = '__STORY_DONE__' + encodeStoryToken(storyLines).slice('__STORY__'.length);
   ctx.refresh();
