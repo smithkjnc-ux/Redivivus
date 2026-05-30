@@ -26,6 +26,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
     if (storyHtml) {return storyHtml;}
 
     let html = escapeHtml(msg.content);
+    html = html.replace(/ ?__BUILD_WORKING__/g, '');
     html = html.replace(/GUARDIAN_PASS\s*/g, '');
     html = html.replace(/📝 (.+)/g, (_m, t) => `<div class="story-line"><span class="story-dot">✅</span><span>${escapeHtml(t)}</span></div>`);
     html = html.replace(/__ACTION_CARD__([^|]+)\|\|\|([^|]+)\|\|\|END__/g, (_m, c, l) => renderActionCard(c, l));

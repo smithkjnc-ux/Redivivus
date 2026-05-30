@@ -53,16 +53,30 @@ export async function runBuildAfterGates(
     }
   }
 
-  // Show working indicator
-  deps.conversation.push({ role: 'assistant', content: '⚙️ Building...', timestamp: Date.now() });
+  // Show working indicator — tag with __BUILD_WORKING__ so we can find it precisely on completion
+  const workingTs = Date.now();
+  deps.conversation.push({ role: 'assistant', content: '⚙️ Building... __BUILD_WORKING__', timestamp: workingTs });
   deps.refresh();
 
+  const updateProgress = (msg: string) => {
+    const idx = deps.conversation.findIndex(m => m.timestamp === workingTs && m.role === 'assistant');
+    if (idx >= 0) {
+      deps.conversation[idx] = { ...deps.conversation[idx], content: `⚙️ ${msg} __BUILD_WORKING__` };
+      deps.refresh();
+    }
+  };
+
+  const removeWorkingMessage = () => {
+    const idx = deps.conversation.findIndex(m => m.timestamp === workingTs && m.role === 'assistant');
+    if (idx >= 0) deps.conversation.splice(idx, 1);
+  };
+
   try {
-    const result = await callCloudBuild(task, root, deps, { isFix: isFixRequest });
+    const result = await callCloudBuild(task, root, deps, { isFix: isFixRequest, onProgress: updateProgress });
 
     if (!result.success) {
       if (result.error === 'NOT_AUTHENTICATED') {
-        deps.conversation.splice(-1, 1);
+        removeWorkingMessage();
         deps.conversation.push({
           role: 'assistant',
           content: '🔒 **Session expired — please sign in again.**\n\nRun **Redivivus: Sign In** from the command palette.',
