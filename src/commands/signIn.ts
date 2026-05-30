@@ -60,7 +60,7 @@ export function registerSignInCommand(context: vscode.ExtensionContext, statusBa
 
       // Open browser to the IDE auth page
       const cfg = vscode.workspace.getConfiguration('redivivus');
-      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus.dev/api/v1';
+      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev/api/v1';
       const webBase = apiBase.replace('/api/v1', '');
       const scheme = vscode.env.uriScheme;
       const authUrl = `${webBase}/auth/ide?port=${port}&scheme=${scheme}`;

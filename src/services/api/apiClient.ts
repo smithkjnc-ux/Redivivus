@@ -1,15 +1,14 @@
-// [SCOPE] Redivivus cloud API client -- routes AI calls through redivivus.dev instead of calling providers directly
+// [SCOPE] Redivivus cloud API client -- routes AI calls through the Fly.io backend instead of calling providers directly
 // Account token stored in VS Code SecretStorage. Keys sent per-request, never persisted server-side.
 
 import * as vscode from 'vscode';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from '../ai/routingKeys.js';
 
 const SECRET_KEY = 'redivivus.account.token';
-const API_BASE_DEFAULT = 'https://redivivus.dev/api/v1';
+const API_BASE_DEFAULT = 'https://redivivus-backend.fly.dev/api/v1';
 export function getApiBase(): string {
-  // [WARN] Never hardcode or rewrite to internal backend domains.
-  // The extension always hits the public redivivus.dev domain.
-  // Cloudflare proxies /api/v1 to the backend — internal URLs stay internal.
+  // [WARN] Never hardcode or rewrite to stale Cloudflare/legacy domains.
+  // The extension hits the Fly.io backend directly — redivivus.dev is no longer the API origin.
   return vscode.workspace.getConfiguration('redivivus').get<string>('apiBase') || API_BASE_DEFAULT;
 }
 

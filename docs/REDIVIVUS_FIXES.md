@@ -5,7 +5,23 @@
 
 ---
 
-*Last updated: May 30, 2026 (Session 11DL: Fix redivivus icon not installing — missing exe symlink, wrong StartupWMClass)*
+*Last updated: May 30, 2026 (Session 11DM: Fix API endpoint pointing to dead Cloudflare origin — switched to Fly.io)*
+
+---
+
+## May 30, 2026 — Session 11DM (Fix: API endpoint still pointing to redivivus.dev/Cloudflare after backend migrated to Fly.io)
+
+**Root cause:** `API_BASE_DEFAULT` and all fallback URL strings hardcoded `redivivus.dev`, which routes through Cloudflare. After the backend moved to `redivivus-backend.fly.dev`, Cloudflare's origin server went down, causing all cloud builds, classify calls, and health checks to fail with 500.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `src/services/api/apiClient.ts` | `API_BASE_DEFAULT` → `https://redivivus-backend.fly.dev/api/v1`; updated [SCOPE] and [WARN] comments to remove Cloudflare references. | Primary API base was still pointing at the dead Cloudflare origin. | None — URL change only. |
+| `src/commands/signIn.ts` | Fallback `apiBase` → `https://redivivus-backend.fly.dev/api/v1` | Auth flow was opening Cloudflare domain for IDE sign-in. | None. |
+| `src/commands/checkForUpdates.ts` | Fallback `apiBase` → `https://redivivus-backend.fly.dev` | Version check was hitting dead origin. | None. |
+| `src/commands/reportIssue.ts` | Fallback `apiBase` → `https://redivivus-backend.fly.dev` | Feedback form URL was derived from dead origin. | None. |
+| `src/extension.ts` | Fallback `apiBase` → `https://redivivus-backend.fly.dev` | Startup check was hitting dead origin. | None. |
 
 ---
 

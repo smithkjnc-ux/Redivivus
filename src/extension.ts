@@ -143,7 +143,7 @@ export function activate(context: vscode.ExtensionContext) {
       const pkg = require('../package.json');
       const currentVersion: string = pkg.version;
       const cfg = vscode.workspace.getConfiguration('redivivus');
-      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus.dev';
+      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev';
       const webBase = apiBase.replace('/api/v1', '');
       const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(5000) });
       if (!res.ok) { return; }
