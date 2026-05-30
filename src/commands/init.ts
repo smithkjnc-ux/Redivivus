@@ -108,6 +108,24 @@ export async function runAutoInit(
   redivivus: RedivivusService,
   refreshAll: () => void
 ): Promise<void> {
+  // [FIX] Auto-open .code-workspace file when found in the current folder.
+  // VS Code shows a toast asking the user to open it — we skip that and do it automatically.
+  // Only fires when NOT already running from a workspace file (vscode.workspace.workspaceFile is undefined/untitled).
+  const alreadyWorkspaceFile = vscode.workspace.workspaceFile?.scheme === 'file';
+  if (!alreadyWorkspaceFile) {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (root) {
+      try {
+        const wsFiles = fs.readdirSync(root).filter(f => f.endsWith('.code-workspace'));
+        if (wsFiles.length > 0) {
+          const wsPath = path.join(root, wsFiles[0]);
+          vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(wsPath), { forceNewWindow: false });
+          return; // window will reload; next activation runs in workspace-file mode, no toast
+        }
+      } catch { /* non-blocking */ }
+    }
+  }
+
   const pending = context.globalState.get<{folder: string; name: string; blueprint?: any}>('pendingRedivivusInit');
   require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[runAutoInit] pending=${JSON.stringify(pending)} currentRoot=${vscode.workspace.workspaceFolders?.[0]?.uri.fsPath} isInit=${redivivus.isInitialized()}\n`);
   if (pending && !redivivus.isInitialized()) {

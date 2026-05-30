@@ -5,14 +5,21 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 
 export class RedivivusPaths {
-  private workspaceRoot: string | undefined;
+  // [WARN] Do NOT cache workspaceRoot — read dynamically so the header rebuilds correctly
+  // after a build auto-adds a new project folder to the workspace.
+  // If an explicit root is provided at construction, always use it (scaffoldAt / one-off builds).
+  private readonly _explicitRoot: string | undefined;
 
   constructor(root?: string) {
-    this.workspaceRoot = root || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    this._explicitRoot = root;
+  }
+
+  getWorkspaceRoot(): string | undefined {
+    return this._explicitRoot ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   }
 
   get redivivusDir(): string {
-    return path.join(this.workspaceRoot || '', '.redivivus');
+    return path.join(this.getWorkspaceRoot() || '', '.redivivus');
   }
 
   get configPath(): string {
@@ -36,11 +43,7 @@ export class RedivivusPaths {
   }
 
   get roadmapPath(): string {
-    return path.join(this.workspaceRoot || '', 'REDIVIVUS_ROADMAP.md');
-  }
-
-  getWorkspaceRoot(): string | undefined {
-    return this.workspaceRoot;
+    return path.join(this.getWorkspaceRoot() || '', 'REDIVIVUS_ROADMAP.md');
   }
 }
 

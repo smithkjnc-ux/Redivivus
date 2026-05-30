@@ -28,6 +28,11 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     if (deps.buildMode === 'plan' && deps.planInterview && (deps.planInterview.step < 8 || deps.planInterview.needsProjectName)) {
       const { handlePlanInterviewAnswer } = await import('../../ui/panels/chat/chatPanelPlanInterview.js');
       await handlePlanInterviewAnswer(msg, deps);
+      // Unlock input — the build pipeline will re-lock with set-status:working if a build starts
+      const _iv = deps.planInterview as any;
+      if (!_iv || !(_iv.step >= 8 && !_iv.needsProjectName)) {
+        panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+      }
       return;
     }
     await handleSendMessage(msg, deps);

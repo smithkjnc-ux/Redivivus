@@ -36,8 +36,10 @@ export function doShowChatPanel(
     });
     return;
   }
+  const wsFolder = vscode.workspace.workspaceFolders?.[0];
+  const panelTitle = wsFolder ? path.basename(wsFolder.uri.fsPath) : 'Redivivus Chat';
   const panel = vscode.window.createWebviewPanel(
-    'redivivusChat', 'Redivivus Chat',
+    'redivivusChat', panelTitle,
     { viewColumn: vscode.ViewColumn.One, preserveFocus: false },
     { enableScripts: true, retainContextWhenHidden: true }
   );

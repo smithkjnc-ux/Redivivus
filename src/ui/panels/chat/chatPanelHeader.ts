@@ -20,16 +20,20 @@ export function buildHeaderInfo(
   assistMode?: boolean,
 ): ChatHeaderInfo {
   const available = routing.getAvailableAI();
-  const config = redivivus.isInitialized() ? redivivus.loadConfig() : null;
+  const isInitialized = redivivus.isInitialized();
+  const config = isInitialized ? redivivus.loadConfig() : null;
   const hasBlueprint = !!config?.blueprint?.who;
   const blueprintLocked = config?.blueprint?.locked || false;
-  const isInitialized = redivivus.isInitialized();
   const projectName = config?.projectName || (vscode.workspace.workspaceFolders?.[0] ? path.basename(vscode.workspace.workspaceFolders[0].uri.fsPath) : 'No Project');
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const workspaceFolderIsOpen = !!vscode.workspace.workspaceFolders?.length;
   const hasProjectOpen = workspaceFolderIsOpen && isInitialized;
+
+  // [DEBUG] Log header state to diagnose header button issue
+  require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
+    `[buildHeaderInfo] ws0=${vscode.workspace.workspaceFolders?.[0]?.uri.fsPath} isInit=${isInitialized} hasProject=${hasProjectOpen} wsFolderOpen=${workspaceFolderIsOpen}\n`);
 
   // Check if current workspace has a .redivivus/ folder or .redivivus-assist shim
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;

@@ -83,7 +83,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
     </div>
     <div class="header-right">
       ${header && header.hasProjectOpen ? `
-      <button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">📋 ${header.projectName}</button>
+      <button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>
       <button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>
       <button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Build History">&#x1F4CB; History</button>
       <button class="header-btn header-btn--preview" data-action="preview-show" title="Live preview of your project">&#x25B6; Preview</button>

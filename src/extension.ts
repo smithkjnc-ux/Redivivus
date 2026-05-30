@@ -212,20 +212,21 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(RedivivusSidebarProvider.viewType, sidebarProvider));
 
   // ── auto-open chat panel on startup (first activation only) ──
-  // Guard: skip if pendingRedivivusInit is queued — runAutoInit poll will create the panel at the right time
-  // Guard: skip if a panel is already open — prevents re-spawn after close-project or folder-swap
-  // [WARN] suppressAutoOpen set to currentRoot means this folder was JUST added by a build — don't re-open.
-  //        Do NOT require pendingInit to also match — that's a new-project-only condition.
+  // Open panel at startup if none is running. suppressAutoOpen only prevents DUPLICATES (currentPanel exists).
+  // After a window reload (workspace conversion), currentPanel is null — must open a fresh panel.
+  // [WARN] Do NOT skip open when currentPanel=false even if suppressed — that's the post-reload scenario.
   setTimeout(() => {
     const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const suppressPath = context.globalState.get<string>('redivivus.suppressAutoOpen');
-    // Suppress if suppressPath matches current root (covers both new-project AND post-build folder add)
+    // [FIX] suppress only blocks DUPLICATE panels (currentPanel exists). After a window reload
+    // (single→multi-root workspace conversion), currentPanel is null — always open then,
+    // otherwise the orphaned pre-reload webview stays visible with stale generic-button header.
     const suppressed = !!(suppressPath && currentRoot && suppressPath === currentRoot);
     if (suppressed) {
       context.globalState.update('redivivus.suppressAutoOpen', undefined);
     }
     require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[auto-open-timer] currentPanel=${!!ChatPanel.currentPanel} suppressed=${suppressed} currentRoot=${currentRoot}\n`);
-    if (!ChatPanel.currentPanel && !suppressed) {
+    if (!ChatPanel.currentPanel) {
       ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
     }
   }, 500);

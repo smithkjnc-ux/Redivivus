@@ -94,6 +94,12 @@ export async function panelRefresh(panel: any): Promise<void> {
   try { const { getAccountToken } = await import('../../../services/api/apiClient.js'); headerInfo.isSignedIn = !!(await getAccountToken()); } catch {}
   const _panel = panel._panel;
   const _initialized = panel._initialized;
+  // Keep tab title in sync with the open project
+  const wsFolder = vscode.workspace.workspaceFolders?.[0];
+  const desiredTitle = wsFolder ? require('path').basename(wsFolder.uri.fsPath) : 'Redivivus Chat';
+  if (_panel.title !== desiredTitle) { _panel.title = desiredTitle; }
+  require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
+    `[panelRefresh] _initialized=${_initialized} hasProject=${headerInfo.hasProjectOpen} conv=${panel.state?.conversation?.length}\n`);
   if (!_initialized) {
     let progress;
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
