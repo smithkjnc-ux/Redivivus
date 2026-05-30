@@ -78,6 +78,8 @@ const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOW
 fs.writeFileSync(file, content);
 "
 cd "$WEB_DIR" && fly deploy -a redivivus-backend 2>&1 | grep -E "✓|deployed|Error|error|v[0-9]" | tail -5
+echo "▶  Deploying web app to Cloudflare Workers (redivivus.dev)..."
+cd "$WEB_DIR" && npm run deploy 2>&1 | grep -E "✓|Deployed|Error|error|success|worker" | tail -5
 
 # Update developer's local stable symlink so the .desktop launcher always works
 STABLE_LINK="$HOME/.local/opt/redivivus"
