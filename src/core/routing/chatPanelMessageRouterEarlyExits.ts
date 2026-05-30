@@ -94,10 +94,11 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
 
 
   if (msg.type === 'open-workspace-btn' && msg.path) {
-    // [FIX] Set flag so ChatPanel constructor skips conversation restore for this new project
-    const _ctx = require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext;
-    if (_ctx) { _ctx.globalState.update('redivivus.skipConversationRestore', true); }
-    vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(msg.path), { forceNewWindow: false });
+    const { ChatPanel } = require('../../ui/panels/chat/chatPanel.js');
+    // [FIX] Suppress runAutoInit, add folder without reloading, rebuild header in-place
+    if (ChatPanel.extensionContext) { ChatPanel.extensionContext.globalState.update('redivivus.suppressAutoOpen', msg.path); }
+    if (!vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === msg.path)) { vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(msg.path) }); }
+    (panel as any)._initialized = false; panel.refresh();
     return true;
   }
 

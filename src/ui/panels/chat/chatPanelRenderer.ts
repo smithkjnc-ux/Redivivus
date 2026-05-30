@@ -128,7 +128,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
     // [Redivivus] Open workspace token — renders a manual button instead of forcing a window reload
     html = html.replace(/__OPEN_WORKSPACE__(.+?)\|\|\|END_OPEN__/g, (_m, rawPath) => {
       const b64 = encodeBase64(rawPath);
-      return `<button class="open-workspace-btn" data-path="${b64}" style="margin-top:10px;padding:8px 16px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;width:100%;box-shadow:0 2px 6px rgba(16,185,129,0.3);">&#x1F4C2; Open Project in Explorer (Reloads Window)</button>`;
+      return `<button class="open-workspace-btn" data-path="${b64}" style="margin-top:10px;padding:8px 16px;background:linear-gradient(135deg,#10b981,#059669);color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;width:100%;box-shadow:0 2px 6px rgba(16,185,129,0.3);">&#x1F4C2; Open Project in Explorer</button>`;
     });
 
     // [FIX] Code block renderer — handles all fence variants, full lang→ext map, auto-filename from first comment
