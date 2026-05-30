@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 29, 2026 — Feature: System Health panel with color-coded cards (green/yellow/red) per section (Session 11DH)
+*Last updated:* May 30, 2026 — Fix: redivivus icon not installing — postcompile.js split (Rule 9), redivivus→codium symlink, StartupWMClass=codium (Session 11DL)
 
 ---
 

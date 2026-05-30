@@ -78,3 +78,8 @@ https://github.com/smithkjnc-ux/Redivivus/releases/tag/v0.3.24
 ▶  Uploading to R2 (downloads.redivivus.dev)...
    Removed v0.3.23 from R2
 ./scripts/release.sh: line 67: wrangler: command not found
+[master 52bbad5] chore: release 0.3.24
+ 3 files changed, 44 insertions(+), 3 deletions(-)
+To https://github.com/smithkjnc-ux/Redivivus.git
+   f992c6d..52bbad5  master -> master
+Fri May 29 09:04:49 PM EDT 2026: Nightly release complete.

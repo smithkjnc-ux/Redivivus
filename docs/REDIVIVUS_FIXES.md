@@ -5,7 +5,25 @@
 
 ---
 
-*Last updated: May 29, 2026 (Session 11DK: Health panel — build API check, Cloudflare detection, cloud/local fallback indicator)*
+*Last updated: May 30, 2026 (Session 11DL: Fix redivivus icon not installing — missing exe symlink, wrong StartupWMClass)*
+
+---
+
+## May 30, 2026 — Session 11DL (Fix: redivivus icon not installing — missing executable symlink and wrong WM class)
+
+**Root cause:** The release tarball contains `codium` as the executable (VSCodium base), but `install.sh` pointed `Exec=` at `./redivivus` which didn't exist. Clicking the launcher did nothing. `StartupWMClass=redivivus` also didn't match the running window's actual class (`codium`), so the taskbar icon stayed generic when the app ran.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `scripts/postcompile-deploy.js` | NEW FILE — split from `postcompile.js` (was 243 lines, over 200-line limit). Contains: build-info write, brand media sync, extension deploy loop, icon copy, `redivivus→codium` symlink creation, install.sh generation. | Rule 9 split required; also adds the symlink and install.sh fixes. | Low — same logic as before, just split out. |
+| `scripts/postcompile.js` | Trimmed to checks only (115 lines): ROADMAP freshness, Rule 9 line-count enforcer, auto-commit. Deploy logic moved to `postcompile-deploy.js`. | Rule 9 — was 243 lines. | None — logic unchanged. |
+| `package.json` | compile script now runs `postcompile-deploy.js && postcompile.js` instead of just `postcompile.js`. | Required to invoke the split deploy step. | Low — both scripts are idempotent. |
+| `scripts/postcompile-deploy.js` | `install.sh` template: adds `ln -sf codium "$INSTALL_DIR/redivivus"` step; changes `StartupWMClass=redivivus` → `StartupWMClass=codium`; adds `gio set` trusted + `gtk-update-icon-cache`. | `redivivus` exe didn't exist in tarball → launcher silently failed. Wrong WM class → taskbar icon generic. `gio set` required for GNOME 40+ launcher display. | None. |
+| `scripts/postcompile-deploy.js` | Creates `redivivus→codium` symlink in build dir during postcompile so `tar` includes it in release tarballs. | Without the symlink in the build dir, the tarball would still be missing it for users who skip `install.sh`. | None — `fs.existsSync` guard prevents duplicate creation. |
+| `.local/share/applications/redivivus.desktop` | `StartupWMClass=redivivus` → `StartupWMClass=codium`; re-ran `gio set` trusted + desktop-database + icon cache. | Immediate fix for current install without waiting for a new release. | None. |
+| `Downloads/redivivus-0.3.24/redivivus` | Created `redivivus→codium` symlink in current extracted tarball. | Immediate fix — launcher now launches the app. | None. |
 
 ---
 
