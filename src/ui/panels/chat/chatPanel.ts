@@ -83,18 +83,15 @@ export class ChatPanel {
     this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('../../../core/routing/chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
     this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
     // [Redivivus] Rebuild full HTML when workspace folder changes — clear old conversation so new project starts fresh
-    // [FIX] Do NOT restore conversation here — user wants a fresh chat screen when opening a project.
+    // [FIX] suppressConversationClear: build pipeline sets this so result card survives the folder add.
     this._disposables.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      this.state.conversation = [];
-      this._initialized = false;
-      // Clear persisted chat history for the new workspace so old conversations don't resurface
-      try {
+      const suppress = ChatPanel.extensionContext?.globalState.get<boolean>('redivivus.suppressConversationClear');
+      ChatPanel.extensionContext?.globalState.update('redivivus.suppressConversationClear', undefined);
+      if (!suppress) { this.state.conversation = []; try {
         const newRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (newRoot && ChatPanel.extensionContext) {
-          const { chatHistoryKey } = require('./chatPanelPublicAPI.js');
-          ChatPanel.extensionContext.globalState.update(chatHistoryKey(newRoot), undefined);
-        }
-      } catch { /* non-fatal */ }
+        if (newRoot && ChatPanel.extensionContext) { const { chatHistoryKey } = require('./chatPanelPublicAPI.js'); ChatPanel.extensionContext.globalState.update(chatHistoryKey(newRoot), undefined); }
+      } catch {} }
+      this._initialized = false;
       this.refresh();
     }));
     // [Redivivus] Hot-reload roster when API key settings change
