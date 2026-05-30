@@ -15,6 +15,7 @@ export interface DevServerInfo {
   command: string;
   type: 'static' | 'vite' | 'next' | 'cra' | 'express' | 'npm';
   loadingMsg: string;
+  webRoot?: string; // serve from this subdirectory instead of workspace root (for AI-generated subfolder projects)
 }
 
 export type ProjectKind = 'web' | 'python' | 'node-cli' | 'api' | 'shell' | 'unknown';
@@ -32,6 +33,21 @@ const MIME: Record<string, string> = {
 
 let _staticServer: http.Server | null = null;
 let _devTerminal: vscode.Terminal | null = null;
+
+// Returns root if it directly contains HTML, else first immediate subdir that does, else null.
+// Handles the common case where AI builds <project>/<project>/index.html (double-nested).
+function findHtmlRoot(root: string): string | null {
+  try {
+    if (fs.readdirSync(root).some(f => f.endsWith('.html'))) { return root; }
+    const subs = fs.readdirSync(root, { withFileTypes: true })
+      .filter(d => d.isDirectory() && !d.name.startsWith('.') && d.name !== 'node_modules');
+    for (const sub of subs) {
+      const p = path.join(root, sub.name);
+      try { if (fs.readdirSync(p).some(f => f.endsWith('.html'))) { return p; } } catch {}
+    }
+  } catch {}
+  return null;
+}
 
 export function detectProjectKind(root: string): ProjectKind {
   const pkgPath = path.join(root, 'package.json');
@@ -53,10 +69,7 @@ export function detectProjectKind(root: string): ProjectKind {
       if (pkg.bin) { return 'node-cli'; }
     } catch {}
   }
-  try {
-    const hasHtml = fs.readdirSync(root).some(f => f.endsWith('.html'));
-    if (hasHtml) { return 'web'; }
-  } catch {}
+  if (findHtmlRoot(root)) { return 'web'; }
   return 'unknown';
 }
 
@@ -74,8 +87,8 @@ export function getNoPreviewMessage(kind: ProjectKind): string {
 
 export function detectDevServer(root: string): DevServerInfo | null {
   const pkgPath = path.join(root, 'package.json');
-  let hasHtml = false;
-  try { hasHtml = fs.readdirSync(root).some(f => f.endsWith('.html')); } catch {}
+  const htmlRoot = findHtmlRoot(root);
+  const hasHtml = htmlRoot !== null;
 
   if (fs.existsSync(pkgPath)) {
     try {
@@ -90,7 +103,7 @@ export function detectDevServer(root: string): DevServerInfo | null {
       // Must come before generic dev/start checks so "tsc -w" or "http-server -p 8080" projects
       // don't get misdetected as a web server on port 3000.
       if (hasHtml) {
-        return { port: 5500, command: '', type: 'static', loadingMsg: 'Serving files...' };
+        return { port: 5500, command: '', type: 'static', loadingMsg: 'Serving files...', webRoot: htmlRoot ?? undefined };
       }
       // Generic npm server (Express, etc.) — only when no index.html exists
       if (scripts['dev'])    { return { port: 3000, command: 'npm run dev', type: 'npm',     loadingMsg: 'Starting dev server...' }; }
@@ -98,7 +111,7 @@ export function detectDevServer(root: string): DevServerInfo | null {
     } catch { /* fall through */ }
   }
   if (hasHtml) {
-    return { port: 5500, command: '', type: 'static', loadingMsg: 'Serving files...' };
+    return { port: 5500, command: '', type: 'static', loadingMsg: 'Serving files...', webRoot: htmlRoot ?? undefined };
   }
   return null;
 }
@@ -110,7 +123,7 @@ export async function startPreviewServer(root: string, info: DevServerInfo): Pro
   }
   stopPreviewServer();
   if (info.type === 'static') {
-    _staticServer = _buildStaticServer(root, info.port);
+    _staticServer = _buildStaticServer(info.webRoot || root, info.port);
     _staticServer.listen(info.port, 'localhost');
     return { port: info.port, stop: stopPreviewServer, alreadyRunning: false };
   }

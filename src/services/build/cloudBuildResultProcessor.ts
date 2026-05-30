@@ -88,12 +88,17 @@ export async function processBuildResults(
   // Add the project folder to the workspace without reloading the window.
   // updateWorkspaceFolders is non-destructive — Explorer updates in place.
   const vscode = await import('vscode');
+  const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
   const alreadyInWs = vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === root);
   if (!alreadyInWs) {
+    // [FIX] Set suppress flag BEFORE updateWorkspaceFolders so onDidChangeWorkspaceFolders
+    // does not fire runAutoInit and open a second chat panel alongside the one already showing the result.
+    if (ChatPanel.extensionContext) {
+      ChatPanel.extensionContext.globalState.update('redivivus.suppressAutoOpen', root);
+    }
     vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(root) });
   }
 
-  const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
   ChatPanel.onBuildFinished?.(task, writtenPaths, root);
 
   return { success: true, files: data.files, narration: data.narration, model: data.model, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
