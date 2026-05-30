@@ -122,7 +122,8 @@ export function buildHeaderInfo(
     projectTokens,
     buildStamp,
     vaultItemCount: (() => { try { const { VaultService } = require('../../../services/vault/vaultService.js'); const v = new VaultService(extensionContext); return v.listItems().length; } catch { return 0; } })(),
-    isSignedIn: false, // populated async below — caller uses refreshHeader() to get updated value
+    isSignedIn: false,
+    healthStatus: extensionContext?.globalState.get<'green' | 'yellow' | 'red'>('redivivus.healthStatus'), // populated async below — caller uses refreshHeader() to get updated value
   };
 }
 

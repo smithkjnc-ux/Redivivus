@@ -85,6 +85,16 @@ export async function collectHealthData(): Promise<HealthData> {
   };
 }
 
+// Compute overall health level for header button coloring.
+// Red = blocks coding (no API, no keys, build endpoint down). Yellow = degraded. Green = all clear.
+export function getHealthStatus(d: HealthData): 'green' | 'yellow' | 'red' {
+  const configuredKeys = Object.values(d.keys).filter(Boolean).length;
+  if (!d.api.reachable || !d.buildApi.reachable || configuredKeys === 0) { return 'red'; }
+  const failRate = d.buildStats ? d.buildStats.failed / Math.max(d.buildStats.total, 1) : 0;
+  if ((d.api.latencyMs !== null && d.api.latencyMs >= 800) || !d.account.signedIn || configuredKeys < 2 || failRate >= 0.3) { return 'yellow'; }
+  return 'green';
+}
+
 // Uses CSS classes defined in chatPanelStylesInput.ts (.hc-*) — NOT inline color styles.
 // Inline color styles are ignored in this WebView context; class-based styles are nonce-approved.
 export function buildHealthHtml(d: HealthData): string {

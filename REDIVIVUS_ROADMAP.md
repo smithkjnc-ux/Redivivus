@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 30, 2026 — Fix: API endpoint switched from dead Cloudflare/redivivus.dev to redivivus-backend.fly.dev (Session 11DM)
+*Last updated:* May 30, 2026 — Fix: launcher opening two windows (--reuse-window), health button color (Session 11DO)
 
 ---
 

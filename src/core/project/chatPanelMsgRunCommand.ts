@@ -18,9 +18,12 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
   if (!command) { return; }
   try {
     if (command === 'redivivus.showSystemHealth') {
-      const { collectHealthData, buildHealthHtml } = await import('../../ui/panels/chat/chatPanelHealthCheck.js');
+      const { collectHealthData, buildHealthHtml, getHealthStatus } = await import('../../ui/panels/chat/chatPanelHealthCheck.js');
       panel.webview.postMessage({ type: 'set-status', status: 'working' });
       const data = await collectHealthData();
+      const status = getHealthStatus(data);
+      ChatPanel.extensionContext?.globalState.update('redivivus.healthStatus', status);
+      deps.refresh();
       panel.webview.postMessage({ type: 'set-status', status: 'ready' });
       panel.webview.postMessage({ type: 'show-panel', title: 'System Health', content: buildHealthHtml(data) });
       return;

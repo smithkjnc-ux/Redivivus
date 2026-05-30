@@ -91,7 +91,7 @@ cat > "$DESKTOP_FILE" <<DESKTOPEOF
 [Desktop Entry]
 Name=Redivivus IDE
 Comment=AI-powered code editor
-Exec=$STABLE_LINK/codium --no-sandbox %U
+Exec=$STABLE_LINK/codium --no-sandbox --reuse-window %U
 Icon=$ICON_DEST
 Terminal=false
 Type=Application
