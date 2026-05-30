@@ -59,6 +59,8 @@ export async function callCloudBuild(
     } catch { /* plan failed — fall through to single-file build */ }
   }
 
+  opts.onProgress?.('Building your project...');
+
   try {
     // Step 1: Get routing instructions from backend (SECRET SAUCE)
     // [FIX] Removed hardcoded tier:'pro' — server determines tier from the account token.
@@ -91,7 +93,8 @@ export async function callCloudBuild(
       // 4xx = client error (bad request, auth, etc.) — don't fall back, surface the error.
       if (instructionRes.status >= 500) {
         console.log('[Redivivus] Cloud 5xx — activating local build fallback');
-        return await runLocalBuild(task, root, context, deps);
+        opts.onProgress?.('Cloud unavailable — building with your local key...');
+        return await runLocalBuild(task, root, context, deps, opts.onProgress);
       }
       return { success: false, error: errMsg, failureSource: 'cloud' };
     }

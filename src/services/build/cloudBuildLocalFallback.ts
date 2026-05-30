@@ -100,6 +100,7 @@ export async function runLocalBuild(
   root: string,
   context: CloudBuildContext,
   deps: BuildRequestDeps,
+  onProgress?: (msg: string) => void,
 ): Promise<CloudBuildResult> {
   const keys = collectKeys();
   const prompt = buildLocalPrompt(task, context);
@@ -114,11 +115,15 @@ export async function runLocalBuild(
   for (const provider of availableProviders) {
     try {
       console.log(`[Redivivus] Local fallback: trying provider=${provider}`);
-      // Update the "Building..." conversation bubble so user knows what's happening
-      if (deps.postToWebview) {
-        deps.postToWebview({ type: 'update-building-message', text: `Building with ${providerLabel[provider] || provider} (cloud unavailable)...` });
-      }
-      const response = await callProvider(provider, prompt, createFetch(), undefined, undefined, undefined, SYSTEM);
+      onProgress?.(`Building with ${providerLabel[provider] || provider} (cloud unavailable)...`);
+      // [WARN] createFetch clears timeout on response headers, not body — AI streaming can hang.
+      // Wrap in Promise.race to enforce a hard 150s ceiling across the full provider call.
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Local build timed out after 150s')), 150_000));
+      const response = await Promise.race([
+        callProvider(provider, prompt, createFetch(), undefined, undefined, undefined, SYSTEM),
+        timeout,
+      ]);
       if (!response.text || response.text.length < 50) { continue; }
 
       const files = parseLocalBuildResponse(response.text, root);

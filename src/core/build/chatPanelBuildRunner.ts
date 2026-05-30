@@ -97,7 +97,7 @@ export async function runBuildAfterGates(
         totalTokens: 0,
         error: result.error,
       });
-      deps.conversation.splice(-1, 1);
+      removeWorkingMessage();
       deps.conversation.push({
         role: 'assistant',
         content: `❌ **Build failed:** ${result.error}\n\n_Try rephrasing your request._`,
@@ -108,7 +108,7 @@ export async function runBuildAfterGates(
     }
 
     // Build succeeded — replace working indicator with result
-    deps.conversation.splice(-1, 1);
+    removeWorkingMessage();
     const files = result.files ?? [];
     const fileList = files.map(f => `- \`${f.path}\``).join('\n');
     const openWorkspaceToken = files.length > 0 && root && !vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === root)
