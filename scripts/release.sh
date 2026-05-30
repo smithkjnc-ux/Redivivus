@@ -91,12 +91,12 @@ cat > "$DESKTOP_FILE" <<DESKTOPEOF
 [Desktop Entry]
 Name=Redivivus IDE
 Comment=AI-powered code editor
-Exec=$STABLE_LINK/redivivus --no-sandbox --new-window %U
+Exec=$STABLE_LINK/codium --no-sandbox %U
 Icon=$ICON_DEST
 Terminal=false
 Type=Application
 Categories=Development;IDE;
-StartupWMClass=redivivus
+StartupWMClass=codium
 MimeType=text/plain;inode/directory;
 DESKTOPEOF
 chmod +x "$DESKTOP_FILE"

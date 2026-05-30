@@ -99,6 +99,18 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.commands.executeCommand('setContext', 'redivivus.initialized', redivivusService.isInitialized());
   vscode.commands.executeCommand('setContext', 'redivivus.sessionActive', false);
 
+  // ── suppress VSCodium welcome page and multi-window restore — set once if uncustomized ──
+  const wbCfg = vscode.workspace.getConfiguration('workbench');
+  const winCfg = vscode.workspace.getConfiguration('window');
+  const startupEditorInspect = wbCfg.inspect('startupEditor');
+  const restoreWindowsInspect = winCfg.inspect('restoreWindows');
+  if (!startupEditorInspect?.globalValue && !startupEditorInspect?.workspaceValue) {
+    wbCfg.update('startupEditor', 'none', vscode.ConfigurationTarget.Global);
+  }
+  if (!restoreWindowsInspect?.globalValue && !restoreWindowsInspect?.workspaceValue) {
+    winCfg.update('restoreWindows', 'one', vscode.ConfigurationTarget.Global);
+  }
+
   // ── activate subsystems ──
   annotationService.activate(context);
   statusBar.activate(context);
