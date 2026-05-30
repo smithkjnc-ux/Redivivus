@@ -5,7 +5,24 @@
 
 ---
 
-*Last updated: May 30, 2026 (Session 11DP: Fix health button color — targeted postMessage instead of refresh)*
+*Last updated: May 30, 2026 (Session 11DQ: Health button real-time — background probe on startup + every 5 min)*
+
+---
+
+## May 30, 2026 — Session 11DQ (Feature: Health button real-time probe; remove redundant REDIVIVUS logo from header)
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `chatPanelPublicAPI.ts` | After first-init render: fires async IIFE that imports health check, runs probe immediately, posts `update-health-btn`, then `setInterval` re-probes every 5 min. | Button was only colored after user clicked Health. Now colors on startup automatically. | Low — fire-and-forget with try/catch. |
+| `chatPanelHtml.ts` | Removed the `R EDIVIVUS` logo `<div>` from `header-left`. | Redundant — tab already says "Redivivus Chat". Wastes header space. | None. |
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `chatPanelPublicAPI.ts` | After first-init HTML render: fires async IIFE that imports `collectHealthData`/`getHealthStatus`, runs probe immediately, posts `update-health-btn` to webview, then sets `setInterval` to re-probe every 5 min. | Button was only colored after user clicked Health. Now colors automatically on startup and stays current. | Low — fire-and-forget IIFE with try/catch; `setInterval` fails silently if panel is disposed. |
 
 ---
 

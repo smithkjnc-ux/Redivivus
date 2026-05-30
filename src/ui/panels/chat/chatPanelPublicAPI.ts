@@ -113,6 +113,23 @@ export async function panelRefresh(panel: any): Promise<void> {
     panel._initialized = true;
     // Persist conversation after first load so existing messages survive a panel reopen
     saveConversation(state, root);
+    // Background health probe — colors the Health button on startup and every 5 min without user interaction
+    (async () => {
+      try {
+        const { collectHealthData, getHealthStatus } = await import('./chatPanelHealthCheck.js');
+        const colorMap: Record<string, string> = { green: '#4caf50', yellow: '#ff9800', red: '#f44336' };
+        const probe = async () => {
+          try {
+            const data = await collectHealthData();
+            const status = getHealthStatus(data);
+            _panel.webview.postMessage({ type: 'update-health-btn', status, color: colorMap[status] });
+            ChatPanel.extensionContext?.globalState.update('redivivus.healthStatus', status);
+          } catch {}
+        };
+        await probe();
+        setInterval(probe, 5 * 60 * 1000);
+      } catch {}
+    })();
     return;
   }
   const { renderMessages } = await import('./chatPanelRenderer.js');
