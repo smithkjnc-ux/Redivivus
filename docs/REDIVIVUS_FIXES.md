@@ -5,7 +5,20 @@
 
 ---
 
-*Last updated: May 30, 2026 (Session 11DO: Fix launcher opening two windows — --new-window → --reuse-window)*
+*Last updated: May 30, 2026 (Session 11DP: Fix health button color — targeted postMessage instead of refresh)*
+
+---
+
+## May 30, 2026 — Session 11DP (Fix: health button color not updating — wrong update mechanism)
+
+**Root cause:** `panelRefresh` only replaces `webview.html` on first load (`!_initialized`). After init, it uses `postMessage` for conversation only — the header is never re-rendered. `deps.refresh()` could never update the button.
+
+**Changes:**
+
+| File | What Changed | Why | Risk |
+|---|---|---|---|
+| `chatPanelScriptListener.ts` | Added `update-health-btn` message handler — finds button by `data-cmd`, sets `style.borderColor`, `style.color`, and `textContent` directly. Uses `String.fromCharCode` for dot/ring per Rule 13. | Direct DOM update is the only reliable way to change the button after panel is initialized. | None — targeted selector, no side effects. |
+| `chatPanelMsgRunCommand.ts` | Replaced `deps.refresh()` with `panel.webview.postMessage({ type: 'update-health-btn', status, color })`. Removed the useless refresh call. | `deps.refresh()` never updated the header post-init. Direct message works immediately. | None. |
 
 ---
 

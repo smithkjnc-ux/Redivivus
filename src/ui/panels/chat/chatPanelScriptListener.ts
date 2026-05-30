@@ -98,6 +98,14 @@ export function buildListenerScript(): string {
         var mb2 = document.getElementById('preview-move-btn'); if (mb2) mb2.classList.remove('active');
         var rl3 = document.getElementById('preview-chat-last'); if (rl3) rl3.textContent = msg.type === 'rearrange-error' ? '⚠ ' + (msg.message || 'Move failed') : '✓ Done';
       }
+      if (msg.type === 'update-health-btn') {
+        var hBtn = document.querySelector('[data-cmd="redivivus.showSystemHealth"]');
+        if (hBtn) {
+          hBtn.style.borderColor = msg.color || '';
+          hBtn.style.color = msg.color || '';
+          hBtn.textContent = (msg.status ? String.fromCharCode(9679) : String.fromCharCode(9678)) + ' Health';
+        }
+      }
       if (msg.type === 'show-visual-editor' && msg.contract) { veOpen(msg.contract); }
       if (msg.type === 'visual-patch-ack') {
         veShowStatus(msg.ok ? 'Saved ✓' : '⚠ ' + (msg.message || 'Error'), !msg.ok);

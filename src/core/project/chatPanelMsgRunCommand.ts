@@ -22,8 +22,9 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
       panel.webview.postMessage({ type: 'set-status', status: 'working' });
       const data = await collectHealthData();
       const status = getHealthStatus(data);
+      const colorMap: Record<string, string> = { green: '#4caf50', yellow: '#ff9800', red: '#f44336' };
+      panel.webview.postMessage({ type: 'update-health-btn', status, color: colorMap[status] });
       ChatPanel.extensionContext?.globalState.update('redivivus.healthStatus', status);
-      deps.refresh();
       panel.webview.postMessage({ type: 'set-status', status: 'ready' });
       panel.webview.postMessage({ type: 'show-panel', title: 'System Health', content: buildHealthHtml(data) });
       return;
