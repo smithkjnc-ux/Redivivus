@@ -21,14 +21,20 @@ if (fs.existsSync(outDataDir)) { fs.writeFileSync(path.join(outDataDir, 'build-i
 // Stored in resources/media/ so they survive a fresh build deploy.
 const mediaSrc = path.join(workspaceRoot, 'resources', 'media');
 const mediaDest = path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'out', 'media');
-if (fs.existsSync(mediaSrc) && fs.existsSync(mediaDest)) {
+const mediaTargets = [mediaDest];
+try {
+  const runningMedia = path.join(fs.realpathSync(path.join(home, '.local', 'opt', 'redivivus')), 'resources', 'app', 'out', 'media');
+  if (fs.existsSync(runningMedia) && runningMedia !== mediaDest) mediaTargets.push(runningMedia);
+} catch {}
+for (const mt of mediaTargets) {
+  if (!fs.existsSync(mt)) continue;
   try {
-    execSync(`rsync -a "${mediaSrc}/" "${mediaDest}/"`, { stdio: 'pipe' });
-    console.log('✓ Brand media synced to build');
+    execSync(`rsync -a "${mediaSrc}/" "${mt}/"`, { stdio: 'pipe' });
   } catch (e) {
     console.warn('⚠️  Brand media sync failed:', e.stderr?.toString()?.trim() || e.message);
   }
 }
+if (fs.existsSync(mediaSrc)) console.log('✓ Brand media synced to build');
 
 // Deploy compiled out/ to all known extension locations — runs unconditionally so every compile stays in sync.
 // Prevents zombie bugs where a source fix is compiled but never reaches the running build.

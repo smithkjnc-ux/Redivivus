@@ -6,10 +6,7 @@ export function registerReportIssueCommand(context: vscode.ExtensionContext): vo
     vscode.commands.registerCommand('redivivus.reportIssue', async () => {
       const pkg = require('../../package.json');
       const version: string = pkg.version;
-      const cfg = vscode.workspace.getConfiguration('redivivus');
-      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev';
-      const webBase = apiBase.replace('/api/v1', '');
-      const url = `${webBase}/feedback?source=ide&version=${encodeURIComponent(version)}`;
+      const url = `https://github.com/smithkjnc-ux/Redivivus/issues/new?title=Bug+Report+v${encodeURIComponent(version)}&labels=bug&template=bug_report.md`;
       await vscode.env.openExternal(vscode.Uri.parse(url));
     })
   );

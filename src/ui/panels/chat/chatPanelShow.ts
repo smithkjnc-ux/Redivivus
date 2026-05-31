@@ -43,6 +43,10 @@ export function doShowChatPanel(
     { viewColumn: vscode.ViewColumn.One, preserveFocus: false },
     { enableScripts: true, retainContextWhenHidden: true }
   );
+  const extCtx = ChatPanel.extensionContext;
+  if (extCtx) {
+    panel.iconPath = vscode.Uri.joinPath(extCtx.extensionUri, 'resources', 'redivivus-icon-v2.svg');
+  }
   const instance = new (ChatPanel as any)(panel, redivivus, routing, usageTracker, vault);
   const ctx = ChatPanel.extensionContext;
   const startupBehavior = vscode.workspace.getConfiguration('redivivus').get<string>('startupBehavior') || 'launcher';

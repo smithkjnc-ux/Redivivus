@@ -1,3 +1,15 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="109 79 233 293" fill="none" stroke="#14B8A6" stroke-width="42" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M130,350 L130,100 L245,100 Q320,100 320,165 Q320,230 245,230 L185,230 L310,350" />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="58 10 102 110">
+  <g transform="translate(55, 18)">
+    <path fill-rule="evenodd" fill="#1D9E75" d="M 12 82 Q 12 68 20 60 L 20 32 Q 20 0 50 0 L 62 0 Q 96 0 96 30 Q 96 56 68 60 L 46 60 Q 36 60 30 68 Q 28 71 28 75 L 28 82 Q 28 92 20 92 Q 12 92 12 82 Z M 36 12 L 58 12 Q 78 12 78 30 Q 78 48 60 48 L 38 48 Q 36 48 36 50 L 36 12 Z"/>
+    <path d="M 50 63 L 65 63 Q 73 63 79 71 L 94 91 Q 98 97 91 97 L 78 97 Q 71 97 65 89 L 52 72 Q 46 63 50 63 Z" fill="#1D9E75"/>
+    <line x1="57" y1="30" x2="57" y2="14" stroke="#D4A84B" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+    <line x1="57" y1="30" x2="57" y2="46" stroke="#D4A84B" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+    <line x1="57" y1="30" x2="41" y2="30" stroke="#D4A84B" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+    <line x1="57" y1="30" x2="73" y2="30" stroke="#D4A84B" stroke-width="1.2" stroke-linecap="round" opacity="0.35"/>
+    <circle cx="57" cy="14" r="2.5" fill="#D4A84B" opacity="0.6"/>
+    <circle cx="57" cy="46" r="2.5" fill="#D4A84B" opacity="0.6"/>
+    <circle cx="41" cy="30" r="2.5" fill="#D4A84B" opacity="0.6"/>
+    <circle cx="73" cy="30" r="2.5" fill="#D4A84B" opacity="0.6"/>
+    <circle cx="57" cy="30" r="5" fill="#D4A84B" opacity="0.95"/>
+  </g>
 </svg>

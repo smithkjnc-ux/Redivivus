@@ -60,12 +60,8 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
 
   return `<div class="empty-state launcher-root">
     ${signInBanner}
-    <div class="launcher-hero">
-      <span class="launcher-logo">&#x1F3D7;&#xFE0F;</span>
-      <div class="launcher-hero-text">
-        <div class="onboarding-title" style="font-size:20px;font-weight:700;">Welcome to Redivivus</div>
-        <div class="onboarding-sub" style="font-size:13px;margin:0;">Your AI build system. Plan, scaffold, build, and iterate.</div>
-      </div>
+    <div class="launcher-hero" style="text-align:center;">
+      <div class="onboarding-sub" style="font-size:13px;margin:0;">Your AI build system. Plan, scaffold, build, and iterate.</div>
     </div>
     <div class="launcher-actions">
       <button class="launcher-action-card" data-action="start-new-project" data-mode="plan" title="Guided Mode: full 5 W's interview before building -- Redivivus learns exactly what you need and saves it to a blueprint"><span class="lac-icon">&#x1F3AF;</span><span class="lac-label">Guided</span><span class="lac-desc">Interview first</span></button>

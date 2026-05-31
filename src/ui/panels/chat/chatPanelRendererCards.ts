@@ -39,5 +39,11 @@ export function renderActionCard(command: string, label: string): string {
 }
 
 export function renderResultCard(summary: string): string {
-  return `<div style="margin:12px 0;padding:14px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:8px;"><div style="font-weight:700;margin-bottom:6px;">🎉 Build Complete</div><div style="font-size:13px;line-height:1.5;">${escapeHtml(summary.trim())}</div></div>`;
+  // [FIX] summary is already HTML-escaped by renderMessages — do NOT call escapeHtml again (double-escape shows &amp;).
+  // Apply minimal markdown on pre-escaped content.
+  const body = summary.trim()
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br>');
+  return `<div style="margin:12px 0;padding:14px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:8px;"><div style="font-weight:700;margin-bottom:6px;">🎉 Build Complete</div><div style="font-size:13px;line-height:1.5;">${body}</div></div>`;
 }

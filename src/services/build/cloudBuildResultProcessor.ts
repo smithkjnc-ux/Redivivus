@@ -8,6 +8,7 @@ import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { CloudBuildResult } from './cloudBuildClient.js';
 import { appendBuildLog } from './buildLogger.js';
 import type { BuildMeta } from './buildLogger.js';
+import { autoCaptureFiles } from '../vault/vaultAutoCapture.js';
 
 export async function processBuildResults(
   data: any,
@@ -30,13 +31,16 @@ export async function processBuildResults(
   // Track the "best" file to open: prefer .html, then .ts/.js, then first file.
   let primaryPath: string | undefined;
 
+  // [FIX] Strip project-name prefix from AI-generated paths (e.g. "react-todo-app/src/App.js" -> "src/App.js")
+  const slug = path.basename(root);
   for (const file of data.files) {
-    const absPath = path.join(root, file.path);
-    const snapshotId = createSnapshot(root, task, file.path);
+    const relPath = file.path.startsWith(slug + '/') ? file.path.slice(slug.length + 1) : file.path;
+    const absPath = path.join(root, relPath);
+    const snapshotId = createSnapshot(root, task, relPath);
     writeBuiltFile(absPath, file.content, { root, task });
     writtenPaths.push(absPath);
     // Pick the primary file to show — skip docs/config (md, json, toml, yaml)
-    const ext = path.extname(file.path).toLowerCase();
+    const ext = path.extname(relPath).toLowerCase();
     const isDoc = ['.md', '.json', '.yaml', '.yml', '.toml', '.txt'].includes(ext);
     if (!isDoc && (!primaryPath || ext === '.html')) { primaryPath = absPath; }
     if (snapshotId) {
@@ -100,5 +104,18 @@ export async function processBuildResults(
   }
   ChatPanel.onBuildFinished?.(task, writtenPaths, root);
 
-  return { success: true, files: data.files, narration: data.narration, model: data.model, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
+  // Auto-capture reusable code from built files into the vault (fire-and-forget — never blocks)
+  const vault = (deps as any).vault;
+  const routing = (deps as any).routing;
+  if (vault && writtenPaths.length > 0) {
+    const callAI = (prompt: string) => routing.prompt(prompt, 8_000);
+    autoCaptureFiles(writtenPaths, path.basename(root), vault, task, callAI).catch(() => {});
+  }
+
+  // Return normalized file paths so callers (result card, preview token) use the actual written paths
+  const normalizedFiles = data.files.map((f: any) => ({
+    ...f,
+    path: f.path.startsWith(slug + '/') ? f.path.slice(slug.length + 1) : f.path,
+  }));
+  return { success: true, files: normalizedFiles, narration: data.narration, model: data.model, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
 }

@@ -20,9 +20,11 @@ function isProjectsContainer(root: string): boolean {
 function getLiveRoot(deps: BuildRequestDeps): string | undefined {
   const liveRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (isValidBuildRoot(liveRoot) && !isProjectsContainer(liveRoot)) { return liveRoot; }
-  if (!liveRoot) { return undefined; }
+  // [FIX] Fall back to redivivus service root even when no VS Code workspace folder is open.
+  // resumeBuildTask sets panel.redivivus to the new project root before calling _handleBuildRequest,
+  // so this catches the case where the folder exists but hasn't been added to the workspace yet.
   const redivivusRoot = deps.redivivus?.getWorkspaceRoot?.();
-  if (isValidBuildRoot(redivivusRoot) && redivivusRoot !== liveRoot && !isProjectsContainer(redivivusRoot)) { return redivivusRoot; }
+  if (isValidBuildRoot(redivivusRoot) && !isProjectsContainer(redivivusRoot)) { return redivivusRoot; }
   return undefined;
 }
 

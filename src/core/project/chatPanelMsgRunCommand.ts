@@ -53,6 +53,10 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
     } else if (command === 'workbench.action.closeFolder') {
       const folders = vscode.workspace.workspaceFolders;
       if (folders && folders.length > 0) {
+        // [FIX] Suppress "Do you want to save workspace?" dialog for untitled workspaces.
+        // window.confirmSaveUntitledWorkspace=false is the exact setting the "Always discard" checkbox sets.
+        const cfg = vscode.workspace.getConfiguration();
+        await cfg.update('window.confirmSaveUntitledWorkspace', false, vscode.ConfigurationTarget.Global);
         await vscode.workspace.updateWorkspaceFolders(0, folders.length);
       } else {
         await vscode.commands.executeCommand(command);

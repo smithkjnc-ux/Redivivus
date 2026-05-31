@@ -10,6 +10,7 @@ import type { VaultService } from '../vault/vaultService';
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
 import { runLocalBuild } from './cloudBuildLocalFallback.js';
+import { executeMultiFileBuild } from './cloudBuildMultiFile.js';
 
 export interface CloudBuildResult {
   success: boolean
@@ -53,7 +54,7 @@ export async function callCloudBuild(
       if (planRes.ok) {
         const plan = await planRes.json() as { files: Array<{ path: string; description: string; isNew: boolean }> };
         if (plan.files && plan.files.length > 1) {
-          return await executeMultiFileBuild(task, root, context, keys, token, base, preferred ?? '', plan.files, opts.onProgress);
+          return await executeMultiFileBuild(task, root, context, keys, token, base, preferred ?? '', plan.files, deps, opts.onProgress);
         }
       }
     } catch { /* plan failed — fall through to single-file build */ }
@@ -197,67 +198,4 @@ function createFetchWithTimeout() {
   };
 }
 
-async function executeMultiFileBuild(
-  task: string,
-  root: string,
-  context: any,
-  keys: any,
-  token: string,
-  base: string,
-  preferred: string,
-  planFiles: Array<{ path: string; description: string; isNew: boolean }>,
-  onProgress?: (msg: string) => void,
-): Promise<CloudBuildResult> {
-  const allFiles: Array<{ path: string; content: string; isNew: boolean }> = [];
-  const siblings = planFiles.map(f => ({ path: f.path, description: f.description }));
-  let totalTokens = 0;
-  let lastModel = '';
-
-  for (let i = 0; i < planFiles.length; i++) {
-    const file = planFiles[i];
-    onProgress?.(`Building ${file.path} (${i + 1}/${planFiles.length})...`);
-
-    try {
-      const body = JSON.stringify({
-        task,
-        context,
-        keys,
-        preferred,
-        targetFile: { path: file.path, description: file.description, isNew: file.isNew, fileIndex: i, totalFiles: planFiles.length, siblings },
-      });
-      const res = await fetch(`${base}/build`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body,
-        signal: AbortSignal.timeout(120_000),
-      });
-
-      if (res.status === 401) {
-        const { clearAccountToken } = await import('../api/apiClient.js');
-        await clearAccountToken();
-        return { success: false, error: 'NOT_AUTHENTICATED' };
-      }
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: res.statusText })) as any;
-        return { success: false, error: `Failed on ${file.path}: ${err.error || res.statusText}`, failureSource: 'cloud' };
-      }
-
-      const data = await res.json() as { files: typeof allFiles; model: string; inputTokens: number; outputTokens: number };
-      allFiles.push(...(data.files ?? []));
-      totalTokens += (data.inputTokens ?? 0) + (data.outputTokens ?? 0);
-      lastModel = data.model ?? lastModel;
-    } catch (e: any) {
-      if (e?.name === 'TimeoutError') return { success: false, error: `Timed out on ${file.path} — try a simpler request.`, failureSource: 'cloud' };
-      return { success: false, error: e?.message ?? 'Network error', failureSource: 'cloud' };
-    }
-  }
-
-  return {
-    success: true,
-    files: allFiles,
-    narration: `Built ${allFiles.length} files for: ${task.slice(0, 60)}${task.length > 60 ? '...' : ''}`,
-    model: lastModel,
-    inputTokens: Math.round(totalTokens * 0.6),
-    outputTokens: Math.round(totalTokens * 0.4),
-  };
-}
+// [DEAD] executeMultiFileBuild moved to cloudBuildMultiFile.ts (Rule 9 split + bug fix: was returning files without writing to disk)

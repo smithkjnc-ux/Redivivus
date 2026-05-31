@@ -36,7 +36,8 @@ CRITICAL RULES — follow these exactly:
     (populate valid moves list BEFORE calling movePiece — never set selectedPiece directly)
   * Test mentally: after human moves, does the AI's turn actually fire and complete?
 - Do NOT include any text outside the file blocks
-- Self-contained single-file web apps are preferred (inline CSS and JS in index.html) unless the project clearly needs multiple files`;
+- Self-contained single-file web apps are preferred (inline CSS and JS in index.html) unless the project clearly needs multiple files
+- NEVER use CDN URLs (unpkg, jsdelivr, cdnjs, etc.) -- files are opened via file:// and CDN scripts will not load. All JS must be inline or bundled`;
 
 function buildLocalPrompt(task: string, context: CloudBuildContext): string {
   const parts: string[] = [`BUILD TASK: ${task}`];
@@ -72,7 +73,10 @@ function parseLocalBuildResponse(text: string, root: string): Array<{ path: stri
   const xmlFileRe = /<file\s+path="([^"]+)">[\s\S]*?<content>\n?([\s\S]*?)\n?<\/content>[\s\S]*?<\/file>/g;
   let m: RegExpExecArray | null;
   while ((m = xmlFileRe.exec(text)) !== null) {
-    const relPath = m[1].trim().replace(/^\.?\//, '');
+    // [FIX] Strip project-name prefix if AI echoes it (e.g. "react-todo-app/index.html" → "index.html")
+    const slug = path.basename(root);
+    const rawPath = m[1].trim().replace(/^\.?\//, '');
+    const relPath = rawPath.startsWith(slug + '/') ? rawPath.slice(slug.length + 1) : rawPath;
     const content = m[2].trimEnd();
     if (relPath && content) {
       const { existsSync } = require('fs') as typeof import('fs');

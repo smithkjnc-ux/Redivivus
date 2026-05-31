@@ -8,6 +8,7 @@ import { handleEditRequest } from '../ai/chatPanelIntent';
 import { handleInterviewMessage } from '../../ui/views/blueprintInterviewPanel';
 import { panelVaultOnlyBuild } from '../build/chatPanelBuildUtils';
 import { handlePreviewMessages } from './chatPanelMessageRouterPreview';
+import { handleScaffoldQuickstart } from './chatPanelMessageRouterScaffold';
 
 export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<boolean> {
   const state = (panel as any).state;
@@ -187,14 +188,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     return true;
   }
 
-  if (msg.type === 'scaffold-quickstart') {
-    const label = ({ react: 'React', flask: 'Python Flask', go: 'Go API', express: 'Node Express' } as any)[msg.template] || msg.template;
-    state.buildMode = 'direct';
-    state.conversation.push({ role: 'user', content: `Scaffold a new ${label} project`, timestamp: Date.now() });
-    state.conversation.push({ role: 'assistant', content: `🚀 Scaffolding ${label} project...`, timestamp: Date.now() });
-    panel.refresh(); await (panel as any)._handleBuildRequest(`scaffold a new ${label} project`, true, false);
-    return true;
-  }
+  if (msg.type === 'scaffold-quickstart') { return handleScaffoldQuickstart(panel, msg); }
   if (msg.type === 'start-preview' || msg.type === 'popout-preview' || msg.type === 'open-in-browser' || msg.type === 've-open-request' || msg.type === 'visual-apply-all' || msg.type === 'rearrange-start' || msg.type === 'redivivus-drag-drop' || msg.type === 'rearrange-finish' || msg.type === 'rearrange-undo') {
     return handlePreviewMessages(panel, msg);
   }

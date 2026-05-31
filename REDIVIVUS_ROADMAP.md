@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* May 30, 2026 — Health button real-time background probe; remove redundant REDIVIVUS logo header (Session 11DQ)
+*Last updated:* May 30, 2026 — Vault auto-capture wired to build pipeline; files from every build now feed the vault (Session 11DW)
 
 ---
 

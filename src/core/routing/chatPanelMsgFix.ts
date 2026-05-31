@@ -25,10 +25,8 @@ import { initFixLogger, fixLog, finalizeFixLogger, getCurrentLogPath } from '../
 export async function handleFixRequest(userText: string, deps: MessageHandlerDeps, imageBase64?: string, imageType?: string): Promise<void> {
   const { routing, conversation, refresh } = deps;
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root) {
-    conversation.push({ role: 'assistant', content: 'No project folder open -- open your project first.', timestamp: Date.now() });
-    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
-  }
+  // [FIX] No workspace open means no code to fix — treat as a new build request so autoCreateProject runs.
+  if (!root) { await deps.handleBuildRequest(userText, true); return; }
 
   // [LOG] Initialize file-based logging for this fix session
   initFixLogger(root);
@@ -60,23 +58,8 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       diagLog(`fallback scan error: ${e.message}`);
     }
   }
-  if (sourceFiles.length === 0) {
-    const dirExists = fs.existsSync(root);
-    let entries: string[] = [];
-    try { entries = fs.readdirSync(root); } catch {}
-    const hasSrc = entries.includes('src');
-    const detail = !dirExists
-      ? `Workspace root does not exist: ${root}`
-      : entries.length === 0
-        ? `Workspace root is empty: ${root}`
-        : `Workspace root has no source files. Root: ${root}. Entries: ${entries.slice(0, 20).join(', ')}`;
-    conversation.push({
-      role: 'assistant',
-      content: `No source files found. ${detail}\n\nIf your project is inside a wrapper folder, make sure the correct subfolder is opened as the workspace.`,
-      timestamp: Date.now()
-    });
-    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
-  }
+  // [FIX] Empty scaffold (no source files yet) — treat as a first build, not a fix.
+  if (sourceFiles.length === 0) { await deps.handleBuildRequest(userText, true); return; }
   const allowedRels = new Set(sourceFiles.map(f => f.rel));
   let fileNames = sourceFiles.map(f => f.rel).join(', ');
   let filesBlock = sourceFiles.map(f => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');

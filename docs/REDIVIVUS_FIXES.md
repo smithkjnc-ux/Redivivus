@@ -5,7 +5,107 @@
 
 ---
 
-*Last updated: May 30, 2026 (Session 11DQ: Health button real-time — background probe on startup + every 5 min)*
+*Last updated: May 30, 2026 (Session 11DW: no-workspace chat + template button fix)*
+
+- **File changed:** `src/core/project/chatPanelMsgRunCommand.ts`
+- **What changed:** Close project handler now temporarily sets `files.hotExit=off` before calling `updateWorkspaceFolders(0, n)`, then restores the previous value. Intended to suppress "Do you want to save your workspace configuration?" VSCodium dialog when closing an untitled workspace.
+- **Why:** Clicking "Close Project" showed a native VSCodium dialog requiring manual "Don't Save" click. User expects one-click close.
+- **Risk:** Medium. `files.hotExit` may not be the right setting for this specific dialog (it's for file content, not workspace config). Needs testing. If dialog persists, the deeper fix is to open projects via `vscode.openFolder` instead of `updateWorkspaceFolders`.
+
+- **File changed:** `src/services/build/cloudBuildResultProcessor.ts` (vault auto-capture)
+- **What changed:** After writing built files to disk, now calls `autoCaptureFiles` (fire-and-forget) with the written paths, project name, vault service, build task, and AI caller. Extracts reusable functions/logic from every build and saves unique, high-quality items to the vault.
+- **Why:** `autoCaptureFile` was fully implemented in `vaultAutoCapture.ts` but was never called from the build pipeline. The vault was seeder-only — builds never contributed new items.
+- **Risk:** Low. Fire-and-forget — failures are silent and never block the build. Quality gate in `evaluateQuality` prevents junk from being saved.
+
+- **File changed (new):** `src/services/build/cloudBuildMultiFile.ts`
+- **What changed:** Extracted `executeMultiFileBuild` from `cloudBuildClient.ts` (Rule 9 split — file was 263 lines). Added call to `processBuildResults` at the end so files are actually written to disk. Added project-name prefix stripping for cloud-returned paths (cloud API returns `react-todo-app/src/App.js`, now normalized to `src/App.js`).
+- **Why:** This was the root cause of ALL the "Built N files" but nothing on disk bugs. `executeMultiFileBuild` collected files from the cloud API and returned them WITHOUT calling `processBuildResults`, so `writeBuiltFile` was never called.
+- **Risk:** Medium. `processBuildResults` is now called from two more call sites (multi-file cloud + the multi-file path). Tested via compile only — needs a reload + build test.
+
+- **File changed:** `src/services/build/cloudBuildLocalFallback.ts`
+- **What changed:** (1) `parseLocalBuildResponse` now strips the project-name prefix from AI-generated paths (e.g., `react-todo-app/index.html` → `index.html`). (2) System prompt now explicitly forbids CDN URLs since files are opened via `file://` and external scripts don't load.
+- **Why:** AI was prefixing file paths with the project name, causing double-nested folders. AI was also using unpkg/React CDN which silently fails under `file://`, producing a blank page.
+- **Risk:** Low. Path stripping only fires when the prefix matches the project slug exactly. CDN ban forces vanilla JS which is more portable.
+
+- **File changed:** `src/core/routing/chatPanelMsgFix.ts` (second fix)
+- **What changed:** Empty scaffold (no source files) now redirects to `deps.handleBuildRequest(userText, true)` instead of showing "No source files found" error. Covers the case where project is initialized but has no code yet.
+- **Why:** Opening a new Redivivus project folder and typing a build request was failing because `.redivivus/config.json` exists (project is "initialized") so the request routes to fix pipeline, which needs source files to work on.
+- **Risk:** Low. If `collectSourceFiles` legitimately finds nothing in a real project, we now try to build instead of erroring. Edge case: could add files to a project that has code the scanner doesn't see (unusual language). Acceptable trade-off vs. hard dead-end.
+
+- **File changed:** `src/commands/reportIssue.ts`
+- **What changed:** Report button now opens GitHub Issues (`github.com/smithkjnc-ux/Redivivus/issues/new`) instead of `redivivus-backend.fly.dev/feedback` which doesn't exist.
+- **Why:** The `/feedback` backend route was never implemented. Clicking "Report" opened a "This page couldn't load" error in the browser.
+- **Risk:** None. GitHub Issues is always available and pre-fills the version number in the title.
+
+- **File changed:** `src/core/routing/chatPanelMsgFix.ts` (first fix, no workspace), instead of showing "No project folder open -- open your project first.", now calls `deps.handleBuildRequest(userText, true)` to route through the build pipeline which auto-creates a project folder.
+- **Why:** Chat input classified as 'fix' (e.g., "Build a React todo app") dead-ended when no workspace was open. No workspace means no code to fix — treat it as a new build.
+- **Risk:** Low. `handleBuildRequest` already has its own auth check and `autoCreateProject` fallback. File stays at 198 lines.
+
+---
+
+## Session 11DW — May 30, 2026: scaffold-quickstart no-workspace fix
+
+- **File changed:** `src/core/routing/chatPanelMessageRouterEarlyExits.ts`
+- **What changed:** Extracted scaffold-quickstart handler into new file (Rule 9 split — file was 203 lines). Replaced 7-line inline handler with single-line delegate call.
+- **Why:** File exceeded 200-line limit. Rule 9 requires split before any edit.
+- **Risk:** None. Pure extraction — no logic changed in the early-exits file.
+
+- **File changed (new):** `src/core/routing/chatPanelMessageRouterScaffold.ts`
+- **What changed:** New file containing `handleScaffoldQuickstart`. When no workspace folder is open, posts `show-panel/create-folder` to the webview (shows the folder picker dialog with template name pre-filled and the build task as `pendingTask`) instead of calling `_handleBuildRequest` directly. When a workspace IS open, proceeds as before.
+- **Why:** Clicking a Quick Start Template (React, Flask, Go API, Express) with no workspace open was failing — the old code called `_handleBuildRequest` which tried `autoCreateProject` silently. The folder-picker flow (`create-folder` -> `onNewProject` -> `resumeBuildTask`) is the proven path that handles new-project creation correctly and gives the user control over where the folder is created.
+- **Risk:** Low. Uses the same `show-panel/create-folder` message path already wired in `chatPanelScriptListener.ts` line 54. The `onNewProject` handler correctly resumes the build via `resumeBuildTask` after the folder is created.
+
+---
+
+### Session 11DV — May 30, 2026: Running IDE sync fix
+
+| File | What changed | Why | Risk |
+|---|---|---|---|
+| `scripts/postcompile-deploy.js` | Brand media sync now also targets running IDE's `out/media/` (resolved via symlink), not just build dir | Letterpress/code-icon changes were not reaching the running IDE | None — skips gracefully if symlink missing |
+| `~/.local/share/icons/redivivus.png` | Updated directly with new 512px R icon | Desktop/titlebar icon still showed old R | None |
+| `~/.local/opt/redivivus/.../out/media/` | Letterpress + code-icon SVGs copied directly | Startup splash still showed old R after compile | None |
+
+---
+
+### Session 11DU — May 30, 2026: Startup splash + standalone icon updated
+
+| File | What changed | Why | Risk |
+|---|---|---|---|
+| `resources/media/code-icon.svg` | Replaced stroke R with new filled R + gold circuit nodes (viewBox 58 10 102 110) | Match new brand R everywhere | None |
+| `resources/media/letterpress-dark.svg` | R path replaced with new filled R via translate(-143.6,28.2) scale(3.26); fill #F0FDFA | Startup splash uses this on dark theme | None |
+| `resources/media/letterpress-hcDark.svg` | Same as above, fill #ffffff for high-contrast dark | Match new brand | None |
+| `resources/media/letterpress-light.svg` | Same as above, fill #F0FDFA | Match new brand on light theme | None |
+| `resources/media/letterpress-hcLight.svg` | Same as above, fill #003030 for high-contrast light | Match new brand | None |
+
+---
+
+### Session 11DT — May 30, 2026: Panel tab icon + header cleanup
+
+| File | What changed | Why | Risk |
+|---|---|---|---|
+| `src/ui/panels/chat/chatPanelHtml.ts` | Removed inline SVG wordmark from header-left | Logo was in wrong place — tab icon is the right surface | None |
+| `src/ui/panels/chat/chatPanelShow.ts` | Added `panel.iconPath` using `redivivus-icon-v2.svg` from extensionUri | New R icon now appears in the "Redivivus Chat" panel tab | None — gracefully skipped if extensionContext is unavailable |
+
+---
+
+### Session 11DS — May 30, 2026: Logo consolidation
+
+| File | What changed | Why | Risk |
+|---|---|---|---|
+| `src/ui/panels/chat/chatPanelEmptyState.ts` | Removed SVG wordmark from launcher hero section | Moved to header bar; launcher now shows subtitle only | None |
+| `src/ui/panels/chat/chatPanelHtml.ts` | Added inline SVG wordmark to header-left (22px height, gradient ID `hdr-lfg`) | Logo now lives in the persistent header bar | File at 200-line limit — do not add lines without splitting first |
+| `resources/redivivus-icon-v2.svg` | Replaced old geometric R with new teal R + gold circuit nodes (viewBox 58 10 102 110) | Match new brand design across all UI surfaces | None |
+| `resources/redivivus-icon-128.png` | Regenerated from new SVG via rsvg-convert | Match new brand | None |
+| `resources/redivivus-icon-256.png` | Regenerated from new SVG via rsvg-convert | Match new brand | None |
+| `resources/redivivus-icon-512.png` | Regenerated from new SVG via rsvg-convert | Match new brand | None |
+
+---
+
+### Session 11DR — May 30, 2026: New SVG logo in launcher
+
+| File | What changed | Why | Risk |
+|---|---|---|---|
+| `src/ui/panels/chat/chatPanelEmptyState.ts` | Replaced building emoji + "Welcome to Redivivus" title with inline SVG wordmark logo (teal R + gold "edivivus" wordmark, circuit nodes) | New brand logo provided; SVG is logo + title combined | None — inlined SVG, ASCII-safe per Rule 13, gradient ID renamed to `logo-lfg` |
 
 ---
 

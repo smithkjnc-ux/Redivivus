@@ -42,6 +42,11 @@ export function activate(context: vscode.ExtensionContext) {
   ChatPanel.extensionContext = context;
   initApiClient(context);
 
+  // [FIX] Suppress "Do you want to save workspace configuration?" dialog for untitled workspaces.
+  // window.confirmSaveUntitledWorkspace=false is the exact setting the "Always discard" checkbox sets.
+  // Set once on activation so it is always in place before any close attempt, avoiding the IPC race.
+  vscode.workspace.getConfiguration().update('window.confirmSaveUntitledWorkspace', false, vscode.ConfigurationTarget.Global).then(() => {}, () => {});
+
   // ── init services ──
   // [WARN] This block initializes all core services. The order and dependencies are critical for the extension's functionality.
   const redivivusService = new RedivivusService();
