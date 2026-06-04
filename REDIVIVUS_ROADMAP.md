@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* Jun 4, 2026 — Session 16h: fixed "close the project" hanging forever on "Closing project..." (input spinner never reset when last-folder removal doesn't reload the window). Session 16g: Supervisor (Claude) attribution fixed end-to-end (usage dashboard, byline, build history now show the Supervisor+Worker split instead of hardcoded "solo").
+*Last updated:* Jun 4, 2026 — Session 16i: fixed "close the project" opening a DUPLICATE chat tab + stale dashboard (async userClosedProject flag lost the reload race → synchronous marker file in closeMarker.ts; deserialize idempotent + auto-open fallback guarantee exactly one launcher). Session 16h: fixed "close the project" hanging on "Closing project..." (spinner never reset). Session 16g: Supervisor (Claude) attribution fixed end-to-end (usage dashboard, byline, build history now show the Supervisor+Worker split instead of hardcoded "solo").
 
 ---
 

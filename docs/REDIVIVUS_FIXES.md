@@ -5,6 +5,19 @@
 
 ---
 
+## Session 16i — Jun 4, 2026: "close the project" opened a DUPLICATE chat tab + showed the stale project
+
+**Problem (follow-on from 16h):** After the spinner fix, "close the project" closed the folder but opened a *second* "asteroid-arcade-game" chat tab, and the launcher showed the stale project dashboard (blueprint, "Setup 70%") instead of an empty getting-started view.
+
+**Root cause (confirmed via `~/redivivus_debug.log`):** Removing the last folder converts the window to an Untitled Workspace and re-activates the extension host. The `userClosedProject` guard is written with `globalState.update()` — which is **async and loses the race against that reload** (the codebase already documents this exact race for the folder-ADD case via the synchronous `_suppressNextFolderAdd` flag). So on re-activation the flag was gone: the auto-open timer fired with `currentPanel=false` (log line: `[auto-open-timer] currentPanel=false ... currentRoot=undefined`) and opened panel #A, while `deserializeWebviewPanel` separately restored the orphaned tab as panel #B → two tabs. The same lost flag meant deserialize's launcher-clear never ran → stale dashboard.
+
+**Fix:**
+- **File (new): `src/services/project/closeMarker.ts`** — `markProjectClosed()` writes a synchronous marker file (`fs.writeFileSync`, flushes before the reload); `wasProjectClosedRecently()` reads it within a 15s window. A reliable cross-reload signal where async globalState fails. Unit-tested (fresh→true, 20s-old→false).
+- **File: `src/core/routing/chatPanelMsgSendKeywords.ts`** — call `markProjectClosed()` synchronously before the folder mutation (kept the globalState flag too as belt-and-suspenders).
+- **File: `src/extension.ts`** — `deserializeWebviewPanel` and the auto-open timer now read `wasProjectClosedRecently() || globalState`, so both reliably detect the close (auto-open skips the duplicate; deserialize clears the restored panel to the launcher). Hardened to guarantee EXACTLY ONE panel across any timing: (a) deserialize is now idempotent — if an instance already exists it disposes the restored orphan instead of creating a 2nd tab; (b) auto-open schedules a 1200ms fallback that opens a launcher only if none exists, so a close can never leave zero panels. NOTE: extension.ts is ~305 lines — pre-existing Rule 9 violation; [NEXT] split it.
+
+**Verified:** `tsc -p ./` clean (0 errors); marker recency logic unit-tested; compiled + deployed to baked IDE (marker logic confirmed present in deployed `extension.js`/`chatPanelMsgSendKeywords.js`/`closeMarker.js`). **Live reload-race re-test pending the user** — this is a window-reload timing bug that can't be reproduced without the running IDE reloading; needs a manual "close the project" after an IDE reload to confirm exactly one launcher tab appears.
+
 ## Session 16h — Jun 4, 2026: "close the project" hangs forever on "Closing project..."
 
 **Problem:** Typing "close the project" removed the folder ("NO FOLDER OPENED") but the chat panel stayed stuck on "Closing project..." with the input spinner spinning forever and the old conversation still shown — the close never finished.

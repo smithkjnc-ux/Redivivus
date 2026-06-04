@@ -5,6 +5,7 @@ import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { ProjectOperations } from '../../services/project/projectOperations';
 import { _scanRedivivusProjects } from '../../ui/redivivusProjectScanner';
+import { markProjectClosed } from '../../services/project/closeMarker';
 
 export async function handleKeywordShortcuts(
   userText: string,
@@ -91,6 +92,9 @@ export async function handleKeywordShortcuts(
       (ChatPanel.currentPanel as any).state.conversation = [];
       (ChatPanel.currentPanel as any)._initialized = false;
     }
+    // [FIX] Synchronous marker survives the reload that removing the last folder triggers — the async
+    // globalState flag below loses that race, which let the auto-open timer create a DUPLICATE panel.
+    markProjectClosed();
     await ChatPanel.extensionContext?.globalState.update('redivivus.userClosedProject', true);
     if (folders && folders.length > 0) {
       await vscode.workspace.updateWorkspaceFolders(0, folders.length);

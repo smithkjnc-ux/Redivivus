@@ -31,6 +31,7 @@ import { initApiClient } from './services/api/apiClient.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
 import { initProjectContextLogger, resetProjectContext } from './services/logging/projectContextLogger.js';
+import { wasProjectClosedRecently } from './services/project/closeMarker.js';
 import { initMasterLogger } from './core/logging/masterLogger.js';
 
 // [WARN] Synchronous suppress flag — set BEFORE updateWorkspaceFolders fires onDidChangeWorkspaceFolders.
@@ -227,12 +228,17 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer('redivivusChat', {
       async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel) {
+        // [FIX] Idempotent — never create a SECOND instance. If a panel already exists (e.g. the
+        // auto-open fallback created one), dispose this restored orphan instead of producing a 2nd tab.
+        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} return; }
         (ChatPanel as any)._instance = undefined;
         webviewPanel.webview.options = { enableScripts: true };
         const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
         const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
         // If user closed the project, clear conversation and force launcher view
-        const closedByUser = context.globalState.get<boolean>('redivivus.userClosedProject');
+        // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag,
+        // which is unreliable here — without it the restored panel keeps the stale project dashboard.
+        const closedByUser = wasProjectClosedRecently() || context.globalState.get<boolean>('redivivus.userClosedProject');
         if (closedByUser) {
           context.globalState.update('redivivus.userClosedProject', undefined);
           if (panel?.state) { panel.state.conversation = []; }
@@ -260,9 +266,18 @@ export function activate(context: vscode.ExtensionContext) {
     const suppressed = !!(suppressPath && currentRoot && suppressPath === currentRoot);
     if (suppressed) { context.globalState.update('redivivus.suppressAutoOpen', undefined); }
     require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[auto-open-timer] currentPanel=${!!ChatPanel.currentPanel} suppressed=${suppressed} currentRoot=${currentRoot}\n`);
-    const _closedByUser = context.globalState.get<boolean>('redivivus.userClosedProject');
-    // [FIX] If user closed project, window reloads and re-activates extension — skip auto-open to avoid duplicate panel
-    if (_closedByUser) { context.globalState.update('redivivus.userClosedProject', undefined); }
+    // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag. The
+    // async flag lost the race against the reload, so this branch failed to skip and auto-open created
+    // a DUPLICATE panel while the serializer restored the orphaned one. Do NOT delete the marker here —
+    // it self-expires by recency; deleting would re-open the deserialize/auto-open race.
+    const _closedByUser = wasProjectClosedRecently() || context.globalState.get<boolean>('redivivus.userClosedProject');
+    if (_closedByUser) {
+      context.globalState.update('redivivus.userClosedProject', undefined);
+      // Fallback: the serializer (deserializeWebviewPanel) normally restores the one orphaned tab as
+      // the launcher. If it didn't fire, open one so a close never leaves ZERO panels. The idempotent
+      // guard in deserialize prevents this from racing into a duplicate.
+      setTimeout(() => { if (!ChatPanel.currentPanel) { ChatPanel.show(redivivusService, routingService, usageTracker, vaultService); } }, 1200);
+    }
     else if (!ChatPanel.currentPanel) { ChatPanel.show(redivivusService, routingService, usageTracker, vaultService); }
   }, 500);
 
