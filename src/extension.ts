@@ -228,12 +228,15 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer('redivivusChat', {
       async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel) {
-        // [FIX] Idempotent — never create a SECOND instance. If a panel already exists (e.g. the
-        // auto-open fallback created one), dispose this restored orphan instead of producing a 2nd tab.
+        // [FIX] Idempotent — never create a SECOND instance. Guard at entry AND again after the async
+        // import: the auto-open timer fires on a 500ms timer and, if it sees currentPanel=false while
+        // we're awaiting the import, it creates a panel — that race produced a duplicate chat tab on
+        // EVERY window reload. Re-checking after the await (and not nulling _instance, which only widened
+        // the window) means whoever wins the race keeps its panel and the other disposes its orphan.
         if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} return; }
-        (ChatPanel as any)._instance = undefined;
         webviewPanel.webview.options = { enableScripts: true };
         const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
+        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} return; }
         const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
         // If user closed the project, clear conversation and force launcher view
         // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag,

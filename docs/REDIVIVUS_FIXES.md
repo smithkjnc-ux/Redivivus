@@ -5,6 +5,16 @@
 
 ---
 
+## Session 16k — Jun 4, 2026: Every window reload spawned a duplicate chat tab
+
+**Problem:** A plain Developer: Reload Window created a second "Redivivus Chat" tab (confirmed by user). Debug log: `[auto-open-timer] currentPanel=false ... currentRoot=undefined` on the reload — auto-open opened a panel while the serializer ALSO restored the orphaned tab.
+
+**Root cause:** A race inside `deserializeWebviewPanel`. It guards against duplicates at entry, but then does `await import('./ui/panels/chat/chatPanel.js')` before constructing the panel. The auto-open timer fires on a 500ms timer; if it runs during that `await` gap it sees `currentPanel` (`_instance`) still null and creates a panel — then deserialize resumes and creates a second. The 16i guard only checked at entry; worse, it set `_instance = undefined` first, which *widened* the gap. This race is independent of close-project — it hit on any reload.
+
+**Fix — File: `src/extension.ts`:** In `deserializeWebviewPanel`, re-check `_instance` AGAIN after the `await import` (dispose the restored orphan + return if a panel now exists), and remove the `_instance = undefined` reset. Now whichever of {auto-open, deserialize} wins keeps its panel and the other disposes its orphan — exactly one tab in every ordering. `doShowChatPanel` is synchronous so it has no comparable gap.
+
+**Verified:** `tsc -p ./` clean (0 errors); compiled + deployed to baked IDE. **Live reload re-test pending the user** — this is a 500ms-timer vs async-import race I can't reproduce without the running IDE reloading; needs a manual reload to confirm a single tab. Pushed to master.
+
 ## Session 16j — Jun 4, 2026: Health view — "API Credits" mislabeled + key status not colored
 
 **Problem:** The Health view's "API Credits" section actually shows key VALIDITY (key valid / HTTP 403 / invalid key), not credits — wrong label. And every status row was rendered in dim grey, so a broken key (HTTP 403, invalid key) looked the same as a healthy one.
