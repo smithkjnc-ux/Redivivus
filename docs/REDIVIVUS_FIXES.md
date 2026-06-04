@@ -5,6 +5,17 @@
 
 ---
 
+## Session 16j — Jun 4, 2026: Health view — "API Credits" mislabeled + key status not colored
+
+**Problem:** The Health view's "API Credits" section actually shows key VALIDITY (key valid / HTTP 403 / invalid key), not credits — wrong label. And every status row was rendered in dim grey, so a broken key (HTTP 403, invalid key) looked the same as a healthy one.
+
+**Fix — File: `src/ui/panels/chat/chatPanelHealthCheck.ts`:**
+- Renamed the card from `API Credits` to `API Key Status`.
+- Status detail is now `green` when the key is valid (`status==='ok'`) and `red` on any issue (invalid key / HTTP error / timeout), instead of dim grey for all. The live-balance branch (Kimi) keeps its amount-based green/yellow/red.
+- Card accent (`balCls`) now: green when every key is valid, yellow if some are, red if none (was green whenever any single key was ok).
+
+Risk: low — pure rendering change. Verified: `tsc -p ./` clean (0 errors); compiled + deployed (new label + coloring confirmed in deployed JS).
+
 ## Session 16i — Jun 4, 2026: "close the project" opened a DUPLICATE chat tab + showed the stale project
 
 **Problem (follow-on from 16h):** After the spinner fix, "close the project" closed the folder but opened a *second* "asteroid-arcade-game" chat tab, and the launcher showed the stale project dashboard (blueprint, "Setup 70%") instead of an empty getting-started view.

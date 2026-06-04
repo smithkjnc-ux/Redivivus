@@ -117,7 +117,8 @@ export function buildHealthHtml(d: HealthData): string {
   // — Balances —
   const hasBal = d.balances.length > 0;
   const anyOk  = d.balances.some(b => b.status === 'ok');
-  const balCls = !hasBal ? 'dim' : anyOk ? 'green' : 'dim';
+  // Card accent: green only when every key is valid, yellow if some are, red if none.
+  const balCls = !hasBal ? 'dim' : d.balances.every(b => b.status === 'ok') ? 'green' : anyOk ? 'yellow' : 'red';
 
   return `<div style="font-family:var(--vscode-font-family);padding:2px 0;">
     <div class="hc-dim" style="font-size:11px;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #1e293b;">
@@ -151,15 +152,19 @@ export function buildHealthHtml(d: HealthData): string {
       ).join('')
     )}
 
-    ${hasBal ? card(`API Credits`, balCls,
+    ${hasBal ? card(`API Key Status`, balCls,
       d.balances.map(b => {
         const cur = b.currency ?? '$';
         const amt = (v: number) => `${cur}${v.toFixed(2)}`;
+        // [FIX] This section shows key VALIDITY, not credits/balance — renamed from "API Credits".
+        // Colour the status green when the key is valid, red on any issue (invalid key, HTTP 403,
+        // timeout). Was dim(grey) for everything, so problems looked the same as healthy keys.
+        const validityHtml = b.status === 'ok' ? green(b.detail ?? 'key valid') : red(b.detail ?? 'error');
         return tr(b.label,
           b.status === 'ok' && b.balance !== undefined
             ? (b.balance > 5 ? green(amt(b.balance)) : b.balance > 1 ? yellow(amt(b.balance)) : red(amt(b.balance)))
               + (b.detail ? ' ' + dim(`(${b.detail})`) : '')
-            : dim(b.detail ?? 'unavailable')
+            : validityHtml
         );
       }).join('')
     ) : ''}
