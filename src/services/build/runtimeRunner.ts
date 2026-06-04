@@ -36,8 +36,22 @@ export function detectRunCommand(root: string): string | null {
     if (files.includes('app.js'))    return 'node app.js';
   }
 
-  for (const f of ['main.py', 'app.py', 'server.py', 'run.py']) {
+  // Python — prefer conventional entry names, then any .py file that is actually runnable.
+  // [FIX] Previously only matched main/app/server/run.py, so a build like `calculator.py`
+  // produced no Run button even though the post-build guidance told the user to click Run.
+  for (const f of ['main.py', 'app.py', 'server.py', 'run.py', '__main__.py']) {
     if (files.includes(f)) return `python ${f}`;
+  }
+  if (hasPy) {
+    const pyFiles = files.filter(f => f.endsWith('.py'));
+    // A file with a __main__ guard is the real entry point — prefer it.
+    const withMain = pyFiles.find(f => {
+      try { return /if\s+__name__\s*==\s*['"]__main__['"]/.test(fs.readFileSync(path.join(root, f), 'utf8')); }
+      catch { return false; }
+    });
+    if (withMain) return `python ${withMain}`;
+    // Otherwise, if there's exactly one .py file, it's unambiguously the program to run.
+    if (pyFiles.length === 1) return `python ${pyFiles[0]}`;
   }
   if (files.includes('main.go'))    return 'go run .';
   if (files.includes('Cargo.toml')) return 'cargo run';

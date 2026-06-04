@@ -5,6 +5,18 @@
 
 ---
 
+## Session 16M — Jun 4, 2026: No Run button for Python builds with non-conventional filenames
+
+**Problem:** Building a Python program (e.g. `calculator.py`) produced a result card whose guidance said "Click ▶ Run to start the app (`python calculator.py`)" but **no Run button appeared**.
+
+**Root cause:** Two detectors disagreed. The guidance text (`detectPostBuildInfo` in `chatPanelPostBuild.ts`) recognizes ANY `.py` file. The Run-button gate (`detectRunCommand` in `services/build/runtimeRunner.ts`) only matched the hardcoded names `main.py`, `app.py`, `server.py`, `run.py` — so `calculator.py` returned `null`, suppressing the `__RUN_PROJECT__` token.
+
+**Fix — File: `src/services/build/runtimeRunner.ts`:** After the conventional-name list (added `__main__.py`), fall back to: (1) any `.py` file containing an `if __name__ == "__main__"` guard, then (2) the sole `.py` file when there's exactly one. Now any single-program Python build gets a Run button, consistent with the guidance text. The same `runProject()` verification path benefits too.
+
+**Risk:** Low. Multi-file Python projects with no `__main__` guard and >1 file still return null (ambiguous entry) — unchanged behavior.
+
+---
+
 ## Session 16L — Jun 4, 2026: Duplicate chat tab on reload — ROOT CAUSE (deserialize never set _instance)
 
 **Problem:** 16k did not fix it — reload still spawned a second chat tab.
