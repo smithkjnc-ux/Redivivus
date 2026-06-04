@@ -14,6 +14,8 @@ import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.
 import { redivivusLog } from '../logging/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
 import { logTelemetry } from '../api/apiClient.js';
+import { logAICall } from './aiCallLogger.js';
+import { promptCheapImpl } from './routingServiceCheap.js';
 
 import {
   selectSupervisorAndWorker,
@@ -62,7 +64,7 @@ export class RoutingService {
   // [Redivivus] Failover callback — set by caller to show "Gemini timed out, retrying with Kimi..." in chat
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
 
-  async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string): Promise<AIResponse & { usingFallback?: string }> {
+  async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string, role = 'worker'): Promise<AIResponse & { usingFallback?: string }> {
 
     const keyMap = this.getKeyMap();
     // Build ranked list of available AIs
@@ -91,6 +93,15 @@ export class RoutingService {
         // Fire-and-forget telemetry so admin analytics reflect direct calls too
         logTelemetry('ai_prompt', {
           model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens, success: true,
+        });
+        logAICall({
+          role,
+          model: result.model || ai,
+          prompt: text,
+          response: result.text || '',
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+          durationMs: Date.now() - startTime,
         });
         return { ...result, usingFallback: i > 0 ? ai : undefined };
       }
@@ -123,43 +134,10 @@ export class RoutingService {
     return { text: '', model: 'none', success: false, error: `All AI providers failed. Last error: ${lastError}` };
   }
 
-  // [SCOPE] Cheap-first prompt — tries the cheapest/free AI models first (Groq -> Gemini -> Kimi).
-  // Used for Q&A, classification, and simple tasks. Falls back to expensive models only if cheap ones fail.
-  async promptCheap(text: string, timeoutMs = 30_000, imageBase64?: string, imageType?: string, systemMessage?: string): Promise<AIResponse & { usingFallback?: string }> {
-    const keyMap = this.getKeyMap();
-    // Sort ascending by rank — cheapest first
-    const ranked = Object.entries(AI_RANK)
-      .filter(([ai]) => keyMap[ai]?.())
-      .sort(([, a], [, b]) => a - b)
-      .map(([ai]) => ai);
-
-    if (ranked.length === 0) {
-      return { text: '', model: 'none', success: false, error: 'No AI key configured.' };
-    }
-
-    redivivusLog({ operation: 'chat', message: 'AI prompt sent (cheap-first)', data: { ai: ranked[0], promptLength: text.length } });
-
-    let lastError = '';
-    for (let i = 0; i < ranked.length; i++) {
-      const ai = ranked[i];
-      const fetchFn = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
-      const result = await callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage);
-      if (result.success) {
-        logTelemetry('ai_prompt', { model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens, success: true });
-        return { ...result, usingFallback: i > 0 ? ai : undefined };
-      }
-      const err = (result.error || '').toLowerCase();
-      const isRetryable = err.includes('timed out') || err.includes('timeout') || err.includes('abort')
-        || err.includes('network') || err.includes('enotfound') || err.includes('econnrefused')
-        || err.includes('fetch') || err.includes('credit') || err.includes('balance')
-        || err.includes('quota') || err.includes('rate limit') || err.includes('rate_limit')
-        || err.includes('429') || err.includes('402') || err.includes('insufficient')
-        || err.includes('overloaded') || err.includes('capacity') || err.includes('billing');
-      lastError = result.error || 'Unknown error';
-      if (!isRetryable) { return result; }
-      if (i < ranked.length - 1 && this.promptFailoverCallback) { this.promptFailoverCallback(ai, ranked[i + 1]); }
-    }
-    return { text: '', model: 'none', success: false, error: `All AI providers failed. Last error: ${lastError}` };
+  // [SCOPE] Cheap-first prompt — extracted to routingServiceCheap.ts (203-line split)
+  // [DEAD] Body was inline here — moved to keep routingService.ts under 200 lines (Rule 9)
+  async promptCheap(text: string, timeoutMs = 30_000, imageBase64?: string, imageType?: string, systemMessage?: string, role = 'cheap'): Promise<AIResponse & { usingFallback?: string }> {
+    return promptCheapImpl(this, text, timeoutMs, imageBase64, imageType, systemMessage, role);
   }
 
   private async fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> {

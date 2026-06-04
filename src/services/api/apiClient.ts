@@ -63,7 +63,13 @@ export function collectKeys(): Record<string, string> {
 }
 
 export function getPreferred(): string | undefined {
-  return vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || undefined;
+  // Use the top-ranked available AI (supervisor), not the manually-set defaultAI preference.
+  // defaultAI is the user's chat default — it doesn't reflect which AI should be supervisor.
+  const { selectSupervisorAndWorker } = require('../ai/routingServiceRoster.js');
+  const { getGeminiKey: gk, getClaudeKey: ck, getOpenAIKey: ok, getGroqKey: gr, getXAIKey: xk, getKimiKey: km } = require('../ai/routingKeys.js');
+  const keyMap: Record<string, () => string | null> = { gemini: gk, claude: ck, openai: ok, groq: gr, xai: xk, kimi: km };
+  const { supervisor } = selectSupervisorAndWorker(keyMap);
+  return supervisor || vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || undefined;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
@@ -113,6 +119,53 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
       }
     }).catch(() => {});
   }).catch(() => {});
+}
+
+/** Fire-and-forget: send a Guardian-caught issue to backend for collective learning.
+ *  Stored in guardian_catches table → aggregated into community_gotchas view →
+ *  fetched by all extension users → injected into every Worker + Guardian prompt.
+ *  Also feeds training_pairs view for future Redivivus-specific LLM fine-tuning. */
+export function logGotcha(opts: {
+  pattern: string;
+  issueText: string;
+  buildContext?: string;
+  taskSummary?: string;
+  workerModel?: string;
+  guardianModel?: string;
+}): void {
+  getAccountToken().then(token => {
+    if (!token) { return; }
+    fetch(`${getApiBase()}/telemetry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ event: 'guardian_catch', ...opts }),
+    }).catch(() => {});
+  }).catch(() => {});
+}
+
+// Community gotchas -- lazy-fetched once per session, injected into every build prompt.
+let _communityCache: string | null = null, _communityFetching = false;
+
+export function getCommunityGotchas(): string {
+  if (_communityCache === null && !_communityFetching) {
+    _communityFetching = true;
+    fetchCommunityGotchas().catch(() => {});
+  }
+  return _communityCache ?? '';
+}
+
+export async function fetchCommunityGotchas(): Promise<string> {
+  if (_communityCache !== null) { return _communityCache; }
+  try {
+    const res = await fetch(`${getApiBase()}/knowledge/community-gotchas/`, { signal: AbortSignal.timeout(5000) });
+    if (!res.ok) { _communityCache = ''; return ''; }
+    const data = await res.json() as { gotchas: Array<{ promptLine: string }> };
+    const lines = (data.gotchas ?? []).map(g => g.promptLine).filter(Boolean);
+    _communityCache = lines.length > 0
+      ? '\n--- COMMUNITY KNOWLEDGE (patterns caught across all Redivivus users) ---\n' + lines.join('\n') + '\n---\n'
+      : '';
+    return _communityCache;
+  } catch { _communityCache = ''; return ''; }
 }
 
 export async function cloudClassify(

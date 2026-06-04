@@ -14,6 +14,7 @@ export async function runChatClarifyStep(
   routing: RoutingService,
   conversation: ChatMessage[],
   refresh: () => void,
+  maxQuestions?: number, // from JobSizer tier: 1=look-it-up, 3=offer-choices, 5=explore-with-them
 ): Promise<ChatClarifyResult> {
   // [FIX] If the conversation already discussed features, show a blueprint summary FIRST
   // so the user can verify before building. Don't rely on AI to generate this — build it directly.
@@ -63,7 +64,33 @@ export async function runChatClarifyStep(
     questions.push(blueprintQ, ...filtered);
   }
 
-  if (questions.length === 0) { return { routedText: userText, cancelled: false }; }
+  // Stage 3 -- Decision Triage: split questions into ask/guess/ai-owns before showing user
+  let _guesses: Array<{ question: string; guessValue?: string }> = [];
+  if (questions.length > 0) {
+    try {
+      const { triageDecisions } = await import('../ai/decisionTriage.js');
+      const triage = await triageDecisions(questions, routing, userText);
+      const askSet = new Set(triage.questionsToAsk.map(q => q.question));
+      const filtered = questions.filter(q => askSet.has(q.question));
+      questions.length = 0;
+      questions.push(...filtered);
+      _guesses = triage.questionsAIGuesses;
+    } catch { /* triage failed -- proceed with all questions, no guesses */ }
+  }
+
+  // Appends AI guess context to routedText so build AI and Guardian both see what was decided
+  const withGuesses = (text: string): string => {
+    if (_guesses.length === 0) { return text; }
+    const block = _guesses.map(g => `  - ${g.question.replace(/\?$/, '').trim()}: ${g.guessValue || 'AI default'}`).join('\n');
+    return `${text}\n\nAI DEFAULT CHOICES (apply these, mention in post-build summary):\n${block}`;
+  };
+
+  // Cap questions at maxQuestions based on JobSizer tier
+  if (maxQuestions !== undefined && maxQuestions > 0 && questions.length > maxQuestions) {
+    questions.length = maxQuestions;
+  }
+
+  if (questions.length === 0) { return { routedText: withGuesses(userText), cancelled: false }; }
 
   conversation.push({ role: 'assistant', content: encodeClarifyToken(questions), timestamp: Date.now() });
   refresh();
@@ -87,7 +114,7 @@ export async function runChatClarifyStep(
   if (wantsBuildNow) {
     conversation[conversation.length - 1].content = '⚡ Building now...';
     refresh();
-    return { routedText: userText, cancelled: false };
+    return { routedText: withGuesses(userText), cancelled: false };
   }
 
   const answersBlock = formatAnswersForPrompt(answers);
@@ -104,22 +131,22 @@ export async function runChatClarifyStep(
       const originalRequest = userMessages.length >= 2 ? userMessages[userMessages.length - 3]?.content || userMessages[0].content : userText;
       const featureContext = recentAssistant.join('\n\n');
       return {
-        routedText: `Build: ${originalRequest}\n\nFEATURES DISCUSSED AND APPROVED BY USER:\n${featureContext}\n\n${answersBlock}`,
+        routedText: withGuesses(`Build: ${originalRequest}\n\nFEATURES DISCUSSED AND APPROVED BY USER:\n${featureContext}\n\n${answersBlock}`),
         cancelled: false,
       };
     }
 
-    return { routedText: `${userText}\n\n${answersBlock}`, cancelled: false };
+    return { routedText: withGuesses(`${userText}\n\n${answersBlock}`), cancelled: false };
   }
 
   conversation.pop();
   refresh();
-  return { routedText: userText, cancelled: false };
+  return { routedText: withGuesses(userText), cancelled: false };
 }
 
-// [RULE 18] AI judgment replaces the old bug-keyword regex + spec-length heuristic.
-// Returns true when the request needs clarifying questions, false when it is clear enough to build.
-// Fallback: reproduces the old heuristic when the AI is unreachable.
+// [DEAD] replaced by JobSizer — Stage 2. Use sizeJob() from jobSizer.ts instead.
+// sizeJob() returns a tier that controls question count; shouldClarify() was binary (CLEAR/VAGUE).
+// Do not delete — kept for audit trail.
 export async function shouldClarify(userText: string, routing: RoutingService): Promise<boolean> {
   const prompt =
     'A developer sent this build request. Does it have enough detail to start building immediately, or does it need clarifying questions first?\n\n' +

@@ -8,28 +8,30 @@ import { executeGroq } from './groqProvider.js';
 import { executeXAI } from './xaiProvider.js';
 import { executeKimi } from './kimiProvider.js';
 
+// [WARN] tier selects model from modelRegistry: 'ultra'=most capable, 'pro'=guardian/supervisor,
+//        'flash'=worker (cheapest that qualifies). Always pass tier explicitly for Guardian calls.
 export async function callProvider(
   ai: string,
   text: string,
   fetchWithTimeout: (url: string, options: RequestInit, timeoutMs?: number) => Promise<Response>,
-  geminiModel?: 'flash' | 'pro',
+  tier?: 'flash' | 'pro' | 'ultra',
   imageBase64?: string,
   imageType?: string,
   systemMessage?: string
 ): Promise<AIResponse & { usingFallback?: string }> {
   switch (ai) {
     case 'gemini':
-      return executeGemini(text, fetchWithTimeout, geminiModel, imageBase64, imageType, systemMessage);
+      return executeGemini(text, fetchWithTimeout, tier, imageBase64, imageType, systemMessage);
     case 'claude':
-      return executeClaude(text, fetchWithTimeout, geminiModel, imageBase64, imageType, systemMessage);
+      return executeClaude(text, fetchWithTimeout, tier, imageBase64, imageType, systemMessage);
     case 'openai':
-      return executeOpenAI(text, fetchWithTimeout, systemMessage);
+      return executeOpenAI(text, fetchWithTimeout, systemMessage, tier);
     case 'groq':
-      return executeGroq(text, fetchWithTimeout, systemMessage);
+      return executeGroq(text, fetchWithTimeout, systemMessage, tier);
     case 'xai':
-      return executeXAI(text, fetchWithTimeout, systemMessage);
+      return executeXAI(text, fetchWithTimeout, systemMessage, tier);
     case 'kimi':
-      return executeKimi(text, fetchWithTimeout, systemMessage);
+      return executeKimi(text, fetchWithTimeout, systemMessage, tier);
     default:
       return { text: '', model: 'none', success: false, error: 'Unknown AI provider: ' + ai };
   }

@@ -31,9 +31,11 @@ export function buildProviderCards(
         statusText = '&#x2705; Configured';
         toggleBtnHtml = `<button type="button" class="btn-toggle btn-disable" onclick="toggleProvider('${p.id}')">🔒 Disable AI</button>`;
         const roles: string[] = [];
-        if (roster.supervisor === p.id) { roles.push('<span class="badge badge-supervisor">🎯 Supervisor</span>'); }
-        if (roster.workers.includes(p.id)) { roles.push('<span class="badge badge-worker">⚙️ Worker</span>'); }
-        if (roster.guardian === p.id && roster.guardian !== roster.supervisor) { roles.push('<span class="badge badge-guardian">🛡️ Guardian</span>'); }
+        if (roster.supervisor === p.id) {
+          // Supervisor and Guardian are always the same AI — show as one combined role
+          roles.push('<span class="badge badge-supervisor" title="Plans every build AND reviews the result. Guardian = Supervisor by rule — both require the same depth of reasoning.">&#x1F3AF; Supervisor &amp; Guardian &mdash; plans, delegates, and reviews</span>');
+        }
+        if (roster.workers.includes(p.id)) { roles.push('<span class="badge badge-worker" title="Executes specific steps assigned by the Supervisor.">&#x2699;&#xFE0F; Worker &mdash; executes Supervisor instructions</span>'); }
         if (roles.length > 0) { rolesHtml = `<div class="provider-roles">${roles.join('')}</div>`; }
       }
     }

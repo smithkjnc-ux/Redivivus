@@ -55,7 +55,14 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         }
         
         let contentToWrite = args.content || '';
-        
+
+        // [FIX] Strip markdown fences: AIs frequently wrap write_file content in ```lang\n...\n```.
+        // extractCodeFromResponse handles closed/unclosed fences; is a no-op for fence-free content.
+        if (contentToWrite.trimStart().startsWith('```')) {
+          const { extractCodeFromResponse } = await import('../../core/build/chatPanelBuildInference.js');
+          contentToWrite = extractCodeFromResponse(contentToWrite);
+        }
+
         // [Redivivus] Guardian AI Oversight
         if (ctx.routing && ctx.routing.isGuardianActive()) {
           ctx.log(`🛡️ **Guardian AI** reviewing proposed write to \`${args.filePath}\`...`);

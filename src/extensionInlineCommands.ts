@@ -61,12 +61,9 @@ export function registerInlineCommands(
 
   // ── Setup hub — aggregates all global setup, shows on first install ──
   try { registerSetupHubCommand(context, githubBackupService); } catch (e) { console.error('[Redivivus] Setup hub registration failed', e); }
-  // [FIX] Chain from existing onBuildFinished (save-point/session callback set by session.ts) instead of overwriting.
-  const _prevOnBuildFinished = ChatPanel.onBuildFinished;
-  ChatPanel.onBuildFinished = async (_task: string, _files: string[], buildRoot?: string) => {
-    // [NOTE] No auto-backup here — GitHub commits are always user-initiated via the result card button.
-    if (_prevOnBuildFinished) { await _prevOnBuildFinished(_task, _files, buildRoot); }
-  };
+  // [FIX] Removed ChatPanel.onBuildFinished chaining — migrated to buildEvents in session.ts.
+  // buildEvents.on() means each listener is independent; no chaining needed here.
+  // This file has no additional build:finished work to do.
 
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.helpMeRefine', async () => {

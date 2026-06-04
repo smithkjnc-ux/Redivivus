@@ -4,6 +4,7 @@ import * as vscode from 'vscode';
 import type { RedivivusService } from '../services/redivivusService.js';
 import type { SessionService } from '../services/sessionService.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import { buildEvents } from '../services/build/buildEvents';
 
 export function registerSessionCommands(
   context: vscode.ExtensionContext,
@@ -48,8 +49,9 @@ export function registerSessionCommands(
     })
   );
 
-  // [Redivivus] Auto-save-point: create git commit after successful builds
-  ChatPanel.onBuildFinished = async (task: string, files: string[], buildRoot?: string) => {
+  // [FIX] Migrated from ChatPanel.onBuildFinished = fn (overwrite pattern) to buildEvents.on()
+  // Each listener registers independently — no more manual chaining or overwrite risk.
+  buildEvents.on('build:finished', async (task: string, files: string[], buildRoot?: string) => {
     const root = buildRoot || redivivus.getWorkspaceRoot();
     if (!root) { return; }
     const { SavePointService } = await import('../services/savePointService.js');
@@ -57,13 +59,8 @@ export function registerSessionCommands(
     const description = `Redivivus build: ${task.slice(0, 60)} (${files.length} file${files.length !== 1 ? 's' : ''})`;
     try {
       const result = await svc.create(description);
-      if (result.success) {
-        vscode.window.showInformationMessage(`Save point created: ${description}`);
-      }
+      if (result.success) { vscode.window.showInformationMessage(`Save point created: ${description}`); }
     } catch { /* non-blocking */ }
-    // Also record in session
-    if (sessions.isActive) {
-      sessions.recordChange(files.join(', '), task.slice(0, 80), 'worked', '');
-    }
-  };
+    if (sessions.isActive) { sessions.recordChange(files.join(', '), task.slice(0, 80), 'worked', ''); }
+  });
 }

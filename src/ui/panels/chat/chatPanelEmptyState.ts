@@ -60,17 +60,15 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
 
   return `<div class="empty-state launcher-root">
     ${signInBanner}
-    <div class="launcher-hero" style="text-align:center;">
-      <div class="onboarding-sub" style="font-size:13px;margin:0;">Your AI build system. Plan, scaffold, build, and iterate.</div>
+    <div class="launcher-hero" style="text-align:center;margin-bottom:16px;">
+      <div class="onboarding-sub" style="font-size:16px;font-weight:600;margin:0;color:var(--vscode-foreground);">Tell me what you want to build.</div>
     </div>
-    <div class="launcher-actions">
-      <button class="launcher-action-card" data-action="start-new-project" data-mode="plan" title="Guided Mode: full 5 W's interview before building -- Redivivus learns exactly what you need and saves it to a blueprint"><span class="lac-icon">&#x1F3AF;</span><span class="lac-label">Guided</span><span class="lac-desc">Interview first</span></button>
-      <button class="launcher-action-card" data-action="start-new-project" data-mode="direct" title="Auto Mode: describe what you want and Redivivus builds immediately -- no questions, AI decides everything"><span class="lac-icon">&#x26A1;</span><span class="lac-label">Auto</span><span class="lac-desc">Build immediately</span></button>
-      <button class="launcher-action-card" data-action="open-existing-project" title="Open an existing folder from your filesystem"><span class="lac-icon">&#x1F4C2;</span><span class="lac-label">Open Project</span><span class="lac-desc">Resume existing</span></button>
+    <div style="text-align:right;margin-bottom:10px;">
+      <button data-action="open-existing-project" style="background:none;border:none;color:inherit;opacity:0.55;cursor:pointer;font-size:12px;padding:0;text-decoration:underline;text-underline-offset:2px;">or open an existing project &#x2192;</button>
     </div>
     <div class="launcher-grid">
       <div class="launcher-section">
-        <div class="launcher-section-label">Quick Start Templates</div>
+        <div class="launcher-section-label">Start from a template</div>
         <div class="launcher-templates">
           <button class="launcher-tpl-pill" data-action="scaffold-quickstart" data-template="react" title="Scaffold a React 19 + Vite + TypeScript project with starter files"><span class="tpl-dot" style="background:#61dafb;"></span>React</button>
           <button class="launcher-tpl-pill" data-action="scaffold-quickstart" data-template="flask" title="Scaffold a Python Flask API with routes, requirements, and .env"><span class="tpl-dot" style="background:#3b82f6;"></span>Flask</button>
@@ -90,6 +88,5 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
     <div class="launcher-auto-popover" id="launcher-auto-popover" style="display:none;">
       <label class="launcher-autostart"><input type="checkbox" id="auto-open-last-project" data-action="toggle-auto-open"><span>Always open my last project on startup</span></label>
     </div>
-    <div class="onboarding-hint">Or just type what you want to build below</div>
   </div>`;
 }

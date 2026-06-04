@@ -2,6 +2,24 @@
 // Zero AI tokens: all narration is generated from tool name + args context.
 // Called by agentService.ts for each tool use in the loop.
 
+/** Converts a raw model ID to a short human-readable label for display in chat bubbles. */
+export function friendlyModelName(model: string): string {
+  if (!model || model === 'none') { return ''; }
+  if (model.includes('sonnet')) { return 'Claude Sonnet'; }
+  if (model.includes('opus')) { return 'Claude Opus'; }
+  if (model.includes('haiku')) { return 'Claude Haiku'; }
+  if (model.includes('gpt-4o-mini')) { return 'GPT-4o Mini'; }
+  if (model.includes('gpt-4o')) { return 'GPT-4o'; }
+  if (model.includes('gemini-2')) { return 'Gemini 2'; }
+  if (model.includes('gemini-1.5-pro')) { return 'Gemini Pro'; }
+  if (model.includes('gemini')) { return 'Gemini Flash'; }
+  if (model.includes('llama')) { return 'Llama'; }
+  if (model.includes('grok')) { return 'Grok'; }
+  if (model.includes('kimi') || model.includes('moonshot')) { return 'Kimi'; }
+  if (model.includes('deepseek')) { return 'DeepSeek'; }
+  return model.split('/').pop()?.split(':')[0]?.split('-20')[0] || model;
+}
+
 /** Extracts the agent's own reasoning text (before any <tool_call> block). */
 export function extractAgentThought(aiText: string): string {
   const toolCallIdx = aiText.indexOf('<tool_call>');

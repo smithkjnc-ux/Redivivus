@@ -1,6 +1,8 @@
 // [SCOPE] Redivivus Cost Estimator — estimates token count and USD cost before a build starts.
 // Called by chatPanelBuild.ts BEFORE any AI call. Never makes AI calls itself.
 
+import { estimateTokens } from '../../services/ai/tokenBudget.js';
+
 /** Cost per token by model family (USD) */
 const COST_PER_TOKEN: Record<string, number> = {
   'gemini-2.5-flash':              0.000000075,
@@ -128,7 +130,8 @@ function formatCost(usd: number, isFree: boolean): string {
 export function estimateBuild(prompt: string, model: string, supervisorModel?: string, guardianModel?: string): CostEstimate {
   const phases = estimatePhases(prompt);
   const { description, fileCount } = detectStack(prompt);
-  const tokens = Math.ceil((prompt.length / 4) * phases * 3.5);
+  // Shared token heuristic (tokenBudget.estimateTokens) so estimate and budget never disagree.
+  const tokens = Math.ceil(estimateTokens(prompt) * phases * 3.5);
 
   const rateKey = getRateKey(model);
   const costPerToken = COST_PER_TOKEN[rateKey] ?? 0.000000075;

@@ -40,16 +40,26 @@ export function initProjectContextLogger(root: string): void {
   currentProjectRoot = root;
 }
 
-/** Log a project context switch attempt */
+/** Clear the tracked project context — call when a session ends / project closes so the next
+ * project is not mistaken for an illegal mid-build switch. */
+export function resetProjectContext(): void {
+  currentProjectRoot = null;
+}
+
+/** Log a project context switch attempt.
+ * @param explicit true for user-initiated switches (new project, open project) — always allowed.
+ *                 The block only guards IMPLICIT switches during an active build. */
 export function logProjectContextSwitch(
   newRoot: string,
   trigger: string,
-  userRequest?: string
+  userRequest?: string,
+  explicit = false,
 ): { allowed: boolean; reason?: string } {
   const previousRoot = currentProjectRoot;
-  
-  // Validation: Prevent switching to a different project during a fix/build request
-  if (previousRoot && previousRoot !== newRoot) {
+
+  // Validation: Prevent switching to a different project during a fix/build request.
+  // Skipped for explicit user actions (creating/opening a project) — those are intentional.
+  if (!explicit && previousRoot && previousRoot !== newRoot) {
     const event: ProjectContextEvent = {
       timestamp: new Date().toISOString(),
       type: 'project_switch_blocked',

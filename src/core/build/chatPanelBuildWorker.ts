@@ -17,12 +17,12 @@ const AI_LABELS: Record<string, string> = {
   kimi: 'Kimi'
 };
 
-export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onChunk?: (chunk: string) => void): Promise<{ success: boolean; text: string; error?: string; routedTo?: string; inputTokens?: number; outputTokens?: number; streamed?: boolean }> {
+export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onChunk?: (chunk: string) => void, tier: 'flash' | 'pro' | 'ultra' = 'flash'): Promise<{ success: boolean; text: string; error?: string; routedTo?: string; inputTokens?: number; outputTokens?: number; streamed?: boolean }> {
   // Try real streaming first when the caller wants live chunks
   if (onChunk) {
     const { worker } = ctx.routing.selectSupervisorAndWorker();
     const ai = worker || ctx.routing.getAvailableAI().ai;
-    const streamRes = await streamProvider(ai, prompt, onChunk, 300_000);
+    const streamRes = await streamProvider(ai, prompt, onChunk, 300_000, undefined, tier);
     if (streamRes.success && streamRes.text) {
       return { success: true, text: streamRes.text, routedTo: ai, streamed: true };
     }
@@ -74,7 +74,11 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onCh
 }
 
 export function buildWorkerPrompt(ctx: BuildContext, relPath: string, isModifying: boolean, existingContent: string, supervisorSpec: string | null, vaultSummary: string, sourceRef?: string, similarCode?: string): string {
-  const { task, blueprintContext, root } = ctx;
+  const { blueprintContext, root } = ctx;
+  // Extract visual contract from task string and surface it as a labeled block
+  const vcMatch = ctx.task.match(/\n\nVISUAL CONTRACT \(locked[^)]*\):[^\n]*(?:\n[^\n]+)*/);
+  const vcBlock = vcMatch ? `\n${vcMatch[0].trimStart()}\n` : '';
+  const task = vcMatch ? ctx.task.replace(vcMatch[0], '').trim() : ctx.task;
   const isHtml = relPath.endsWith('.html');
   const role = supervisorSpec ? 'Redivivus Worker AI. Implementation only.' : 'Redivivus AI. Generate complete code.';
   
@@ -105,5 +109,5 @@ REPLACE>>>
   // [DONE] Rule 18 complement — static scan (not AI) tells Worker what already exists so it imports real names
   const exportsBlock = root ? formatExportsForPrompt(scanProjectExports(root, relPath)) : '';
   const similarBlock = similarCode ? `\n\n${similarCode}` : '';
-  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}\n\nCONTEXT:\n${blueprintContext}\n\n${exportsBlock ? exportsBlock + '\n\n' : ''}${vaultBlock}${similarBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${redivivusRules}\n\nReturn ONLY the code.`;
+  return `${role}\n\nTASK: ${task}\nSPEC: ${supervisorSpec || 'None'}\nFILE: ${relPath}${vcBlock}\n\nCONTEXT:\n${blueprintContext}\n\n${exportsBlock ? exportsBlock + '\n\n' : ''}${vaultBlock}${similarBlock}\n${isModifying ? 'EXISTING CONTENT:\n' + existingContent : ''}${sourceBlock}\n\nRULES:\n${rules}\n${modRules}${redivivusRules}\n\nReturn ONLY the code.`;
 }

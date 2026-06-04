@@ -13,6 +13,7 @@ import { buildImageScript } from './chatPanelScriptImage';
 import { buildListenerScript } from './chatPanelScriptListener';
 import { buildPreviewScript } from './chatPanelPreviewScript';
 import { buildVEScript } from './chatPanelVisualEditorScript';
+import { buildBlueprintCardScript } from './chatPanelScriptBlueprintCard';
 
 export function buildChatScript(): string {
   return `
@@ -186,6 +187,7 @@ export function buildChatScript(): string {
     ${buildInterviewScript()}
     ${buildActionsScript()}
     ${buildActionsScriptB()}
+    ${buildBlueprintCardScript()}
     ${buildGatesScript()}
     ${buildExpandedInterviewScript()}
     ${buildImageScript()}

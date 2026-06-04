@@ -1,0 +1,189 @@
+{
+  "_comment": "Well-known build prescriptions. Add a new pattern here — no recompile or reload needed.",
+  "patterns": [
+    {
+      "name": "checkers",
+      "category": "checkers",
+      "regex": "\\b(checkers|draughts|checker[\\s_-]?board)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE CHECKERS PRESCRIPTION (all items MANDATORY -- missing any = build failure):",
+        "CANVAS: square; size = Math.min(window.innerWidth, window.innerHeight, 560) * 0.92; set canvas.width=canvas.height=size in JS; each cell = (size - 32) / 8; board drawn at offset 16px from canvas edge",
+        "BOARD: drawBoard() fills alternating light '#f0d9b5' / dark '#2d1b69' squares each frame; board border + outer shadow; requestAnimationFrame(loop) calls update() + draw() every frame",
+        "PIECES: red (human) on rows 5-7 at start; black (AI) on rows 0-2; circles radius=cellSize*0.38; MUST use ctx.createLinearGradient on each piece (red: #ff6b6b->#c0392b; black: #666->#1a1a1a); kings get a second inner ring drawn on top",
+        "INPUT: canvas.addEventListener('mousedown') -> Math.floor((x - 16) / cellSize) for col/row; click own piece = select it; click valid destination = move; NO overlay covers canvas during play so canvas listener is correct here",
+        "SELECTION: selected piece outline ctx.shadowColor='#FFD700' ctx.shadowBlur=20; valid destination cells shown as semi-transparent circles (ctx.globalAlpha=0.4; green '#00ff88'; radius=cellSize*0.2)",
+        "RULES: pieces move diagonally forward 1 cell; jump over opponent to empty cell beyond (capture); MANDATORY jumps -- if any jump available player MUST take one; multi-jump -- after capture check same piece can jump again before switching turn; piece kings when reaching far end (row 0 for red, row 7 for black); kings move/jump all 4 diagonals",
+        "AI: setTimeout(aiMove, 600) after human moves; aiMove() calls getValidMoves(all black pieces); prefers jumps over non-jumps; picks random among best moves; handles multi-jump recursively",
+        "WIN: no pieces left OR no valid moves = loss; check after every move; show result in overlay",
+        "SCORE PANEL: HTML divs OUTSIDE canvas: 'Red: N | Black: N' piece counts + 'Your turn' / 'AI thinking...' turn label",
+        "AUDIO: beep(freq, dur, type) helper; playMove() beep(330,0.1,'sine'); playCapture() beep(200,0.2,'square'); playKing() beep(660,0.15,'sine'); playWin() beep(880,0.3,'triangle')",
+        "VISUALS: gradient background behind canvas; pieces use createLinearGradient (not flat hex); selected piece glows; valid moves visible; no score drawn on canvas"
+      ]
+    },
+    {
+      "name": "chess",
+      "category": "chess",
+      "regex": "\\b(chess([\\s_-]?(game|ai|board))?)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE CHESS PRESCRIPTION (all items MANDATORY -- missing any = build failure):",
+        "CANVAS: square; size = Math.min(window.innerWidth, window.innerHeight, 600) * 0.92; canvas.width=canvas.height=size; CELL = size/8; board fills canvas edge-to-edge",
+        "BOARD: drawBoard() alternates light '#f0d9b5' / dark '#b58863'; highlight selected cell (rgba gold, 0.5); highlight last move from+to (rgba yellow, 0.3); valid move dots (rgba(0,0,0,0.25) circle radius CELL*0.15)",
+        "PIECE DATA: board[8][8] of {type:'K'|'Q'|'R'|'B'|'N'|'P', color:'w'|'b', moved:bool} or null; standard start: rank 8=black back row RNBQKBNR, rank 7=black pawns, rank 2=white pawns, rank 1=white back row RNBQKBNR",
+        "PIECE DRAWING: use Unicode glyphs via ctx.fillText -- white K='\\u2654' Q='\\u2655' R='\\u2656' B='\\u2657' N='\\u2658' P='\\u2659'; black same codepoints +6 OR use color difference; ctx.font=CELL*0.72+'px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; draw at cell center; white pieces ctx.fillStyle='#fff' + ctx.strokeStyle='#333' stroke; black pieces '#1a1a1a'",
+        "MOVE GENERATION: getValidMoves(row,col) returns [{r,c}] filtered to only moves that do not leave own king in check; raw moves per type: pawn forward 1 (2 from start row), diagonal capture only; knight 8 L-shapes; bishop diagonals slide until blocked; rook ranks+files slide until blocked; queen bishop+rook combined; king 1 step all dirs",
+        "INPUT: canvas.addEventListener('mousedown'); Math.floor(e.offsetY/CELL) row, Math.floor(e.offsetX/CELL) col; first click own piece=select+show moves; second click valid dest=move; click elsewhere=deselect",
+        "SPECIAL MOVES: castling -- king not moved, rook not moved, squares between empty, king not in check and not passing through check; move king 2 squares, rook jumps over; en passant -- pawn captures diagonally to empty square where opponent pawn just double-moved (track lastPawnDoubleMove); pawn promotion -- auto-promote to queen when pawn reaches rank 0 (black) or rank 7 (white)",
+        "CHECK+MATE: isInCheck(color) scans all opponent moves for any attacking king square; after player move call isInCheck(opponent); if opponent has zero valid moves: checkmate if in check, stalemate if not; display result overlay",
+        "AI: minimax(depth=3, alpha, beta, isMaximizing); evaluate()=sum piece values (P=100,N=320,B=330,R=500,Q=900,K=20000) white minus black; AI plays black (minimizing); setTimeout(aiMove,400) after player moves; aiMove picks best move from all black pieces",
+        "STATUS PANEL: HTML elements OUTSIDE canvas -- turn indicator, check warning in red, move count; captured pieces shown as Unicode glyphs",
+        "AUDIO: beep(freq,dur,type) helper; playMove() 440Hz sine 0.08s; playCapture() 280Hz square 0.15s; playCheck() 660Hz sine 0.2s; playEnd() 880Hz triangle 0.4s; all lazy-init AudioContext on first interaction",
+        "VISUALS: gradient background outside canvas; ctx.shadowColor+'#000' ctx.shadowBlur=4 on pieces for depth; selected piece square glows gold; no piece values or coordinates drawn on canvas"
+      ]
+    },
+    {
+      "name": "flappy bird",
+      "category": "game",
+      "regex": "\\b(flappy[\\s_-]?bird)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE FLAPPY BIRD PRESCRIPTION (all items are MANDATORY -- missing any = build failure):",
+        "CANVAS: fixed pixel dimensions in JS (W=360, H=640); CSS width:100% scales it; aspect-ratio:9/16 on wrapper",
+        "LOOP: requestAnimationFrame(loop) calling update() + draw() every frame -- NO LOOP = NO GAME",
+        "PHYSICS: velocityY += GRAVITY each frame; y += velocityY; rotation = Math.min(Math.max(vY * 0.06, -0.5), Math.PI / 2) -- NEVER Math.clamp(), it does not exist in JavaScript",
+        "OBSTACLES: spawn on PIPE_INTERVAL frames; move left at constant speed; remove when off-screen left",
+        "COLLISION: circle-vs-nearest-rect-point using Math.hypot; floor/ceiling boundary check",
+        "INPUT: keydown listener (Space + ArrowUp = flap); mousedown on document (not canvas -- overlay may cover it); touchstart passive:false",
+        "STATES: 'start' -> 'playing' -> 'gameover'; HTML overlay divs shown/hidden via CSS class on each transition",
+        "SCORE: DOM element updated in real-time; increment on passing obstacle; localStorage best score",
+        "AUDIO: Web Audio API, lazy-init AudioContext on first user gesture; define ONE beep(freq, dur) helper; call it from playFlap(), playScore(), playDeath() -- all three functions MUST be defined before they are called",
+        "VISUALS: Background 3-stop gradient; 2 parallax layers; Player drawPlayer() with ctx.save/restore, body gradient (#FFD700->#FF8C00), wing arc, eye dot, shadowBlur glow; Pipes with left->right gradient + highlight stripe + cap; Particles on death (20+); Screen shake on death; Score pop '+1' floating text; Score panel HTML outside canvas"
+      ]
+    },
+    {
+      "name": "centipede",
+      "category": "game",
+      "regex": "\\b(centipede)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE CENTIPEDE PRESCRIPTION (all items are MANDATORY -- missing any = build failure):",
+        "CANVAS: W=600, H=600 fixed in JS; CSS width:100% max-width:600px; top 80% is play field, bottom 20% is player zone",
+        "GRID: 30x30 cell grid (20px each); mushrooms occupy cells and are tracked in a 2D array",
+        "CENTIPEDE: starts as 12-segment linked list at top; head moves right across row, drops 1 row + reverses at wall or mushroom; each segment follows the one ahead; segments are rect 18x18px with rounded corners; gradient green (#22c55e->#16a34a); head has 2 eye dots",
+        "PLAYER: cannon triangle at bottom center; moves left/right with arrow keys or A/D; stays in player zone (bottom 20%); shoots upward; max 1-2 bullets on screen",
+        "BULLETS: move up at 8px/frame; hit detection against centipede segments and mushrooms",
+        "MUSHROOMS: randomly placed (30-40) at start; drawn as filled circle with 4 dots; when hit, lose 1 of 4 HP (change color each hit); destroyed at 0 HP; leave a mushroom stub when centipede segment is killed",
+        "COLLISION: segment hit by bullet -> that segment dies, mushroom appears at that cell, segments behind it become new independent centipede; head hit -> whole remaining chain becomes new centipede from that position",
+        "SCORING: mushroom hit=1pt, segment kill=10pt, head kill=100pt; display score + lives (3 lives) as HTML outside canvas",
+        "WAVES: when all segments destroyed, new centipede spawns (faster); mushroom field partially resets",
+        "AUDIO: beep(freq,dur) helper; playShoot() 880Hz 0.05s; playHit() 440Hz 0.1s; playDeath() 200Hz 0.3s",
+        "STATES: 'start' -> 'playing' -> 'gameover'; HTML overlay divs shown/hidden per state; START GAME button MUST have a click listener that sets state='playing', hides the overlay, and calls requestAnimationFrame(loop) -- if clicking Start does nothing the build is broken",
+        "VISUALS: dark background (#0a0a0a); mushrooms use radial gradient; player cannon glows (#00ff88 shadowBlur=10 while firing); bullet is bright rect with glow; screen flash on player death"
+      ]
+    },
+    {
+      "name": "game",
+      "category": "game",
+      "regex": "\\b(snake|tetris|pong|pac[\\s_-]?man|asteroids|breakout|space[\\s_-]?invaders|2048|minesweeper|tic[\\s_-]?tac|platformer|endless[\\s_-]?runner|dino[\\s_-]?run|simon[\\s_-]?says|memory[\\s_-]?game|card[\\s_-]?game|word[\\s_-]?game|quiz|trivia)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE CANVAS GAME PRESCRIPTION (mandatory structure -- adapt mechanics to the specific game requested):",
+        "CANVAS: set pixel dimensions in JS matching the game's natural aspect ratio; CSS width:100% scales it",
+        "LOOP: requestAnimationFrame(loop) calling update() + draw() every frame -- NO LOOP = NO GAME",
+        "MECHANICS: implement the EXACT game requested -- do NOT substitute a different game. Build the correct entities, movement, and rules for the named game.",
+        "STATES: 'start' -> 'playing' -> 'gameover' (add 'paused', 'levelup' as needed); HTML overlay divs shown/hidden via CSS class",
+        "INPUT: keydown/keyup listeners for keyboard games; mousedown/mousemove for pointer games; touchstart passive:false for mobile; wire all controls before game starts",
+        "SCORE: DOM element OUTSIDE canvas (never ctx.fillText score); increment per game rules; localStorage best score",
+        "AUDIO: Web Audio API, lazy-init AudioContext on first user gesture; beep(freq, dur, type) helper; playShoot/playHit/playDeath/playScore as needed",
+        "COLLISION: correct detection for the game type (rect-vs-rect, circle-vs-rect, grid cell checks, etc.)",
+        "VISUALS: gradient background; primary game entities use ctx.createLinearGradient (not flat hex); particles on significant events; score pop on point gain; screen shake on death/loss",
+        "COMPLETION: fully playable end-to-end -- no placeholder functions, no TODO stubs"
+      ]
+    },
+    {
+      "name": "todo app",
+      "category": "todo",
+      "regex": "\\b(todo(\\s+(app|list))?|task\\s+(manager|app|list)|to[\\s-]do(\\s+(app|list))?)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE TODO APP PRESCRIPTION:",
+        "DATA: tasks = [{id, text, done}]; load from localStorage on init; save on every change",
+        "ADD: text input + button (or Enter key); trim+validate non-empty; push to tasks; clear input; re-render",
+        "TOGGLE: click task row = toggle done; strikethrough styling on done; save; re-render",
+        "DELETE: visible X/trash button on hover; remove from array; save; re-render",
+        "FILTER: 'All' | 'Active' | 'Completed' tab buttons; filter rendered list; show remaining count",
+        "EMPTY STATE: friendly message when list is empty or filter shows nothing",
+        "KEYBOARD: Enter in input = add; Escape = clear input focus",
+        "VISUAL: each task is a full-width row; checkbox-style toggle; delete button right-aligned"
+      ]
+    },
+    {
+      "name": "landing page",
+      "category": "landing-page",
+      "regex": "\\b(landing[\\s-]?page|startup[\\s-]?(page|website|landing)|portfolio[\\s-]?(website|site|page)?|coming[\\s-]?soon[\\s-]?(page)?|marketing[\\s-]?page|product[\\s-]?page)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE LANDING PAGE PRESCRIPTION:",
+        "STRUCTURE: sticky <header> with logo+nav links; <main> with 3-5 <section> blocks; <footer>",
+        "HERO: full-viewport-height first section; H1 headline + subheading + CTA button; gradient or image bg",
+        "FEATURES: 3-column card grid (or 2-col on mobile) with icon/emoji, heading, short description per feature",
+        "CTA: prominent button in hero AND at least one more section; hover animation; scroll-to or action",
+        "NAV: smooth-scroll anchor links to sections; hamburger toggle <768px; active link highlight on scroll",
+        "RESPONSIVE: mobile-first; CSS grid/flexbox; font scaling with clamp(); stacked layout on small screens",
+        "VISUAL: consistent brand colors (>=2); alternating section bg; card shadow + border-radius; cohesive palette",
+        "FOOTER: copyright year; optional nav links or social icons"
+      ]
+    },
+    {
+      "name": "calculator",
+      "category": "calculator",
+      "regex": "\\b(calculator|unit[\\s-]?converter|currency[\\s-]?converter|tip[\\s-]?calculator|bmi[\\s-]?calculator|loan[\\s-]?calculator|age[\\s-]?calculator|password[\\s-]?generator|qr[\\s-]?(?:code[\\s-]?)?generator|color[\\s-]?picker)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE CALCULATOR/TOOL PRESCRIPTION:",
+        "INPUTS: all labeled; type=number or text with appropriate inputmode; placeholder showing example",
+        "REAL-TIME: oninput on all fields triggers calculation instantly -- no submit button required",
+        "VALIDATION: check empty/NaN/division-by-zero/out-of-range; show error message under field",
+        "OUTPUT: result area prominent (large font, contrasting bg); show units/label next to value",
+        "KEYBOARD: Enter triggers calculation; Escape clears; Tab order matches visual order",
+        "HISTORY: optional list of last 5 calculations shown below result (id, inputs, result)",
+        "EDGE CASES: Infinity, NaN, negative numbers -- handled with graceful user-facing message",
+        "COPY: copy-result button next to output value"
+      ]
+    },
+    {
+      "name": "form page",
+      "category": "form",
+      "regex": "\\b(login[\\s-]?(form|page)|sign[\\s-]?up[\\s-]?(form|page)|contact[\\s-]?(form|page)|registration[\\s-]?(form|page)|auth(?:entication)?[\\s-]?(form|page))\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE FORM PAGE PRESCRIPTION:",
+        "FIELDS: email (type=email), password (type=password with show/hide toggle); all labeled with <label>",
+        "VALIDATION: inline error message below each field on blur AND on submit attempt; no submit while invalid",
+        "PASSWORD: show/hide eye-icon button; strength indicator bar for signup (weak/fair/strong/very strong)",
+        "SUBMIT: button shows spinner/loading state; success message replaces form on success; error shown on failure",
+        "UX: auto-focus first field on load; Enter in last field submits; Tab order correct; Escape clears errors",
+        "VISUAL: card centered on gradient page; clear field borders (red on error, green on valid); full-width button",
+        "SECURITY: never store plain password; sanitize inputs; HTTPS note in footer"
+      ]
+    },
+    {
+      "name": "clock/timer",
+      "category": "clock",
+      "regex": "\\b(countdown[\\s-]?timer|stopwatch|digital[\\s-]?clock|analog[\\s-]?clock|pomodoro|timer[\\s-]?app)\\b",
+      "flags": "i",
+      "prescription": [
+        "COMPLETE CLOCK/TIMER PRESCRIPTION:",
+        "ENGINE: requestAnimationFrame or setInterval(100ms); use Date.now() for elapsed -- never count frames",
+        "DISPLAY: large readable time in HH:MM:SS or MM:SS format; CSS transition on digit change",
+        "CONTROLS: Start/Pause/Reset buttons; Lap button for stopwatch; clear keyboard shortcuts shown",
+        "KEYBOARD: Space = start/pause; R = reset; L = lap (stopwatch)",
+        "PRECISION: track startTime + elapsed separately so pause/resume is accurate",
+        "PERSISTENCE: save paused state + elapsed to localStorage; restore on page reload",
+        "AUDIO: optional subtle tick via Web Audio API; completion sound when countdown hits zero",
+        "VISUAL: centered layout; large digit display; subtle progress ring or bar optional"
+      ]
+    }
+  ]
+}

@@ -20,21 +20,21 @@ export function getApiSetupHtml(): string {
   const roster = routing.buildRoster();
 
   const providers = [
-    { id: 'gemini', icon: '🤖', name: 'Gemini (Google)',        badge: 'FREE tier available', badgeColor: '#1a7a3a', 
-      desc: 'Recommended for most users. Fast, capable, and extremely generous free tier.', 
-      abilities: 'Excels at general coding, high-speed UI generation, and large context windows.', 
-      costDetails: 'Free tier: 15 requests/minute. Paid: ~$0.07 per 1M tokens (extremely cheap).',
-      link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey, model: 'gemini-2.5-flash', tier: '🚀 Ultra-Fast (Free / Low Cost)' },
-    { id: 'claude', icon: '🧠', name: 'Claude (Anthropic)',      badge: 'Paid',                badgeColor: '#b85c00', 
-      desc: 'The industry gold standard for complex coding tasks.', 
-      abilities: 'Best-in-class reasoning. Perfect for deep architectural refactoring, subtle bug hunting, and massive codebase analysis.', 
-      costDetails: 'No free tier. Paid: $3.00 per 1M input tokens. (Premium pricing).',
-      link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey, model: 'claude-3-5-sonnet', tier: '🧠 Deep Reasoning (Premium Paid)' },
-    { id: 'openai', icon: '⚡', name: 'OpenAI (GPT-4o)',         badge: 'Paid',                badgeColor: '#b85c00', 
-      desc: 'Strong all-rounder for code, chat, and analysis.', 
-      abilities: 'Highly reliable and consistent formatting. Excellent at following strict system rules and JSON schema generation.', 
-      costDetails: 'No free tier. Paid: $0.150 per 1M input tokens (GPT-4o-mini).',
-      link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey, model: 'gpt-4o-mini', tier: '⚖️ Strong Generalist (Low Cost)' },
+    { id: 'gemini', icon: '🤖', name: 'Gemini (Google)',        badge: 'FREE tier available', badgeColor: '#1a7a3a',
+      desc: 'Recommended for most users. Fast, capable, and extremely generous free tier.',
+      abilities: 'Excels at general coding, high-speed UI generation, and large context windows.',
+      costDetails: 'Free tier: 15 requests/minute. Paid: ~$1.25 per 1M tokens. As Supervisor, uses gemini-2.5-pro.',
+      link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey, model: 'gemini-2.5-pro', tier: '🚀 Fast + Capable (Free / Low Cost)' },
+    { id: 'claude', icon: '🧠', name: 'Claude (Anthropic)',      badge: 'Paid',                badgeColor: '#b85c00',
+      desc: 'The industry gold standard for complex coding tasks.',
+      abilities: 'Best-in-class reasoning. Perfect for deep architectural refactoring, subtle bug hunting, and massive codebase analysis.',
+      costDetails: 'No free tier. Paid: ~$3.00 per 1M input tokens (Sonnet). As Supervisor, uses claude-sonnet-4-6.',
+      link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey, model: 'claude-sonnet-4-6', tier: '🧠 Deep Reasoning (Premium Paid)' },
+    { id: 'openai', icon: '⚡', name: 'OpenAI (GPT-4o)',         badge: 'Paid',                badgeColor: '#b85c00',
+      desc: 'Strong all-rounder for code, chat, and analysis.',
+      abilities: 'Highly reliable and consistent formatting. Excellent at following strict system rules and JSON schema generation.',
+      costDetails: 'No free tier. Paid: ~$2.50 per 1M input tokens (GPT-4o). As Supervisor, uses gpt-4o.',
+      link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey, model: 'gpt-4o', tier: '⚖️ Strong Generalist (Paid)' },
     { id: 'groq',   icon: '🔥', name: 'Groq (Llama / Mixtral)',  badge: 'FREE tier available', badgeColor: '#1a7a3a', 
       desc: 'Extremely fast inference powered by LPU hardware.', 
       abilities: 'Near-instant responses. Best used as a secondary "Worker" AI for rapid, small-scope component generation.', 
@@ -73,6 +73,53 @@ export function getApiSetupHtml(): string {
   <h1>&#x1F510; Redivivus API Setup</h1>
   <div class="subtitle">Configure your AI provider API keys -- you only need ONE to get started.</div>
   <div class="free-tip">&#x1F4A1; <strong>Free options:</strong> Gemini (Google) and Groq both have free tiers -- no credit card needed. Start with either one and add others later.</div>
+
+  <div class="how-it-works">
+    <div class="how-header">&#x1F3AF; How Redivivus uses your AI keys</div>
+    <div class="how-grid">
+      <div class="how-item">
+        <div class="how-role">&#x1F3AF; Supervisor</div>
+        <div class="how-desc">Your <strong>highest-ranked available AI</strong> is always the Supervisor. It plans every build, writes the implementation contract, and reviews the result. Always uses the most capable model from that provider -- never the cheap/fast one.</div>
+      </div>
+      <div class="how-item">
+        <div class="how-role">&#x2699;&#xFE0F; Worker</div>
+        <div class="how-desc">When you have 2+ AIs configured, the Supervisor delegates build steps to Workers. Each Worker executes exactly what the Supervisor specifies -- no interpretation, no shortcuts.</div>
+      </div>
+      <div class="how-item">
+        <div class="how-role">&#x1F6E1;&#xFE0F; Guardian = Supervisor</div>
+        <div class="how-desc">The Guardian is <strong>always the same AI as the Supervisor</strong> &mdash; no exceptions. Both roles require the same depth of reasoning. A weaker Guardian would miss what the Supervisor intended.</div>
+      </div>
+    </div>
+
+    <div class="quality-box">
+      <div class="quality-header">&#x1F4C8; Your AI is your build quality ceiling</div>
+      <div class="quality-body">
+        The Supervisor AI determines how deeply a project is planned, how well edge cases are anticipated, and how architecturally sound the output is. <strong>A better Supervisor produces fundamentally better builds</strong> -- not just stylistically different ones.<br><br>
+        <div class="quality-tiers">
+          <div class="quality-tier tier-top">
+            <span class="tier-label">&#x1F947; Best results</span>
+            <span class="tier-models">Claude (Sonnet 4.6) &mdash; Most thorough planning, strongest architectural reasoning, best at multi-file coordination and catching subtle bugs.</span>
+          </div>
+          <div class="quality-tier tier-mid">
+            <span class="tier-label">&#x1F948; Great results</span>
+            <span class="tier-models">Gemini (2.5 Pro) &mdash; Excellent broad capability, massive context window, best value. OpenAI (GPT-4o) &mdash; Reliable, consistent, strong at structured tasks.</span>
+          </div>
+          <div class="quality-tier tier-base">
+            <span class="tier-label">&#x1F949; Good results</span>
+            <span class="tier-models">Groq (Llama 3.3) &mdash; Fastest inference, solid for simple and mid-complexity builds. Less consistent on complex multi-file architecture.</span>
+          </div>
+        </div>
+        <div class="quality-note">
+          &#x1F4A1; <strong>This is Bring Your Own AI.</strong> Your AI choice shapes what you build, how it&apos;s structured, and how far you can push it. Users with different AI keys will build the same thing differently. That&apos;s not a bug -- it&apos;s the point.
+        </div>
+      </div>
+    </div>
+
+    <div class="how-rank">
+      <strong>Supervisor priority order (automatic):</strong> Claude &gt; Gemini &gt; OpenAI &gt; xAI &gt; Kimi &gt; Groq
+    </div>
+  </div>
+
   ${providerCards}
   <div class="actions">
     <button id="apply-btn">&#x2705; Apply Changes</button>

@@ -8,6 +8,7 @@ import type { RedivivusService } from '../../services/redivivusService';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
 import { getSystemPrompt } from './chatPanelAIPrompt';
 import { buildProjectAnnotationContext } from '../project/chatPanelProjectContext';
+import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { extractFileMentions } from '../project/chatPanelFileContext';
 import { selectRelevantTurns } from './contextSelector';
 
@@ -103,6 +104,8 @@ RULES:
 - For browser targets: single self-contained HTML file with inline <style> and <script>.
 - Convert TypeScript constructs (enums, interfaces, type annotations) to plain JavaScript equivalents.
 - Preserve all constants, physics values, colors, dimensions, and game logic exactly.
+
+${Redivivus_WORKER_RULES}
 ${sourceCode}
 User:`;
 }

@@ -11,12 +11,29 @@ import { inspectPhase } from '../inspector/phaseInspector';
 import { formatInspectionReport } from '../inspector/phaseInspectorReport';
 import type { PhaseInspection } from '../inspector/phaseInspector';
 import { isValidBuildRoot } from './chatPanelBuildUtils';
+import { LearnedMemoryService } from '../../services/learnedMemoryService';
+
+// [FIX] Supervisor contract guidance — tells the Supervisor to produce explicit implementation
+// contracts for the Worker, not just problem diagnoses. Applies to ALL local build paths.
+// Mirrors the same guidance added to the cloud build path in chatPanelBuildRunner.ts.
+const SUPERVISOR_CONTRACT_GUIDANCE = `
+
+SUPERVISOR TO WORKER CONTRACT REQUIREMENT:
+Your analysis is the Worker's only instruction set. Structure your output as a complete implementation contract:
+- For every function that must exist: name it, state what it calls, state what it returns
+- For every rendering concern: explicitly list every entity the draw loop must render
+- For every state transition: specify the exact sequence of operations
+- Do not describe problems — prescribe solutions with enough precision that any capable model implements them correctly on the first attempt
+The Worker has no context beyond your instructions. Ambiguity becomes missing code.`;
 
 export function createBuildContext(task: string, deps: OrchestratorDeps): BuildContext {
   const rawRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const root = isValidBuildRoot(rawRoot) ? rawRoot : '';
+  // Enrich task with project-specific never_do rules + supervisor contract guidance
+  const neverDo = root ? (() => { try { return new LearnedMemoryService(root).getNeverDoForPrompt(); } catch { return ''; } })() : '';
+  const enrichedTask = neverDo ? `${task}\n\n${neverDo}${SUPERVISOR_CONTRACT_GUIDANCE}` : `${task}${SUPERVISOR_CONTRACT_GUIDANCE}`;
   return {
-    task, root,
+    task: enrichedTask, root,
     blueprintContext: deps.blueprintContext,
     vault: deps.vault,
     redivivus: deps.redivivus,

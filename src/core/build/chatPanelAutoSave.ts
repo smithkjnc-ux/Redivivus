@@ -138,15 +138,15 @@ export async function autoSaveAndOpen(
     } catch { /* best-effort */ }
   }
 
-  // Signal build finished so vault capture, session recording, etc. all fire
+  // Signal build:finished so save-points, session recording, etc. all fire via event bus
   try {
-    const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
-    ChatPanel.onBuildFinished?.('auto-save', [absPath], root);
+    const { buildEvents } = await import('../../services/build/buildEvents.js');
+    await buildEvents.emit('build:finished', 'auto-save', [absPath], root);
   } catch { /* best-effort */ }
 
   // [Redivivus] Rich result card with AI attribution
   const modelLabel = meta?.model ?? 'AI';
-  const tokenStr = meta?.tokens ? ` (~${meta.tokens.toLocaleString()} tokens)` : '';
+  const breakdownToken = meta?.tokens ? `\n__AI_BREAKDOWN__${modelLabel}~solo~built~${meta.tokens}~0.00000000~0~primary builder|||END_BREAKDOWN__` : '';
   // [FIX] Open the project folder in a NEW window if no folder is currently open or it's different.
   // We use forceNewWindow = true to guarantee we bypass the "Save Workspace" dialog entirely.
   // The user is trapped in a dirty "Untitled (Workspace)" state, and opening in a new window is the only programmatic escape.
@@ -170,10 +170,10 @@ export async function autoSaveAndOpen(
     
     // Explicitly inform the user that a new window was opened
     const windowMsg = shouldNewWindow ? '\n\n> [!TIP]\n> **Project opened in a new window!**\n> Please switch to the new VS Code window to see your files.' : '\n\n> [!TIP]\n> **Project opened!**';
-    return `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__${windowMsg}`;
+    return `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n__END_RESULT_CARD__${windowMsg}${breakdownToken}`;
   }
 
-  const resultMsg = `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__\n__BUILD_RESULT__${filename}|||${absPath}|||END__`;
+  const resultMsg = `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n__END_RESULT_CARD__\n__BUILD_RESULT__${filename}|||${absPath}|||END__${breakdownToken}`;
   return resultMsg;
 }
 // [DONE] DELETE_RE replaced with AI classifier per Rule 18.

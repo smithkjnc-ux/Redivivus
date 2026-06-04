@@ -18,6 +18,7 @@ import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
 import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils.js';
 import { getWorkspaceContextService } from '../../services/workspace/workspaceContext';
 import { runChunkedBuildFinalize } from './chatPanelChunkedFinalize';
+import { startProgressTicker, SUPERVISOR_TICKER_LABELS } from './chatPanelBuildHelpers';
 
 export function appendMsg(ctx: BuildContext, content: string, tokens = 0, cost = 0): void {
   ctx.conversation.push({ role: 'assistant', content, timestamp: Date.now(), tokens: tokens || undefined, cost: cost || undefined }); ctx.refresh();
@@ -59,7 +60,8 @@ export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<
   if (vaultOn) { updateLastMsg(ctx, relevant.length > 0 ? `🔍 Found ${relevant.length} useful match${relevant.length !== 1 ? 'es' : ''} in your code library` : `🔍 No matches found in your code library`); }
 
   // Classification
-  appendMsg(ctx, '📐 Classifying project architecture...');
+  const _classLabels = ['📐 Classifying project architecture...', '🔍 Identifying project type...', '📐 Single-file or multi-file?'];
+  const _stopClass = startProgressTicker(ctx, _classLabels, 3_000);
   const classPrompt = `I need to build: "${task}"
 ${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}${answersBlock ? `${answersBlock}\n` : ''}
 Classify the architecture of this project into EXACTLY ONE of these types:
@@ -73,15 +75,14 @@ Return ONLY the classification string, nothing else.`;
   let projectType = 'multi-file app';
   try {
     const classRes = await routing.prompt(classPrompt, 10_000, undefined, undefined, 'You are an expert software architect.');
+    _stopClass();
     if (classRes.success && classRes.text) {
       projectType = classRes.text.trim().toLowerCase();
     }
   } catch (err) {
+    _stopClass();
     // default to multi-file app on failure
   }
-
-  // Planning
-  appendMsg(ctx, `📋 Planning your build...`);
 
   // [FIX] Inject workspace files & vault context into planner so supervisor knows what exists
   const wsCtx = await getWorkspaceContextService().getContext();
@@ -114,10 +115,12 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
   let filePlan: PlanEntry[] = [];
 
   const _planT0 = Date.now(); const _planSid = tracer.step('SUPERVISOR', supervisorLabel, `Planning ${task.slice(0, 60)}`);
+  const _stopTicker = startProgressTicker(ctx, SUPERVISOR_TICKER_LABELS);
   try {
     const res = await (workerLabel
       ? (async () => { const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 30_000); const { callProvider } = await import('../ai/providers/providerFactory.js'); return callProvider(supervisor, planPrompt, f); })()
       : routing.prompt(planPrompt, 30_000));
+    _stopTicker();
     if (!res.success) { tracer.done(_planSid, 'fail', Date.now() - _planT0, res.error || 'failed'); throw new Error(res.error || 'Planning step failed'); }
     const planTokens = Math.ceil(res.text.length / 4);
     ledger.record(supervisor, worker ? 'supervisor' : 'solo', 'planned', planTokens);
@@ -131,6 +134,7 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
     filePlan = parsed.map((e: any) => ({ filename: e.filename || e.file || 'src/output.py', purpose: e.purpose || '' }));
     tracer.done(_planSid, 'success', Date.now() - _planT0, `${filePlan.length} files planned`, Math.ceil(planPrompt.length / 4), planTokens);
   } catch (err) {
+    _stopTicker();
     const errMsg = err instanceof Error ? err.message : String(err);
     ctx.logError(task, planPrompt, `Build plan failed: ${errMsg}`, promptLen);
     conversation.pop(); conversation.pop();

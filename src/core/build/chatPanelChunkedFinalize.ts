@@ -2,7 +2,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { BuildContext } from './chatPanelBuild';
-import { encodeStoryToken, buildResultCard } from '../../ui/panels/chat/chatPanelStory';
+import { encodeStoryToken, buildResultCard } from './buildOutput.js';
 import { buildPostBuildGuidance } from './chatPanelPostBuild';
 import { generateDocs } from '../../ui/panels/chat/chatPanelDocs';
 import { autoCaptureFiles } from '../../services/vault/vaultAutoCapture';
@@ -13,6 +13,8 @@ import { autoCommitIfEnabled } from '../../services/gitAutoCommitService';
 import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel';
 import { runCompileAutoFix } from '../../services/build/compileAutoFix';
 import { runTestAutoFix } from '../../services/build/testAutoFix';
+import { runAutoFix } from '../../services/build/runAutoFix';
+import { scanProject, formatSecurityReport } from '../../services/build/securityScanner';
 import type { VaultService } from '../../services/vault/vaultService';
 import type { BuildLedger } from '../../services/build/buildLedgerService';
 
@@ -38,9 +40,20 @@ export async function runChunkedBuildFinalize(
   const resultCard = buildResultCard(builtFiles, 0, totalTokens, totalCost, elapsed, snapshotId, capture, false, ledgerSummary);
   const htmlFile = builtFiles.find(f => f.endsWith('.html'));
   const previewToken = htmlFile ? `\n__PREVIEW_BROWSER__${path.join(root, htmlFile)}|||END_PREVIEW_BROWSER__` : '';
+  // Open Workspace button — show if this project isn't already open in the explorer
+  const currentRoots = (vscode.workspace.workspaceFolders ?? []).map(f => path.resolve(f.uri.fsPath));
+  const openWorkspaceToken = root && !currentRoots.includes(path.resolve(root)) ? `\n__OPEN_WORKSPACE__${root}|||END_OPEN__` : '';
+  // Run Project button — show for non-HTML projects
+  let runToken = '';
+  if (!htmlFile && root) {
+    try { const { detectRunCommand } = await import('../../services/build/runtimeRunner.js'); if (detectRunCommand(root)) { runToken = `\n__RUN_PROJECT__${root}|||END_RUN__`; } } catch { /* non-blocking */ }
+  }
+  // Edit Visually button — show if HTML or CSS files were built
+  const hasVisual = builtFiles.some(f => /\.(html|css)$/i.test(f));
+  const editVisuallyToken = (hasVisual && root) ? `\n__EDIT_VISUALLY__${root}|||END_EDIT_VISUALLY__` : '';
   const nextSteps = buildPostBuildGuidance(root, builtFiles);
-  
-  ctx.conversation.push({ role: 'assistant', content: `${resultCard}${previewToken}${nextSteps}`, timestamp: Date.now(), tokens: totalTokens, cost: totalCost });
+
+  ctx.conversation.push({ role: 'assistant', content: `${resultCard}${openWorkspaceToken}${previewToken}${runToken}${editVisuallyToken}${nextSteps}`, timestamp: Date.now(), tokens: totalTokens, cost: totalCost });
   ctx.refresh();
 
   tracer.vault('save', `${builtFiles.length} files saved to vault`);
@@ -64,7 +77,16 @@ export async function runChunkedBuildFinalize(
 
   try { new BuildHistoryService(root).record(makeBuildHistoryEntry({ snapshotId: snapshotId || Date.now().toString(), task, files: builtFiles, tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: 'gemini', worker: worker || null, resultCardToken: resultCard })); } catch { /* never block */ }
 
-  await runCompileAutoFix(ctx, builtFiles).catch(() => {}); await runTestAutoFix(ctx, builtFiles).catch(() => {});
+  await runCompileAutoFix(ctx, builtFiles).catch(() => {});
+  await runTestAutoFix(ctx, builtFiles).catch(() => {});
+  await runAutoFix(ctx, builtFiles).catch(() => {});
+
+  // Security scan — runs after every build, reports findings without blocking
+  try {
+    const findings = scanProject(root);
+    const report = formatSecurityReport(findings, root);
+    if (report) { ctx.conversation.push({ role: 'assistant', content: report, timestamp: Date.now() }); ctx.refresh(); }
+  } catch { /* never block the build pipeline */ }
   generateDocs(root, task, blueprintContext, filePlan, routing)
     .then(docPath => { if (docPath.endsWith('.md')) { conversation.push({ role: 'assistant', content: `📖 Documentation written to \`${docPath}\``, timestamp: Date.now() }); ctx.refresh(); } }).catch(() => {});
 }

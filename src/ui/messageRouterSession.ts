@@ -21,6 +21,10 @@ export async function handleSessionMessage(
       isProcessingSession = true;
       try {
         await sessions.endSessionWithData(msg.data);
+        // [FIX] Clear the project-context latch so the NEXT project isn't mistaken for an illegal
+        // mid-build switch (previously left the old project "stuck in the queue" after exiting).
+        const { resetProjectContext } = await import('../services/logging/projectContextLogger.js');
+        resetProjectContext();
         refresh();
       } finally {
         isProcessingSession = false;

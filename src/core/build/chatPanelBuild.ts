@@ -14,13 +14,14 @@ import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds';
 import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils';
 import { buildSingleFileResult } from './chatPanelBuildResult';
 import type { BuildContext } from './chatPanelBuildHelpers';
-import { updateLastMsg, appendMsg } from './chatPanelBuildHelpers';
+import { updateLastMsg, appendMsg, supervisorPlanWithTicker } from './chatPanelBuildHelpers';
 import { buildGitContextBlock } from '../../services/workspace/gitContext';
 import { redivivusLog } from '../../services/logging/redivivusLogger';
 import { inferBuildTarget, runCodeReviewPipeline, applyCodeToFile, runPostBuildActions, resolveWorkerPrompt } from './chatPanelBuildSteps';
 import { generatePlanId, formatPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
+import { getCommunityGotchas, fetchCommunityGotchas } from '../../services/api/apiClient.js';
 import { selectRelevantTurns } from '../ai/contextSelector';
 import { findSimilarCode } from '../../services/code/similarCodeFinder';
 
@@ -61,15 +62,33 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
 
   const { relPath, absPath, existingTarget, isCrossLang, isMod, ext } = await inferBuildTarget(task, root, blueprintContext, routing, { usageTracker: ctx.usageTracker });
 
-  appendMsg(ctx, `📋 Planning \`${relPath}\`...`);
+  // Show the user which file is being reviewed and its current state
+  if (existingTarget && fs.existsSync(absPath)) {
+    const lineCount = fs.readFileSync(absPath, 'utf-8').split('\n').length;
+    appendMsg(ctx, `📂 Reading \`${relPath}\` — ${lineCount} lines — analyzing for issues...`);
+  } else {
+    appendMsg(ctx, `📋 Planning \`${relPath}\`...`);
+  }
   const neverDoContext = await new LearnedMemoryService(root).getNeverDoForTask(task, routing);
+  fetchCommunityGotchas().catch(() => {}); // warm cache for next build; use sync result this build
+  const fullNeverDo = [neverDoContext, getCommunityGotchas()].filter(Boolean).join('\n\n');
   const _supT0 = Date.now(); const _supSid = tracer.step('SUPERVISOR', supervisorAI, task.slice(0, 80));
-  const spec = await routing.supervisorPlan(task, relPath, blueprintContext, neverDoContext || undefined).catch(() => null);
-  const _supTok = spec ? Math.ceil((task.length + blueprintContext.length + spec.length) / 4) : 0;
+  // Well-known pattern bypass -- deterministic prescription replaces Supervisor AI planning.
+  // For known patterns (games, todo apps, landing pages, etc.) the AI already knows exactly what
+  // to build. The Supervisor prescription step adds lossy indirection that degrades output quality.
+  let spec: string | null = null;
+  let _supTok = 0;
+  spec = await supervisorPlanWithTicker(ctx, routing, task, relPath, blueprintContext, fullNeverDo || undefined);
+  _supTok = spec ? Math.ceil((task.length + blueprintContext.length + spec.length) / 4) : 0;
   tracer.done(_supSid, spec ? 'success' : 'fail', Date.now() - _supT0, spec ? `${spec.split('\n').length} steps` : 'no supervisor plan', Math.ceil((task.length + blueprintContext.length) / 4), _supTok);
-  if (spec) { ledger.record(supervisorAI, 'supervisor', 'planned', _supTok); updateLastMsg(ctx, `📋 Plan ready`); }
+  if (spec) {
+    ledger.record(supervisorAI, 'supervisor', 'planned', _supTok);
+    const specLines = spec.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('{') && !l.startsWith('['));
+    const preview = specLines.slice(0, 2).join(' · ').slice(0, 180);
+    updateLastMsg(ctx, preview ? `📋 Found: ${preview}` : `📋 Plan ready`);
+  }
 
-  // [FIX] Plan Approval Gate — show plan to user and wait for approval (skip for nano/no-spec builds)
+  // Plan Approval Gate
   if (spec && ctx.conversation) {
     const planId = generatePlanId();
     const planCard = formatPlanForApproval(spec, relPath, 'standard', planId);

@@ -20,8 +20,8 @@ export function buildUsageReport(tracker: UsageTracker, projectName?: string): U
   weekStart.setDate(weekStart.getDate() - weekStart.getDay());
   weekStart.setHours(0, 0, 0, 0);
   const weekStartMs = weekStart.getTime();
-  const monthStartMs = new Date().setDate(1);
-  const monthStart = new Date(monthStartMs);
+  const monthStart = new Date();
+  monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
 
   // Helper to create fresh period with empty AI breakdown map

@@ -12,8 +12,8 @@ import { handleFixRequest } from './chatPanelMsgFix';
 import { handleRunIntent, handleScaffoldIntent, handleServiceIntent } from './chatPanelMsgIntentActions';
 import { handleUrlRead, handleWebSearch, handleRememberIntent, handleReadResult } from './chatPanelMsgSendEarlyExits';
 import { runAgentMode } from './chatPanelMsgSendAgent';
-import { ChatPanel } from '../../ui/panels/chat/chatPanel';
-import { runChatClarifyStep, shouldClarify } from './chatPanelMsgSendClarify';
+
+import { runChatClarifyStep } from './chatPanelMsgSendClarify';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent';
 import { runConfirmedLocalBuild } from './chatPanelMsgSendConfirmedBuild';
 
@@ -34,15 +34,12 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
 
-  const _lastSm = conversation[conversation.length - 1];
-  if (!_lastSm || _lastSm.role !== 'user' || _lastSm.content !== userText) {
-    conversation.push({ role: 'user', content: userText, timestamp: Date.now() });
-  }
-  refresh();
-
-  // [Redivivus] Auto-session: silently start on first user message if no session is active
-  if (!/\bdone\s+for\s+(now|today)\b|\bend\s+(the\s+)?session\b|\bstart\s+(a\s+)?session\b/i.test(userText)) {
-    try { const silentStart = (ChatPanel as any).startSessionSilent; if (silentStart) { silentStart(userText); } } catch { /* non-blocking */ }
+  // [FIX] fromBlueprintCard: skip the verbose enriched-task user bubble — card is already the context
+  if (!msg.fromBlueprintCard) {
+    const _lastSm = conversation[conversation.length - 1];
+    if (!_lastSm || _lastSm.role !== 'user' || _lastSm.content !== userText) { conversation.push({ role: 'user', content: userText, timestamp: Date.now() }); }
+    refresh();
+    if (!/\bdone.*session\b|\bstart.*session\b/i.test(userText)) { try { const _CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; const ss = (_CP as any).startSessionSilent; if (ss) { ss(userText); } } catch {} }
   }
 
   const lowerText = userText.toLowerCase();
@@ -105,22 +102,69 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return;
   }
 
-  // ── Clarify step (design triage) — only for build intents ──
-  // [DONE] Bug-keyword regex and spec-length heuristic replaced with AI judgment (shouldClarify).
+  // ── Job sizing — classify tier before any clarify/build fires (Stage 2) ──
+  // [JobSizer] Replaces shouldClarify() binary check with 4-tier intake control.
+  // tell-them=0 questions, look-it-up=1, offer-choices=3, explore-with-them=5.
+  if (msg.fromBlueprintCard && intent.type === 'build') { conversation.push({ role: 'assistant', content: 'Analyzing your build... __BUILD_WORKING__', timestamp: Date.now() }); refresh(); }
   let clarify = { cancelled: false, routedText: userText };
+  let _jobTier = 'offer-choices'; // hoisted for Stage 4 diagnostic
 
-  if (!msg.fromPreview && deps.buildMode !== 'direct' && intent.type === 'build') {
-    const needsClarify = await shouldClarify(userText, deps.routing);
-    if (needsClarify) {
+  // [FIX] Skip clarify for new-project builds — blueprint inference card handles pre-build questions
+  const _wsR = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const _pd = (vscode.workspace.getConfiguration('redivivus').get('projectsDirectory', '~/projects') as string).replace('~', require('os').homedir());
+  if (!msg.fromPreview && deps.buildMode !== 'direct' && intent.type === 'build' && _wsR && require('path').resolve(_wsR) !== require('path').resolve(_pd)) {
+    const { sizeJob } = await import('../ai/jobSizer.js');
+    const jobSize = await sizeJob(userText, deps.routing);
+    _jobTier = jobSize.tier;
+    if (jobSize.tier === 'tell-them') {
+      // Supervisor acknowledges trivial task — no questions, straight to build
+      conversation.push({ role: 'assistant', content: 'Got it — on it.', timestamp: Date.now() });
+      refresh();
+    } else {
       try {
-        clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh);
+        clarify = await runChatClarifyStep(userText, deps.routing, conversation, refresh, jobSize.suggestedQuestions);
         if (clarify.cancelled) { return; }
       } catch (_e) {
         // [FIX] Never silently swallow clarify errors — fall through to build
       }
     }
   }
-  const routedText = clarify.routedText;
+  let routedText = clarify.routedText;
+
+  // Stage 4 — Five W's pre-commit diagnostic (goal-alignment check before build fires)
+  {
+    const { runFiveWsDiagnostic, handleMismatch } = await import('../ai/fiveWsDiagnostic.js');
+    const diagnostic = await runFiveWsDiagnostic(routedText, _jobTier, intent.type, deps.routing);
+    if (!diagnostic.aligned) {
+      const resolved = await handleMismatch(diagnostic, routedText, deps.routing, conversation, refresh);
+      if (!resolved) { return; } // user cancelled or chose "let me explain"
+      routedText = resolved;
+    }
+    // WHO calibration: append experience level so Guardian calibrates response depth
+    if (diagnostic.who !== undefined) {
+      const whoDesc = diagnostic.who < 0.35 ? 'non-technical -- explain outcomes, no code jargon'
+        : diagnostic.who < 0.7 ? 'intermediate -- name files but explain what they do'
+        : 'technical -- use technical terms, be concise';
+      routedText += `\n\nUSER EXPERIENCE LEVEL: ${diagnostic.who.toFixed(1)} (${whoDesc})`;
+    }
+  }
+
+  // Stage 5 — Visual Spec: establish visual contract before build fires (UI requests only)
+  if (!msg.fromPreview && (intent.type === 'build' || intent.type === 'scaffold')) {
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (root) {
+      try {
+        const { shouldRunVisualSpec, orchestrateVisualSpec, formatVisualContractBlock, setCurrentSpec } = await import('../ai/visualSpecService.js');
+        if (shouldRunVisualSpec(routedText, _jobTier)) {
+          const { spec, statusMsg } = await orchestrateVisualSpec(routedText, root, deps.routing);
+          setCurrentSpec(spec);
+          routedText += formatVisualContractBlock(spec);
+          conversation.push({ role: 'assistant', content: statusMsg, timestamp: Date.now() });
+          refresh();
+        }
+      } catch { /* visual spec optional -- never block a build */ }
+    }
+  }
 
   // ── Adaptive Mode — auto-route between simple pipeline and agent pipeline ──
   const blueprintConfirmed = routedText !== userText && routedText.startsWith('Build:');

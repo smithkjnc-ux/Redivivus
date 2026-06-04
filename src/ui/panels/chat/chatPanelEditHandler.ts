@@ -26,8 +26,10 @@ export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, '
     logError: deps.logError,
     onBuildFinished: (task: string, builtFiles?: string[]) => {
       vscode.commands.executeCommand('redivivus.resolveFix', task, builtFiles);
-      const { ChatPanel } = require('./chatPanel.js');
-      ChatPanel.onBuildFinished?.(task, builtFiles || []);
+      // [FIX] Migrated from dead ChatPanel.onBuildFinished static to buildEvents
+      import('../../../services/build/buildEvents.js').then(({ buildEvents }) => {
+        buildEvents.emit('build:finished', task, builtFiles || []);
+      }).catch(() => {});
     },
     onBuildFailed: (task, reason) => { vscode.commands.executeCommand('redivivus.buildFailed', task, reason); },
   };

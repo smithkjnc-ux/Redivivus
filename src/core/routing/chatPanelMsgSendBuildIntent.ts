@@ -8,6 +8,8 @@ import { handleFixRequest } from './chatPanelMsgFix';
 import { runTemplateWizard } from '../../services/project/templateWizard';
 import { detectBlueprintGaps, buildGapPromptMessage } from '../../services/blueprint/blueprintGapDetector';
 import { _pendingGuidedBuilds } from './chatPanelMsgSpecial';
+import { inferBlueprintFields, buildBlueprintCardToken } from '../../services/blueprint/blueprintInference';
+import { _pendingBlueprintCards } from './chatPanelMsgBlueprintCard';
 
 function isProjectsContainer(root: string): boolean {
   const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
@@ -37,8 +39,20 @@ export async function handleBuildIntent(
   }
 
   if (!deps.buildMode) {
-    // No project open OR workspace is just the projects container → build directly (auto-create project folder)
-    if (!wsRoot || isProjectsContainer(wsRoot)) { await deps.handleBuildRequest(routedText); return; }
+    // No project open OR workspace is just the projects container → infer 5 W's, show confirmation card
+    if (!wsRoot || isProjectsContainer(wsRoot)) {
+      // Skip card when re-entering from blueprint card confirm — go straight to build
+      if (!msg.fromBlueprintCard) {
+        // [FIX] Use userText (clean) not routedText — routedText has diagnostic suffixes that confuse inference
+        const inferred = await inferBlueprintFields(userText, deps.routing).catch(() => null);
+        if (inferred) {
+          _pendingBlueprintCards.set(inferred.sessionId, userText);
+          conversation.push({ role: 'assistant', content: buildBlueprintCardToken(inferred), timestamp: Date.now() });
+          refresh(); return;
+        }
+      }
+      await deps.handleBuildRequest(routedText); return;
+    }
     if (isInit) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
     panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
     return;

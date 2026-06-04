@@ -79,10 +79,29 @@ Object.assign(winP, extraP);
 winP.nameShort = 'Redivivus';
 winP.nameLong = 'Redivivus IDE';
 winP.applicationName = 'redivivus';
+winP.dataFolderName = '.redivivus';
+winP.win32MutexName = 'redivivus';
+winP.win32DirName = 'Redivivus';
+winP.win32NameVersion = 'Redivivus';
+winP.win32RegValueName = 'Redivivus';
+winP.win32AppUserModelId = 'Redivivus.Redivivus';
+winP.win32ShellNameShort = 'Redivivus';
+winP.win32TunnelServiceMutex = 'redivivus-tunnelservice';
+winP.win32TunnelMutex = 'redivivus-tunnel';
+winP.win32ContextMenu = 'Open with Redivivus';
 fs.writeFileSync(winProdPath, JSON.stringify(winP, null, 2));
 "
-# Copy icons (Windows uses .ico, but we can put the .pngs in for good measure)
+# Copy Redivivus PNG icons for Windows resources
 cp "$PROJECT_DIR/resources/redivivus-icon-512.png" "VSCode-win32-x64/resources/app/resources/win32/redivivus.png" 2>/dev/null || true
+cp "$PROJECT_DIR/resources/redivivus-icon-256.png" "VSCode-win32-x64/resources/app/resources/win32/redivivus256.png" 2>/dev/null || true
+# Generate .ico from PNG (multi-resolution for proper Windows taskbar/title bar icon)
+if command -v convert &>/dev/null; then
+    convert "$PROJECT_DIR/resources/redivivus-icon-512.png" \
+        -define icon:auto-resize=256,128,64,48,32,16 \
+        "VSCode-win32-x64/resources/app/resources/win32/code.ico" 2>/dev/null || true
+    cp "VSCode-win32-x64/resources/app/resources/win32/code.ico" \
+       "VSCode-win32-x64/resources/app/resources/win32/redivivus.ico" 2>/dev/null || true
+fi
 
 # Rename executable to redivivus.exe
 if [ -f "VSCode-win32-x64/VSCodium.exe" ]; then

@@ -24,6 +24,10 @@ export interface BuildMeta {
   source: 'cloud' | 'local-fallback';
   provider?: string;
   vaultItemNames?: string[];
+  // Two-phase attribution — when a Supervisor (pro-tier, e.g. Claude) wrote the prescription.
+  // Lets the usage tracker record Supervisor + Worker separately instead of one hardcoded "solo" row.
+  supervisor?: { ran: boolean; provider?: string; model?: string; inputTokens?: number; outputTokens?: number; error?: string };
+  workerProvider?: string;
 }
 
 export function appendBuildLog(root: string, entry: BuildLogEntry): void {

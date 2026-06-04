@@ -15,11 +15,17 @@ export function buildChatCssMid(): string {
       box-shadow: 0 2px 12px rgba(37,99,235,0.35);
     }
     .assistant-bubble {
-      align-self: flex-start; background: var(--c-surface);
+      align-self: flex-start; background: var(--c-surface); position: relative;
       border: 1px solid var(--c-border); border-radius: 4px 16px 16px 16px;
       padding: 11px 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .message-content { line-height: 1.6; white-space: pre-wrap; word-break: break-word; font-size: 13px; }
+    .msg-fwd-bar { position: absolute; top: 6px; right: 8px; display: none; gap: 4px; }
+    .assistant-bubble:hover .msg-fwd-bar { display: flex; }
+    .msg-fwd-btn { background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text-dim);
+      border-radius: 5px; padding: 2px 7px; font-size: 11px; cursor: pointer; font-family: inherit;
+      transition: all 0.12s; line-height: 1.6; }
+    .msg-fwd-btn:hover { background: var(--c-border); color: var(--c-text); }
+    .message-content { line-height: 1.6; white-space: pre-wrap; word-break: break-word; font-size: 13px; user-select: text; }
     .message-meta { font-size: 10px; color: var(--c-text-faint); margin-top: 5px; }
     .story-panel { display: flex; flex-direction: column; gap: 5px; padding: 2px 0; }
     .story-header {
@@ -56,6 +62,16 @@ export function buildChatCssMid(): string {
       letter-spacing: 0.5px; text-transform: uppercase; margin-bottom: 8px;
     }
     .bp-gap-input:focus { outline: none; border-color: #4a9eff !important; }
+    .bpc-card {
+      background: rgba(74,158,255,0.06); border: 1px solid rgba(74,158,255,0.28);
+      border-radius: 10px; padding: 14px 16px; margin: 8px 0;
+    }
+    .bpc-header { font-size: 13px; font-weight: 600; color: var(--vscode-foreground); margin-bottom: 6px; }
+    .bpc-legend { font-size: 10px; color: var(--vscode-descriptionForeground); margin-bottom: 10px; }
+    .bpc-fields { display: flex; flex-direction: column; gap: 6px; }
+    .bpc-row { display: flex; align-items: center; gap: 10px; }
+    .bpc-label { font-size: 11px; font-weight: 700; color: var(--vscode-descriptionForeground); width: 50px; flex-shrink: 0; }
+    .bpc-input:focus { outline: none; border-color: #4a9eff !important; }
     .terminal-error-card {
       background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.35);
       border-radius: 8px; padding: 10px 14px; margin: 8px 0;

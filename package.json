@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.3.32",
+  "version": "0.3.55",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -116,6 +116,10 @@
       {
         "command": "redivivus.wizard",
         "title": "Redivivus: Wizard"
+      },
+      {
+        "command": "redivivus.runProject",
+        "title": "Redivivus: Run Project"
       },
       {
         "command": "redivivus.wizardRetrofit",
@@ -618,7 +622,7 @@
   },
   "scripts": {
     "vscode:prepublish": "tsc -p ./",
-    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
+    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && cp src/data/prescriptions.json out/data/prescriptions.json && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
     "package": "npm run compile && vsce package --no-dependencies",
     "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
     "watch": "tsc -watch -p ./",

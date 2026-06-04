@@ -4,18 +4,17 @@ import type { AIResponse } from '../../../services/ai/routingTypes.js';
 import { getGeminiKey } from '../../../services/ai/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 
-// [WARN] gemini-pro is used for Supervisor and Guardian calls — higher reasoning quality.
-// gemini-flash is used for Worker calls — faster and cheaper for code generation.
 export async function executeGemini(
   text: string,
   fetchWithTimeout: (url: string, options: RequestInit, timeoutMs?: number) => Promise<Response>,
-  geminiModel?: 'flash' | 'pro',
+  tier?: 'flash' | 'pro' | 'ultra',
   imageBase64?: string,
   imageType?: string,
   systemMessage?: string
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getGeminiKey()!;
-  const model = geminiModel === 'pro' ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+  const { bestModelForRole, tierToRole } = await import('../../../services/ai/modelRegistry.js');
+  const model = bestModelForRole('gemini', tierToRole(tier))?.modelId ?? 'gemini-2.5-flash';
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
     // [WARN] Without maxOutputTokens, Gemini defaults to a low limit that truncates code generation.

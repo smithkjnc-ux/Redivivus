@@ -3,10 +3,11 @@
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import * as path from 'path';
+import * as vscode from 'vscode';
 import type { BuildContext } from './chatPanelBuild';
 import { inferExtension, deriveFileBase, extractCodeFromResponse } from './chatPanelBuildInference';
 import { createSnapshot, writeBuiltFile, captureToVault } from './chatPanelBuildWriter';
-import { buildResultCard } from '../../ui/panels/chat/chatPanelStory';
+import { buildResultCard } from './buildOutput.js';
 import { buildPostBuildGuidance } from './chatPanelPostBuild';
 import { appendCompileAction, maybeAutoCompile } from './chatPanelBuildPipeline';
 
@@ -123,12 +124,15 @@ INSTRUCTIONS:
   const elapsed = (Date.now() - buildStart) / 1000;
   const resultCard = buildResultCard([relPath], filteredItems.length, 0, 0, elapsed, snapshotId, 0, false);
   const previewToken = relPath.endsWith('.html') ? `\n__PREVIEW_BROWSER__${absPath}|||END_PREVIEW_BROWSER__` : '';
+  const currentRoots = (vscode.workspace.workspaceFolders ?? []).map(f => path.resolve(f.uri.fsPath));
+  const openWsToken = root && !currentRoots.includes(path.resolve(root)) ? `\n__OPEN_WORKSPACE__${root}|||END_OPEN__` : '';
+  const editToken = /\.(html|css)$/i.test(relPath) && root ? `\n__EDIT_VISUALLY__${root}|||END_EDIT_VISUALLY__` : '';
   const nextSteps = buildPostBuildGuidance(root, [relPath]);
   const compileBtn = appendCompileAction(relPath);
   const componentNames = filteredItems.slice(0, 8).map((i: any) => i.name).join(', ');
   const componentLine = `\n_Components: ${componentNames}${filteredItems.length > 8 ? ` +${filteredItems.length - 8} more` : ''}_`;
   conversation[conversation.length - 1].content =
-    `\u{1F4E6} **Built from Vault** (${filteredItems.length} component${filteredItems.length !== 1 ? 's' : ''} adapted)${componentLine}\n\n${resultCard}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${previewToken}${nextSteps}${compileBtn}`;
+    `\u{1F4E6} **Built from Vault** (${filteredItems.length} component${filteredItems.length !== 1 ? 's' : ''} adapted)${componentLine}\n\n${resultCard}\n__BUILD_RESULT__${relPath}|||${absPath}|||END__${openWsToken}${previewToken}${editToken}${nextSteps}${compileBtn}`;
   ctx.refresh();
 
   captureToVault(ctx, absPath, relPath);

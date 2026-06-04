@@ -109,10 +109,14 @@ function registerCoreCommands(
     })
   );
 
-  // Wizard Panel
+  // New Project — open chat panel and show the new project screen
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.wizard', async () => {
-      await vscode.commands.executeCommand('redivivusSidebar.focus');
+      await vscode.commands.executeCommand('redivivus.openChat');
+      await new Promise(r => setTimeout(r, 400));
+      if (ChatPanel.currentPanel) {
+        ChatPanel.currentPanel.showNewProject();
+      }
     })
   );
 

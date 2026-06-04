@@ -10,7 +10,7 @@ import * as Inf from './chatPanelBuildInference';
 import * as Review from './chatPanelBuildReview';
 import * as Worker from './chatPanelBuildWorker';
 import * as Writer from './chatPanelBuildWriter';
-import { extractNarrator } from '../../ui/panels/chat/chatPanelStory';
+import { extractNarrator } from './buildOutput.js';
 import { logFileChange } from '../../services/logging/redivivusLogger';
 import { refreshSetupProgressIfOpen } from '../../services/project/setupProgressPanel';
 import { autoCommitIfEnabled } from '../../services/gitAutoCommitService';

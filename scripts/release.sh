@@ -3,6 +3,9 @@
 # Usage: ./scripts/release.sh
 set -e
 
+# Load user env (tokens) — needed when run from cron or non-interactive shell
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" || true
+
 REPO="smithkjnc-ux/Redivivus"
 BUILD_DIR="$HOME/projects/redivivus-build/VSCode-linux-x64"
 WEB_DIR="$HOME/projects/redivivus-web"
@@ -56,6 +59,8 @@ cd redivivus-${NEW_VERSION} && ./redivivus
 Extract the zip and double-click \`redivivus.exe\`"
 
 echo "▶  Uploading to R2 (downloads.redivivus.dev)..."
+# CLOUDFLARE_API_TOKEN must be set in the environment (e.g. ~/.bashrc) — never hardcoded here.
+if [ -z "$CLOUDFLARE_API_TOKEN" ]; then echo "ERROR: CLOUDFLARE_API_TOKEN not set — skipping R2 upload."; exit 1; fi
 # Delete previous version files before uploading new ones
 PREV_VERSION=$(node -e "
 const [major, minor, patch] = '$NEW_VERSION'.split('.').map(Number);
@@ -64,10 +69,17 @@ console.log(major + '.' + minor + '.' + (patch - 1));
 wrangler r2 object delete "redivivus-downloads/redivivus-$PREV_VERSION.tar.gz" --remote 2>/dev/null || true
 wrangler r2 object delete "redivivus-downloads/redivivus-win32-x64-v$PREV_VERSION.zip" --remote 2>/dev/null || true
 echo "   Removed v$PREV_VERSION from R2"
-wrangler r2 object put "redivivus-downloads/redivivus-$NEW_VERSION.tar.gz" \
-  --file="$TARBALL" --content-type="application/gzip" --remote
-wrangler r2 object put "redivivus-downloads/redivivus-win32-x64-v$NEW_VERSION.zip" \
-  --file="$WIN_ZIP" --content-type="application/zip" --remote
+r2_upload() {
+  local key="$1" file="$2" type="$3"
+  for attempt in 1 2 3; do
+    wrangler r2 object put "redivivus-downloads/$key" --file="$file" --content-type="$type" --remote && return 0
+    echo "   R2 upload attempt $attempt failed for $key — retrying in 5s..."
+    sleep 5
+  done
+  echo "   ⚠ R2 upload failed after 3 attempts for $key — continuing release"
+}
+r2_upload "redivivus-$NEW_VERSION.tar.gz" "$TARBALL" "application/gzip"
+r2_upload "redivivus-win32-x64-v$NEW_VERSION.zip" "$WIN_ZIP" "application/zip"
 echo "▶  R2 upload complete — https://downloads.redivivus.dev/redivivus-$NEW_VERSION.tar.gz"
 
 echo "▶  Updating web app download link to $NEW_VERSION..."

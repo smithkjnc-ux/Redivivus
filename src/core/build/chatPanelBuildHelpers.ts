@@ -84,6 +84,47 @@ export async function streamCodePreview(ctx: BuildContext, lines: string[], labe
   }
 }
 
+export const SUPERVISOR_TICKER_LABELS = [
+  '🔍 Supervisor analyzing your request...',
+  '📐 Detailing implementation steps...',
+  '✍️ Writing build prescription...',
+  '🔍 Checking patterns and requirements...',
+  '📋 Spec almost ready...',
+];
+
+/**
+ * Runs routing.supervisorPlan() while cycling live status messages so the user sees
+ * progress during the 10-30 second supervisor planning window.
+ */
+export async function supervisorPlanWithTicker(
+  ctx: BuildContext,
+  routing: RoutingService,
+  task: string,
+  relPath: string,
+  blueprintContext: string,
+  neverDoContext?: string,
+): Promise<string | null> {
+  let _tick = 0;
+  updateLastMsg(ctx, SUPERVISOR_TICKER_LABELS[0]);
+  const _timer = setInterval(() => {
+    _tick = (_tick + 1) % SUPERVISOR_TICKER_LABELS.length;
+    updateLastMsg(ctx, SUPERVISOR_TICKER_LABELS[_tick]);
+  }, 4_000);
+  try {
+    return await routing.supervisorPlan(task, relPath, blueprintContext, neverDoContext).catch(() => null);
+  } finally {
+    clearInterval(_timer);
+  }
+}
+
+/** Start a rotating label ticker and return a stop function. Call stop() when the async op completes. */
+export function startProgressTicker(ctx: BuildContext, labels: string[], intervalMs = 4_000): () => void {
+  let tick = 0;
+  updateLastMsg(ctx, labels[0]);
+  const timer = setInterval(() => { tick = (tick + 1) % labels.length; updateLastMsg(ctx, labels[tick]); }, intervalMs);
+  return () => clearInterval(timer);
+}
+
 /** Returns a "+N / -N lines" diff summary when modifying an existing file. Empty string for new files. */
 export function diffSummary(oldContent: string, newContent: string): string {
   if (!oldContent) { return ''; }

@@ -1,12 +1,13 @@
 // [SCOPE] System health check — collects network, account, AI key, build stats, and provider balances.
 // Called on demand (user clicks Health button). Never runs automatically.
 
-import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
 import { getApiBase, getAccountToken, collectKeys } from '../../../services/api/apiClient.js';
 import { checkProviderBalances } from './chatPanelProviderBalance.js';
 import type { ProviderBalance } from './chatPanelProviderBalance.js';
+import { readBuildStats, readUsage } from './chatPanelHealthMetrics.js';
+import type { BuildStats, UsageSnapshot } from './chatPanelHealthMetrics.js';
 
 interface HealthData {
   checkedAt: string;
@@ -14,9 +15,10 @@ interface HealthData {
   buildApi: { reachable: boolean; statusCode: number | null; cloudflare: boolean; detail: string };
   account: { signedIn: boolean };
   keys: Record<string, boolean>;
-  buildStats: { total: number; success: number; failed: number; cloud: number; local: number; tokens: number; lastDate: string } | null;
+  buildStats: BuildStats | null;
   projectName: string | null;
   balances: ProviderBalance[];
+  usage: UsageSnapshot | null;
 }
 
 async function pingApi(base: string): Promise<{ reachable: boolean; latencyMs: number | null; error?: string }> {
@@ -43,27 +45,7 @@ async function checkBuildApi(base: string): Promise<HealthData['buildApi']> {
   }
 }
 
-function readBuildStats(root: string): HealthData['buildStats'] {
-  try {
-    const lines = fs.readFileSync(path.join(root, '.redivivus', 'build_log.jsonl'), 'utf8')
-      .trim().split('\n').filter(Boolean);
-    if (lines.length === 0) { return null; }
-    let success = 0, failed = 0, cloud = 0, local = 0, tokens = 0, lastDate = '';
-    for (const line of lines) {
-      try {
-        const e = JSON.parse(line);
-        if (e.error) { failed++; } else { success++; }
-        if (e.source === 'cloud') { cloud++; } else { local++; }
-        tokens += e.totalTokens ?? 0;
-        if (e.timestamp > lastDate) { lastDate = e.timestamp; }
-      } catch {}
-    }
-    return { total: lines.length, success, failed, cloud, local, tokens,
-             lastDate: lastDate.slice(0, 16).replace('T', ' ') };
-  } catch { return null; }
-}
-
-export async function collectHealthData(): Promise<HealthData> {
+export async function collectHealthData(ctx?: vscode.ExtensionContext): Promise<HealthData> {
   const base = getApiBase();
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? null;
   const rawKeys = collectKeys();
@@ -82,6 +64,7 @@ export async function collectHealthData(): Promise<HealthData> {
     buildStats: root ? readBuildStats(root) : null,
     projectName: root ? path.basename(root) : null,
     balances,
+    usage: readUsage(ctx),
   };
 }
 
@@ -169,13 +152,23 @@ export function buildHealthHtml(d: HealthData): string {
     )}
 
     ${hasBal ? card(`API Credits`, balCls,
-      d.balances.map(b =>
-        tr(b.label,
+      d.balances.map(b => {
+        const cur = b.currency ?? '$';
+        const amt = (v: number) => `${cur}${v.toFixed(2)}`;
+        return tr(b.label,
           b.status === 'ok' && b.balance !== undefined
-            ? (b.balance > 5 ? green(`$${b.balance.toFixed(2)}`) : b.balance > 1 ? yellow(`$${b.balance.toFixed(2)}`) : red(`$${b.balance.toFixed(2)}`))
-            + (b.detail ? ' ' + dim(`(${b.detail})`) : '')
+            ? (b.balance > 5 ? green(amt(b.balance)) : b.balance > 1 ? yellow(amt(b.balance)) : red(amt(b.balance)))
+              + (b.detail ? ' ' + dim(`(${b.detail})`) : '')
             : dim(b.detail ?? 'unavailable')
-        )
+        );
+      }).join('')
+    ) : ''}
+
+    ${d.usage ? card('AI Usage (lifetime)', d.usage.lifetimeTokens > 0 ? 'green' : 'dim',
+      tr('Total tokens', d.usage.lifetimeTokens > 0 ? d.usage.lifetimeTokens.toLocaleString() : muted('0')) +
+      tr('Total cost', d.usage.lifetimeCost > 0 ? `$${d.usage.lifetimeCost.toFixed(4)}` : muted('$0.0000')) +
+      d.usage.byProvider.map(p =>
+        tr(KEY_LABEL[p.provider] ?? p.provider, `${p.tokens.toLocaleString()} tokens ` + dim(`&middot; $${p.cost.toFixed(4)}`))
       ).join('')
     ) : ''}
 

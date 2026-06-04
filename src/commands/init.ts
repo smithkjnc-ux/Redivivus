@@ -25,7 +25,7 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
     require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[onNewProject] name=${name} folder=${targetFolder} task=${pendingTask.slice(0,60)}\n`);
     
     // [LOG] Track project context change
-    const validation = logProjectContextSwitch(targetFolder, 'onNewProject', pendingTask);
+    const validation = logProjectContextSwitch(targetFolder, 'onNewProject', pendingTask, true);
     if (!validation.allowed) {
       // This is a critical error - we're trying to switch projects unexpectedly
       vscode.window.showErrorMessage(`Redivivus Error: ${validation.reason}. Current: ${currentRoot}, Attempted: ${targetFolder}`);

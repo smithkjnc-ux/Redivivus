@@ -159,7 +159,7 @@ function saveConversation(state: any, root?: string): void {
   try {
     const ctx = ChatPanel.extensionContext;
     if (!ctx || !root || !state.conversation.length) { return; }
-    ctx.globalState.update(chatHistoryKey(root), JSON.stringify(state.conversation.slice(-100)));
+    ctx.globalState.update(chatHistoryKey(root), JSON.stringify(state.conversation.filter((m: any) => !m.content?.includes('__BUILD_WORKING__')).slice(-100))); // [FIX] strip working messages — don't survive host restarts
     
     // Append new messages to project folder log
     const fs = require('fs');

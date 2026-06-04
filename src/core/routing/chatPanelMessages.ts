@@ -13,6 +13,7 @@ import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrows
 import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder, handleStartNewProject } from '../project/chatPanelMsgProjectOps';
 import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne, handleArchitectPerAction, handleArchitectActionConfirm } from '../../ui/panels/chat/chatPanelMsgArchitect';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial';
+import { handleBlueprintCardConfirm, handleBlueprintCardSkip } from './chatPanelMsgBlueprintCard';
 import { handleMapContext } from '../../ui/panels/chat/chatPanelMsgMapContext';
 import { handleExpandedInterviewSubmit } from '../../ui/panels/chat/chatPanelMsgExpandedInterview';
 
@@ -136,9 +137,6 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
       resolveTemplateWizard(msg);
     } catch { /* wizard may have already timed out */ }
 
-  } else if (msg.type === 'architect-dismiss') {
-    // no-op
-
   } else if (msg.type === 'architect-explain') {
     await handleArchitectExplain(msg, routing, conversation, refresh);
 
@@ -160,11 +158,10 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   } else if (msg.type === 'architect-action-cancel') {
     conversation.push({ role: 'assistant', content: 'Cancelled.', timestamp: Date.now() }); refresh();
 
-  } else if (msg.type === 'blueprint-gap-answer') {
-    await handleBlueprintGapAnswer(msg, deps, conversation, refresh);
-
-  } else if (msg.type === 'blueprint-gap-skip') {
-    await handleBlueprintGapSkip(msg, deps, conversation, refresh);
+  } else if (msg.type === 'blueprint-card-confirm') { await handleBlueprintCardConfirm(msg, deps, conversation, refresh);
+  } else if (msg.type === 'blueprint-card-skip') { await handleBlueprintCardSkip(msg, deps, conversation, refresh);
+  } else if (msg.type === 'blueprint-gap-answer') { await handleBlueprintGapAnswer(msg, deps, conversation, refresh);
+  } else if (msg.type === 'blueprint-gap-skip') { await handleBlueprintGapSkip(msg, deps, conversation, refresh);
 
   } else if (msg.type === 'vault-dedup-preview') {
     handleVaultDedupPreview(msg, conversation, refresh);
@@ -189,16 +186,9 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     (require('vscode') as typeof import('vscode')).commands.executeCommand('redivivus.githubCommitFiles', files, commitMsg, panel.webview);
 
   // [FIX] Plan Approval Gate — bridges webview plan buttons to the build pipeline Promise
-  } else if (msg.type === 'plan-approve') {
+  } else if (msg.type === 'plan-approve' || msg.type === 'plan-revise' || msg.type === 'plan-cancel') {
     const { resolvePlanApproval } = await import('../build/chatPanelBuildPlanGate.js');
-    if (msg.planId) { resolvePlanApproval(msg.planId, 'approve'); }
-
-  } else if (msg.type === 'plan-revise') {
-    const { resolvePlanApproval } = await import('../build/chatPanelBuildPlanGate.js');
-    if (msg.planId) { resolvePlanApproval(msg.planId, 'revise'); }
-
-  } else if (msg.type === 'plan-cancel') {
-    const { resolvePlanApproval } = await import('../build/chatPanelBuildPlanGate.js');
-    if (msg.planId) { resolvePlanApproval(msg.planId, 'cancel'); }
+    const outcome = msg.type === 'plan-approve' ? 'approve' : msg.type === 'plan-revise' ? 'revise' : 'cancel';
+    if (msg.planId) { resolvePlanApproval(msg.planId, outcome as 'approve' | 'revise' | 'cancel'); }
   }
 }

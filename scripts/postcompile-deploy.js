@@ -10,7 +10,9 @@ const workspaceRoot = process.cwd();
 // Write build timestamp for visual verification
 const buildTimestamp = new Date().toISOString();
 const pkgVersion = (() => { try { return JSON.parse(fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf-8')).version; } catch { return '0.0.0'; } })();
-const buildInfo = { timestamp: buildTimestamp, version: pkgVersion };
+// Commit hash so bug reports pin the exact source that produced the build (causation-first debugging).
+const gitCommit = (() => { try { return execSync('git rev-parse --short HEAD', { cwd: workspaceRoot }).toString().trim(); } catch { return 'unknown'; } })();
+const buildInfo = { timestamp: buildTimestamp, version: pkgVersion, commit: gitCommit };
 // [WARN] Write to both .redivivus/ (project tooling) and out/data/ (deployed with extension, readable at runtime)
 const buildInfoPath = path.join(workspaceRoot, '.redivivus', 'build-info.json');
 fs.writeFileSync(buildInfoPath, JSON.stringify(buildInfo, null, 2));

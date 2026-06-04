@@ -8,7 +8,8 @@ import type { AIResponse } from './routingTypes.js';
 import { Redivivus_WORKER_RULES } from './redivivusWorkerRules.js';
 import { getAllTools, callTool } from '../mcpService.js';
 import { BuildLedger } from '../build/buildLedgerService.js';
-import { extractAgentThought, narrateTool } from './agentNarrator.js';
+import { extractAgentThought, narrateTool, friendlyModelName } from './agentNarrator.js';
+import { runSupervisorPreplanning } from './agentSupervisor.js';
 
 export interface AgentExecutionResult {
   success: boolean;
@@ -51,6 +52,7 @@ CRITICAL RULES FOR Redivivus AGENT:
 9. PROPER WEB STRUCTURE. If you create an \`.html\` file, it MUST contain a valid, fully-formed HTML5 structure (\`<!DOCTYPE html><html><body>...\`). DO NOT just write raw JavaScript or CSS directly into an \`.html\` file.
 10. NO FLAT FILES. Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects Redivivus builds and to Redivivus itself. No exceptions.
 11. ACTUALLY WRITE THE CODE. If the user asks you to build an app, game, or project, you MUST use the \`write_file\` tool to create the actual source files. Do NOT just output a text description, markdown checkboxes, or a plan of the project in your final answer. The user expects a working, runnable project in their workspace.
+12. DO NOT USE ask_user WHEN A SUPERVISOR PRESCRIPTION IS PROVIDED. The prescription already resolves all ambiguity. If you see "SUPERVISOR PRESCRIPTION" below, implement it directly -- no questions, no choices presented to the user.
 
 AVAILABLE TOOLS:
 ${getToolInstructions()}${mcpInstructions}
@@ -63,6 +65,12 @@ To use a tool, output an XML block like this:
   "args": { "filePath": "index.html" }
 }
 </tool_call>
+
+CRITICAL -- write_file with large content: Embedding large files in JSON causes parse errors.
+If the file content is longer than 50 lines, use this raw block format INSTEAD of the JSON args:
+<write_file path="relative/path/to/file">
+[raw file content here -- no JSON escaping needed, no markdown fences, paste code exactly as-is]
+</write_file>
 
 You can only use ONE tool at a time. After you use a tool, the system will execute it and provide you with the <tool_result>.
 If you do not need to use a tool, simply output your final answer. Do NOT output a <tool_call> block if you are finished.
@@ -80,11 +88,18 @@ Begin. Think step-by-step.`;
   const MAX_ITERATIONS = 15;
   let iterations = 0;
 
+  // [Redivivus] Supervisor reads current project files THEN generates a prescription.
+  // Agent implements the prescription exactly -- no re-analysis, no deviation.
+  const supervisorPrescription = await runSupervisorPreplanning(task, context, agentCtx, routing, onUpdate);
+  if (supervisorPrescription) {
+    history = history.replace('Begin. Think step-by-step.', `${supervisorPrescription}\nBegin. Implement the prescription above. Think step-by-step.`);
+  }
+
   onUpdate('🧠 **Autonomous Agent** spinning up — analysing your task and preparing a plan...');
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
-    const res: AIResponse = await routing.prompt(history, 60_000);
+    const res: AIResponse = await routing.prompt(history, 60_000, undefined, undefined, undefined, `agent-iter-${iterations}`);
     
     // Track tokens for this iteration
     const inTok = res.inputTokens || 0;
@@ -102,23 +117,39 @@ Begin. Think step-by-step.`;
 
     // [Redivivus] Surface AI's own reasoning as narrator bubble — zero extra tokens
     const thought = extractAgentThought(aiText);
-    if (thought) { onUpdate(`\uD83D\uDCAD _Step ${iterations}:_ ${thought}`); }
+    const modelTag = res.model ? ` \u00B7 ${friendlyModelName(res.model)}` : '';
+    if (thought) { onUpdate(`\uD83D\uDCAD _Step ${iterations}${modelTag}:_ ${thought}`); }
 
-    // Parse tool call
-    const toolMatch = aiText.match(/<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/);
-    if (!toolMatch) {
+    // [WARN] Priority: raw <write_file> block MUST be checked before <tool_call>.
+    // AI often outputs both in one response (write block + run_command verification call).
+    // If we match tool_call first we execute the verification and skip the file write entirely.
+    const rawWriteMatch = aiText.match(/<write_file\s+path="([^"]+)">([\s\S]*?)<\/write_file>/);
+    const toolMatch = !rawWriteMatch ? aiText.match(/<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/) : null;
+    if (!rawWriteMatch && !toolMatch) {
       // No tool call -> final answer
       return { success: true, finalAnswer: aiText, iterations, ledger };
     }
 
     let toolData: any;
-    try {
-      toolData = JSON.parse(toolMatch[1]);
-    } catch (e) {
-      const errorMsg = 'Error parsing tool call JSON. Ensure it is valid JSON.';
-      history += `\n\nSystem:\n<tool_result>\n${errorMsg}\n</tool_result>`;
-      onUpdate(`\u26A0\uFE0F _Step ${iterations}:_ Had a formatting hiccup \u2014 adjusting and trying again...`);
-      continue;
+    if (rawWriteMatch) {
+      // Raw block format: content between tags, no JSON encoding needed
+      toolData = { name: 'write_file', args: { filePath: rawWriteMatch[1].trim(), content: rawWriteMatch[2] } };
+    } else {
+      try {
+        toolData = JSON.parse(toolMatch![1]);
+      } catch (e) {
+        // [WARN] JSON parse fails on large write_file content -- the full file is too big to encode as a JSON string.
+        // Last-chance fallback: re-check for raw block (handles AI that put it after a broken tool_call).
+        const fallbackRaw = aiText.match(/<write_file\s+path="([^"]+)">([\s\S]*?)<\/write_file>/);
+        if (fallbackRaw) {
+          toolData = { name: 'write_file', args: { filePath: fallbackRaw[1].trim(), content: fallbackRaw[2] } };
+        } else {
+          const errorMsg = 'Error parsing tool call JSON. Ensure it is valid JSON.';
+          history += `\n\nSystem:\n<tool_result>\n${errorMsg}\n</tool_result>`;
+          onUpdate(`\u26A0\uFE0F _Step ${iterations}:_ Had a formatting hiccup \u2014 adjusting and trying again...`);
+          continue;
+        }
+      }
     }
 
     let result: string = '';

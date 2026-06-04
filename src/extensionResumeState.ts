@@ -20,6 +20,25 @@ export function resumePendingState(
   context: vscode.ExtensionContext,
   showArgs: ShowArgs,
 ): void {
+  // ── restore conversation after successful build opened a new folder ──
+  const pendingBuildComplete = context.globalState.get<boolean>('redivivus.pendingBuildComplete');
+  if (pendingBuildComplete) {
+    context.globalState.update('redivivus.pendingBuildComplete', undefined);
+    const rescuedConv = context.globalState.get<any[]>('redivivus.pendingRescueConversation');
+    if (rescuedConv && rescuedConv.length > 0) {
+      context.globalState.update('redivivus.pendingRescueConversation', undefined);
+      (async () => {
+        await openPanel(showArgs, 100, 400);
+        if (ChatPanel.currentPanel) {
+          const conv = ChatPanel.currentPanel.getConversation();
+          conv.splice(0, conv.length, ...rescuedConv);
+          (ChatPanel.currentPanel as any).refresh();
+        }
+      })();
+    }
+    return;
+  }
+
   // ── resume build task after extension reload (updateWorkspaceFolders 0→1 folder causes restart) ──
   // [FIX] Saved by onNewProject BEFORE updateWorkspaceFolders so the task survives the reload.
   const pendingResumeRaw = context.globalState.get<string>('redivivus.pendingResumeTask');
@@ -90,11 +109,11 @@ export function resumePendingState(
     context.globalState.update('redivivus.pendingBuildResult', undefined);
     const { filename, model, tokens, absPath } = pendingBuildResult;
     const modelLabel = model ?? 'AI';
-    const tokenStr = tokens ? ` (~${tokens.toLocaleString()} tokens)` : '';
+    const breakdownToken = tokens ? `\n__AI_BREAKDOWN__${modelLabel}~solo~built~${tokens}~0.00000000~0~primary builder|||END_BREAKDOWN__` : '';
     const previewToken = filename.endsWith('.html')
       ? `\n__PREVIEW_BROWSER__${absPath}|||END_PREVIEW_BROWSER__`
       : '';
-    const resultMsg = `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n\n*Built with ${modelLabel}${tokenStr}*\n__END_RESULT_CARD__${previewToken}`;
+    const resultMsg = `__RESULT_CARD__\n✅ Done! Built 1 file\n\n- \`${filename}\`\n__END_RESULT_CARD__${previewToken}${breakdownToken}`;
     (async () => {
       await openPanel(showArgs, 100, 250);
       const cp = ChatPanel.currentPanel;

@@ -6,6 +6,7 @@ export interface ProviderBalance {
   provider: string;
   label: string;
   balance?: number;
+  currency?: string; // HTML entity: '$' default, '&yen;' for Moonshot/Kimi (billed in CNY)
   status: 'ok' | 'unavailable' | 'error';
   detail?: string;
 }
@@ -25,6 +26,25 @@ async function validateKey(
   } catch (e: any) {
     return { provider, label, status: 'unavailable', detail: e?.message ?? 'timeout' };
   }
+}
+
+// Most providers expose no balance API (Anthropic, OpenAI, Gemini, Groq, xAI) — key validation is the
+// best signal. Moonshot/Kimi is the exception: it has /v1/users/me/balance. Returns the live balance
+// when available, else falls back to key validation.
+async function fetchKimiBalance(key: string): Promise<ProviderBalance> {
+  const headers = { 'Authorization': `Bearer ${key}` };
+  try {
+    const res = await fetch('https://api.moonshot.cn/v1/users/me/balance', { headers, signal: AbortSignal.timeout(6000) });
+    if (res.status === 401) { return { provider: 'kimi', label: 'Kimi', status: 'error', detail: 'invalid key' }; }
+    if (res.ok) {
+      const j = await res.json() as { data?: { available_balance?: number } };
+      const bal = j?.data?.available_balance;
+      if (typeof bal === 'number') {
+        return { provider: 'kimi', label: 'Kimi', status: 'ok', balance: bal, currency: '&yen;', detail: 'live balance (CNY)' };
+      }
+    }
+  } catch { /* fall through to key validation */ }
+  return validateKey('kimi', 'Kimi', 'https://api.moonshot.cn/v1/models', headers);
 }
 
 export async function checkProviderBalances(keys: Record<string,string>): Promise<ProviderBalance[]> {
@@ -61,10 +81,8 @@ export async function checkProviderBalances(keys: Record<string,string>): Promis
     ));
   }
   if (keys.kimi) {
-    checks.push(validateKey('kimi', 'Kimi',
-      'https://api.moonshot.cn/v1/models',
-      { 'Authorization': `Bearer ${keys.kimi}` }
-    ));
+    // Kimi/Moonshot exposes a real balance endpoint — fetch it (falls back to key validation).
+    checks.push(fetchKimiBalance(keys.kimi));
   }
 
   return Promise.all(checks);

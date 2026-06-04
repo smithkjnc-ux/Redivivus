@@ -21,13 +21,12 @@ import { handleComplexityRoutedBuild, OrchestratorDeps } from '../build/chatPane
 import { runBuildAfterGates } from '../build/chatPanelBuildRunner';
 import { autoCreateProject } from '../build/chatPanelBuildAutoCreate';
 import { estimateBuild } from './costEstimatorService';
-import { checkBuildPlacement } from '../../services/build/buildPlacementCheck';
 import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintExtractor';
 
 // [Redivivus] Moved resolvers to chatPanelResolvers.ts
 
 /** Shows placement modal and waits for user choice. Returns 'here' | 'new-project' | 'cancel'. */
-import { awaitPlacementConfirmation, awaitCostConfirmation } from '../../ui/panels/chat/chatPanelGates';
+import { runPlacementGate, awaitCostConfirmation } from '../../ui/panels/chat/chatPanelGates';
 
 
 export interface BuildRequestDeps {
@@ -78,11 +77,16 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
   if (!vscode.workspace.workspaceFolders?.length) { skipComplex = true; }
   if (!skipComplex) {tracer.start(task);}
 
+  // ── Placement gate — confirm task belongs in this project before running any other gates ──
+  if (!skipComplex && deps.buildMode !== 'direct' && await runPlacementGate(task, deps)) { return; }
+
   // ── Scope clarification — ask 2 questions in chat before doing anything for vague requests ──
   // [WARN] Only fires on fresh project-type requests with no detail. Never fires on skipComplex=true
   //        (that's a resumed build that already went through the wizard).
   // Direct mode: skip scope clarification entirely (auto-approve scope)
   // Initialized projects: skip scope clarification — user is modifying, not starting fresh
+  // [DEAD] replaced by JobSizer — Stage 2. sizeJob() at intake handles vague-request detection
+  // before handleBuildRequest fires. This guard is now redundant. Do not delete — audit trail.
   if (!skipComplex && deps.buildMode !== 'direct' && !deps.redivivus?.isInitialized?.() && await isVagueProjectRequest(task, deps.routing)) {
     const scopeAnswer = await askScopeQuestions(task, deps.postToWebview);
     if (scopeAnswer) {

@@ -58,6 +58,7 @@ import { registerInlineCommands } from './extensionInlineCommands.js';
 import { registerSignInCommand } from './commands/signIn.js';
 import { registerReportIssueCommand } from './commands/reportIssue.js';
 import { registerCheckForUpdatesCommand } from './commands/checkForUpdates.js';
+import { initOutputChannels } from './ui/logging/outputChannelManager.js';
 
 export function registerAllCommands(
   context: vscode.ExtensionContext,
@@ -133,9 +134,12 @@ export function registerAllCommands(
   try {   registerScopeCreepCommand(context, redivivusService, routingService); } catch (e) { console.error('Failed to register ' + 'registerScopeCreepCommand(context, redivivusService, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerScopeCreepCommand(context, redivivusService, routingService); failed: ' + e + '\n'); }
   try {   registerDuplicateCodeCommand(context, routingService); } catch (e) { console.error('Failed to register ' + 'registerDuplicateCodeCommand(context, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerDuplicateCodeCommand(context, routingService); failed: ' + e + '\n'); }
   try {   registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); failed: ' + e + '\n'); }
-  registerInlineCommands(context, redivivusService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd);
+  // [FIX] registerInlineCommands was the only registration NOT wrapped in try/catch.
+  // If it throws (e.g. terminalErrorService setup, inline command init), signIn and reportIssue
+  // were silently never registered. Now wrapped like every other registration.
+  try { registerInlineCommands(context, redivivusService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd); } catch (e) { console.error('Failed to register inline commands', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerInlineCommands failed: ' + e + '\n'); }
   try { registerSignInCommand(context, statusBar); } catch (e) { console.error('Failed to register signIn command', e); }
-  try { registerReportIssueCommand(context); } catch (e) { console.error('Failed to register reportIssue command', e); }
+  try { registerReportIssueCommand(context, routingService); } catch (e) { console.error('Failed to register reportIssue command', e); }
   try { registerCheckForUpdatesCommand(context); } catch (e) { console.error('Failed to register checkForUpdates command', e); }
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
 
@@ -172,4 +176,6 @@ export function registerAllCommands(
 
   // Register deep link handler
   registerAuthHandler(context, statusBar);
+  // Initialize per-layer Output Channels — must be last so all services are set up first
+  try { initOutputChannels(); } catch { /* non-blocking */ }
 }

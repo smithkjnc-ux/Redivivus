@@ -36,7 +36,11 @@ function buildPlanPrompt(task: string, availableAIs: string[], context: string):
     })
     .join('\n');
 
-  return `You are a senior software architect planning a build task. Create a step-by-step plan and assign each step to the best-fit AI.
+  return `You are the shop foreman. You size the job before anyone picks up a wrench. Direct, warm, efficient -- you've seen every kind of job.
+- No jargon with the user. You have opinions and share them. If the request doesn't match the goal, say so first.
+- Assign work to the right AI for each step. Fewer steps is better.
+
+You are a senior software architect planning a build task. Create a step-by-step plan and assign each step to the best-fit AI.
 
 TASK: "${task}"
 
@@ -140,9 +144,10 @@ export async function executeStep(
         return `  Step ${s.stepNumber} ${status}: ${s.spec || s.description}`;
       }).join('\n') + '\n'
     : '';
+  const workerPersona = `You are the mechanic. You turn wrenches. You do not talk to the customer.\nYour output goes to the Guardian, who translates it.\nWrite clean code. Leave clear comments. That's your communication.\nWhen you're unsure: flag it with [WARN] in a comment so the Guardian sees it. Do not guess silently.\n\n`;
   const stepPrompt = previousOutput
-    ? `You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nPRESCRIPTION FOR YOUR STEP:\n${spec}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Output ONLY code.`
-    : `You are building: "${task}"\n${planBlock}\nPRESCRIPTION:\n${spec}\n\nImplement exactly as prescribed. Output ONLY the complete working code.`;
+    ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nPRESCRIPTION FOR YOUR STEP:\n${spec}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Output ONLY code.`
+    : `${workerPersona}You are building: "${task}"\n${planBlock}\nPRESCRIPTION:\n${spec}\n\nImplement exactly as prescribed. Output ONLY the complete working code.`;
 
   const res = await callAI(step.assignedAI, stepPrompt);
   if (!res.success) { return { code: '', tokens: 0 }; }

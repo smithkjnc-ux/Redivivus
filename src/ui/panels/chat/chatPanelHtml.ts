@@ -100,7 +100,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
   <div id="input-area">
     <div id="input-card">
       <div id="input-top">
-        <textarea id="message-input" placeholder="Ask about your code, the blueprint, or anything else…" rows="1"></textarea>
+        <textarea id="message-input" placeholder="What do you want to build or fix?" rows="1"></textarea>
       </div>
       <div id="input-bottom">
         <div id="input-left">

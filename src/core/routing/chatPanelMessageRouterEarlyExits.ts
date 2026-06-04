@@ -94,6 +94,8 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
   }
 
 
+  if (msg.type === 'run-project' && msg.path) { vscode.commands.executeCommand('redivivus.runProject', msg.path); return true; }
+
   if (msg.type === 'open-workspace-btn' && msg.path) {
     const { ChatPanel } = require('../../ui/panels/chat/chatPanel.js');
     if (ChatPanel.extensionContext) {

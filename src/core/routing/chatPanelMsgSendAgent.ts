@@ -82,8 +82,14 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
       }
       
       const buildResultMarker = builtFiles.length > 0 ? `\n__BUILD_RESULT__${builtFiles[0]}|||${path.join(rootPath, builtFiles[0])}|||END__` : '';
-      
-      finalContent += `\n\n${card}${buildResultMarker}${previewToken}${nextSteps}`;
+      const curRoots = (vscode.workspace.workspaceFolders ?? []).map(f => path.resolve(f.uri.fsPath));
+      const openWsToken = rootPath && !curRoots.includes(path.resolve(rootPath)) ? `\n__OPEN_WORKSPACE__${rootPath}|||END_OPEN__` : '';
+      const hasVisual = builtFiles.some((f: string) => /\.(html|css)$/i.test(f));
+      const editToken = hasVisual && rootPath ? `\n__EDIT_VISUALLY__${rootPath}|||END_EDIT_VISUALLY__` : '';
+      let runToken = '';
+      if (!htmlFile && rootPath) { try { const { detectRunCommand } = await import('../../services/build/runtimeRunner.js'); if (detectRunCommand(rootPath)) { runToken = `\n__RUN_PROJECT__${rootPath}|||END_RUN__`; } } catch {} }
+
+      finalContent += `\n\n${card}${buildResultMarker}${openWsToken}${previewToken}${runToken}${editToken}${nextSteps}`;
       const sw = deps.routing.selectSupervisorAndWorker();
       try {
         new BuildHistoryService(rootPath).record(makeBuildHistoryEntry({
@@ -95,11 +101,11 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
     }
     conversation.push({ role: 'assistant', content: finalContent, timestamp: Date.now() });
     
-    // Auto-open workspace folder just like standard build pipeline
+    // Fire build:finished event so save-points and session recording trigger
     if (builtFiles.length > 0) {
       setTimeout(() => {
-        import('../../ui/panels/chat/chatPanel.js').then(({ ChatPanel }) => {
-          ChatPanel.onBuildFinished?.(userText, builtFiles, rootPath);
+        import('../../services/build/buildEvents.js').then(({ buildEvents }) => {
+          buildEvents.emit('build:finished', userText, builtFiles, rootPath);
         });
       }, 300);
     }

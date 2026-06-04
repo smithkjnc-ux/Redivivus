@@ -20,9 +20,10 @@ export function registerInlineCommandsC(
 
   // [Redivivus] Run Project — detects runnable entry point from build history and opens a terminal
   // [FIX] Auto-captures terminal errors and offers to fix them in chat
+  // rootOverride is passed by the result card ▶ Run Project button via vscode.commands.executeCommand
   context.subscriptions.push(
-    vscode.commands.registerCommand('redivivus.runProject', async () => {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    vscode.commands.registerCommand('redivivus.runProject', async (rootOverride?: string) => {
+      const root = rootOverride || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (!root) { vscode.window.showWarningMessage('No project folder open.'); return; }
       const recentFiles = new BuildHistoryService(root).list().filter(e => !e.undone).slice(0, 1).flatMap(e => e.files);
       const info = detectPostBuildInfo(root, recentFiles);

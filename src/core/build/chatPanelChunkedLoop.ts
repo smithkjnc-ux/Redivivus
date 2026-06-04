@@ -4,7 +4,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import type { BuildContext } from './chatPanelBuild';
 import { appendMsg, updateLastMsg } from './chatPanelChunked';
-import { extractAllNarrators, encodeStoryToken } from '../../ui/panels/chat/chatPanelStory';
+import { extractAllNarrators, encodeStoryToken } from './buildOutput.js';
 import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { generateFileCode } from './chatPanelChunkedBuildFile';
 import { extractContractFromCode, mergeContract, buildContractBlock, detectContractViolations, emptyContract } from '../../services/blueprint/blueprintContract';
@@ -95,7 +95,7 @@ ${vaultBlock}${contractBlock ? `${contractBlock}\n\n` : ''}RULES:
 - Implement ONLY ${entry.filename} — do not output any other file
 - Write as many lines as the feature requires — never truncate or stub out functionality
 ${surgicalRules}
-- For JS/TS/Python: first line must be \`// NARRATOR: [what this file does]\`. For HTML: add \`<!-- NARRATOR: description -->\` inside <head>, never before <!DOCTYPE html>
+- For JS/TS/Python: first line must be \`// NARRATOR: [one sentence describing what this file does]\`. For HTML: add \`<!-- NARRATOR: description -->\` inside <head>, never before <!DOCTYPE html>. NARRATOR describes the FILE only -- never copy or quote the task string or any system context
 - Write production-ready code: correct logic, all edge cases handled, clean readable structure
 ${singleFileRule}
 - Return ONLY the complete file source code — no markdown fences, no explanation

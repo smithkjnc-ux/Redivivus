@@ -1,10 +1,12 @@
 // [SCOPE] Collects local project context for the cloud build API.
-// Reads blueprint, vault, git, project rules, and existing files — sends as plain data, never logic.
+// Reads blueprint, vault, git, project rules, existing files, and chat history.
+// Sends complete data — no pre-emptive caps. budgetContext() is the last-resort trimmer only.
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import type { VaultService } from '../vault/vaultService';
+import { estimateTokens, getInputBudget } from '../ai/tokenBudget.js';
+import { readFileSafe, buildProjectMap, buildGitContext, getRecentBuilds } from './buildContextHelpers.js';
 
 export interface CloudBuildContext {
   blueprint?: { projectName?: string; what?: string; who?: string; where?: string; when?: string; why?: string }
@@ -17,51 +19,7 @@ export interface CloudBuildContext {
   projectMap?: string
   targetFile?: string
   isFix?: boolean
-}
-
-function readFileSafe(p: string, maxBytes = 8000): string {
-  try {
-    const content = fs.readFileSync(p, 'utf8');
-    return content.length > maxBytes ? content.slice(0, maxBytes) + '\n[truncated]' : content;
-  } catch { return ''; }
-}
-
-function buildProjectMap(root: string): string {
-  const lines: string[] = [];
-  const walk = (dir: string, depth = 0) => {
-    if (depth > 3) return;
-    try {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        if (/^(node_modules|\.git|\.redivivus|out|dist|build|__pycache__)$/.test(entry.name)) continue;
-        const full = path.join(dir, entry.name);
-        const rel = path.relative(root, full);
-        if (entry.isDirectory()) { lines.push(rel + '/'); walk(full, depth + 1); }
-        else { lines.push(rel); }
-      }
-    } catch {}
-  };
-  walk(root);
-  return lines.slice(0, 80).join('\n');
-}
-
-function buildGitContext(root: string): string {
-  try {
-    const { execSync } = require('child_process');
-    const opts = { cwd: root, encoding: 'utf8' as const, stdio: ['pipe', 'pipe', 'pipe'] as const };
-    const log = execSync('git log --oneline -5 2>/dev/null', opts) as string || '';
-    const status = execSync('git status --short 2>/dev/null', opts) as string || '';
-    const diff = execSync('git diff --stat HEAD 2>/dev/null', opts) as string || '';
-    return [log && `RECENT COMMITS:\n${log}`, status && `STATUS:\n${status}`, diff && `CHANGES:\n${diff}`]
-      .filter(Boolean).join('\n').slice(0, 3000);
-  } catch { return ''; }
-}
-
-function getRecentBuilds(root: string): string[] {
-  try {
-    const p = path.join(root, '.redivivus', 'build_history.json');
-    const history = JSON.parse(fs.readFileSync(p, 'utf8')) as Array<{ task?: string }>;
-    return history.slice(-3).map(h => h.task || '').filter(Boolean);
-  } catch { return []; }
+  recentChat?: string
 }
 
 export async function collectBuildContext(
@@ -70,75 +28,111 @@ export async function collectBuildContext(
   vault: VaultService | undefined,
   targetFileHint?: string,
   isFix?: boolean,
+  conversation?: Array<{ role: string; content: string; timestamp?: number }>,
 ): Promise<CloudBuildContext> {
   // Blueprint
   let blueprint: CloudBuildContext['blueprint'] | undefined;
   try {
     const cfg = JSON.parse(readFileSafe(path.join(root, '.redivivus', 'config.json')));
     if (cfg.blueprint || cfg.projectName) {
-      blueprint = {
-        projectName: cfg.projectName,
-        what: cfg.blueprint?.what,
-        who:  cfg.blueprint?.who,
-        where: cfg.blueprint?.where,
-        when: cfg.blueprint?.when,
-        why:  cfg.blueprint?.why,
-      };
+      blueprint = { projectName: cfg.projectName, what: cfg.blueprint?.what, who: cfg.blueprint?.who,
+        where: cfg.blueprint?.where, when: cfg.blueprint?.when, why: cfg.blueprint?.why };
     }
   } catch {}
 
-  // Vault items (top 20 most relevant by simple text match)
+  // Vault items — all relevant ones, no arbitrary cap
   let vaultItems: CloudBuildContext['vaultItems'] | undefined;
   if (vault) {
     try {
       const all = vault.listItems() as Array<{ name: string; code: string; language?: string; tags?: string[] }>;
-      const taskLow = task.toLowerCase();
       const scored = all.map(item => {
         const words = (item.name + ' ' + (item.tags ?? []).join(' ')).toLowerCase();
         const score = task.toLowerCase().split(/\W+/).filter(w => w.length > 3).filter(w => words.includes(w)).length;
         return { item, score };
       });
-      // [FIX] Only include vault items with keyword overlap — sending irrelevant items wastes
-      // tokens and can push the request payload over server size limits.
-      const matched = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score).slice(0, 10);
+      const matched = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
       vaultItems = matched.length > 0 ? matched.map(s => s.item) : undefined;
     } catch {}
   }
 
-  // Existing target file content (for modifications)
+  // Existing target file — full content, no byte cap
   let existingFiles: Record<string, string> | undefined;
   const candidates = targetFileHint ? [targetFileHint] : findLikelyTargets(root, task);
   for (const rel of candidates) {
     const abs = path.join(root, rel);
-    if (fs.existsSync(abs)) {
-      existingFiles ??= {};
-      existingFiles[rel] = readFileSafe(abs, 12000);
-    }
+    if (fs.existsSync(abs)) { existingFiles ??= {}; existingFiles[rel] = readFileSafe(abs); }
+  }
+
+  // Recent chat — last 20 turns, full message content, no per-message truncation
+  let recentChat: string | undefined;
+  if (conversation && conversation.length > 0) {
+    const UI_TOKEN_RE = /__BUILD_WORKING__|__RESULT_CARD__|__END_RESULT_CARD__|TOK_|__AI_BREAKDOWN__/;
+    const turns = conversation
+      .filter(m => !UI_TOKEN_RE.test(m.content) && (m.role === 'user' || m.role === 'assistant'))
+      .slice(-20)
+      .map(m => `${m.role === 'user' ? 'User' : 'Redivivus'}: ${m.content}`)
+      .join('\n');
+    if (turns.length > 0) { recentChat = turns; }
   }
 
   return {
-    blueprint,
-    existingFiles,
-    vaultItems,
-    deadEnds: readFileSafe(path.join(root, '.redivivus', 'dead_ends.md'), 4000) || undefined,
-    // [FIX] Skip generic scaffold rules for brand-new projects (no history, no existing files).
-    // The scaffolded rules.md contains Redivivus meta-protocol, not project-specific coding rules.
-    // Only send rules when the project has build history (meaning rules have been customized).
-    projectRules: (getRecentBuilds(root).length > 0)
-      ? (readFileSafe(path.join(root, '.redivivus', 'rules.md'), 4000) || undefined)
-      : undefined,
+    blueprint, existingFiles, vaultItems,
+    deadEnds:     readFileSafe(path.join(root, '.redivivus', 'dead_ends.md'))  || undefined,
+    projectRules: getRecentBuilds(root).length > 0
+      ? (readFileSafe(path.join(root, '.redivivus', 'rules.md')) || undefined) : undefined,
     recentBuilds: getRecentBuilds(root),
-    gitContext: buildGitContext(root) || undefined,
-    projectMap: buildProjectMap(root) || undefined,
-    targetFile: targetFileHint,
-    isFix,
+    gitContext:   buildGitContext(root) || undefined,
+    projectMap:   buildProjectMap(root) || undefined,
+    targetFile:   targetFileHint,
+    isFix, recentChat,
   };
 }
 
 function findLikelyTargets(root: string, task: string): string[] {
   const taskLow = task.toLowerCase();
-  const isModVerb = /^(fix|update|change|add|remove|modify|extend|improve)\b/i.test(taskLow);
+  // Explicit file mention wins
+  const fileMatch = task.match(/\b([\w/.-]+\.(html|ts|tsx|js|jsx|py|css|scss|json))\b/i);
+  if (fileMatch) {
+    const rel = fileMatch[1];
+    if (fs.existsSync(path.join(root, rel))) return [rel];
+    const inSrc = path.join('src', rel);
+    if (fs.existsSync(path.join(root, inSrc))) return [inSrc];
+  }
+  const isModVerb = /^(fix|update|change|add|remove|modify|extend|improve|rebuild|rewrite|upgrade|enhance|refactor|replace|redo|rework|revamp)\b/i.test(taskLow);
   if (!isModVerb) return [];
   const common = ['index.html', 'index.ts', 'src/index.ts', 'src/App.tsx', 'main.py', 'app.py'];
   return common.filter(f => fs.existsSync(path.join(root, f)));
+}
+
+/**
+ * Last-resort context trimmer — only fires when the assembled context actually exceeds the
+ * model's window. Not a pre-emptive cut. Drops lowest-value fields first; existing files shrink last.
+ */
+export function budgetContext(ctx: CloudBuildContext, model: string): { dropped: string[]; trimmed: string[]; usedTokens: number } {
+  const dropped: string[] = [];
+  const trimmed: string[] = [];
+  const budget = getInputBudget(model);
+  const tokens = () => estimateTokens(JSON.stringify(ctx));
+  const over = () => tokens() > budget;
+  const markTrim = (n: string) => { if (!trimmed.includes(n)) trimmed.push(n); };
+
+  if (over() && ctx.vaultItems?.length) {
+    while (over() && ctx.vaultItems.length > 0) { ctx.vaultItems.pop(); markTrim('vault'); }
+    if (ctx.vaultItems.length === 0) ctx.vaultItems = undefined;
+  }
+  if (over() && ctx.gitContext)          { ctx.gitContext = undefined;   dropped.push('gitContext'); }
+  if (over() && ctx.projectMap)          { ctx.projectMap = undefined;   dropped.push('projectMap'); }
+  if (over() && ctx.recentBuilds?.length){ ctx.recentBuilds = undefined; dropped.push('recentBuilds'); }
+  if (over() && ctx.recentChat)          { ctx.recentChat = undefined;   dropped.push('recentChat'); }
+  if (over() && ctx.deadEnds)            { ctx.deadEnds = undefined;     dropped.push('deadEnds'); }
+  if (over() && ctx.projectRules)        { ctx.projectRules = undefined; dropped.push('projectRules'); }
+  if (over() && ctx.existingFiles) {
+    for (const k of Object.keys(ctx.existingFiles)) {
+      while (over() && ctx.existingFiles[k].length > 1000) {
+        ctx.existingFiles[k] = ctx.existingFiles[k].slice(0, Math.floor(ctx.existingFiles[k].length / 2)) + '\n[...trimmed to fit context window]';
+        markTrim('existingFiles');
+      }
+    }
+  }
+  return { dropped, trimmed, usedTokens: tokens() };
 }

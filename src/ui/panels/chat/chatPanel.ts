@@ -38,7 +38,8 @@ export class ChatPanel {
   public static suppressAutoOpen = false;
   // [WARN] Callback registered by session.ts to handle start-session messages without circular imports.
   public static extensionContext: vscode.ExtensionContext | undefined;
-  public static onBuildFinished: ((task: string, files: string[], buildRoot?: string) => Promise<void>) | undefined;
+  // [DEAD] onBuildFinished removed — use buildEvents.on('build:finished', fn) from buildEvents.ts instead.
+  // Static callbacks are a global-write anti-pattern: one file overwrites another's listener silently.
   public static onStartSession: ((goal: string, ai: string) => Promise<void>) | undefined;
   // [WARN] Callback registered by misc.ts to handle switch-ai messages without circular imports.
   public static onSwitchAI: ((ai: string) => Promise<void>) | undefined;

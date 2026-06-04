@@ -2,6 +2,7 @@
 # Runs daily at 9 PM. Checks for new commits. If changed, triggers release.sh
 
 export PATH=$PATH:/usr/local/bin:/usr/bin:/bin
+[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc" || true
 cd /home/papajoe/projects/redivivus
 
 # 1. Ensure we have the latest tags
@@ -21,8 +22,8 @@ fi
 
 echo "$(date): New commits detected. Triggering release..."
 
-# 3. We need to export a PAT for the gh CLI if cron can't access the keyring.
-export GH_TOKEN=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
+# 3. GH_TOKEN must be set in the environment (e.g. ~/.bashrc) — never hardcoded here.
+if [ -z "$GH_TOKEN" ]; then echo "ERROR: GH_TOKEN not set — skipping release."; exit 1; fi
 
 # Run the user's release script
 ./scripts/release.sh

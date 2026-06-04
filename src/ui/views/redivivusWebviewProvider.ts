@@ -158,7 +158,7 @@ export class RedivivusWebviewProvider implements vscode.WebviewViewProvider {
     }
 
     return `<!DOCTYPE html><html><head><style>${getStyles()}</style></head><body>
-      <div class="header"><div class="header-left"><h1>C H A S S I S</h1><div class="sub">Your AI coding organizer</div></div><div class="header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><button class="chat-button" data-cmd="redivivus.openChatPanel">Open Chat</button><button style="padding:3px 10px;font-size:10px;background:#3a3a3a;color:#ccc;border:none;border-radius:4px;cursor:pointer;" data-cmd="redivivus.openSetupHub">⚙️ Setup</button>${buildTimestamp}</div><div class="project">${projectName}</div></div>
+      <div class="header"><div class="header-left"><h1>Redivivus</h1><div class="sub">Your AI coding organizer</div></div><div class="header-right" style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;"><button class="chat-button" data-cmd="redivivus.openChatPanel">Open Chat</button><button style="padding:3px 10px;font-size:10px;background:#3a3a3a;color:#ccc;border:none;border-radius:4px;cursor:pointer;" data-cmd="redivivus.openSetupHub">⚙️ Setup</button>${buildTimestamp}</div><div class="project">${projectName}</div></div>
       ${badges}${content}<div class="footer">Redivivus v0.2.0 &mdash; Built by PapaJoe — ${new Date().toLocaleTimeString()}</div>
       <script>${getScripts()}</script></body></html>`;
   }

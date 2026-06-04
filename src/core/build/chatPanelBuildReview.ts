@@ -3,7 +3,6 @@
 
 import type { BuildContext } from './chatPanelBuild';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
-import { extractCodeFromResponse } from './chatPanelBuildInference';
 
 export interface GuardianReviewResult {
   code: string;
@@ -11,33 +10,30 @@ export interface GuardianReviewResult {
 }
 
 export async function runGuardianReview(ctx: BuildContext, code: string, relPath: string, supervisorSpec: string | null): Promise<GuardianReviewResult> {
-  const { routing, blueprintContext, root, task } = ctx;
+  const { blueprintContext, root, task, routing } = ctx;
   try {
-    // [RULE 18] Inject task-relevant NeverDo entries so Guardian checks project-specific gotchas,
-    // not a static hardcoded list. Empty string when no entries match this task.
+    // [RULE 18] Inject task-relevant NeverDo entries so Guardian checks project-specific gotchas
     const neverDo = await new LearnedMemoryService(root).getNeverDoForTask(task, routing);
     const baseContext = supervisorSpec ? `${blueprintContext}\n\nSPEC:\n${supervisorSpec}` : blueprintContext;
     const guardianContext = neverDo ? `${baseContext}\n${neverDo}` : baseContext;
-    const review = await routing.guardianReview(task, code, 'worker', guardianContext);
 
-    // [FIX] Compute quality score based on review signals
-    let positiveSignals = 0;
-    if (review?.passed) {positiveSignals += 2;}              // Passed review: +2
-    if (code.split('\n').length > 50) {positiveSignals += 1;} // Substantial code: +1
-    if (!/TODO|FIXME|XXX/i.test(code)) {positiveSignals += 1;} // No TODO comments: +1
-    if (supervisorSpec && review?.passed) {positiveSignals += 1;} // Supervisor + worker both ran: +1
-    const qualityScore = Math.min(5, positiveSignals);
+    // Stage 6: retry loop with user escalation (replaces one-shot correction)
+    const { runGuardianWithRetry } = await import('../../services/ai/guardianRetryHandler.js');
+    const result = await runGuardianWithRetry(ctx, code, relPath, supervisorSpec, guardianContext);
 
-    // [FIX] Guard: correctedText starting with prose means Guardian failed to parse the code — don't write it to disk.
-    const correctedLooksLikeCode = review?.correctedText && !review.correctedText.trimStart().startsWith('Since the worker') && !review.correctedText.trimStart().startsWith('GUARDIAN_PASS cannot');
-    if (review && !review.passed && review.correctedText && correctedLooksLikeCode) {
+    // Persist final issues as NeverDo entries AND send to backend for collective learning
+    if (result.finalIssues.length > 0) {
       const learned = new LearnedMemoryService(root);
-      review.issues.forEach(issue => learned.addNeverDo(issue, relPath.split('.').pop() || 'code'));
-      return { code: extractCodeFromResponse(review.correctedText), qualityScore };
+      const ext = relPath.split('.').pop() || 'code';
+      const { logGotcha } = await import('../../services/api/apiClient.js');
+      result.finalIssues.forEach(issue => {
+        learned.addNeverDo(issue, ext);
+        logGotcha({ pattern: issue.slice(0, 200), issueText: issue, buildContext: ext, taskSummary: task.slice(0, 200) });
+      });
     }
-    return { code, qualityScore };
+
+    return { code: result.code, qualityScore: result.qualityScore };
   } catch {
-    // Return original code with default quality score on error
     return { code, qualityScore: 3 };
   }
 }
@@ -59,6 +55,7 @@ export async function runImportValidation(ctx: BuildContext, code: string, absPa
       const repairPrompt = buildImportRepairPrompt(ctx.task, code, check, absPath);
       const res = await ctx.routing.routeByComplexity(ctx.task, repairPrompt);
       if (res.success && res.text) {
+        const { extractCodeFromResponse } = await import('./chatPanelBuildInference.js');
         return extractCodeFromResponse(res.text);
       }
     }

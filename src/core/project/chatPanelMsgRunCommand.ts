@@ -20,7 +20,7 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
     if (command === 'redivivus.showSystemHealth') {
       const { collectHealthData, buildHealthHtml, getHealthStatus } = await import('../../ui/panels/chat/chatPanelHealthCheck.js');
       panel.webview.postMessage({ type: 'set-status', status: 'working' });
-      const data = await collectHealthData();
+      const data = await collectHealthData(ChatPanel.extensionContext);
       const status = getHealthStatus(data);
       const colorMap: Record<string, string> = { green: '#4caf50', yellow: '#ff9800', red: '#f44336' };
       panel.webview.postMessage({ type: 'update-health-btn', status, color: colorMap[status] });
@@ -53,8 +53,7 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
     } else if (command === 'workbench.action.closeFolder') {
       const folders = vscode.workspace.workspaceFolders;
       if (folders && folders.length > 0) {
-        // [FIX] Suppress "Do you want to save workspace?" dialog for untitled workspaces.
-        // window.confirmSaveUntitledWorkspace=false is the exact setting the "Always discard" checkbox sets.
+        // Suppress "Do you want to save workspace?" dialog for untitled workspaces.
         const cfg = vscode.workspace.getConfiguration();
         await cfg.update('window.confirmSaveUntitledWorkspace', false, vscode.ConfigurationTarget.Global);
         await vscode.workspace.updateWorkspaceFolders(0, folders.length);

@@ -4,11 +4,22 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI)*
+*Last updated: June 2, 2026 (Session 11EG) — added Admin Reports two-way follow-up backlog*
 
 ---
 
 ## Active Backlog — Work Top-to-Bottom
+
+### 🟠 Admin — Reports: reporter identity + two-way follow-up (requested Jun 2, 2026)
+Make /admin/reports a real triage tool, not just a read-only feed.
+
+- [ ] **Show who sent it + timestamp** — display the reporter's email/identity and date-time prominently on each report card. **Prereq:** the IDE submission must include the signed-in user's email/id (now that the IDE is authed). Store reporter email on the `feedback` row (currently only nullable `user_id`).
+- [ ] **Follow-up / messaging area per report** — admin can message the reporter: ask clarifying questions, give instructions ("try this", "test new build vX.Y"). Emails the reporter via Resend and records the thread on the report. Phase 1: admin → reporter (one-way email + logged note). Phase 2 (optional): reporter can reply.
+- [ ] **Auto "it's fixed" email** — when a report's status is set to `fixed`, automatically email the reporter ("your report is fixed — in version X, please update/retest"). Resend, like the waitlist invite.
+- **Notes:** All three depend on capturing the reporter's email on the report. Reuse the Resend pattern from `api/admin/waitlist/invite`. Consider a `report_messages` table (report_id, from, body, created_at) for the thread.
+
+### 🔵 Auth — Enforce single session per user (WHEN PAID)
+- [ ] **One active session per email** — enable Supabase **Authentication → Sessions → "Single session per user"** so signing in on a new device invalidates the previous device's session (limits beta-key sharing). **Blocked:** paid-plan feature — currently on Free. **Tradeoff:** legit testers using >1 machine get booted when switching, so weigh friction vs. anti-sharing before enabling. No app code change — it's a Supabase setting.
 
 ### 🔴 Priority 1 — Core Differentiators (Redivivus DNA)
 - [x] **Build Narrator** — plain English story while building. AI emits `// NARRATOR:` lines. DONE

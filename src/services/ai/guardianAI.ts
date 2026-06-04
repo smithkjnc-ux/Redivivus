@@ -18,15 +18,17 @@ export interface GuardianReviewResult {
   outputTokens?: number;         // actual completion tokens from API response
 }
 
-// [SCOPE] AI capability ranking — higher = more capable = better guardian candidate
-// Based on known model quality benchmarks as of 2025.
+// [SCOPE] AI capability ranking — higher = more capable = better guardian/supervisor candidate
+// Guardian/Supervisor (pro tier): claude=Sonnet 4.6, openai=GPT-4o, xai=Grok-3, gemini=2.5-Pro
+// Worker (flash tier):            claude=Haiku 4.5,  openai=GPT-4o-mini, xai=Grok-3-mini, gemini=2.5-Flash
+// Single-AI: same AI for both roles — pro tier for Guardian, flash tier for Worker
 export const AI_RANK: Record<string, number> = {
-  claude: 10,   // Claude 3.5+ — best reasoning
-  openai: 9,    // GPT-4o — strong all-rounder
-  xai:    8,    // Grok — strong reasoning
-  gemini: 7,    // Gemini 2.5 — very capable, free
-  kimi:   6,    // Kimi — large context
-  groq:   5,    // Groq — fastest, weaker reasoning
+  claude: 10,   // Sonnet 4.6 (guardian) / Haiku 4.5 (worker)
+  openai: 9,    // GPT-4o (guardian) / GPT-4o-mini (worker)
+  xai:    8,    // Grok-3 (guardian) / Grok-3-mini (worker)
+  gemini: 7,    // Gemini 2.5-Pro (guardian) / 2.5-Flash (worker)
+  kimi:   6,    // Moonshot 128k (guardian) / 32k (worker)
+  groq:   5,    // Llama 3.3 70B — same model for both (no cheaper tier)
 };
 
 // [SCOPE] AI capability descriptors — used by the Supervisor to assign work
@@ -48,21 +50,22 @@ export const AI_CAPABILITIES: Record<string, AICapability> = {
   groq:   { rank: 5, label: 'Groq', strengths: ['speed', 'simple completions', 'quick iterations'], bestFor: 'Fast simple completions, rapid iteration', contextLimit: 32_000 },
 };
 
+// [RULE] Guardian === Supervisor — always the highest-ranked available AI, no exceptions.
+// Reasoning: the Supervisor writes the plan; the Guardian verifies it was executed correctly.
+// Both roles require the same depth of reasoning. A weaker Guardian misses what a stronger
+// Supervisor intended. Cost-first was tried and failed (see [DEAD] below).
 // [DEAD] Cost-first guardian selection — Groq ($0.09/1M) reviewing Claude's work caused vague
 // style critiques ("could be simplified"), wasting 4-6 retry calls. Net cost was HIGHER than
-// one capable guardian call. Reverted to capability-first (same ranking as Supervisor).
-// [WARN] Guardian and Supervisor MUST use the same smartest-first ranking. They are the
-// quality gate — the user's best AI reviews the worker's output.
+// one capable guardian call. Reverted to capability-first. Never do cost-first again.
 
-/** Returns the most capable available guardian AI that is not the worker.
- *  Uses AI_RANK descending (same logic as Supervisor selection). */
-export function selectGuardianAI(workerAI: string, keyMap: Record<string, () => string | null>): string | null {
+/** Returns the Guardian AI — always the highest-ranked available AI (same as Supervisor).
+ *  workerAI param retained for call-site compatibility but is no longer used to exclude. */
+export function selectGuardianAI(_workerAI: string, keyMap: Record<string, () => string | null>): string | null {
   const ranked = Object.entries(AI_RANK)
-    .filter(([ai]) => ai !== workerAI && keyMap[ai]?.())
+    .filter(([ai]) => keyMap[ai]?.())
     .sort(([, a], [, b]) => b - a)
     .map(([ai]) => ai);
-  if (ranked[0]) { return ranked[0]; }
-  return keyMap[workerAI]?.() ? workerAI : null; // solo mode — same AI as skeptical reviewer
+  return ranked[0] ?? null;
 }
 
 /** Returns true if Guardian AI review is enabled and possible */

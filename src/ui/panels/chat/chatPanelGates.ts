@@ -1,9 +1,13 @@
 // [SCOPE] Chat Panel Gates — placement confirmation and cost estimate modal helpers
 // Extracted from chatPanelIntent.ts
 
+import * as vscode from 'vscode';
 import type { BuildRequestDeps} from '../../../core/ai/chatPanelIntent';
 import { _pendingPlacements, _pendingBuildConfirms } from '../../../core/ai/chatPanelResolvers.js';
 import { estimateBuild } from '../../../core/ai/costEstimatorService';
+import { checkBuildPlacement } from '../../../services/build/buildPlacementCheck';
+import { autoCreateProject } from '../../../core/build/chatPanelBuildAutoCreate';
+import { tracer } from '../../../services/pipelineTracer';
 
 export async function awaitPlacementConfirmation(
   task: string,
@@ -24,6 +28,43 @@ export async function awaitPlacementConfirmation(
     }, 5 * 60 * 1000);
   });
   return choice;
+}
+
+/**
+ * Placement gate — checks if the current task belongs in the open project.
+ * Returns true if the caller should abort (new project opened or user cancelled).
+ * Returns false to continue building in the current project.
+ * Skipped when no workspace is open, project is not initialized, or task references a specific file path.
+ */
+export async function runPlacementGate(task: string, deps: BuildRequestDeps): Promise<boolean> {
+  const folders = vscode.workspace.workspaceFolders;
+  if (!folders?.length || !deps.redivivus?.isInitialized?.()) { return false; }
+
+  const projectName = folders[0].name;
+  const placement = await checkBuildPlacement(task, deps.blueprintContext, true, projectName, deps.routing);
+  if (placement.decision !== 'ambiguous') { return false; }
+
+  tracer.gate('Placement', `ambiguous — showing modal for project "${projectName}"`);
+  const choice = await awaitPlacementConfirmation(task, projectName, false, deps);
+
+  if (choice === 'cancel') {
+    deps.postToWebview({ type: 'set-status', status: 'ready' });
+    return true;
+  }
+
+  if (choice === 'new-project') {
+    try {
+      const created = await autoCreateProject(task, deps);
+      await vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(created.dir));
+    } catch (e) {
+      deps.conversation.push({ role: 'assistant', content: `Could not create project folder: ${e instanceof Error ? e.message : String(e)}`, timestamp: Date.now() });
+      deps.refresh();
+      deps.postToWebview({ type: 'set-status', status: 'ready' });
+    }
+    return true;
+  }
+
+  return false; // 'here' — continue building in current project
 }
 
 /** Shows cost estimate modal and waits (async) for user to confirm or cancel. Returns true = proceed. */

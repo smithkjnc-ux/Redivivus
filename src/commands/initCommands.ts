@@ -135,4 +135,7 @@ export function registerInitCommands(
       await runNewProjectWizard(context);
     })
   );
+
+  // [DEAD] redivivus.runProject was registered here during Phase 1 — duplicate of extensionInlineCommandsC.ts.
+  // Removed: extensionInlineCommandsC.ts version is canonical (has terminal error injection + rootOverride support).
 }

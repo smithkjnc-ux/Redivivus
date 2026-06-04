@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { execSync } from 'child_process';
+import { execSync, execFileSync } from 'child_process';
 
 const DEFAULT_GITIGNORE = [
   'node_modules/',
@@ -53,8 +53,9 @@ function doCommit(root: string, message: string, files?: string[]): void {
     }
     const staged = execSync('git diff --cached --name-only', { cwd: root, encoding: 'utf-8' }).trim();
     if (!staged) { return; }
-    const safeMsg = message.replace(/"/g, "'").replace(/\n/g, ' ').slice(0, 150);
-    execSync(`git commit -m "${safeMsg}"`, { cwd: root, stdio: 'ignore' });
+    const safeMsg = message.replace(/\n/g, ' ').slice(0, 150);
+    // [FIX] Use execFileSync (array args) to prevent shell injection via backticks or $() in message
+    execFileSync('git', ['commit', '-m', safeMsg], { cwd: root, stdio: 'ignore' });
   } catch { /* silent */ }
 }
 

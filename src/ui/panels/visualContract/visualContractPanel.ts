@@ -11,17 +11,18 @@ import { postToChatWebview } from '../chat/chatPanelPublicAPI';
 
 let _activePanel: vscode.WebviewPanel | undefined;
 
-export function openVisualContractPanel(
+export async function openVisualContractPanel(
   context: vscode.ExtensionContext,
   projectRoot: string,
   builtFiles: string[],
   routing?: any,
-): void {
+): Promise<void> {
   if (_activePanel) {
     _activePanel.reveal(vscode.ViewColumn.Two);
-    // Re-extract in case files changed since last open
     const contract = extractVisualContract(projectRoot, builtFiles);
-    _activePanel.webview.postMessage({ type: 'load-contract', contract });
+    let bSpec = null;
+    try { const { getCurrentSpec } = await import('../../../core/ai/visualSpecService.js'); bSpec = getCurrentSpec(); } catch {}
+    _activePanel.webview.postMessage({ type: 'load-contract', contract, baselineSpec: bSpec });
     return;
   }
 
@@ -39,8 +40,14 @@ export function openVisualContractPanel(
   console.log('[Redivivus][VisualEditor] builtFiles:', builtFiles);
   console.log('[Redivivus][VisualEditor] contract.properties.length:', contract.properties.length);
   console.log('[Redivivus][VisualEditor] contract.properties:', JSON.stringify(contract.properties.slice(0, 5)));
+  // Include upstream baseline spec if one was established before this build
+  let baselineSpec: import('../../../core/ai/visualSpecService.js').VisualSpec | null = null;
+  try { const { getCurrentSpec } = await import('../../../core/ai/visualSpecService.js'); baselineSpec = getCurrentSpec(); } catch {}
   const nonce = Math.random().toString(36).slice(2);
   panel.webview.html = getVisualContractHtml(nonce, contract);
+
+  // Send baseline spec alongside the extracted contract so editor knows intended values
+  setTimeout(() => { panel.webview.postMessage({ type: 'load-contract', contract, baselineSpec }); }, 100);
 
   panel.webview.onDidReceiveMessage(
     async (msg) => {

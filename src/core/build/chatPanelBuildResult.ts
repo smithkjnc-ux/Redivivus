@@ -2,8 +2,9 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
+import * as vscode from 'vscode';
 import { checkImports, formatMissingImports } from '../../ui/panels/chat/chatPanelImportCheck';
-import { buildResultCard } from '../../ui/panels/chat/chatPanelStory';
+import { buildResultCard } from './buildOutput.js';
 import { buildPostBuildGuidance } from './chatPanelPostBuild';
 import { BuildLedger } from '../../services/build/buildLedgerService';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService';
@@ -60,11 +61,14 @@ export function buildSingleFileResult(p: SingleFileBuildResultParams): {
     const resultCard = buildResultCard([p.relPath, ...scaffoldedFiles], p.searchResult.items.length, totalTokens, totalCost, elapsed, p.snapshotId, 0, !!p.existingTarget, ledgerSummary) + (_diff ? `\n_Changes: ${_diff}_` : '');
     try { new BuildHistoryService(p.root).record(makeBuildHistoryEntry({ snapshotId: p.snapshotId || Date.now().toString(), task: p.task, files: [p.relPath, ...scaffoldedFiles], tokensUsed: totalTokens, costUSD: totalCost, source: 'ai', supervisor: p.supervisorAI, worker: p.workerAI !== p.supervisorAI ? p.workerAI : null, resultCardToken: resultCard })); } catch (e) { console.error('[Redivivus] BuildHistory.record failed:', e); }
     const previewToken = p.relPath.endsWith('.html') ? `\n__PREVIEW_BROWSER__${p.absPath}|||END_PREVIEW_BROWSER__` : '';
+    const currentRoots = (vscode.workspace.workspaceFolders ?? []).map(f => path.resolve(f.uri.fsPath));
+    const openWsToken = p.root && !currentRoots.includes(path.resolve(p.root)) ? `\n__OPEN_WORKSPACE__${p.root}|||END_OPEN__` : '';
+    const editToken = /\.(html|css)$/i.test(p.relPath) && p.root ? `\n__EDIT_VISUALLY__${p.root}|||END_EDIT_VISUALLY__` : '';
     let nextSteps = '';
     try { nextSteps = buildPostBuildGuidance(p.root, [p.relPath, ...scaffoldedFiles]); } catch (e) { console.error('[Redivivus] postBuildGuidance failed:', e); }
     let compileAction = '';
     try { compileAction = (require('./chatPanelBuildPipeline.js') as any).appendCompileAction(p.relPath) || ''; } catch (e) { console.error('[Redivivus] appendCompileAction failed:', e); }
-    resultMessage = `${p.narration ? '📝 ' + p.narration + '\n\n' : ''}${resultCard}${importWarning}\n__BUILD_RESULT__${p.relPath}|||${p.absPath}|||END__${previewToken}${nextSteps}${compileAction}`;
+    resultMessage = `${p.narration ? '📝 ' + p.narration + '\n\n' : ''}${resultCard}${importWarning}\n__BUILD_RESULT__${p.relPath}|||${p.absPath}|||END__${openWsToken}${previewToken}${editToken}${nextSteps}${compileAction}`;
   } catch (e) {
     redivivusLog({ operation: 'build', phase: 'error', message: 'Build failed', error: e instanceof Error ? e.message : String(e), success: false });
     console.error('[Redivivus] Result construction failed:', e);

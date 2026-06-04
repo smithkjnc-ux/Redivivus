@@ -1,16 +1,15 @@
 // [SCOPE] Cloud build client — thin client: gets routing instructions from backend, executes AI calls client-side, sends results back.
 // Backend provides secret sauce, client handles AI API calls with user keys.
-// On 5xx: falls back to runLocalBuild() using user's own AI keys directly.
+// On error: surfaces a clean message — no local fallback (cloud is required for quality builds).
 
 import * as vscode from 'vscode';
 import { getAccountToken, getApiBase, collectKeys, getPreferred } from '../api/apiClient.js';
-import { collectBuildContext } from './buildContextCollector.js';
+import { collectBuildContext, budgetContext } from './buildContextCollector.js';
 import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { VaultService } from '../vault/vaultService';
-import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
-import { runLocalBuild } from './cloudBuildLocalFallback.js';
 import { executeMultiFileBuild } from './cloudBuildMultiFile.js';
+import { runTwoPhaseBuild } from './cloudBuildClientAI.js';
 
 export interface CloudBuildResult {
   success: boolean
@@ -20,15 +19,32 @@ export interface CloudBuildResult {
   inputTokens?: number
   outputTokens?: number
   error?: string
-  // Carries failure origin through the call stack so the runner can log it accurately.
+  captureCount?: number   // vault items saved after this build
   failureSource?: 'cloud' | 'local-fallback'
+  // Two-phase attribution — lets the byline/dashboard show the Supervisor (e.g. Claude) truthfully.
+  supervisorRan?: boolean
+  supervisorModel?: string
+  supervisorProvider?: string
+  supervisorInputTokens?: number
+  supervisorOutputTokens?: number
+  supervisorError?: string
+  workerProvider?: string
+}
+
+// [WARN] AbortSignal.timeout() does not reliably abort in Electron's fetch — use Promise.race instead.
+function makeTimeout(ms: number, label: string): Promise<never> {
+  return new Promise((_, reject) => setTimeout(() => {
+    const err = new Error(`${label} timed out — try a simpler request.`);
+    err.name = 'TimeoutError'; // must match catch check: err?.name === 'TimeoutError'
+    reject(err);
+  }, ms));
 }
 
 export async function callCloudBuild(
   task: string,
   root: string,
   deps: BuildRequestDeps,
-  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void } = {},
+  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void; onChunk?: (chunk: string) => void } = {},
 ): Promise<CloudBuildResult> {
   const token = await getAccountToken();
   if (!token) {
@@ -36,21 +52,29 @@ export async function callCloudBuild(
   }
 
   const vault = (deps as any).vault as VaultService | undefined;
-  const context = await collectBuildContext(root, task, vault, opts.targetFile, opts.isFix);
+  const context = await collectBuildContext(root, task, vault, opts.targetFile, opts.isFix, deps.conversation);
   const keys = collectKeys();
   const base = getApiBase();
   const preferred = getPreferred();
+
+  // [FIX] Token-budget the context packet to the chosen model before sending — converts silent
+  // context overflow into a bounded packet plus a visible "trimmed to fit" signal. (Unknown model
+  // falls back to a conservative window, so trimming only kicks in when context is genuinely large.)
+  const { dropped, trimmed } = budgetContext(context, preferred ?? '');
+  if (dropped.length || trimmed.length) {
+    opts.onProgress?.(`Context trimmed to fit ${preferred || 'model'} window -- dropped: ${dropped.join(', ') || 'none'}, trimmed: ${trimmed.join(', ') || 'none'}`);
+  }
 
   // ── Step 0: Get build plan (skip for fix requests — always single-file) ──
   if (!opts.isFix && !opts.targetFile) {
     try {
       opts.onProgress?.('Planning your build...');
-      const planRes = await fetch(`${base}/plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ task, keys, preferred, context: { blueprint: context.blueprint, existingFiles: context.existingFiles } }),
-        signal: AbortSignal.timeout(30_000),
-      });
+      const planBody = JSON.stringify({ task, keys, preferred, context: { blueprint: context.blueprint, existingFiles: context.existingFiles } });
+      // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
+      const planRes = await Promise.race([
+        fetch(`${base}/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: planBody }),
+        makeTimeout(30_000, 'Plan'),
+      ]);
       if (planRes.ok) {
         const plan = await planRes.json() as { files: Array<{ path: string; description: string; isNew: boolean }> };
         if (plan.files && plan.files.length > 1) {
@@ -64,15 +88,16 @@ export async function callCloudBuild(
 
   try {
     // Step 1: Get routing instructions from backend (SECRET SAUCE)
-    // [FIX] Removed hardcoded tier:'pro' — server determines tier from the account token.
-    const requestBody = JSON.stringify({ task, context, keys, preferred });
+    // [FIX] Send workerModel = preferred so the server uses the user's chosen AI for the Worker role,
+    // not a cheaper fallback. Without this the server was using GPT-4o as Worker even when Claude
+    // was selected, producing incomplete output while Supervisor/Guardian ran on Claude.
+    const requestBody = JSON.stringify({ task, context, keys, preferred, workerModel: preferred });
     console.log(`[Redivivus] Build request: taskLen=${task.length}, bodyLen=${requestBody.length}, vaultItems=${context.vaultItems?.length ?? 0}, hasRules=${!!context.projectRules}`);
-    const instructionRes = await fetch(`${base}/build`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: requestBody,
-      signal: AbortSignal.timeout(120_000),
-    });
+    // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
+    const instructionRes = await Promise.race([
+      fetch(`${base}/build`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: requestBody }),
+      makeTimeout(240_000, 'Build instruction'),
+    ]);
 
     if (instructionRes.status === 401) {
       const { clearAccountToken } = await import('../api/apiClient.js');
@@ -90,56 +115,39 @@ export async function callCloudBuild(
       } catch {}
       console.error(`[Redivivus] Build API failed: status=${instructionRes.status}, bodyLen=${requestBody.length}`);
 
-      // [FIX] 5xx = server-side crash — fall back to local build using user's own AI keys.
-      // 4xx = client error (bad request, auth, etc.) — don't fall back, surface the error.
       if (instructionRes.status >= 500) {
-        console.log('[Redivivus] Cloud 5xx — activating local build fallback');
-        opts.onProgress?.('Cloud unavailable — building with your local key...');
-        return await runLocalBuild(task, root, context, deps, opts.onProgress);
+        return { success: false, error: 'Redivivus is temporarily unavailable — please try again in a moment.', failureSource: 'cloud' };
       }
       return { success: false, error: errMsg, failureSource: 'cloud' };
     }
 
     const instructions = await instructionRes.json() as {
-      instructions: {
-        routing: {
-          selectedProvider: string;
-          fallbackProviders: string[];
-          systemMessage: string;
-          temperature: number;
-          maxTokens: number;
-          model: string;
-        };
-        prompt: string;
-        context: any;
+      supervisorInstructions: {
+        selectedProvider: string; model: string; prompt: string; systemMessage: string; maxTokens: number;
+      } | null;
+      workerInstructions: {
+        selectedProvider: string; fallbackProviders: string[]; model: string; promptTemplate: string;
+        systemMessage: string; maxTokens: number; temperature: number;
       };
+      context: any;
       requiresClientExecution: boolean;
-      files?: Array<{ path: string; content: string; isNew: boolean }>;
-      narration?: string;
-      model?: string;
-      inputTokens?: number;
-      outputTokens?: number;
     };
 
-    if (!instructions.requiresClientExecution) {
-      // [FIX] Legacy path — body already consumed by .json() above; pass parsed data directly
-      return await processBuildResults(instructions as any, task, root, deps,
-        { source: 'cloud', vaultItemNames: context.vaultItems?.map(v => v.name) });
-    }
-
-    // Step 2: Execute AI call client-side using backend routing instructions
-    const aiResponse = await executeClientAI(instructions.instructions.routing, instructions.instructions.prompt, keys);
+    // Step 2: Two-phase execution — supervisor writes prescription, worker builds from it.
+    // [FIX] Capture the Supervisor outcome (model, tokens, success/error) so it can be attributed
+    // downstream. Previously this block ran the Supervisor but threw its identity and tokens away,
+    // so Claude always showed 0 tokens and the byline always said "solo / primary builder".
+    const { aiResponse, supervisor } = await runTwoPhaseBuild(instructions, keys, opts.onProgress, opts.onChunk);
     if (!aiResponse.success) {
       return { success: false, error: aiResponse.error || 'AI call failed', failureSource: 'cloud' };
     }
 
     // Step 3: Send AI response back to backend for processing
-    const completionRes = await fetch(`${base}/build/complete`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ task, aiResponse: aiResponse.text, model: aiResponse.model, context: instructions.instructions.context }),
-      signal: AbortSignal.timeout(120_000),
-    });
+    // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
+    const completionRes = await Promise.race([
+      fetch(`${base}/build/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ task, aiResponse: aiResponse.text, model: aiResponse.model, context: instructions.context }) }),
+      makeTimeout(120_000, 'Build completion'),
+    ]);
 
     if (!completionRes.ok) {
       if (completionRes.status === 401) {
@@ -156,46 +164,29 @@ export async function callCloudBuild(
       narration: string; model: string; inputTokens: number; outputTokens: number;
     };
 
-    return await processBuildResults(data, task, root, deps,
-      { source: 'cloud', vaultItemNames: context.vaultItems?.map(v => v.name) });
+    const built = await processBuildResults(data, task, root, deps, {
+      source: 'cloud',
+      vaultItemNames: context.vaultItems?.map(v => v.name),
+      supervisor,
+      workerProvider: instructions.workerInstructions.selectedProvider,
+    });
+    // Attach two-phase attribution so the build runner can render an honest Supervisor + Worker byline.
+    return {
+      ...built,
+      supervisorRan: supervisor.ran,
+      supervisorModel: supervisor.model,
+      supervisorProvider: supervisor.provider,
+      supervisorInputTokens: supervisor.inputTokens,
+      supervisorOutputTokens: supervisor.outputTokens,
+      supervisorError: supervisor.error,
+      workerProvider: instructions.workerInstructions.selectedProvider,
+    };
 
   } catch (err: any) {
-    if (err?.name === 'TimeoutError') return { success: false, error: 'Build timed out — try a simpler request.', failureSource: 'cloud' };
+    if (err?.name === 'TimeoutError') return { success: false, error: 'Build timed out — the AI is taking longer than expected. Please try again.', failureSource: 'cloud' };
     return { success: false, error: err?.message ?? 'Network error', failureSource: 'cloud' };
   }
 }
 
-async function executeClientAI(
-  routing: any,
-  prompt: string,
-  keys: Record<string, string>
-): Promise<{ success: boolean; text: string; model: string; error?: string }> {
-  const fetchFn = createFetchWithTimeout();
-  try {
-    const response = await callProvider(routing.selectedProvider, prompt, fetchFn, undefined, undefined, undefined, routing.systemMessage);
-    return { success: true, text: response.text, model: response.model || routing.model };
-  } catch (error: any) {
-    for (const fallbackProvider of routing.fallbackProviders) {
-      if (!keys[fallbackProvider]) { continue; }
-      try {
-        const response = await callProvider(fallbackProvider, prompt, fetchFn, undefined, undefined, undefined, routing.systemMessage);
-        return { success: true, text: response.text, model: response.model || fallbackProvider };
-      } catch { continue; }
-    }
-    return { success: false, text: '', model: '', error: error?.message || 'All AI providers failed' };
-  }
-}
-
-function createFetchWithTimeout() {
-  return async (url: string, options: RequestInit, timeoutMs?: number) => {
-    const controller = new AbortController();
-    const id = setTimeout(() => controller.abort(), timeoutMs || 120000);
-    try {
-      const res = await fetch(url, { ...options, signal: controller.signal });
-      clearTimeout(id);
-      return res;
-    } catch (e) { clearTimeout(id); throw e; }
-  };
-}
-
 // [DEAD] executeMultiFileBuild moved to cloudBuildMultiFile.ts (Rule 9 split + bug fix: was returning files without writing to disk)
+// [DEAD] executeClientAI and createFetchWithTimeout moved to cloudBuildClientAI.ts (Rule 9 split)

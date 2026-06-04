@@ -1,132 +1,129 @@
-// [SCOPE] Redivivus Learned Memory Service — reads/writes .redivivus/learned.md
-// Manages two memory tiers:
-//   Permanent — architectural decisions, user preferences, file facts. Never deleted.
-//   Recent    — session observations. Auto-pruned after 30 days.
-// [WARN] Keep entries plain English — must be readable by any AI model (Gemini, Claude, local LLMs)
-// I/O helpers (read/write/append) -> learnedMemoryServiceIO.ts
+// [SCOPE] Redivivus Knowledge Service -- reads/writes .redivivus/knowledge.json
+// Structured storage replacing the flat learned.md format.
+// Two tiers: permanent (never deleted) and recent (pruned after 30 days).
+// Public API is unchanged -- callers do not need to update.
 
 import * as path from 'path';
 import type { RoutingService } from './ai/routingService.js';
 import {
-  LearnedEntry, RECENT_TTL_DAYS,
-  readLearnedEntries, writeLearnedEntries, appendLearnedEntry,
+  KnowledgeEntry, KnowledgeStore, RECENT_TTL_DAYS,
+  readKnowledge, writeKnowledge, makeEntry,
 } from './learnedMemoryServiceIO.js';
-export { LearnedEntry };
-
-const LEARNED_FILE = '.redivivus/learned.md';
+export { KnowledgeEntry };
 
 export class LearnedMemoryService {
-  private filePath: string;
+  private root: string;
 
-  constructor(root: string) {
-    this.filePath = path.join(root, LEARNED_FILE);
-  }
+  constructor(root: string) { this.root = root; }
 
-  // [DONE] Called from chatPanelMessages.ts when PREFERENCE_RE matches a user message mid-chat
+  private read(): KnowledgeStore { return readKnowledge(this.root); }
+  private write(store: KnowledgeStore): void { writeKnowledge(this.root, store); }
+
   addPermanent(text: string): void {
-    appendLearnedEntry(this.filePath, '## Permanent', text, true);
+    const store = this.read();
+    if (store.entries.some(e => e.pattern === text.slice(0, 200))) { return; }
+    store.entries.push(makeEntry({ type: 'preference', pattern: text.slice(0, 200), description: text, source: 'user', permanent: true }));
+    this.write(store);
   }
 
-  // [DONE] Called from sessionService.ts endSession() with AI-extracted session observations
   addRecent(text: string): void {
-    appendLearnedEntry(this.filePath, '## Recent', text, false);
+    const store = this.read();
+    store.entries.push(makeEntry({ type: 'fact', pattern: text.slice(0, 200), description: text, source: 'session', permanent: false }));
+    this.write(store);
   }
 
-  /** Record a mistake caught by Guardian or flagged by the user. Increments count if pattern already known. */
+  /** Record a Guardian-caught or user-reported mistake. Increments count if already known. */
   addNeverDo(text: string, context?: string): void {
-    const entries = readLearnedEntries(this.filePath);
-    const existing = entries.find(e => e.neverDo && e.text.toLowerCase() === text.toLowerCase());
+    const store = this.read();
+    const pattern = text.slice(0, 200).toLowerCase();
+    const existing = store.entries.find(e => e.type === 'never_do' && e.pattern.toLowerCase() === pattern);
     if (existing) {
       existing.count = (existing.count || 1) + 1;
-      existing.date = new Date().toISOString().slice(0, 10);
-      writeLearnedEntries(this.filePath, entries);
+      existing.lastSeen = new Date().toISOString().slice(0, 10);
+      if (context && !existing.context) { existing.context = context; }
     } else {
-      const date = new Date().toISOString().slice(0, 10);
-      entries.push({ date, text, permanent: true, neverDo: true, count: 1, context });
-      writeLearnedEntries(this.filePath, entries);
+      store.entries.push(makeEntry({ type: 'never_do', pattern: text.slice(0, 200), description: text, context, severity: 'bug', source: 'guardian', permanent: true }));
     }
+    this.write(store);
   }
 
-  private _formatNeverDo(entries: LearnedEntry[]): string {
+  /** Add or update a never_do entry with example/fix pair for fine-tuning. */
+  addNeverDoWithPair(text: string, context: string, example: string, fix: string): void {
+    const store = this.read();
+    const pattern = text.slice(0, 200).toLowerCase();
+    const existing = store.entries.find(e => e.type === 'never_do' && e.pattern.toLowerCase() === pattern);
+    if (existing) {
+      existing.count = (existing.count || 1) + 1;
+      existing.lastSeen = new Date().toISOString().slice(0, 10);
+      if (!existing.example) { existing.example = example.slice(0, 500); }
+      if (!existing.fix)     { existing.fix = fix.slice(0, 500); }
+    } else {
+      store.entries.push(makeEntry({ type: 'never_do', pattern: text.slice(0, 200), description: text, context, severity: 'bug', source: 'guardian', permanent: true, example: example.slice(0, 500), fix: fix.slice(0, 500) }));
+    }
+    this.write(store);
+  }
+
+  private formatNeverDo(entries: KnowledgeEntry[]): string {
     const lines = entries.map(e => {
       const times = (e.count || 1) > 1 ? ` [seen ${e.count}x]` : '';
-      const ctx = e.context ? ` (${e.context})` : '';
-      return `- DO NOT: ${e.text}${ctx}${times}`;
+      const ctx   = e.context ? ` (${e.context})` : '';
+      const fix   = e.fix ? ` -> ${e.fix.slice(0, 80)}` : '';
+      return `- DO NOT: ${e.description}${ctx}${times}${fix}`;
     });
     return '\n--- NEVER DO (learned from past mistakes) ---\n' + lines.join('\n') + '\n---\n';
   }
 
-  /** Sync fallback — top-10 by frequency, no task filtering. Kept for non-async call sites. */
   getNeverDoForPrompt(): string {
-    const entries = readLearnedEntries(this.filePath).filter(e => e.neverDo);
+    const entries = this.read().entries.filter(e => e.type === 'never_do');
     if (entries.length === 0) { return ''; }
     const sorted = [...entries].sort((a, b) => (b.count || 1) - (a.count || 1)).slice(0, 10);
-    return this._formatNeverDo(sorted);
+    return this.formatNeverDo(sorted);
   }
 
-  // [RULE 18] AI selects which NeverDo entries are relevant to the current task.
-  // Replaces blind top-10-by-frequency injection with task-aware filtering.
-  // Falls back to frequency sort when AI is unreachable.
   async getNeverDoForTask(task: string, routing: RoutingService): Promise<string> {
-    const entries = readLearnedEntries(this.filePath).filter(e => e.neverDo);
+    const entries = this.read().entries.filter(e => e.type === 'never_do');
     if (entries.length === 0) { return ''; }
-    if (entries.length <= 3) { return this._formatNeverDo(entries); }
-
-    const numbered = entries.map((e, i) => `${i + 1}. ${e.text}`).join('\n');
-    const prompt =
-      `You are reviewing past coding mistakes for relevance to a new task.\n\n` +
-      `Task: "${task.slice(0, 200)}"\n\n` +
-      `Past mistakes:\n${numbered}\n\n` +
-      `Reply with ONLY the numbers of mistakes that could realistically recur in this task, comma-separated.\n` +
-      `If none apply, reply: NONE`;
+    if (entries.length <= 3) { return this.formatNeverDo(entries); }
+    const numbered = entries.map((e, i) => `${i + 1}. ${e.description}`).join('\n');
+    const prompt = `Task: "${task.slice(0, 200)}"\n\nPast mistakes:\n${numbered}\n\nReply ONLY with comma-separated numbers of mistakes that could recur in this task. If none: NONE`;
     try {
       const result = await routing.promptCheap(prompt, 8_000);
       const raw = result.text.trim().toUpperCase();
       if (!raw || raw === 'NONE') { return ''; }
-      const indices = raw.split(/[,\s]+/)
-        .map(s => parseInt(s.trim()))
-        .filter(n => !isNaN(n) && n >= 1 && n <= entries.length);
+      const indices = raw.split(/[,\s]+/).map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n >= 1 && n <= entries.length);
       const relevant = indices.map(i => entries[i - 1]).filter(Boolean);
-      return relevant.length > 0 ? this._formatNeverDo(relevant) : '';
+      return relevant.length > 0 ? this.formatNeverDo(relevant) : '';
     } catch {
-      // Offline fallback: top-10 by frequency
-      const sorted = [...entries].sort((a, b) => (b.count || 1) - (a.count || 1)).slice(0, 10);
-      return this._formatNeverDo(sorted);
+      return this.formatNeverDo([...entries].sort((a, b) => (b.count || 1) - (a.count || 1)).slice(0, 10));
     }
   }
 
-  /** Returns a compact string to inject into AI prompts — max ~300 tokens */
   getSummaryForPrompt(): string {
-    const entries = readLearnedEntries(this.filePath);
-    if (entries.length === 0) { return ''; }
-
-    const permanent = entries.filter(e => e.permanent);
-    const recent = entries.filter(e => !e.permanent);
-
+    const store = this.read();
+    if (store.entries.length === 0) { return ''; }
+    const permanent = store.entries.filter(e => e.permanent && e.type !== 'never_do');
+    const recent    = store.entries.filter(e => !e.permanent).slice(-5);
     let out = '\n--- LEARNED ABOUT THIS PROJECT ---\n';
-    if (permanent.length > 0) {
-      out += permanent.map(e => '• ' + e.text).join('\n') + '\n';
-    }
-    if (recent.length > 0) {
-      const latest = recent.slice(-5);
-      out += 'Recently: ' + latest.map(e => e.text).join(' | ') + '\n';
-    }
-    out += '---\n';
-    return out;
+    if (permanent.length > 0) { out += permanent.map(e => '• ' + e.description).join('\n') + '\n'; }
+    if (recent.length > 0) { out += 'Recently: ' + recent.map(e => e.description).join(' | ') + '\n'; }
+    return out + '---\n';
   }
 
-  /** Prune Recent entries older than RECENT_TTL_DAYS. Call at session start. */
+  /** Returns structured training pairs for fine-tuning. Only entries with example+fix. */
+  getTrainingPairs(): Array<{ input: string; output: string; context?: string; count: number }> {
+    return this.read().entries
+      .filter(e => e.type === 'never_do' && e.example && e.fix)
+      .map(e => ({ input: e.example!, output: e.fix!, context: e.context, count: e.count }));
+  }
+
   pruneRecent(): void {
-    const entries = readLearnedEntries(this.filePath);
+    const store = this.read();
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - RECENT_TTL_DAYS);
-    const kept = entries.filter(e => e.permanent || new Date(e.date) >= cutoff);
-    writeLearnedEntries(this.filePath, kept);
+    store.entries = store.entries.filter(e => e.permanent || new Date(e.firstSeen) >= cutoff);
+    this.write(store);
   }
 
-  /** Extract decisions from a completed build conversation and persist to learned.md.
-   *  Captures implicit decisions reached through dialogue, not just explicit preference statements.
-   *  Non-blocking — caller should .catch(() => {}) and not await. */
   static async extractBuildDecisions(
     conversation: Array<{ role: string; content: string }>,
     task: string,
@@ -134,62 +131,24 @@ export class LearnedMemoryService {
   ): Promise<{ permanent: string[]; recent: string[] }> {
     if (conversation.length === 0) { return { permanent: [], recent: [] }; }
     const turns = conversation.slice(-20).map(m => `${m.role}: ${m.content.slice(0, 200)}`).join('\n');
-    const prompt =
-      `A developer just finished a coding task. Extract memory facts from the conversation below.\n\n` +
-      `COMPLETED TASK: "${task.slice(0, 200)}"\n\n` +
-      `CONVERSATION:\n${turns}\n\n` +
-      `Return strict JSON only (no markdown, no explanation):\n` +
-      `- permanent: tech choices, naming decisions, constraints, or architecture that came up. Persist forever. Max 5 items.\n` +
-      `- recent: what was built this session (files, features). Will expire in 30 days. Max 3 items.\n` +
-      `- Skip obvious facts derivable from the task itself. Capture the HOW and WHY that only appear in the conversation.\n\n` +
-      `Format: {"permanent":["..."],"recent":["..."]}\n` +
-      `If nothing qualifies: {"permanent":[],"recent":[]}`;
+    const prompt = `A developer just finished a coding task. Extract memory facts.\n\nTASK: "${task.slice(0, 200)}"\n\nCONVERSATION:\n${turns}\n\nReturn strict JSON only:\n- permanent: tech choices, naming decisions, constraints. Max 5.\n- recent: what was built this session. Max 3.\n\nFormat: {"permanent":["..."],"recent":["..."]}\nIf nothing: {"permanent":[],"recent":[]}`;
     try {
       const result = await routing.promptCheap(prompt, 10_000);
       const raw = result.text.trim().replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
       const parsed = JSON.parse(raw);
-      return {
-        permanent: Array.isArray(parsed.permanent) ? parsed.permanent.slice(0, 5) : [],
-        recent:    Array.isArray(parsed.recent)    ? parsed.recent.slice(0, 3)    : [],
-      };
-    } catch {
-      return { permanent: [], recent: [] };
-    }
+      return { permanent: Array.isArray(parsed.permanent) ? parsed.permanent.slice(0, 5) : [], recent: Array.isArray(parsed.recent) ? parsed.recent.slice(0, 3) : [] };
+    } catch { return { permanent: [], recent: [] }; }
   }
 
-  /** AI-powered fact extraction — call at session end with user-only messages.
-   *  Falls back to empty arrays if AI call fails — never blocks session end. */
-  static async extractFacts(
-    userMessages: string[],
-    routing: RoutingService
-  ): Promise<{ permanent: string[]; recent: string[] }> {
+  static async extractFacts(userMessages: string[], routing: RoutingService): Promise<{ permanent: string[]; recent: string[] }> {
     if (userMessages.length === 0) { return { permanent: [], recent: [] }; }
-
     const capped = userMessages.slice(-20).join('\n').slice(0, 2000);
-    const prompt =
-      'You are analyzing a coding session to extract memory facts for a developer AI assistant.\n' +
-      'Read the session messages below and return ONLY a JSON object — no explanation, no markdown.\n\n' +
-      'Rules:\n' +
-      '- permanent: architectural decisions, explicit preferences ("I prefer X", "use X not Y"). Max 5 items.\n' +
-      '- recent: what the developer was working on this session (topics, files, features). Max 5 items.\n' +
-      '- Each item must be a single plain-English sentence under 120 characters.\n' +
-      '- If nothing qualifies for a category, return an empty array for it.\n\n' +
-      'Return format (strict JSON, nothing else):\n' +
-      '{"permanent":["..."],"recent":["..."]}\n\n' +
-      'Session messages:\n' + capped;
-
+    const prompt = `Analyze this coding session. Return ONLY JSON.\n- permanent: architectural decisions, explicit preferences. Max 5.\n- recent: what was worked on. Max 5.\nFormat: {"permanent":["..."],"recent":["..."]}\nSession:\n${capped}`;
     try {
       const result = await routing.prompt(prompt, 15_000);
-      const raw = result.text.trim();
-      const jsonStr = raw.replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
-      const parsed = JSON.parse(jsonStr);
-      return {
-        permanent: Array.isArray(parsed.permanent) ? parsed.permanent.slice(0, 5) : [],
-        recent:    Array.isArray(parsed.recent)    ? parsed.recent.slice(0, 5)    : [],
-      };
-    } catch {
-      // [DEAD] Regex heuristic fallback removed — AI extraction is reliable enough with the strict prompt
-      return { permanent: [], recent: [] };
-    }
+      const raw = result.text.trim().replace(/^```[a-z]*\n?/i, '').replace(/\n?```$/, '').trim();
+      const parsed = JSON.parse(raw);
+      return { permanent: Array.isArray(parsed.permanent) ? parsed.permanent.slice(0, 5) : [], recent: Array.isArray(parsed.recent) ? parsed.recent.slice(0, 5) : [] };
+    } catch { return { permanent: [], recent: [] }; }
   }
 }

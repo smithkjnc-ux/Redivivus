@@ -81,15 +81,29 @@ export async function handleKeywordShortcuts(
     return true;
   }
 
-  if (/^(close|exit|leave)\s+(this\s+)?(project|folder|workspace)|^close\s*project\s*$/i.test(lowerText.trim())) {
+  if (/^(close|exit|leave)\s+(the\s+|this\s+)?(project|folder|workspace)|^close\s*project\s*$/i.test(lowerText.trim())) {
     const folders = vscode.workspace.workspaceFolders;
     conversation.push({ role: 'assistant', content: 'Closing project...', timestamp: Date.now() });
     refresh();
+    const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
+    // Clear conversation in-place + set the flag BEFORE the folder mutation, in case the window reloads.
+    if (ChatPanel.currentPanel) {
+      (ChatPanel.currentPanel as any).state.conversation = [];
+      (ChatPanel.currentPanel as any)._initialized = false;
+    }
+    await ChatPanel.extensionContext?.globalState.update('redivivus.userClosedProject', true);
     if (folders && folders.length > 0) {
       await vscode.workspace.updateWorkspaceFolders(0, folders.length);
     } else {
       await vscode.commands.executeCommand('workbench.action.closeFolder');
     }
+    // [FIX] Removing the last folder transitions folder->empty WITHOUT restarting the extension host
+    // in VSCodium, so onDidChangeWorkspaceFolders' refresh alone leaves the input spinner (set on send)
+    // spinning forever — the close "never finishes". Explicitly reset the input status and re-render to
+    // the launcher so the close completes whether or not the window reloads. (set-status:ready is the
+    // only thing that calls setInputBusy(false) in the webview — refresh() does not clear the spinner.)
+    panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+    refresh();
     return true;
   }
 

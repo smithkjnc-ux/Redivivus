@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { buildResultCard } from '../../ui/panels/chat/chatPanelStory';
+import { buildResultCard } from '../../core/build/buildOutput.js';
 
 const HISTORY_FILE = '.redivivus/build_history.json';
 const MAX_ENTRIES = 50;

@@ -50,11 +50,27 @@ export function extractFromFile(filePath: string, content: string): { items: Vau
     case '.ts': case '.tsx': case '.js': case '.jsx': rawBlocks = extractTSJS(lines, filePath); break;
     case '.py': rawBlocks = extractPython(lines, filePath); break;
     case '.md': rawBlocks = extractMarkdown(lines, filePath); break;
-    case '.html': case '.htm': case '.css': case '.svg': {
+    case '.html': case '.htm': {
+      // [FIX] Extract JS functions from inline <script> blocks instead of saving the whole file.
+      // Games are 400-700 lines — the old 400-line limit silently skipped every single game build.
+      // Individual functions (Particle, beep, drawBird) ARE reusable; the whole 600-line file is not.
+      const scriptMatches = [...content.matchAll(/<script(?![^>]*\bsrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi)];
+      for (const m of scriptMatches) {
+        const jsContent = m[1];
+        if (jsContent.trim().length > 100) {
+          rawBlocks.push(...extractTSJS(jsContent.split('\n'), filePath.replace(/\.html?$/, '.js')));
+        }
+      }
+      // Fallback for small non-game HTML (templates, partials) — save whole file
+      if (rawBlocks.length === 0 && content.trim().length > 50 && lines.length <= 300) {
+        const baseName = path.basename(filePath, ext).toLowerCase();
+        rawBlocks = [{ name: baseName, type: 'component', code: content, lines: [1, lines.length], filePath, language: 'html' }];
+      }
+      break;
+    }
+    case '.css': case '.svg': {
       const baseName = path.basename(filePath, ext).toLowerCase();
-      // Allow single-file HTML apps (like games) up to 400 lines.
-      const isLargeEntryFile = ['index','main','app','home','page','style','styles','global'].includes(baseName) && lines.length > 400;
-      if (!isLargeEntryFile && content.trim().length > 50 && lines.length <= 400) {
+      if (content.trim().length > 50 && lines.length <= 400) {
         rawBlocks = [{ name: baseName, type: 'component', code: content, lines: [1, lines.length], filePath, language: ext.replace('.', '') }];
       }
       break;

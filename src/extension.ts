@@ -30,7 +30,7 @@ import { registerAllCommands } from './extensionCommands.js';
 import { initApiClient } from './services/api/apiClient.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
-import { initProjectContextLogger } from './services/logging/projectContextLogger.js';
+import { initProjectContextLogger, resetProjectContext } from './services/logging/projectContextLogger.js';
 import { initMasterLogger } from './core/logging/masterLogger.js';
 
 // [WARN] Synchronous suppress flag — set BEFORE updateWorkspaceFolders fires onDidChangeWorkspaceFolders.
@@ -172,14 +172,17 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.workspace.onDidChangeWorkspaceFolders((e) => {
       if (e.removed.length > 0 && e.added.length === 0) {
-        // Only close if the removed folder was the panel's active project (not stale startup cleanup)
-        const removedPath = e.removed[0]?.uri.fsPath;
-        const panelRoot = ChatPanel.currentPanel?.getRedivivusRoot?.();
-        if (removedPath && panelRoot && removedPath === panelRoot) {
-          ChatPanel.close();
+        // [FIX] Don't close+reopen — that creates a duplicate tab. Instead, refresh the existing
+        // panel in-place so it transitions to the launcher view. Close only if no panel exists.
+        if (ChatPanel.currentPanel) {
+          (ChatPanel.currentPanel as any).state.conversation = [];
+          (ChatPanel.currentPanel as any)._initialized = false;
+          ChatPanel.currentPanel.refresh();
         }
         // [LOG] Finalize logging when workspace closes
         finalizeRedivivusLogger(true);
+        // [FIX] Clear project-context latch so a later project isn't blocked as an illegal switch.
+        resetProjectContext();
       } else if (e.added.length > 0) {
         // New folder added externally (not by onNewProject) — trigger init
         // onNewProject handles its own init inline; this only fires for external folder additions
@@ -200,6 +203,10 @@ export function activate(context: vscode.ExtensionContext) {
         if (addedRoot) {
           const sessionId = initRedivivusLogger(addedRoot);
           redivivusLog({ operation: 'system', message: 'Workspace opened', data: { root: addedRoot, sessionId } });
+          // [FIX] Re-point the project-context latch to the newly opened workspace so the panel/build
+          // follows it instead of staying stuck on the previous project.
+          resetProjectContext();
+          initProjectContextLogger(addedRoot);
         }
       }
     })
@@ -211,6 +218,30 @@ export function activate(context: vscode.ExtensionContext) {
   // ── chat panel command ──
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.openChatPanel', () => ChatPanel.show(redivivusService, routingService, usageTracker, vaultService)));
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.refreshChat', () => ChatPanel.currentPanel?.refresh()));
+
+  // ── WebviewPanelSerializer — lets VS Code hand back orphaned 'redivivusChat' tabs on re-activation ──
+  // Without this, re-activation (triggered by updateWorkspaceFolders removing all folders) leaves the
+  // old tab visible but _instance=undefined → auto-open timer sees currentPanel=false → opens a 2nd tab.
+  // With this, VS Code calls deserializeWebviewPanel before auto-open fires, so _instance is restored
+  // and the auto-open timer sees currentPanel=true → skips creating a duplicate.
+  context.subscriptions.push(
+    vscode.window.registerWebviewPanelSerializer('redivivusChat', {
+      async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel) {
+        (ChatPanel as any)._instance = undefined;
+        webviewPanel.webview.options = { enableScripts: true };
+        const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
+        const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
+        // If user closed the project, clear conversation and force launcher view
+        const closedByUser = context.globalState.get<boolean>('redivivus.userClosedProject');
+        if (closedByUser) {
+          context.globalState.update('redivivus.userClosedProject', undefined);
+          if (panel?.state) { panel.state.conversation = []; }
+          (panel as any)._initialized = false;
+          panel?.refresh?.();
+        }
+      }
+    })
+  );
 
   // ── sidebar view with Redivivus functions ──
   const sidebarProvider = new (RedivivusSidebarProvider as any)(redivivusService, sessionService);
@@ -227,13 +258,12 @@ export function activate(context: vscode.ExtensionContext) {
     // (single→multi-root workspace conversion), currentPanel is null — always open then,
     // otherwise the orphaned pre-reload webview stays visible with stale generic-button header.
     const suppressed = !!(suppressPath && currentRoot && suppressPath === currentRoot);
-    if (suppressed) {
-      context.globalState.update('redivivus.suppressAutoOpen', undefined);
-    }
+    if (suppressed) { context.globalState.update('redivivus.suppressAutoOpen', undefined); }
     require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[auto-open-timer] currentPanel=${!!ChatPanel.currentPanel} suppressed=${suppressed} currentRoot=${currentRoot}\n`);
-    if (!ChatPanel.currentPanel) {
-      ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
-    }
+    const _closedByUser = context.globalState.get<boolean>('redivivus.userClosedProject');
+    // [FIX] If user closed project, window reloads and re-activates extension — skip auto-open to avoid duplicate panel
+    if (_closedByUser) { context.globalState.update('redivivus.userClosedProject', undefined); }
+    else if (!ChatPanel.currentPanel) { ChatPanel.show(redivivusService, routingService, usageTracker, vaultService); }
   }, 500);
 
   // ── shared refresh helper ──

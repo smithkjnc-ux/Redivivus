@@ -209,6 +209,18 @@ export function buildActionsScript(): string {
       if (planRevise) { var pid2 = planRevise.getAttribute('data-plan-id'); try{vscode.postMessage({type:'plan-revise',planId:pid2});}catch(e){} return; }
       const planCancel = target.closest ? target.closest('.plan-cancel-btn') : null;
       if (planCancel) { var pid3 = planCancel.getAttribute('data-plan-id'); try{vscode.postMessage({type:'plan-cancel',planId:pid3});}catch(e){} return; }
+      // [FIX] Forward / Copy message buttons on assistant bubbles
+      const fwdBtn = target.closest ? target.closest('.msg-fwd-btn') : null;
+      if (fwdBtn) {
+        var raw=''; try{raw=atob(fwdBtn.getAttribute('data-fwd')||fwdBtn.getAttribute('data-copy')||'');}catch(e){}
+        if (fwdBtn.hasAttribute('data-copy')) {
+          try{navigator.clipboard.writeText(raw);}catch(e){var t=document.createElement('textarea');t.value=raw;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);}
+          var orig=fwdBtn.textContent; fwdBtn.textContent='✓'; setTimeout(function(){fwdBtn.textContent=orig;},1200);
+        } else {
+          var inp=document.getElementById('user-input'); if(inp){inp.value=raw;inp.focus();inp.style.height='auto';inp.style.height=inp.scrollHeight+'px';}
+        }
+        return;
+      }
     });
     window.addEventListener('message', function(ev) {
       if (!ev.data || ev.data.type !== 'github-commit-result') { return; }

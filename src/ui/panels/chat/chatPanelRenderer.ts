@@ -5,6 +5,19 @@ import type { ChatMessage } from './chatPanelHtml';
 import { renderStoryBlock, renderAIByline, renderActionCard, renderResultCard } from './chatPanelRendererCards';
 import { renderFeedbackBlock, renderArchitectActions, renderArchitectConfirm, renderUndoButton } from './chatPanelRendererArchitect';
 import { renderClarifyCard } from './chatPanelRendererClarify';
+import { renderBlueprintGapsToken, renderBlueprintCardToken } from './chatPanelRendererBlueprintCard';
+import {
+  TOK_RESULT_CARD_START, TOK_RESULT_CARD_END, TOK_AI_BREAKDOWN, TOK_AI_BREAKDOWN_END,
+  TOK_BUILD_FEEDBACK, TOK_BUILD_FEEDBACK_END, TOK_ARCHITECT_ACTIONS, TOK_ARCHITECT_ACTIONS_END,
+  TOK_ARCH_CONFIRM, TOK_ARCH_CONFIRM_END, TOK_UNDO_BUILD, TOK_UNDO_BUILD_END,
+  TOK_BUILD_RESULT, TOK_BUILD_RESULT_END, TOK_PREVIEW_BROWSER, TOK_PREVIEW_BROWSER_END,
+  TOK_RUN_PROJECT, TOK_RUN_PROJECT_END, TOK_EDIT_VISUALLY, TOK_EDIT_VISUALLY_END,
+  TOK_PLAN_GATE, TOK_PLAN_GATE_END, TOK_BLUEPRINT_GAPS, TOK_BLUEPRINT_GAPS_END,
+  TOK_BLUEPRINT_CARD, TOK_BLUEPRINT_CARD_END,
+  TOK_CLARIFY, TOK_CLARIFY_END, TOK_TECH_DETAILS, TOK_TECH_DETAILS_END,
+  TOK_GITHUB_COMMIT, TOK_GITHUB_COMMIT_END, TOK_VAULT_DEDUP, TOK_VAULT_DEDUP_END,
+  TOK_TERMINAL_ERROR,
+} from './chatPanelTokens';
 
 export function escapeHtml(text: string): string {
   const map: { [key: string]: string } = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'": '&#039;' };
@@ -54,34 +67,18 @@ export function renderMessages(conversation: ChatMessage[]): string {
       const b64path = encodeBase64(filepath);
       return `<div class="build-result" style="margin-top:6px;"><button class="preview-browser-btn" data-path="${b64path}">🌐 Preview in Browser</button></div>`;
     });
+    // [Redivivus] Run Project button for non-HTML builds
+    html = html.replace(/__RUN_PROJECT__([^|]+)\|\|\|END_RUN__/g, (_m, rootPath) => {
+      const b64 = encodeBase64(rootPath);
+      return `<div class="build-result" style="margin-top:6px;"><button class="run-project-btn" data-path="${b64}" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">&#9654; Run Project</button></div>`;
+    });
     // [FALLBACK] If regex fails, strip any remaining raw BUILD_RESULT tokens to prevent chat blocking
     html = html.replace(/__BUILD_RESULT__[^\n]*/g, '');
     html = html.replace(/__PREVIEW_BROWSER__[^\n]*/g, '');
     
-    // [Redivivus] Guided Blueprint Mode token — renders inline gap question form
-    html = html.replace(/__BLUEPRINT_GAPS__([a-z0-9]+)\|\|\|(\[.*?\])\|\|\|([^|]*)\|\|\|END_BLUEPRINT_GAPS__/g, (_m, sid, gapsJson, encodedTask) => {
-      let gaps: Array<{ field: string; question: string; hint: string; currentValue: string }> = [];
-      try { gaps = JSON.parse(gapsJson); } catch { return ''; }
-      const fieldInputs = gaps.map(g =>
-        `<div class="bp-gap-field" style="margin-bottom:14px;">`
-        + `<label style="font-size:12px;font-weight:600;color:var(--vscode-foreground);display:block;margin-bottom:3px;">${escapeHtml(g.question)}</label>`
-        + `<div style="font-size:11px;color:var(--vscode-descriptionForeground);margin-bottom:5px;">${escapeHtml(g.hint)}</div>`
-        + `<input type="text" class="bp-gap-input" data-field="${escapeHtml(g.field)}" value="${escapeHtml(g.currentValue)}" `
-        + `placeholder="${escapeHtml(g.hint)}" style="width:100%;box-sizing:border-box;background:var(--vscode-input-background);`
-        + `border:1px solid var(--vscode-input-border);color:var(--vscode-foreground);border-radius:6px;`
-        + `padding:7px 10px;font-size:13px;font-family:inherit;">`
-        + `</div>`
-      ).join('');
-      return `<div class="bp-gap-card" data-session="${sid}">`
-        + `<div class="bp-gap-title">Blueprint Check</div>`
-        + `<div style="font-size:11px;color:var(--vscode-descriptionForeground);margin-bottom:12px;">Answer these to help me write better code. You can skip and I'll do my best.</div>`
-        + fieldInputs
-        + `<div style="display:flex;gap:8px;margin-top:8px;">`
-        + `<button class="bp-gap-submit-btn" data-session="${sid}" style="padding:6px 16px;background:#4a9eff;color:#0f0f1a;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">Let's build</button>`
-        + `<button class="bp-gap-skip-btn" data-session="${sid}" style="padding:6px 14px;background:none;border:1px solid var(--vscode-input-border);color:var(--vscode-descriptionForeground);border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;">Skip</button>`
-        + `</div>`
-        + `</div>`;
-    });
+    // [Redivivus] Blueprint token renderers — gap form (existing projects) and confirmation card (new builds)
+    html = renderBlueprintGapsToken(html);
+    html = renderBlueprintCardToken(html);
 
     // [Redivivus] Multi-file build clarification token — delegates to chatPanelRendererClarify
     // [WARN] escapeHtml() runs first (line 27), so JSON quotes become &quot; — must unescape before parse
@@ -180,7 +177,18 @@ export function renderMessages(conversation: ChatMessage[]): string {
     html = html.replace(/^---$/gm, '<hr style="border:none;border-top:1px solid var(--vscode-input-border);margin:8px 0;">');
     html = html.replace(/\n/g, '<br>');
 
+    // [FIX] Final safety net — strip any raw tokens that slipped through all renderers above.
+    // stripRawTokens() is driven by ALL_TOKEN_PREFIXES in chatPanelTokens.ts, so adding a new
+    // token there automatically protects it here too.
+    const { stripRawTokens } = require('./chatPanelTokens');
+    html = stripRawTokens(html);
+
     const meta = isUser ? '' : `<div class="message-meta">${tokensStr} · ${timeStr}</div>`;
-    return `<div class="${bubbleClass}"><div class="message-content">${html}</div>${meta}</div>`;
+    const fwdBar = isUser ? '' : (() => {
+      const plain = msg.content.replace(/__\w+__[\s\S]*?__END_\w+__/g,'').replace(/__\w+__[^\n]*/g,'').trim();
+      const b64 = encodeBase64(plain);
+      return `<div class="msg-fwd-bar"><button class="msg-fwd-btn" data-fwd="${b64}" title="Forward to input">↩</button><button class="msg-fwd-btn msg-copy-btn" data-copy="${b64}" title="Copy">📋</button></div>`;
+    })();
+    return `<div class="${bubbleClass}">${fwdBar}<div class="message-content">${html}</div>${meta}</div>`;
   }).join('');
 }

@@ -5,6 +5,1136 @@
 
 ---
 
+## Session 16g — Jun 3, 2026: Supervisor (Claude) ran but was invisible — fixed attribution end-to-end
+
+**Problem:** User repeatedly reported "still not using Claude as the supervisor." With 4 keys set (claude, openai, gemini, groq) the backend correctly selects **supervisor=claude, worker=openai(gpt-4o-mini)** — and the single-file two-phase path *does* call Claude to write the prescription. But every reporting layer threw the Supervisor's identity and tokens away, so the usage dashboard showed **Claude (Supervisor): 0 tokens** and the byline always said **"GPT-4o Mini — Planned + built the code, primary builder" (solo)**. The product was structurally incapable of showing Claude supervising even when it did. (The worker being gpt-4o-mini — the provider ranked immediately below Claude — is the fingerprint that Claude *was* selected as supervisor.) This is a Redivivus attribution bug, not a project/game bug.
+
+**Fixes:**
+- **File: `src/services/build/cloudBuildClientAI.ts`** — What: non-streaming `executeClientAI` now returns `inputTokens`/`outputTokens` (was dropped); added `runTwoPhaseBuild()` + `SupervisorOutcome` interface that runs supervisor→worker and returns whether the Supervisor ran, its model/provider, its tokens, and (on failure) the error. Why: the Supervisor's token spend was discarded here, so Claude could never be tracked. Risk: low — pure additive return fields; `(response as any).inputTokens` tolerates providers that don't report tokens.
+- **File: `src/services/build/cloudBuildClient.ts`** — What: replaced the inline two-phase block with `runTwoPhaseBuild()`, added supervisor/worker fields to `CloudBuildResult`, and now passes the `SupervisorOutcome` into `processBuildResults` (via meta) and spreads it onto the returned result. Why: propagate the Supervisor outcome to the usage tracker, byline, and history. Risk: low — behavior identical, just observable now. (File stayed at 192 lines.)
+- **File: `src/services/build/cloudBuildResultProcessor.ts`** — What: usage recording no longer hardcodes one `role='solo'` row with the worker model. It now records a `role='supervisor'` row (Claude's model + tokens) when the Supervisor ran, plus a `role='worker'` (or `'solo'`) row for the builder. Also fixed `build_history.json` `supervisor`/`worker` fields, which were inverted for two-phase builds (worker model was being stored in the supervisor field). Why: this hardcoded `'solo'` is the direct cause of "Claude: 0 tokens" on the dashboard. Risk: low — solo builds still record exactly one row as before.
+- **File: `src/services/build/buildLogger.ts`** — What: extended `BuildMeta` with optional `supervisor` + `workerProvider`. Why: carry attribution into `processBuildResults`. Risk: none — optional fields.
+- **File (new): `src/core/build/chatPanelBuildBreakdown.ts`** — What: `buildBreakdownToken()` emits an honest two-row `__AI_BREAKDOWN__` (Supervisor "prescribed the build" + Worker "built from the prescription"), or a single solo row that *surfaces the reason* if a Supervisor was attempted and failed; `cleanBuildNarration()` (moved out of the runner) also strips the leaked "SUPERVISOR TO WORKER CONTRACT" block. Field text is sanitized of `~`/`|` so a stray char can't corrupt parsing. Why: the renderer already supports `[S]/[W]` rows — only the emitter hardcoded solo. Risk: low — token format matches the existing multi-row pattern in `buildOutput.ts`.
+- **File: `src/core/build/chatPanelBuildRunner.ts`** — What: replaced the hardcoded `~solo~built~…~primary builder` breakdown token and inline narration-cleaning with calls to the new helper. Why: byline now reflects the real two-phase result. Risk: low. NOTE: file is 226 lines — pre-existing Rule 9 violation (was 228; this change *reduced* it). [NEXT] split the post-build result-card assembly out of `chatPanelBuildRunner.ts` to get it under 200.
+
+**Verified:** `tsc -p ./` clean (0 errors); compiled + deployed to baked IDE (`~/projects/redivivus-build/VSCode-linux-x64/.../extensions/redivivus`); deployed JS confirmed to contain `runTwoPhaseBuild` and the `supervisor`/`worker` role recording. Requires an IDE window reload to load the new extension code. End-to-end build re-test (dashboard shows Claude supervisor tokens, byline shows two rows) still pending a live build by the user.
+
+## Session 16f — Jun 3, 2026: Removed local build fallback — cloud-only architecture
+
+**Decision — All builds go through the cloud backend, no local fallback:** The local fallback path (`cloudBuildLocalFallback.ts`) was a parallel build pipeline that bypassed the cloud's secret sauce (supervisor prompts, routing logic, quality gates). It produced inferior output and was the source of all the AI routing bugs this session (wrong model selection, no supervisor, etc.). Like every AI coding tool (Cursor, Windsurf, Copilot, Claude Code), Redivivus requires cloud connectivity — if the backend is unreachable, degraded local output is not a meaningful substitute. On 5xx, users now see "Redivivus is temporarily unavailable — please try again in a moment." instead of a fallback build. Deleted `cloudBuildLocalFallback.ts` (orphaned). Files: `src/services/build/cloudBuildClient.ts`, deleted `src/services/build/cloudBuildLocalFallback.ts`.
+
+## Session 16e — Jun 3, 2026: Close project leaves panel frozen with old conversation
+
+**Fix — Panel frozen at "Closing project..." after folder close:** `onDidChangeWorkspaceFolders` set `_initialized=false` and called `refresh()`, but didn't clear `state.conversation`. `panelRefresh` rebuilt the full HTML using the still-populated conversation, so the panel displayed the old messages instead of the launcher. Fixed by clearing `state.conversation = []` before `_initialized = false` in the folder-removed branch. File: `src/extension.ts`.
+
+## Session 16d — Jun 3, 2026: Cloud build ignores AI rank — always sent Gemini as preferred
+
+**Fix — Cloud builds always used Gemini regardless of available API keys:** `getPreferred()` in `apiClient.ts` read `redivivus.defaultAI` from settings, which is never set (returns `undefined`). The cloud backend received `preferred=undefined` and fell back to its own default (Gemini). Claude was never sent as the preferred/supervisor model. Fixed: `getPreferred()` now calls `selectSupervisorAndWorker(keyMap)` directly — returns the top-ranked AI with a valid key (Claude rank 10 > OpenAI rank 9 > Gemini rank 7). Falls back to `defaultAI` setting if ranking fails. This fixes both the cloud single-file and multi-file build paths since both call `getPreferred()`. File: `src/services/api/apiClient.ts`.
+
+## Session 16c — Jun 3, 2026: Close-project opens duplicate chat tab
+
+**Fix — "close the project" opens a second Redivivus Chat tab:** When the user typed "close the project", the keyword handler called `updateWorkspaceFolders(0, n)` without setting the `redivivus.userClosedProject` flag first. The extension host restarts on workspace close, and the auto-open timer in `extension.ts` checks that flag to skip creating a new panel — but because it was never set, a second tab always opened. Fix: `await` `ChatPanel.extensionContext?.globalState.update('redivivus.userClosedProject', true)` before calling `updateWorkspaceFolders`, so the flag survives the restart and the auto-open timer skips. File: `src/core/routing/chatPanelMsgSendKeywords.ts`.
+
+## Session 16b — Jun 3, 2026: CHASSIS→Redivivus settings fix + well-known pattern bypass removed
+
+**Fix — CHASSIS settings mismatch (Claude/Gemini not routing):** The baked IDE stored API keys as `chassis.*` in `~/.config/CHASSIS/User/settings.json` but the extension reads `redivivus.*`. Result: only OpenAI (from env var) was available, so `selectSupervisorAndWorker()` returned only 1 ranked AI and supervisor was skipped entirely. Fixed by renaming all `chassis.*` keys to `redivivus.*` in the settings file. Also fixed `prepare_vscode.sh` (CHASSIS→Redivivus branding), `chassis-build-local` (ext path `~/projects/chassis`→`~/projects/redivivus`, dest folder `vscode/extensions/chassis`→`vscode/extensions/redivivus`), `chassis-local-build.sh`, `Build-CHASSIS.desktop`, and `redivivus-build/.claude/settings.local.json`. Files: `~/.config/CHASSIS/User/settings.json`, `redivivus-build/prepare_vscode.sh`, `redivivus-build/chassis-build-local`, `redivivus-build/chassis-local-build.sh`, `redivivus-build/Build-CHASSIS.desktop`, `redivivus-build/.claude/settings.local.json`.
+
+**Fix — Removed well-known pattern bypass:** `chatPanelBuild.ts` had a bypass that, for common tasks (asteroid game, checkers, flappy bird, etc.), skipped the supervisor entirely and substituted a hardcoded prescription from `prescriptions.json`. Now that Claude is properly supervisor, the bypass is dead weight. Removed: (1) dynamic import of `getPendingPrescription`/`clearPendingPrescription` and the `if (_knownPattern)` branch in `chatPanelBuild.ts`; (2) `detectPattern`/`setPendingPrescription` call block in `chatPanelMsgSendMessage.ts`; (3) deleted `wellKnownPatterns.ts` (fully orphaned). The plan gate `!_bypassPlanGate` guard also removed — plan approval now always runs when a supervisor spec exists. `prescriptions.json` left as data reference. Files: `src/core/build/chatPanelBuild.ts`, `src/core/routing/chatPanelMsgSendMessage.ts`, deleted `src/core/ai/wellKnownPatterns.ts`.
+
+## Session 16 — Jun 3, 2026: Adaptive Blueprint Completion — AI-inferred 5W confirmation card
+
+**What changed:**
+- **New file:** `src/services/blueprint/blueprintInference.ts` — AI-inferred 5W blueprint. Calls routing.prompt() with a structured JSON prompt to infer WHO/WHAT/WHERE/WHEN/WHY from any build request. Each field gets a confidence label: confident | assumed | unknown.
+- **New file:** `src/ui/panels/chat/chatPanelRendererBlueprintCard.ts` — Renders BLUEPRINT_GAPS token (extracted from chatPanelRenderer.ts) and new BLUEPRINT_CARD token (5W confirmation card with green/yellow/red dots per field confidence).
+- **New file:** `src/ui/panels/chat/chatPanelScriptBlueprintCard.ts` — Click handlers for .bpc-build-btn and .bpc-edit-btn. "Build it" collects all input values and posts blueprint-card-confirm. "Change something" converts static .bpc-static spans to editable inputs.
+- **New file:** `src/core/routing/chatPanelMsgBlueprintCard.ts` — handleBlueprintCardConfirm / handleBlueprintCardSkip. On confirm, enriches the task string with confirmed blueprint fields and calls handleBuildRequest(enriched, skipComplex=true). Map _pendingBlueprintCards stores session → task.
+- **Modified:** `src/core/routing/chatPanelMsgSendBuildIntent.ts` — Before the direct handleBuildRequest call in the projects-container / no-workspace path, now runs inference and shows the confirmation card. Falls back to direct build if inference fails.
+- **Modified:** `src/ui/panels/chat/chatPanelRenderer.ts` — Extracted BLUEPRINT_GAPS block to chatPanelRendererBlueprintCard.ts, added BLUEPRINT_CARD token import + render call. (194 lines)
+- **Modified:** `src/ui/panels/chat/chatPanelScript.ts` — Imports and calls buildBlueprintCardScript().
+- **Modified:** `src/ui/panels/chat/chatPanelTokens.ts` — Added TOK_BLUEPRINT_CARD, TOK_BLUEPRINT_CARD_END, added to ALL_TOKEN_PREFIXES.
+- **Modified:** `src/ui/panels/chat/chatPanelStylesMid.ts` — Added .bpc-card, .bpc-row, .bpc-label, .bpc-input, .bpc-legend styles.
+- **Modified:** `src/core/routing/chatPanelMessages.ts` — Added blueprint-card-confirm/skip routes, consolidated plan-gate handlers, removed architect-dismiss no-op. (194 lines)
+
+**Why:** Replaces the "full interview OR nothing" pattern with an adaptive model: AI fills every 5W it can infer, shows a compact confirmation card, only asks about genuine unknowns. User confirms or edits inline, then build runs with a blueprint-enriched prompt.
+
+**Risk:** Adds one AI call before every new-project build (the inference call). Fast and non-blocking — falls back to direct build on any error.
+
+**Separate fix — AI breakdown card specificity:** "AI Used" section showed only "GPT-4o Mini — Built your project, 3,960 tokens" — vague and missing role context. Rewrote `friendlyAction()` and `renderAIByline()` in `chatPanelRendererCards.ts` to show: role label ([S] Supervisor / [W] Worker / [B] Builder), specific action per entry ("Wrote the build prescription" vs "Wrote the code" vs "Reviewed code quality" vs "Auto-corrected issues"), token count + cost per line, and fallback badge when a model took over from a failed primary. Now shows each AI's exact contribution separately rather than collapsing everything into "Built your project". File: `chatPanelRendererCards.ts`.
+
+**Separate fix — Supervisor fetch timeout:** Usage screen showed Claude (Supervisor) = 0 tokens — the supervisor plan was failing completely and falling back to solo GPT-4o Mini. Root cause: supervisor fetch timeout was 20_000ms (20 seconds). The new UNIVERSAL PRECISION REQUIREMENT prompt is longer, and Claude generating detailed prescriptions with polygon vertices, physics values, exact colors, API signatures, etc. takes 30-45+ seconds. The 20s timeout fired before Claude responded, `callProvider` returned failure, `res.success = false`, supervisor returned null → solo GPT-4o built alone. Fixed to 50_000ms (50 seconds) for both `supervisorPlanImpl` and `guardianReviewImpl`. File: `routingGuardian.ts`.
+
+**Separate fix — Supervisor universal prescription specificity:** The supervisor's job is to eliminate ALL worker guesswork, not just visual guesswork. Replaced the narrow "VISUAL RENDERING RULE" with a UNIVERSAL PRECISION REQUIREMENT covering every build domain: visual/canvas/game (exact shapes, fill, stroke, vertex calculation, physics, color palette), logic/backend/API (exact signatures, all branches, data shapes, constants), CSS/styling (exact hex colors, exact px values, layout model), and state/data (name, type, initial value, allowed mutations). Core principle stated explicitly: "The Worker has zero judgment. Every blank you leave becomes a wrong guess. Fill every blank." File: `routingGuardian.ts` (195 lines).
+
+**Separate fix — Supervisor prescription visual specificity:** GPT-4o Mini drew grey circles because the supervisor prescription said "draws an asteroid" — not which shape, not which color, not which stroke. The real fix is prescription quality, not worker model tier. Added VISUAL RENDERING RULE to the supervisor prompt in `routingGuardian.ts`: every draw function must specify exact shape type (polygon with vertex count, not "circle"), fill style, stroke style, vertex calculation method, and physics values. Bad: "`drawAsteroid()` — draws an asteroid". Good: "`drawAsteroid()` — beginPath(); 8 verts from asteroid.verts[]; strokeStyle='#fff'; lineWidth=2; no fill; stroke()". Worker tier reverted back to 'flash' — with a specific enough prescription, any capable model can execute it. File: `routingGuardian.ts`.
+
+**Separate fix — Chunked build progress tickers:** Chunked build path (`chatPanelChunked.ts`) had two silent AI calls: (1) architecture classification (10s timeout), (2) file plan generation (30s timeout). Both showed static messages with no updates. Added `startProgressTicker()` helper in `chatPanelBuildHelpers.ts` — generic version that takes any label array and interval, starts rotating updates, returns a stop function. Applied to both silent phases in chunked build: classification rotates "Classifying project architecture..." / "Identifying project type..." / "Single-file or multi-file?" every 3s; planning phase uses same SUPERVISOR_TICKER_LABELS as single-file builds (every 4s). Stop functions called both on success and in catch blocks (no leaked intervals). Files: `chatPanelBuildHelpers.ts`, `chatPanelChunked.ts`.
+
+**Separate fix — Supervisor planning live ticker:** The 20-30 second supervisor planning phase showed a static "📋 Planning index.html..." message with no updates — users saw nothing changing. Added `supervisorPlanWithTicker()` in `chatPanelBuildHelpers.ts`: rotates through 5 status messages every 4 seconds ("Supervisor analyzing...", "Detailing implementation steps...", "Writing build prescription...", etc.) using `setInterval` + `updateLastMsg` while `supervisorPlan()` runs, then clears the timer in `finally`. Used in `chatPanelBuild.ts` replacing the bare `supervisorPlan()` call.
+
+**Separate fix — Blueprint card confirm UX:** After confirming the blueprint card, (1) the full enriched task was appearing as a user message bubble (confusing — user didn't type that). Fixed: `fromBlueprintCard` flag suppresses the user bubble push in `handleSendMessage`. (2) Long silent gap between "Building now..." and "Planning your build..." with no visible activity. Fixed: when `fromBlueprintCard=true` and intent is 'build', immediately push an "Analyzing your build... __BUILD_WORKING__" progress note so the user sees the spinner. File: `chatPanelMsgSendMessage.ts` (197 lines).
+
+**Separate fix — Close Project duplicate panel (v4 — root cause found):** Debug log showed `[auto-open-timer] currentPanel=false` firing AFTER "close project" — meaning `updateWorkspaceFolders` causes extension RE-ACTIVATION (not just a workspace event). On re-activation, `ChatPanel._instance` is undefined (new module instance) while the old webview tab is still visible. Auto-open timer sees `currentPanel=false` → creates a second panel → two tabs. Fix: registered a `WebviewPanelSerializer` for viewType `'redivivusChat'`. VS Code calls `deserializeWebviewPanel` before the auto-open timer fires, passing back the existing webview panel. The serializer creates a new `ChatPanel` instance from it, setting `_instance`. Auto-open timer then sees `currentPanel=true` → skips → one tab. File: `extension.ts`.
+
+**Separate fix — Close Project duplicate panel (v3):** Prior close-and-reopen approaches all had a race: `ChatPanel.close()` sets `_instance=undefined`, then `runAutoInit` or the auto-open timer sees `currentPanel=null` and opens a second panel, leaving two tabs. Root cause: the close/reopen model is fundamentally racy. New approach: when workspace folders are removed, keep the existing panel open and refresh it in-place (`_initialized=false` + `refresh()`). The panel transitions to the launcher view using its existing state reset logic. No close, no reopen, no race, no duplicate tab. File: `extension.ts`. Root cause: `onDidChangeWorkspaceFolders` checked `removedPath === getRedivivusRoot()`, but `getRedivivusRoot()` reads `vscode.workspace.workspaceFolders?.[0]?.uri.fsPath` which is already undefined by the time the event fires (folders already removed). So the condition always failed, `userClosedProject` was never set, and after the window reload the auto-open timer found no flag and opened a new panel. Fix: removed the dead condition — always set `userClosedProject=true` and call `ChatPanel.close()` when workspace folders are removed. File: `extension.ts` (net -3 lines).
+
+**Follow-up fix 4 (same session):** Build quality dropped — GPT-4o Mini used instead of Claude. Root cause: `handleBlueprintCardConfirm` called `deps.handleBuildRequest(enriched, true)` directly, bypassing the full pipeline in `chatPanelMsgSendMessage.ts` (job sizing, fiveWsDiagnostic who-calibration, visual spec). Those stages classify task complexity and route to the correct model. Fix: `handleBlueprintCardConfirm` now calls `handleSendMessage({ text: enriched, fromBlueprintCard: true }, deps)` to re-route through the full pipeline. `handleBuildIntent` checks `msg.fromBlueprintCard` to skip showing the card a second time. Files: `chatPanelMsgBlueprintCard.ts`, `chatPanelMsgSendBuildIntent.ts`.
+
+**Follow-up fix 3 (same session):** Blueprint card still all empty — root cause was `routing.prompt(prompt, 700)` where 700 is `timeoutMs` (milliseconds), NOT max tokens. Every inference call timed out in 0.7 seconds and hit the fallback. Fixed to `15_000` (15 seconds). File: `blueprintInference.ts`.
+
+**Follow-up fix 2 (same session):** Blueprint card showing all fields as "need answer" (red dots). Two causes: (1) `routedText` passed to inference instead of `userText` — routedText has fiveWsDiagnostic's "USER EXPERIENCE LEVEL: X.X" suffix appended, which confused the AI and caused "USER EXP" to appear in the card. Fix: pass `userText` (clean original) to `inferBlueprintFields`. (2) AI returning `confidence: "unknown"` even when it inferred a non-empty value. Fix: added post-parse rule — if value is non-empty and confidence is "unknown", upgrade to "assumed". (3) Improved inference prompt with explicit rules (games → browser confident, no deadline → assumed, no WHY → "Personal use" assumed) and a concrete example using Asteroids to guide the model. Files: `blueprintInference.ts`, `chatPanelMsgSendBuildIntent.ts`.
+
+**Follow-up fix 1 (same session):** Old "Build Setup — Question 1 of 3" clarify form was still appearing before the blueprint card. Root cause: `runChatClarifyStep` in `chatPanelMsgSendMessage.ts` fires for all non-direct-mode builds. Added `_wsR && path.resolve(_wsR) !== path.resolve(projectsDir)` guard so clarify is skipped when there is no workspace or when the workspace IS the projects container — the blueprint inference card handles pre-build questions in those cases. File: `chatPanelMsgSendMessage.ts` (199 lines).
+
+---
+
+## Session 15b — Jun 3, 2026: Agent write_file JSON Failure Fix
+
+**Root cause diagnosed via ai_calls.log (two bugs, two iterations):**
+
+**Bug 1 (Session 15b-v1):** ITER-2 called `write_file` with the full HTML game (~7KB) as a JSON string. `JSON.parse` failed. Catch returned "Error parsing tool call JSON." ITER-3/4 ran confused, file never written.
+
+**Bug 2 (Session 15b-v2 — same session, second test):** After the raw block format was added, the AI correctly used `<write_file path="index.html">...</write_file>` BUT also put a `<tool_call>` for `run_command` (HTTP server verification) in the SAME response. The agent matched `<tool_call>` first (old priority order) and ran the server command, skipping the file write. Three iterations, same wrong result.
+
+**Fix for Bug 2:** Changed the parser priority — `<write_file>` raw blocks are now checked BEFORE `<tool_call>`. File writes always take precedence over other tool calls in the same response.
+
+**Root cause of wrong output (red rectangles with glow instead of arcade sprites):**
+Agent mode had no supervisor step. gpt-4o-mini ran the entire loop solo — analysis + implementation — and misinterpreted "arcade style" as "add gradients and shadowBlur to existing fillRect calls." No separate model analyzed the task deeply before implementation began.
+
+**File changed:** `src/services/ai/agentService.ts` + `src/services/ai/agentSupervisor.ts` (NEW)
+**What changed:**
+- Extracted supervisor pre-planning to `agentSupervisor.ts` (Rule 9 split — agentService.ts was 193 lines)
+- `runSupervisorPreplanning()` now: (1) reads current project files from disk FIRST, (2) passes actual file content to supervisor along with task, (3) generates prescription targeted at what actually exists in the code
+- Supervisor sees "CURRENT PROJECT FILES (what exists right now)" section with full file content before writing the work order — not just the task description
+- Agent loop receives the prescription and implements it exactly
+**Why:** Supervisor was generating prescriptions blind — it had never seen the actual code. A doctor doesn't prescribe before examining the patient. Now the supervisor reads the current implementation first, then writes a targeted work order (e.g. "Enemy.draw() at line 183 uses fillRect — replace with this pixel bitmap").
+**Risk:** Low. File reading is best-effort try/catch. Supervisor call still non-blocking. Adds ~1s for file reads before the supervisor AI call.
+
+**Root cause of supervisor asking questions instead of prescribing:**
+The `supervisorPlanImpl` "shop foreman" persona explicitly says "for medium jobs, ask ONE question." When used as agent pre-planning, this breaks the workflow — nobody can answer before the loop starts. Claude Sonnet saw a 346-line HTML file and classified it as a "medium job," returned a question, and the prescription was never written.
+
+**File changed:** `src/services/ai/agentSupervisor.ts`
+**What changed:** Replaced `routing.supervisorPlan()` call with `routing.prompt()` and a custom prescription-only system prompt. The new prompt says: "NEVER ask questions. Make ALL decisions yourself. Match existing file structure. Write a specific prescription with exact code." Checks `supervisor !== worker` before running (skips if only one model available).
+**Why:** `supervisorPlanImpl` was designed for conversational use where a human can answer. For agent pre-planning it must always produce a prescription, never a question.
+
+**File changed:** `src/services/ai/agentService.ts`  
+**What changed:** Added rule 12 to agent system prompt: "DO NOT USE ask_user WHEN A SUPERVISOR PRESCRIPTION IS PROVIDED." Prevents worker from asking questions that cannot be answered mid-loop.
+**Risk:** Low. Custom supervisor prompt still uses best available AI. Rule 12 is additive — ask_user still works for tasks without a prescription.
+
+**Root cause of weak prescription (single enemy type, no variation, basic shapes):**
+`agentSupervisor.ts` was calling `routing.prompt()` without a tier parameter. The default tier maps to Haiku. Haiku produced a 2903-token prescription with one generic enemy shape and no color variation. Sonnet/Pro is needed to write specific pixel-art bitmaps with distinct enemy types per row.
+
+**File changed:** `src/services/ai/agentSupervisor.ts`
+**What changed:** Replaced `routing.prompt()` with `callProvider(supervisor, prompt, fetchFn, 'pro')` — same pattern used by `routingGuardian.ts`. Supervisor now always runs on Pro tier (Sonnet) regardless of what `routing.prompt()` would default to. Also added `logAICall` so supervisor prescriptions appear in ai_calls.log with correct model name.
+**Why:** Haiku writes generic prescriptions. Sonnet writes specific ones with pixel-art arrays, multi-type sprites, and architectural decisions. The worker was faithfully implementing Haiku's weak prescription — worker was not the problem.
+**Risk:** Low. Slightly higher cost per supervisor call (Sonnet vs Haiku). `callProvider` is already battle-tested in routingGuardian.ts with the same pattern.
+
+**File changed:** `src/services/ai/agentNarrator.ts`, `agentSupervisor.ts`, `agentService.ts`
+**What changed:** Added `friendlyModelName()` to `agentNarrator.ts` — converts raw model IDs (e.g. `claude-sonnet-4-6-20251101`) to readable labels (e.g. "Claude Sonnet"). Wired into:
+- Supervisor bubbles: "🎯 **Supervisor** (Claude Sonnet) analyzing task..." and "📋 **Prescription ready** (Claude Sonnet)"
+- Agent thought bubbles: "💭 _Step 2 · GPT-4o Mini:_ I can see the issue..."
+**Why:** Users couldn't see which AI was doing each step. Now every bubble labels the model.
+**Risk:** None. Purely additive display change.
+
+**File changed:** `src/services/ai/agentService.ts`
+**What changed:**
+1. Added `<write_file path="...">...</write_file>` raw block format to the agent system prompt with a clear instruction: use it for any file longer than 50 lines.
+2. Added standalone raw block detection: if no `<tool_call>` but a `<write_file>` block exists, parse and execute it.
+3. Fixed the JSON parse catch block: before giving up, check for the raw `<write_file>` block as a fallback. If found, synthesize `toolData` from it and proceed to execution rather than erroring out.
+**Why:** Large files break JSON encoding reliably. The raw block format bypasses JSON entirely — content is verbatim between XML tags, no escaping required.
+**Risk:** Low. The new format is additive — standard `<tool_call>` JSON still works for small writes. The catch fallback only triggers when JSON.parse already failed.
+
+---
+
+## Session 15d — Jun 3, 2026: Forward/Copy Button + Reports Metadata
+
+**Bug report: "Can the grey text be forwardable? (index)"**
+
+User wanted to be able to copy or forward AI assistant messages in the chat panel. Two issues: (1) assistant text had no `user-select` so it wasn't selectable; (2) no copy/forward affordance.
+
+**File changed:** `src/ui/panels/chat/chatPanelStylesMid.ts`
+**What changed:** Added `user-select: text` to `.message-content`. Added `.msg-fwd-bar` (hidden by default, shown on `.assistant-bubble:hover`), `.msg-fwd-btn` styles for the forward (↩) and copy (📋) buttons positioned top-right of each assistant bubble.
+**Why:** VS Code WebViews inherit `user-select: none` from the host environment on some platforms, making AI text unselectable. The forward/copy bar gives users a reliable way to reuse AI output.
+**Risk:** Low. `user-select: text` is additive. Hover bar is purely CSS-driven.
+
+**File changed:** `src/ui/panels/chat/chatPanelRenderer.ts`
+**What changed:** Assistant messages now include a `.msg-fwd-bar` with two buttons: ↩ (forward to input) and 📋 (copy). Raw message text is base64-encoded into `data-fwd`/`data-copy` attributes, stripped of internal token markup before encoding.
+**Why:** Stores the text on the element itself so the click handler doesn't need to parse innerHTML.
+**Risk:** Low. Base64 encode/decode is safe. Token stripping regex is conservative.
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptActions.ts`
+**What changed:** Added handler for `.msg-fwd-btn` clicks. Forward (↩) puts decoded text into `#user-input` textarea and focuses it. Copy (📋) uses `navigator.clipboard.writeText()` with `execCommand('copy')` fallback; button label flashes ✓ for 1.2s as confirmation.
+**Why:** Copy and forward are the two natural actions for reusing AI output. Forward is most useful — it lets users quickly iterate on a response.
+**Risk:** Low. Both paths are guarded with try/catch.
+
+**Bug report: "reports — nice to see who sent it and time/date"**
+
+Reporter identity and timestamp were color `#444` (near-invisible on dark background) and only showed a truncated UUID for logged-in users.
+
+**File changed:** `src/app/admin/reports/page.tsx` (web app)
+**What changed:** (1) Metadata row color changed from `#444` to `#8888aa` (readable). (2) Batch-fetches user emails for all unique `user_id`s via `admin.auth.admin.getUserById()` after the reports query. (3) Email shown in `#c0c0dd` if found, truncated UUID shown in `#555` if not, "anonymous" shown for null user_id. (4) Timestamp formatted with `toLocaleString` options for more readable output (e.g. "Jun 3, 2026, 5:40 AM").
+**Why:** Admin panel is only useful if the metadata is actually readable. Email > UUID for recognizing repeat reporters.
+**Risk:** Low. Batch email lookups are fire-and-forget try/catch. N queries for N unique users — acceptable for admin use (reports list is short).
+
+---
+
+## Session 15c — Jun 3, 2026: Agent write_file Markdown Fence Leak Fix
+
+**Root cause diagnosed via ai_calls.log + sprites.js on-disk content:**
+
+AGENT-ITER-2 (gpt-4o-mini) used `<write_file path="src/sprites.js">` to create the file. The content it placed between the tags started with ` ```javascript ` (a markdown code fence). The agent parser in `agentService.ts` takes `rawWriteMatch[2]` verbatim and passes it as `args.content` to `write_file.execute()`.
+
+Inside `execute()`, `args.content` is written directly to disk via `fs.writeFileSync`. `extractCodeFromResponse` was only called when the Guardian returned a corrected version (`review.correctedText`). The Guardian either timed out (`20002ms` in log) or passed — in both cases `contentToWrite` was never stripped of its fence before disk write.
+
+Result: `sprites.js` line 2 contained ` ```javascript ` causing a syntax error and the game rendering as plain red blocks (file was syntactically broken, script tag silently failed).
+
+**File changed:** `src/services/ai/agentTools.ts`
+**What changed:** Added fence-stripping guard before Guardian review in `write_file.execute()`. If `args.content.trimStart()` starts with ` ``` `, calls `extractCodeFromResponse` to strip the outer fence before `contentToWrite` is used. This fires before Guardian review and before the disk write — fence-free content reaches both.
+**Why:** AIs reliably wrap code in markdown fences even when told not to. The fix is at the boundary (write-to-disk) where it catches all cases regardless of which AI generated the content or whether the Guardian ran.
+**Risk:** Low. `extractCodeFromResponse` is a no-op for fence-free content (Stage 3 returns as-is). The guard only activates when the trimmed content starts with ` ``` `.
+
+**File changed:** `src/services/ai/agentService.ts`
+**What changed:** Updated the `<write_file>` format instruction in the agent system prompt to say "no markdown fences" — was "paste content exactly as-is", now "no markdown fences, paste code exactly as-is".
+**Why:** Source-level prevention to reduce how often the fence-stripping guard needs to fire.
+**Risk:** None. Prompt-only change. No runtime behavior change.
+
+---
+
+## Session 15 — Jun 3, 2026: AI Call Logger + Worker Rules Fix
+
+**File changed:** `src/services/ai/aiCallLogger.ts` (NEW)
+**What changed:** New service that appends every AI call (role, model, full prompt, full response, tokens, duration) to `.redivivus/ai_calls.log` in the open workspace. Rotates at 2 MB, keeps one `.old` backup. Call `logAICall(entry)` after any `callProvider` result.
+**Why:** No visibility into what each AI role actually sends/receives — impossible to diagnose where quality drops off (e.g. supervisor prescriptions, worker output, guardian verdicts).
+**Risk:** None. Log writes are fire-and-forget try/catch — can never crash the extension.
+
+**File changed:** `src/services/ai/routingServiceCheap.ts` (NEW)
+**What changed:** Extracted `promptCheap` body from `routingService.ts` (which was 203 lines, violating Rule 9) into a standalone `promptCheapImpl` function. Includes `logAICall` with role label.
+**Why:** Rule 9 split required before `routingService.ts` could be touched. Pattern matches existing extracted modules (routingGuardian.ts, routingComplexity.ts, etc.).
+**Risk:** Low. `promptCheap` body is identical — only wrapping changed.
+
+**File changed:** `src/services/ai/routingService.ts`
+**What changed:** Added `role = 'worker'` optional param to `prompt()`. Calls `logAICall` on every successful response. Replaced `promptCheap` body with one-line delegation to `promptCheapImpl`. Imported `aiCallLogger` and `routingServiceCheap`.
+**Why:** Central routing point — logging here captures all worker AI calls with role label.
+**Risk:** Low. Role param is optional with default; all existing callers unaffected.
+
+**File changed:** `src/services/ai/routingGuardian.ts`
+**What changed:** Added `logAICall` calls in `supervisorPlanImpl` (logs supervisor prompt + prescription) and `guardianReviewImpl` (logs what guardian received and its pass/fail verdict).
+**Why:** Supervisor and guardian use `callProvider` directly, bypassing `routing.prompt()`, so they needed separate log points.
+**Risk:** None.
+
+**File changed:** `src/services/ai/agentService.ts`
+**What changed:** `routing.prompt(history, 60_000)` now passes `role='agent-iter-N'` so each agent loop iteration is labeled in the log with its iteration number.
+**Why:** Agent mode logs the full history on each call — labeling the iteration makes it trivial to see the complete supervisor→tool→supervisor chain.
+**Risk:** None.
+
+**File changed:** `src/core/ai/chatPanelAI.ts`
+**What changed:** `buildCodeGenPrefix` (the prompt used when the user types build/create/make in chat) now imports and appends `Redivivus_WORKER_RULES`. Previously this path had no canvas quality rules — causing flat rectangle sprites instead of proper arcade visuals.
+**Why:** `Redivivus_WORKER_RULES` was injected in agent mode and build orchestrator but NOT in the direct chat code-gen path. AI generated bare `fillRect` squares because it never received the canvas gradient/glow/sprite requirements.
+**Risk:** Low. Adds ~70 lines of rules to the code-gen prompt — increases token cost slightly for build/create requests from chat. No functional change to other paths.
+
+---
+
+*Last updated: June 3, 2026 (Session: UI now shows actual files being reviewed and what Supervisor found, not just generic status)*
+
+### Session -- Jun 3, 2026: Build UI showed generic status instead of actual file/issue info
+
+**Root cause:** The build status showed random flavor phrases ("welding joints...", "reading the blueprint...") and generic messages ("📋 Plan ready") with no information about which files were actually being read or what issues were found.
+
+**Fix — `src/core/build/chatPanelBuild.ts`**
+- After `inferBuildTarget`: if an existing file is found, show `📂 Reading index.html — 384 lines — analyzing for issues...` instead of generic planning message
+- After Supervisor generates spec: extract first 2 meaningful lines of the spec and show as `📋 Found: [issue summary]` so user sees what was identified before the fix starts
+
+**Fix — `src/core/build/chatPanelBuildRunner.ts`**
+- Before cloud build starts: scan for existing common files, show `📂 Reading index.html (384 lines) — reviewing current state...` instead of `⚙️ Building...`
+
+**Risk:** None — purely additive UI messaging.
+
+---
+
+### Session -- Jun 3, 2026: Supervisor instructions were diagnoses, not contracts
+
+**Root cause:** The Supervisor (high-reasoning AI) correctly identified bugs but passed a problem list to the Worker rather than an explicit implementation contract. GPT-4o as Worker is fully capable of following explicit instructions — it cannot follow ambiguous ones. When the Supervisor says "add enemy rendering," the Worker has no basis for knowing that means "the draw() loop must call enemies.forEach(e => e.draw())." The result: technically correct analysis, incomplete execution.
+
+**Fix — `src/core/build/chatPanelBuildRunner.ts`**
+Added `SUPERVISOR_CONTRACT_GUIDANCE` to every `buildTask` sent to the server. This tells the Supervisor to produce a complete implementation contract: every function named, every rendering call listed, every state transition specified — precise enough for any capable model to execute without guessing. General principle, not hardcoded to any specific task or project type.
+
+**What this means:** The Supervisor's value is not just correct diagnosis — it's generating instructions precise enough that a cheaper model can execute them correctly. This is the core Redivivus cost model: high-reasoning AI does the thinking once, cheaper AI does the work.
+
+**Risk:** Slightly longer Supervisor output. No functional downside.
+
+---
+
+### Session -- Jun 3, 2026: Worker role ignored user's preferred model
+
+**Root cause:** The server routes the Worker role (actual code generation) to GPT-4o regardless of the `preferred` field in the request. Supervisor and Guardian use Claude (the preferred model) but the Worker — the one writing the code — was using a cheaper model. Result: the Supervisor correctly diagnosed every bug, Claude reviewed and approved, but GPT-4o wrote the code in between and produced an incomplete game where entities were never rendered.
+
+**Fix — `src/services/build/cloudBuildClient.ts`**
+Added `workerModel: preferred` to the build request body alongside the existing `preferred` field. The server already reads `preferred` for Supervisor/Guardian routing — `workerModel` is an explicit signal that the Worker role should also use the user's chosen AI.
+
+**What this means:** When Claude is selected, all three pipeline roles (Supervisor → Worker → Guardian) should now run on Claude. The Worker is the most critical role — it writes the actual code. A Supervisor/Guardian on Claude with a Worker on GPT-4o produces correct analysis but incorrect implementation.
+
+**Risk:** If the server ignores `workerModel`, behavior is unchanged. No downside.
+
+---
+
+### Session -- Jun 3, 2026: Redivivus was pre-empting AI capabilities with artificial token limits
+
+**Root cause:** Multiple layers of artificial caps were neutering the AI before it saw any context. The philosophy was wrong — Redivivus adds structure and rules, it does not limit what the AI knows or can produce. The book cover does not rewrite the book.
+
+**Specific constraints removed:**
+
+- `tokenBudget.ts` — safety margin reduced from 0.15 to 0.05. At 15%, Gemini was losing 150K tokens and Claude was losing 30K tokens before the AI read a single byte. Models have their own internal headroom.
+- `buildContextHelpers.ts` (split from buildContextCollector.ts, Rule 9) — `readFileSafe` default cap removed (was 8KB; now reads full file). Project map line cap removed (was 80 lines). Git context char cap removed (was 3000 chars). Recent builds increased from last 3 to last 10.
+- `buildContextCollector.ts` — existing files now read fully (was 12KB cap). Vault items now include all relevant matches (was capped at 10). Conversation history now 20 turns with full message content (was 8 turns / 600 chars/message / 6K total).
+- `budgetContext` remains as a last-resort trimmer — only fires when the assembled context actually exceeds the model window, not preemptively.
+
+**Risk:** Larger request payloads on very large codebases. Mitigated by `budgetContext` which still handles genuine overflow. No change to output behavior — all trimming logic still exists, it just only fires when truly needed.
+
+---
+
+### Session -- Jun 3, 2026: Cloud build AI was context-blind — conversation never sent
+
+**Root cause:** `collectBuildContext` never included the chat conversation. The cloud build AI received only the task sentence plus blueprint/files. Every clarification, constraint, style preference, and prior attempt the user expressed in chat was invisible to it. This is why Redivivus produces weaker output than asking an AI directly — the direct conversation has full context; the build pipeline had none.
+
+**Fix — `src/services/build/buildContextCollector.ts` + `src/services/build/cloudBuildClient.ts`**
+- Added `recentChat?: string` to `CloudBuildContext`
+- `collectBuildContext` now accepts a `conversation` param and formats the last 8 turns (user + assistant) into `recentChat`, capped at 6000 chars, with UI tokens stripped
+- `cloudBuildClient.ts` passes `deps.conversation` into `collectBuildContext`
+- `budgetContext` drops `recentChat` before existing files if context is over budget
+- Result: the cloud build AI now sees what the user has been discussing, what was tried, and what requirements were expressed — same context as a direct AI conversation
+
+**Risk:** Slightly larger request payload. Mitigated by the 8-turn / 6000-char cap and the budget trimmer.
+
+---
+
+### Session -- Jun 3, 2026: Build context missing for rebuild/rewrite requests + non-playable game
+
+**Root cause (Issue 1 & 2):** `findLikelyTargets` in `buildContextCollector.ts` only returned existing files when the task started with `fix|update|change|add|remove|modify|extend|improve`. Tasks starting with "rebuild", "rewrite", "upgrade" etc. returned empty — so `existingFiles` was never populated. The cloud build received no existing file context, treated the task as a fresh build ("New project"), and generated broken code with no reference to the existing game.
+
+**Fix 1 — `src/services/build/buildContextCollector.ts`**
+- Added explicit file-mention detection: if task mentions a filename like `index.html`, include that file unconditionally regardless of the leading verb
+- Added `rebuild|rewrite|upgrade|enhance|refactor|replace|redo|rework|revamp` to the `isModVerb` regex so these are treated as modification requests
+
+**Fix 2 — `~/projects/space-invaders-game/.redivivus/knowledge.json` (created)**
+- Seeded project-level "never_do" entries: non-playable game, `const` array reassignment crash, screen shake transform drift, and preference entries for single-file format and classic Space Invaders mechanics
+- These inject into every future build prompt for the project via `getNeverDoForPrompt()`
+
+**Risk:** Low. `findLikelyTargets` now catches more modification cases — could theoretically include an existing file when building something genuinely new. Mitigated by the file-mention check being explicit (task must name the file) and mod-verb list being specific words.
+
+---
+
+### Session -- Jun 3, 2026: Auto-continuation when AI hits output token limit
+
+**Root cause:** When the AI hit its max_tokens limit mid-generation, the code was silently truncated. The user received broken/incomplete files with no indication of what happened and no recovery. Redivivus was not handling this like other AI editors (Cursor, Windsurf) which automatically continue from where the AI left off.
+
+**Fix 1 -- `src/services/ai/routingTypes.ts`**
+Added `truncated?: boolean` to `AIResponse` interface.
+
+**File changed:** src/services/ai/routingTypes.ts
+**What changed:** One new field on AIResponse
+**Why:** Need to propagate truncation signal from streaming layer up to executeClientAI
+**Risk:** none — additive change, backward compatible
+
+**Fix 2 -- `src/services/ai/streamingProviders.ts`**
+Modified `readSSE` to accept a `truncCheck` function and track whether the finish_reason indicates truncation. Each provider now passes the correct check: Claude (`message_delta.stop_reason === 'max_tokens'`), OpenAI/Groq/xAI/Kimi (`choices[0].finish_reason === 'length'`), Gemini (`candidates[0].finishReason === 'MAX_TOKENS'`). `streamProvider` returns `truncated` in `AIResponse`.
+
+**File changed:** src/services/ai/streamingProviders.ts
+**What changed:** readSSE signature + return type, all 3 provider calls updated
+**Why:** Must detect truncation at the SSE level where finish_reason is available
+**Risk:** Low — truncCheck is a pure function, no side effects
+
+**Fix 3 -- `src/services/build/cloudBuildClientAI.ts`**
+Added auto-continuation loop in `executeClientAI` streaming path. When `truncated === true`, sends a continuation prompt ("Continue EXACTLY from where it ended...") up to 3 times, appending each response to the accumulated text. Fallback providers tried on first-attempt failure only. The concatenated full response is then sent to the backend for processing as normal.
+
+**File changed:** src/services/build/cloudBuildClientAI.ts
+**What changed:** Streaming path refactored into a continuation loop
+**Why:** Users should never see truncated builds -- recovery is Redivivus's job, not the user's
+**Risk:** Each continuation is a full AI call (tokens + latency). MAX_CONTINUATIONS=3 caps the max at 4x a normal build.
+
+---
+
+### Session -- Jun 3, 2026: Live code streaming added to main build path
+
+**Fix 5 -- `src/core/build/chatPanelBuildRunner.ts`**
+The main cloud build path showed only a char count ("Generating... (N chars)") while code was being generated. Changed `onChunk` to accumulate raw AI output and update the working message with a live code block (same pattern as chatPanelBuild.ts local build path). Also compressed `updateProgress` from 6 to 3 lines to stay under the 200-line limit.
+
+**File changed:** src/core/build/chatPanelBuildRunner.ts
+**What changed:** `onChunk` now accumulates into `streamAccum` and renders a live code fence; `updateProgress` inlined to 3 lines
+**Why:** User could not see code being generated during the main cloud build — only edits/fixes had the live streaming view
+**Risk:** Raw AI output may contain markdown fences; they'll be rendered as nested code blocks but are visually acceptable during generation only
+
+---
+
+### Session -- Jun 3, 2026: Full AI breakdown in project summary
+
+**Root cause:** All result card paths (chatPanelBuildRunner, chatPanelAutoSave, extensionResumeState) showed only a single inline "Built with [model] (~N tokens)" line, with no role, no type, and no breakdown when multiple AIs were involved. The ledger-based `__AI_BREAKDOWN__` token existed for the multi-file build path but not the cloud/single-file paths.
+
+**Fix 1 -- `src/ui/panels/chat/chatPanelRendererCards.ts`**
+Enhanced `renderAIByline` to show per-AI rows with: full model ID, derived model type pill (Haiku/Sonnet/Opus/Flash/Pro/GPT-4o/Llama/etc.), role pill with color coding (Reviewer=purple, Builder=green, Solo Builder=teal), token count, cost, and actions. Removed the generic `aiLabels` map that was masking model names.
+
+**File changed:** src/ui/panels/chat/chatPanelRendererCards.ts
+**What changed:** Complete rewrite of `renderAIByline` with `deriveModelType()` and `deriveRoleStyle()` helpers
+**Why:** User could not tell which AI was used, what type it was, or what role it played
+**Risk:** none -- pure rendering change, no data format changes
+
+**Fix 2 -- `src/core/build/chatPanelBuildRunner.ts`**
+Replaced `*Built with ${modelLabel}${cost}*` inline text with `__AI_BREAKDOWN__` token using result.model, inputTokens+outputTokens, role=solo, action=built.
+
+**File changed:** src/core/build/chatPanelBuildRunner.ts
+**What changed:** Lines 142 and 153
+**Why:** Cloud build result card had no structured AI breakdown
+**Risk:** none
+
+**Fix 3 -- `src/core/build/chatPanelAutoSave.ts`**
+Same as Fix 2 for single-file auto-save result cards (both the new-window and same-window paths).
+
+**File changed:** src/core/build/chatPanelAutoSave.ts
+**What changed:** Lines 149, 173, 176
+**Why:** Same as Fix 2
+**Risk:** none
+
+**Fix 4 -- `src/extensionResumeState.ts`**
+Same as Fix 2 for result cards restored after a window reload.
+
+**File changed:** src/extensionResumeState.ts
+**What changed:** Lines 112 and 116
+**Why:** Same as Fix 2
+**Risk:** none
+
+### Session -- Jun 2, 2026: Prescriptions extracted to prescriptions.json
+
+**Root cause:** All well-known patterns (game, checkers, todo, etc.) were hardcoded TypeScript strings in wellKnownPatterns.ts. Every new pattern or edit required: edit TS -> npm run compile -> reload extension window. User had to reload between every new game type added.
+
+**Fix 1 -- `src/data/prescriptions.json` (new file)**
+All 7 patterns (checkers, game, todo, landing-page, calculator, form, clock) moved to JSON. Each entry has: name, category, regex (string, escaped for JSON), flags, prescription (array of strings joined with newline at runtime). Array format makes prescriptions human-editable without escaping. Order = detection priority (checkers before game so board games don't get Flappy Bird physics).
+
+**Fix 2 -- `src/core/ai/wellKnownPatterns.ts` (125 -> 52 lines)**
+Complete rewrite. Imports fs + path. DATA_PATH = path.join(__dirname, '../../data/prescriptions.json'). detectPattern() calls loadPatterns() (readFileSync each call -- sub-ms, file is 11KB) then iterates, compiles regex from string, returns first match. Array prescriptions joined with newline. Returns null on file error (safe fallback to Supervisor AI). setPendingPrescription / getPendingPrescription / clearPendingPrescription unchanged.
+
+**Fix 3 -- `package.json` compile script**
+Added `cp src/data/prescriptions.json out/data/prescriptions.json` to the compile step. File is deployed alongside commands.json. postcompile-deploy.js copies out/ to both extension locations so the JSON is always in sync.
+
+**Result:** To add a new game type (chess, minesweeper, memory game, etc.) -- edit prescriptions.json, done. No TypeScript, no compile, no reload. Takes effect on the next build.
+
+### Session — Jun 2, 2026: Prescription + Guardian — Prevent Math.clamp Recurrence
+
+**Root cause:** Prescription used pseudocode "clamp(vY * 0.06, -0.5, pi/2)" — AI translated this as Math.clamp() which doesn't exist in JS. Silent crash. Guardian missed it despite "hallucinated APIs" checklist item because the check was too vague.
+
+**Fix 1 — `src/core/ai/wellKnownPatterns.ts`**
+PHYSICS line: replaced `clamp(vY * 0.06, -0.5, π/2)` with `Math.min(Math.max(vY * 0.06, -0.5), Math.PI / 2)` — actual JS syntax, plus explicit "NEVER Math.clamp(), it does not exist in JavaScript".
+AUDIO line: now requires "define ONE beep(freq, dur) helper; call it from playFlap(), playScore(), playDeath() — all three MUST be defined before called." Prevents the playScoreSound-defined-but-never-defined bug.
+
+**Fix 2 — `src/services/ai/guardianAIPrompt.ts`**
+Added "UNDEFINED FUNCTION CALLS — CRITICAL" section before IMPORT/EXPORT VALIDATION. Lists Math.clamp(), Math.clamp01(), Math.lerp(), Math.map(), Array.last(), Array.first() as hallucinated APIs — instant GUARDIAN_ISSUES if found. Also requires scanning every function call and verifying it is defined somewhere in the file.
+
+### Session — Jun 2, 2026: Flappy Bird Game Bugs + Build History Log Fixes
+
+**Game crash root cause:** `Math.clamp` (line 196) — not a standard JS API. `Math.clamp` exists in Three.js/game engines but not native JavaScript. Calling it throws `TypeError: Math.clamp is not a function`, which kills `drawBird()` → kills `draw()` → kills the game loop. Background gradient renders (before the crash), nothing else. Secondary: `playScoreSound()` called but never defined — second crash on first score. Third: `setInterval(() => frames++, 1000/60)` — frame counter drifts vs requestAnimationFrame, wrong pipe spawn timing.
+
+**`projects/flappy-bird-game/index.html` — full rewrite of script block**
+All 8 visual spec requirements now implemented:
+- Background: 3-stop gradient + 2 parallax cloud layers (bgOff1/bgOff2 at 0.3x and 0.6x pipe speed)
+- Bird: `ellipse()` body + wing arc + eye white + pupil; `createLinearGradient(-13,-11,13,11)` #FFE066→#FF8C00; `shadowBlur=14` glow during play; `ctx.save()/restore()` around everything
+- Pipes: `createLinearGradient(pipe.x, 0, pipe.x+PIPE_W, 0)` (anchored to pipe, not canvas x=0); highlight stripe at 12%; wider darker cap rect; `shadowBlur=10` drop shadow
+- Particles: `class Particle` — 24 emitted on death, random angle + speed, alpha decay 0.038/frame, gravity
+- Screen shake: `shakeF=12` on death; `ctx.translate(rand*8-4, rand*8-4)` each frame while shakeF>0
+- Score pops: floating "+1" at bird position on score, alpha decay 0.045/frame, gold color + shadow
+- Score panel: HTML `<div>` outside canvas — never drawn on canvas
+- No flat hex on sprites — all primary sprites use createLinearGradient
+
+Fixed frame counter: `frame++` inside `update()` on every rAF tick (not setInterval). Loop starts once in `loop()` and never re-spawned. Single persistent rAF: loop → if playing update() → always draw(). Start screen shows idle parallax scroll.
+
+**`src/services/build/cloudBuildResultProcessor.ts` — build history log fixes**
+- `tokensUsed: data.outputTokens ?? 0` → `(data.inputTokens ?? 0) + (data.outputTokens ?? 0)` — was only counting output, not input (input is 4-10x output for these builds)
+- `costUSD: 0` → `data.costUSD ?? 0` — was hardcoded zero, now uses value from backend if provided
+- `supervisor: data.model` → `data.model ?? 'unknown'` — cleaner null safety
+- `worker: null` → `data.workerModel ?? null` — uses backend-provided worker model if present
+- [NEXT] `resultCardToken: ''` — still empty; result card is built in chatPanelBuildRunner AFTER this returns. Fix requires 2-phase history record: write entry here, update resultCardToken in runner after card is built.
+- [NEXT] Guardian review result (pass/fail, issues) not recorded — needs Guardian result passed into processBuildResults.
+
+### Session — Jun 2, 2026: Cloud Build Streaming — requiresClientExecution:true path
+
+**Root cause:** `executeClientAI` used `callProvider` (synchronous, wall-clock timeout). When the backend returns `requiresClientExecution: true`, the client runs the AI call but had no streaming — a 2-minute wall-clock timeout was the only guard. For long builds the connection just died.
+
+**Fix 1 — `src/services/build/cloudBuildClientAI.ts` (39 -> 54 lines)**
+Added `onChunk?: (chunk: string) => void` parameter to `executeClientAI`. When provided, uses `streamProvider` instead of `callProvider` — streaming connection has no wall-clock timeout (data keeps flowing as long as the AI is generating; the AbortController timer resets on each chunk). Falls back through `routing.fallbackProviders` with streaming too. Non-streaming path preserved when `onChunk` is absent.
+
+**Fix 2 — `src/services/build/cloudBuildClient.ts` (184 lines)**
+Added `onChunk?` to the `opts` type on `callCloudBuild`. Passed `opts.onChunk` through to `executeClientAI` in Step 2. Transparent to the `requiresClientExecution: false` (backend-runs-AI) path — `onChunk` is never called there since `executeClientAI` isn't reached.
+
+**Fix 3 — `src/core/build/chatPanelBuildRunner.ts` (189 -> 195 lines)**
+Added `streamedChars` counter and `onChunk` handler. Each chunk increments the counter and calls `updateProgress('Generating... (N chars)')` — the working message in the chat UI live-updates with real progress instead of being frozen at "Building...". Passed `onChunk` to `callCloudBuild`.
+
+**What still needs a backend change:** The `requiresClientExecution: false` path (backend runs AI synchronously, returns full result) cannot stream without SSE support on the backend. The 240s timeout covers it for now. True end-to-end streaming requires the backend to either always return `requiresClientExecution: true`, or to pipe its AI call as SSE.
+
+### Session — Jun 2, 2026: Cloud Build Timeout — 120s -> 240s
+
+**Root cause:** The new game prescription generates significantly more code (particle class, parallax layers, per-entity gradients, screen shake). Cloud build backend runs Claude synchronously and returns full response — client's `makeTimeout(120_000)` killed the request at 127 seconds, 7 seconds past the limit. `createFetchWithTimeout` had same 120s default for client-side AI path.
+
+**Fix 1 — `src/services/build/cloudBuildClient.ts`**
+`makeTimeout(120_000, 'Build instruction')` -> `makeTimeout(240_000, 'Build instruction')`.
+Also fixed error message: "try a simpler request" -> "the AI is taking longer than expected. Please try again." (the request isn't too complex — the AI just needs more time to generate quality output).
+
+**Fix 2 — `src/services/build/cloudBuildClientAI.ts`**
+`createFetchWithTimeout` default: 120000 -> 240000. Covers the client-side AI execution path.
+
+**Risk:** Users wait up to 4 minutes instead of 2 before seeing a timeout. Acceptable — a timeout error on a valid request is worse than waiting. The 4-minute window covers even large games with full visual quality requirements.
+
+### Session — Jun 2, 2026: Canvas Game Visual Quality — Prescription, Rules, Guardian
+
+**Root cause:** Game prescription said "gradient sky, styled entity sprites" — Worker checked the box with a 2-stop background gradient and a rectangle. No gradient on sprites, no particles, no glow, no parallax, no screen shake. Guardian had no canvas-specific quality checks so it passed flat-colored games.
+
+**Fix 1 — `src/core/ai/wellKnownPatterns.ts` (102 -> 110 lines)**
+Replaced single vague VISUALS line with 8 specific mandatory canvas rendering requirements:
+Background (3-stop gradient + 2 parallax layers), Player (createLinearGradient body + glow), Obstacles (per-pipe gradient + highlight stripe + shadow), Particles (class with 20+ on death, alpha decay), Screen shake (shakeFrames counter, translate + setTransform reset), Score pop (floating +1 text), Score panel outside canvas, No flat hex fillStyle on primary sprites.
+Each item is labeled "Guardian checks each" so the Guardian knows exactly what to verify.
+
+**Fix 2 — `src/services/ai/redivivusWorkerRules.ts` (63 -> 72 lines)**
+Added "CANVAS RENDERING TECHNIQUES" block inside Rule 9 (after PLAYABILITY items). Teaches the Worker the specific canvas API patterns: gradient fillStyle pattern, glow with reset, ctx.save()/restore() compositing, Particle class skeleton, parallax scroll formula, screen shake pattern. Reinforced the CSS variable warning (was implicit in Rule 6, now explicit with the reason: "silently renders transparent").
+
+**Fix 3 — `src/services/ai/guardianAIPrompt.ts` (136 -> 147 lines)**
+Added "CANVAS VISUAL QUALITY GATE" checklist (8 items) that runs when reviewing a canvas game. Checks: player uses createLinearGradient, obstacles use createLinearGradient, particle system exists, shadowBlur used and reset, screen shake, parallax (2+ layers), score outside canvas, no CSS vars in fillStyle. Any failure goes to GUARDIAN_ISSUES as "Visual quality: [missing technique]".
+
+**Risk:** Longer prompts — Worker prompt grows by ~400 tokens for games; Guardian grows by ~200 tokens per game review. Worth it: flat game output was consistently sub-standard vs Windsurf. These are concrete, checkable requirements not vague quality suggestions.
+
+### Session — Jun 2, 2026: Guardian Now Reviews Against Worker Rules
+
+**Root cause:** Guardian AI never saw `Redivivus_WORKER_RULES` — the rules the Worker was required to follow. It only had a generic checklist and whatever the blueprint context contained. The Canvas API warning (`ctx.fillStyle` does not resolve CSS variables), security rules, annotation rules, code clarity rules — none of them were visible to the Guardian. A Worker could violate Rule 6 (no non-ASCII), Rule 9 (browser game requirements), or Rule 10 (security) and the Guardian would PASS it.
+
+**Fix — `src/services/ai/guardianAIPrompt.ts` (133 → 136 lines)**
+- Added `import { Redivivus_WORKER_RULES } from './redivivusWorkerRules.js'`
+- Built `workerContractSection` string injecting the full worker rules with a header: "WORKER CONTRACT — THE RULES THE WORKER WAS GIVEN: The Worker was required to follow every rule below. Verify compliance. Any violation is a GUARDIAN_ISSUES failure."
+- Injected `workerContractSection` into the prompt between the blueprint section and the review checklist
+- Updated DOMAIN GOTCHAS paragraph: now explicitly tells the Guardian the WORKER CONTRACT is always present and all violations are GUARDIAN_ISSUES failures
+
+**Risk:** Guardian prompts are longer by ~1KB (the worker rules text). Adds ~250-300 tokens per Guardian call. Worth it — the Guardian was passing silent CSS variable violations, missing annotation rules, game quality failures. A false PASS that ships broken code costs more than 300 tokens.
+
+### Session — Jun 2, 2026: Well-Known Pattern Supervisor Bypass
+
+**Root cause diagnosed:** For well-known patterns (games, todo apps, landing pages, etc.), the Supervisor AI prescription step was converting the user's request into an incomplete spec document that lost the "runtime functions required" knowledge. The Worker built exactly what was prescribed — infrastructure + setup — but not the execution-time functions the AI already knew were needed.
+
+**Fix 1 — `src/core/ai/wellKnownPatterns.ts` (new, 102 lines)**
+Six pattern categories detected via fast-path regex (no AI call): game, todo, landing-page, calculator, form-page, clock-timer. Each has a deterministic, complete prescription listing every required implementation component. Module-level store (`setPendingPrescription` / `getPendingPrescription`) bridges the message handler to the build pipeline.
+
+**Fix 2 — `src/core/build/chatPanelBuild.ts` (156 → 172 lines)**
+Before calling `routing.supervisorPlan()`: checks `getPendingPrescription()`. If set, uses that as `spec` directly and skips the Supervisor AI call + Plan Approval Gate entirely. The Worker receives a complete deterministic prescription with every required function specified. Novel/complex requests still go through the Supervisor as before.
+
+**Fix 3 — `src/core/routing/chatPanelMsgSendMessage.ts` (197 → 196 lines)**
+Replaced game-specific 11-line mandate with general 9-line pattern detection. All six pattern categories now inject `COMPLETE IMPLEMENTATION REQUIREMENTS` into `routedText` for cloud builds (where the cloud Supervisor sees the requirements and generates a complete prescription) AND set the local store for local build bypass.
+
+**Fix 4 — `src/services/ai/redivivusWorkerRules.ts` (55 → 63 lines)**
+Added PLAYABILITY mandate to Rule 9: game loop, input listeners, state machine, collision detection, fixed canvas dimensions are mandatory; blank canvas = build failure.
+
+**Fix 5 — `src/core/build/chatPanelBuildRunner.ts`**
+Strips WHO calibration, AI defaults, and game requirements from `result.narration` before displaying in result card.
+
+**Fix 6 — `src/services/ai/redivivusWorkerRules.ts` and `chatPanelChunkedLoop.ts`**
+NARRATOR instruction clarified: describe the file purpose only, never copy the task string or system context.
+
+*Last updated: June 2, 2026 (Session Stage-6 — Guardian Clean-Frame Mode)*
+
+### Session Stage-6 — Jun 2, 2026: Guardian Clean-Frame Mode
+
+#### Audit Findings
+
+1. **Context bleed FOUND** — `guardianAIPrompt.ts:30` disclosed `workerAI` ("Another AI (worker) generated this code") + lines 14-16 solo mode `soloWarning` explicitly told Guardian it wrote the code it was reviewing. Fixed by removing both.
+2. **Structured checklist PARTIAL** — security checklist existed but no Blueprint contract check, no Visual Spec check, no hardcoded-values check. Line 40 said "Do not check boxes" (actively prevented structured review). Fixed.
+3. **Rejection path WEAK** — one-shot correction with silent fallback, no retry loop, no user escalation. Fixed with retry handler.
+4. **WHO calibration MISSING** — Stage 4 WHO context was in `originalTask` string but never extracted. Fixed.
+
+#### File: `src/services/ai/guardianRetryHandler.ts` (new, 78 lines)
+- **What changed:** `runGuardianWithRetry()` implements a 2-retry loop (MAX_GUARDIAN_RETRIES=2, configurable). On each Guardian FAIL: extracts specific issues, sends targeted fix prompt to Worker, re-reviews with clean frame (no prior-attempt context). After max retries: pushes plain-English escalation message to conversation ("I tried to fix this 2 times and it still isn't right. Here's what's wrong:..."), returns escalated=true. Returns `finalIssues` for NeverDo persistence by caller.
+- **Why:** Previous rejection path was silent one-shot; users never knew when Guardian found issues. Retry loop gives Worker a chance to fix, user gets plain English if it can't be resolved.
+- **Risk:** Hard cap at MAX_GUARDIAN_RETRIES prevents infinite loops. Each path wrapped in try/catch.
+
+#### File: `src/core/build/chatPanelBuildReview.ts` (67 → 60 lines)
+- **What changed:** `runGuardianReview()` now delegates to `runGuardianWithRetry()` from `guardianRetryHandler.ts`. Removed one-shot correction logic (`correctedLooksLikeCode` check). NeverDo persistence now uses `result.finalIssues`. Removed `extractCodeFromResponse` top-level import (now dynamic where needed).
+- **Why:** Retry loop belongs in dedicated handler per Rule 9; single responsibility per file.
+- **Risk:** None — behavior is a strict superset of prior one-shot logic.
+
+#### File: `src/services/ai/guardianAIPrompt.ts` (119 → 133 lines)
+- **What changed:**
+  1. **Clean-frame fix:** Removed `soloWarning` (solo mode "you wrote this code" contamination). Removed "Another AI (${workerAI}) generated this code" from main prompt. Added clean-frame instruction: "You are a code inspector with fresh eyes. You did not write this code. Your job: find problems, not justify decisions."
+  2. **WHO calibration:** Added extraction of `USER EXPERIENCE LEVEL` from `originalTask`. Injects `COMMUNICATION REGISTER: [description]` into prompt so Guardian calibrates explanation depth.
+  3. **Blueprint + Visual Spec checklist:** Added CONTRACT COMPLIANCE section with explicit pass/fail/n/a checklist: fulfills user request, matches Blueprint spec, matches Visual Contract, error cases handled, no hardcoded values that should be config.
+  4. **Fixed "Do not check boxes":** Changed to "Answer each item below explicitly -- no skipping, no implied results."
+  5. **Self-check (Part C):** Added before verdict: "Before you submit: ask yourself 'Am I passing this because it is genuinely correct, or because I don't want to find a problem?' If uncertain: FAIL it. A false FAIL is recoverable. A false PASS ships broken code."
+- **Why:** Guardian was reviewing with Worker's frame baked in (context bleed). Structured checklist prevents holistic-but-vague review. Self-check is the inspector's creed.
+- **Risk:** Longer prompt adds ~7 tokens per review call. Marginal cost increase.
+
+*Last updated: June 2, 2026 (Session Stage-5 — Upstream Visual Spec)*
+
+### Session Stage-5 — Jun 2, 2026: Upstream Visual Spec Service
+
+#### Parts A+B — visualSpecService.ts + visualSpecExtractor.ts
+
+- **File created:** `src/core/ai/visualSpecService.ts` (112 lines)
+  - **What changed:** `VisualSpec` interface (palette/typography/spacing/feel/referenceComponents/confidence/source). Module-level `setCurrentSpec`/`getCurrentSpec`/`clearCurrentSpec` store. `shouldRunVisualSpec()` fast-path skip (tell-them/look-it-up/non-visual). `orchestrateVisualSpec()` tries extract → infer → default in order; calls `inferFeel()` for cheap AI feel-detection. `formatVisualContractBlock()` serializes spec to locked contract string embedded in `routedText`.
+  - **Why:** Visual contract was missing upstream — Worker was guessing colors/fonts/feel on every UI build. This establishes the spec before the first line of code is written.
+  - **Risk:** Entire visual spec path wrapped in try/catch — never blocks a build.
+
+- **File created:** `src/core/ai/visualSpecExtractor.ts` (150 lines)
+  - **What changed:** `extractFromProjectFiles()` scans for theme/token/CSS-var files (`:root { --primary-color: ... }`). `inferFromComponents()` reads 2-3 existing UI component files for dominant colors and font-family patterns. No AI calls — pure file system reads.
+  - **Why:** Project scanning is deterministic (no AI needed) and fast. Extraction is separated from service logic per the 200-line rule.
+  - **Risk:** All file reads wrapped in try/catch. Returns `null` on any error — falls through to defaults.
+
+#### Part C — Worker prompt injection
+
+- **File changed:** `src/core/build/chatPanelBuildWorker.ts` (109 → 113 lines)
+  - **What changed:** `buildWorkerPrompt()` now extracts the `VISUAL CONTRACT (locked)` block from `ctx.task`, surfaces it as a labeled section after SPEC in the prompt (not buried inside TASK text), and uses `cleanTask` (without the contract block) for the TASK field.
+  - **Why:** Visual contract needs to be visually prominent in the Worker prompt, not buried in the task description.
+  - **Risk:** Regex match is optional — if contract block not found, prompt is identical to before.
+
+#### Part D — Visual Contract Editor integration
+
+- **File changed:** `src/ui/panels/visualContract/visualContractPanel.ts` (119 → 126 lines)
+  - **What changed:** `openVisualContractPanel` made `async`. On open (both new and re-reveal): reads `getCurrentSpec()` from `visualSpecService` and passes `baselineSpec` alongside `contract` in the `load-contract` webview message. Editor receives the intended spec as `baselineSpec` data in its message context.
+  - **Why:** Editor was opening blank and discovering visual properties from scratch. Now it receives the intended spec as a starting point, reducing "why did it pick that color" moments.
+  - **Risk:** `getCurrentSpec()` import wrapped in try/catch — falls back to `null` baseline (identical to previous behavior).
+
+#### Part E — Stage 5 wiring in send-message path
+
+- **File changed:** `src/core/routing/chatPanelMsgSendMessage.ts` (169 → 186 lines)
+  - **What changed:** Stage 5 block after Stage 4 diagnostic block. For `build`/`scaffold` intents with workspace open: calls `shouldRunVisualSpec()`, runs `orchestrateVisualSpec()` if needed, appends formatted contract to `routedText`, stores spec, pushes one-sentence Guardian status message to conversation.
+  - **Why:** Insertion point is after clarify/triage/diagnostic so the spec is established with full context; before adaptive mode so both simple and agent pipelines receive the contract.
+  - **Risk:** Full try/catch — build fires regardless of spec failure.
+
+*Last updated: June 2, 2026 (Session Stage-4 — Five W's Diagnostic + Landing Page)*
+
+### Session Stage-4 — Jun 2, 2026: Five W's Pre-Commit Diagnostic + Landing Page
+
+#### Parts A–D — fiveWsDiagnostic.ts + wiring
+
+- **File created:** `src/core/ai/fiveWsDiagnostic.ts` (146 lines)
+  - **What changed:** New service runs a single lightweight AI call that checks WHAT (does request match goal?), WHY (better approach?), WHEN (intermittent?, fix-only), WHERE (right source file?, fix-only), and WHO (infers user experience 0-1). Returns `DiagnosticResult` with `aligned`, `mismatch`, `suggestedReframe`, and `who`. Fast-path skip for tell-them/look-it-up/additive requests. `handleMismatch()` surfaces 3-option clarify question when `aligned=false`.
+  - **Why:** Workshop Model Stage 4 — catch "solving the wrong problem" before any build fires, not after. The wheel-bearing check.
+  - **Risk:** Full try/catch around AI call — defaults to `aligned=true` on any failure (never blocks a build due to diagnostic error).
+
+- **File changed:** `src/core/routing/chatPanelMsgSendMessage.ts` (149 → 169 lines)
+  - **What changed:** Hoisted `_jobTier` variable outside the job-sizing block. Changed `const routedText` to `let routedText`. Added Stage 4 diagnostic block: calls `runFiveWsDiagnostic`, handles mismatch (3 options → returns resolved text or null), appends WHO calibration context to `routedText` as `USER EXPERIENCE LEVEL: [0.N] ([plain description])`.
+  - **Why:** Diagnostic fires after clarify step, before adaptive mode routing — the last gate before build commits.
+  - **Risk:** Diagnostic wrapped in its own block; any failure returns early with null (handled gracefully).
+
+#### Part E — Landing Page Updates
+
+- **File changed:** `src/ui/panels/chat/chatPanelEmptyState.ts` (95 → 92 lines)
+  - **What changed:** (1) Tagline updated: "Your AI build system. Plan, scaffold, build, and iterate." → "Tell me what you want to build." (larger, prominent). (2) Removed 3 launcher-action-card mode buttons (Guided, Auto, Open Project). (3) Added demoted "or open an existing project →" text link preserving Open Project functionality. (4) Template section header: "Quick Start Templates" → "Start from a template". (5) Removed redundant "Or just type what you want to build below" hint.
+  - **Why:** JobSizer (Stage 2) now auto-detects depth from what the user types — users should never pre-declare mode. Input is now the primary entry point; page should guide eyes there first.
+  - **Risk:** Open Project functionality preserved via demoted link. Recent Projects list provides quick-resume path.
+
+- **File changed:** `src/ui/panels/chat/chatPanelHtml.ts` (182 lines, no net change)
+  - **What changed:** Textarea placeholder: "Ask about your code, the blueprint, or anything else…" → "What do you want to build or fix?"
+  - **Why:** Short, plain, covers both primary job types (build + fix). Matches Guardian voice.
+  - **Risk:** None.
+
+*Last updated: June 2, 2026 (Session Stage-3 — Decision Triage)*
+
+### Session Stage-3 — Jun 2, 2026: Decision Triage
+
+#### Part A — decisionTriage.ts
+
+- **File created:** `src/core/ai/decisionTriage.ts` (142 lines)
+  - **What changed:** New service classifies clarify questions into three buckets: `ai-owns` (technical — AI answers internally), `user-owns-ask` (structural/visual preference — show to user), `user-owns-guess` (cheap/reversible preference — AI picks default). Fast-path regex for obvious cases; AI classifier for ambiguous questions. Module-level pending-guesses store read by `runChatClarifyStep` to enrich `routedText`.
+  - **Why:** Decision triage is the Stage 3 Workshop Model requirement — AI-answerable questions must never interrupt the user; cheap preferences must not block the build waiting for a shade of color.
+  - **Risk:** AI classifier defaults all `remaining` questions to `user-owns-ask` on error (safest — user sees all questions). Fast-path regex is conservative (only obvious patterns).
+
+#### Part B — generateClarifyQuestions() wiring
+
+- **File changed:** `src/core/routing/chatPanelMsgSendClarify.ts` (153 → 174 lines)
+  - **What changed:** After `generateClarifyQuestions()` returns, runs `triageDecisions()` on the result. Filters the questions array to `user-owns-ask` only (ai-owns and user-owns-guess removed). Stores guesses in `_guesses` array. Added `withGuesses()` helper that appends `AI DEFAULT CHOICES` block to `routedText` when guesses exist. All non-cancelled return paths now call `withGuesses()`.
+  - **Why:** Only `user-owns-ask` questions reach the user. Guesses are embedded in `routedText` so the build AI applies them and the Guardian can mention them post-build.
+  - **Risk:** Triage wrapped in try/catch — if it fails, all questions pass through unchanged (identical to Stage 2 behavior).
+
+#### Part C — Guardian post-build guess summary
+
+- **Implementation:** Via `routedText` enrichment. When `_guesses.length > 0`, `withGuesses()` appends `AI DEFAULT CHOICES (apply these, mention in post-build summary):\n  - [question]: [value]` to the build task string. Build AI sees this instruction and mentions choices; Guardian reviews output with this context and surfaces them per its Stage 2 persona ("tell them what was built in 2-3 plain sentences").
+  - **Location:** `src/core/routing/chatPanelMsgSendClarify.ts` — `withGuesses()` helper, all non-cancelled return paths
+  - **Note:** Full explicit Guardian narrative template is Stage 5/6 work.
+
+*Last updated: June 2, 2026 (Session Stage-2 — JobSizer + Agent Personas)*
+
+### Session Stage-2 — Jun 2, 2026: JobSizer + Agent Personas
+
+#### Part A — JobSizer service
+
+- **File created:** `src/core/ai/jobSizer.ts` (82 lines)
+  - **What changed:** New service classifies every build request into one of four job tiers (`tell-them`, `look-it-up`, `offer-choices`, `explore-with-them`) before any clarify/build logic fires. Fast-path regex for trivial tasks (no AI call), AI fallback for `offer-choices` vs `explore-with-them`.
+  - **Why:** Workshop Model requires the Supervisor to size the job at intake — a "fix this typo" request should ask 0 questions and fire immediately; an "build me an app" should ask the full 5 W's. Previously, every build intent went through the same binary CLEAR/VAGUE check regardless of size.
+  - **Risk:** AI fallback defaults to `offer-choices` (3 questions) on error — safest middle ground.
+
+- **File changed:** `src/core/routing/chatPanelMsgSendMessage.ts`
+  - **What changed:** Replaced `shouldClarify()` binary check with `sizeJob()` tier dispatch. `tell-them` tier pushes an acknowledgment message and skips clarify entirely. Other tiers call `runChatClarifyStep` with `suggestedQuestions` cap.
+  - **Why:** JobSizer is the new intake gate. `shouldClarify` was dead once wired.
+  - **Risk:** None — fallback default is `offer-choices` (same behavior as old `shouldClarify` returning VAGUE).
+
+- **File changed:** `src/core/routing/chatPanelMsgSendClarify.ts`
+  - **What changed:** Added optional `maxQuestions` param to `runChatClarifyStep`; caps question array before display. Marked `shouldClarify()` as `[DEAD]` (kept for audit trail, not deleted).
+  - **Why:** JobSizer controls question count per tier; clarify step enforces the cap.
+  - **Risk:** None — if `maxQuestions` is undefined, behavior is identical to before.
+
+- **File changed:** `src/core/ai/chatPanelIntent.ts`
+  - **What changed:** Marked `isVagueProjectRequest()` guard as `[DEAD]` (kept, not deleted).
+  - **Why:** JobSizer at intake already handles vague-request detection before `handleBuildRequest` fires.
+  - **Risk:** None — guard still executes (belt-and-suspenders) until Stage 3 cleanup.
+
+#### Part B — Agent Personas
+
+- **File changed:** `src/services/ai/guardianAIPrompt.ts`
+  - **What changed:** Prepended Guardian persona to `buildGuardianPrompt()` — establishes Guardian as "the inspector AND the translator"; plain-English voice rules, translate Worker output, own failures, disagree when warranted, no "as an AI" disclaimers.
+  - **Why:** Guardian is the primary human-facing voice. Persona aligns its tone with user expectations.
+  - **Risk:** Adds ~13 lines to the Guardian prompt — marginally increases token cost per review call.
+
+- **File changed:** `src/services/ai/routingGuardian.ts`
+  - **What changed:** Prepended Supervisor persona to `supervisorPlanImpl()` prompt — shop foreman, direct/warm/efficient, sizes job in 5 seconds, tier-appropriate question count, no jargon.
+  - **Why:** Supervisor needs a consistent voice for intake and planning phases.
+  - **Risk:** None — persona precedes functional instructions; functional rules override on conflict.
+
+- **File changed:** `src/services/ai/supervisorOrchestrator.ts`
+  - **What changed:** Prepended condensed Supervisor persona to `buildPlanPrompt()`. Prepended Worker persona to `executeStep()` — mechanic who doesn't talk to customer, flags uncertainty with `[WARN]`, clean code + clear comments.
+  - **Why:** Worker persona directly improves build quality: `[WARN]` flags surface to Guardian; "write clean code, leave clear comments" is actionable guidance.
+  - **Risk:** Worker persona adds ~4 lines per step prompt — negligible token increase.
+
+### Session 11EM (web) — Trophy Room data fix + waitlist auto-graduate + reporter capture groundwork
+
+- **Trophy Room was empty** despite real bugs — root cause: the `public_bugs` VIEW was never created in the DB (migration unapplied). Fix: `app/trophy-room/page.tsx` now reads `feedback` directly via the service-role client (server-only) and resolves finder names from auth.users — no view/migration needed. Active/Squashed bugs show immediately; leaderboard becomes meaningful once reports carry a `user_id`.
+- **Waitlist "archive" pivoted to auto-graduate** — a DB `waitlist_status_check` constraint rejects an `archived` status (can't ALTER without DB access), so instead `app/admin/waitlist/page.tsx` auto-moves approved entries whose email is already a real auth user into a collapsed "Active users" section. Zero-DDL, automatic, matches "approved + in Users → hide." Reverted the broken status-based archive button/route/gate changes.
+- **Reporter capture groundwork** — `app/api/feedback/route.ts` now accepts a `userId` in the body (UUID-shaped, lightly trusted — attribution only) so the authed IDE can attribute reports. [NEXT: IDE must send it; reports page must display reporter + reply button — tracked as tasks.]
+- **Docs:** created `docs/REDIVIVUS_DEBUG_MAP.md` (symptom→files triage index, both repos). Updated FIXES/ROADMAP/CHANGELOG.
+- **Deployed:** versions 84316d42 → dcd73b5d.
+
+
+
+### Session 11DZ — Deep Audit Fixes
+
+**Audit found 6 logic bugs in the recently-added build pipeline (tsc + eslint were clean).**
+
+#### Fix #1 — runAutoFix ran the project without installing dependencies
+
+- **File changed:** `src/services/build/runtimeRunner.ts`
+  - **What changed:** Added `needsNodeInstall(root)` (package.json present but node_modules missing) and `installNodeDeps(root)` (async `npm install`, 120s timeout, returns null on success or an error string).
+  - **Why:** `runAutoFix` ran `npm run dev`/`npm start`/`node x` on freshly-scaffolded projects with no node_modules, so the run failed with "Cannot find module", which was misread as a runtime crash and triggered up to 2 AI source rewrites against a dependency error — wasting tokens and risking corruption of correct code.
+  - **Risk:** `installNodeDeps` uses `cp.spawn` (async, non-blocking) so the extension host doesn't freeze. A 120s npm install adds latency to the post-build run check for uninstalled projects, but only once.
+
+- **File changed:** `src/services/build/runAutoFix.ts`
+  - **What changed:** Captured the run command from `detectRunCommand`; for npm/node commands when `needsNodeInstall` is true, runs `installNodeDeps` first (with a chat status message) and skips the runtime check gracefully if install fails, instead of proceeding into a guaranteed false failure.
+  - **Why:** See above.
+  - **Risk:** None — falls back to the prior behavior for non-npm projects and when deps are already installed.
+
+#### Fix #2 — Multi-file cloud build could silently "succeed" with 0 files
+
+- **File changed:** `src/services/build/cloudBuildMultiFile.ts`
+  - **What changed:** (1) Per-file: if the `/build` response carries `requiresClientExecution`, return a clear failure instead of writing nothing — the multi-file path, unlike single-file, never runs the client-side AI step. (2) Post-loop: if `allFiles.length === 0`, return a failure instead of calling `processBuildResults` with an empty list (which produced a misleading "Built 0 files" success card while writing nothing).
+  - **Why:** `executeMultiFileBuild` read `data.files` directly, assuming the server returns finished files. If the server returned the `requiresClientExecution` shape (as the single-file path handles), `data.files` was undefined → built nothing → reported success.
+  - **Risk:** None — only converts a silent no-op into an actionable error. The caller surfaces the error to the user (no fallback exists for multi-file, which is correct).
+
+#### Fix #3 — Build log/history recorded un-stripped (wrong) file paths
+
+- **File changed:** `src/services/build/cloudBuildResultProcessor.ts`
+  - **What changed:** Added a single `stripSlug(p)` helper and reused it for the write path, the history record (`files: [relPath]`), the build-log entry (path + `fs.statSync`), and the returned normalized files — replacing three duplicated, inconsistent inline prefix checks.
+  - **Why:** Files were written to the slug-stripped path (e.g. `src/App.js`) but the history record and build log stored the original prefixed path (e.g. `react-todo-app/src/App.js`). The log's `fs.statSync(path.join(root, f.path))` then hit a non-existent path, so `sizeBytes` was silently always 0.
+  - **Risk:** None — paths now consistently reflect what's actually on disk.
+
+#### Fix #4 — Security scanner aborted entirely on a single dangling symlink
+
+- **File changed:** `src/services/build/securityScanner.ts`
+  - **What changed:** `scanDir` now uses `fs.readdirSync(dir, { withFileTypes: true })` and checks `entry.isDirectory()/isFile()` instead of an unguarded `fs.statSync(full)` per entry.
+  - **Why:** The bare `statSync` threw on a dangling symlink (or a file removed mid-scan). The throw bubbled to `scanProject`, which is caught at the call sites — so the build didn't break, but the scan silently returned zero findings for the whole project.
+  - **Risk:** Behavior change — symlinked directories/files are no longer followed (Dirent reports symlinks as neither dir nor file). For a post-build scan of generated code this is desirable: it also prevents symlink loops. Regular files/dirs are scanned exactly as before.
+
+#### Fix #5 — Dead timeout branch in multi-file build (TimeoutError name never set)
+
+- **File changed:** `src/services/build/cloudBuildMultiFile.ts`
+  - **What changed:** The 120s timeout now sets `err.name = 'TimeoutError'` on the rejected error, matching the catch branch's `e?.name === 'TimeoutError'` check (and `cloudBuildClient.makeTimeout`).
+  - **Why:** The timeout rejected with a plain `Error` (name `'Error'`), so the dedicated timeout branch never matched and execution fell through to the generic handler. Harmless today since both return the same message, but a future edit to the generic branch would silently change timeout behavior.
+  - **Risk:** None — same user-visible message; the correct branch now handles it.
+
+#### Fix #6 — runProject orphaned server processes on timeout
+
+- **File changed:** `src/services/build/runtimeRunner.ts`
+  - **What changed:** Rewrote `runProject` from synchronous `cp.spawnSync` to async `cp.spawn` with `detached: true`. The shell and everything it spawns now share one process group; on the 8s timeout (server stayed alive = good) it calls `process.kill(-child.pid, 'SIGKILL')` to reap the entire group. Output is captured via stdout/stderr listeners; `isServer` is now simply "still running at 8s".
+  - **Why:** `spawnSync` with `timeout` only SIGTERM'd the direct shell child, leaving the actual node server (a grandchild) orphaned and holding port 3000. Repeated post-build runs leaked processes/ports.
+  - **Risk:** `runProject` is now async (returns a Promise). Only caller is `runAutoFix` (already async) — both call sites updated to `await`. `detached` is POSIX process-group behavior; fine on the Linux target. Also reaps the group on spawn error.
+
+- **File changed:** `src/services/build/runAutoFix.ts`
+  - **What changed:** `await runProject(...)` at both call sites.
+  - **Why:** `runProject` is now async.
+  - **Risk:** None.
+
+### Session 11EB — Model-aware token budget (Phase 1)
+
+- **File created:** `src/services/ai/tokenBudget.ts`
+  - **What changed:** Pure-function core — `estimateTokens` (single source of truth for the chars/4 heuristic, +3% drift), `MODEL_WINDOWS` + `getModelWindow` (conservative input window per model family, longest-prefix match), `getInputBudget` (window − reservedOutput − safety margin − serverOverhead), and `fitToBudget` (priority-ranked section fitter: keep high-priority whole, trim/drop lowest first; never drops the top-priority section; reports dropped/trimmed).
+  - **Why:** Context overflow was prevented only by fixed byte-caps (model-blind, silent). This measures tokens against the target model's window.
+  - **Risk:** Low — pure, no IO. 18 unit assertions pass (window mapping, budget math, order preservation, trim/drop, minTokens, top-priority retention).
+
+- **File changed:** `src/services/build/cloudBuildLocalFallback.ts`
+  - **What changed:** `buildLocalPrompt` now assembles prioritized sections and runs `fitToBudget` against the smallest available provider window (reserving output + SYSTEM prompt); removed the old fixed `.slice(6000/2000)` and top-5 vault caps. `runLocalBuild` emits an `onProgress` "Context trimmed to fit" signal when sections are dropped/trimmed.
+  - **Why:** Local fallback builds the full prompt client-side — easiest place to enforce a real budget + surface trimming.
+  - **Risk:** Low — budgeter validated; falls back to conservative 32k window for unknown providers.
+
+- **File changed:** `src/core/ai/costEstimatorService.ts`
+  - **What changed:** `estimateBuild` now uses `estimateTokens` from tokenBudget instead of an inline `length/4`.
+  - **Why:** So the cost estimate and the budget share one token heuristic and never disagree.
+  - **Risk:** None — same math, centralized.
+
+### Session 11EL — IDE: project-context guard no longer blocks legitimate switches + waitlist archive (web)
+
+**IDE bug (reported via Copy-for-AI):** "Exiting a session and starting a new one — the previous project stayed in queue; after opening a project manually the layout stayed on the previous project."
+**Root cause:** `projectContextLogger.currentProjectRoot` is a module latch; `logProjectContextSwitch` blocked ANY differing-root switch (unconditionally, despite the "during build" comment) and nothing reset it on session end. So exiting left the old root latched, and the new project's switch was blocked → callers (`onNewProject`, `resumeBuildTask`) returned before re-pointing the panel.
+
+- **File changed:** `src/services/logging/projectContextLogger.ts` — added `resetProjectContext()` and an `explicit` param; explicit (user-initiated) switches are always allowed; the block only guards implicit mid-build switches.
+- **File changed:** `src/commands/init.ts` — `onNewProject` now passes `explicit=true`.
+- **File changed:** `src/ui/messageRouterSession.ts` — `endSession` calls `resetProjectContext()`.
+- **File changed:** `src/extension.ts` — `onDidChangeWorkspaceFolders` clears the latch on folder removal and re-points it (reset + init) on folder add, so the panel follows a manually-opened project. (Note: extension.ts is 275 lines — pre-existing Rule 9 over-limit; minimal change only, not split.)
+- **Left `handleStartNewProject` guard intact** — that block is a deliberate "this task is an edit, not a new project" check.
+- **Deployed:** `npm run compile` → out/ copied to 2 IDE locations. Requires IDE window reload. Auto-commit prepared (not run).
+
+#### Session 11EL (web) — Waitlist archive (retrievable, access-preserving)
+- **Files:** `src/lib/approval.ts` (allow status in [approved, archived]), `src/app/api/admin/waitlist/update/route.ts` (+archived), `src/app/admin/waitlist/WaitlistActions.tsx` (Archive on approved rows, Unarchive on archived), `src/app/admin/waitlist/page.tsx` (collapsible Archived section + counter).
+- **What:** Approved users can be archived (hidden from main list) without losing access — `archived` is treated as approved by the gate. Retrievable via Unarchive. Schema-free (reuses status).
+- **Deployed:** version 84316d42.
+
+### Session 11EK (web) — Robust auth: 6-digit code entry (replaces flaky magic link) + admin email + provision Max
+
+- **Root cause of intermittent "auth failed":** single-use magic *link* prefetching — email scanners auto-open the link, consuming the one-time token before the user clicks. Intermittent because it only fails when a scanner prefetches. Link and code share the same token, so a link in the email kills the code too.
+- **Fix — code-entry flow:**
+  - `redivivus-web/src/app/login/page.tsx` — two-step: email → `signInWithOtp` (sends 6-digit code, `shouldCreateUser`, optional name) → enter code → `verifyOtp({ email, token, type:'email' })` client-side → hand off to `/auth/callback`. No clickable link = nothing to prefetch.
+  - `redivivus-web/src/app/auth/callback/route.ts` — added a branch: no code/token_hash but an existing session → `finishSignIn` (creates pending waitlist row, routes to app/pending). Also kept multi-type token_hash + diagnostic logging.
+  - **[NEXT] Requires Supabase email template change:** "Magic link or OTP" template must show `{{ .Token }}` (the code) and contain **no link**. Until done, users get a link-less code email matching the new form.
+- **Admin email feature (requested):** `redivivus-web/src/app/api/admin/email/route.ts` + `src/components/SendEmailButton.tsx` — admin can send a personalized branded email (subject + body) to any address via Resend; wired as an "Email" button on each waitlist row (logs `admin_email_sent`).
+- **Provisioned Max (one-off):** created a confirmed auth account for lokaxn1@gmail.com (id 8c006727…) via service role so he's a full user without re-doing the funnel; waitlist already approved. He still needs one code sign-in on his device to get a session.
+- **Deployed:** versions c64d056d (code flow) → 1e94bf38 (callback session handoff).
+
+### Session 11EJ (web) — Invite email: one clear "Sign in & download" link + Users name fallback
+
+- **File changed:** `redivivus-web/src/app/api/admin/waitlist/invite/route.ts` — invite CTA changed from a bare Download link (which silently bounced to /login with no return path, confusing) to **"Sign in & download →"** pointing at `/login?redirect=%2Fdownload`. Copy now explains: sign in with this email (one-time link), then you land on the download page. One link does the whole thing.
+- **File changed:** `redivivus-web/src/app/download/page.tsx` — signed-out visitors now redirect to `/login?redirect=%2Fdownload` (was `/login` with no return), so after sign-in they land back on the download instead of the homepage.
+- **File changed:** `redivivus-web/src/app/admin/users/page.tsx` — Users list name now also falls back to `user_metadata.name` (magic-link signups store name there), so they no longer show "—".
+- **Why:** Approved testers had only a download link and no sign-in guidance; the round-trip dumped them on the homepage. Now it's one obvious "sign in & download" path.
+- **Deployed:** versions e486295d (name) then 7f69be8e (invite + redirect).
+
+### Session 11EI (web) — Magic link cross-device "auth failed" fixed (multi-type verifyOtp)
+
+- **Problem:** Clicking the magic link on a different device than it was requested on → "Authentication failed." Two causes: (1) PKCE single-browser limitation [fixed earlier via token_hash email template], (2) the `verifyOtp` `type` mismatch — a new-user (signup) token vs a returning-user (magiclink) token differ, but the template hardcodes one `type`.
+- **File changed:** `redivivus-web/src/app/auth/callback/route.ts` — the token_hash branch now tries the URL `type` first, then falls back through `email`/`magiclink`/`signup`/`invite`. `verifyOtp` only consumes the token on success, so iterating failed attempts is safe.
+- **Why:** Removes the type-guessing fragility; works for fresh signups and returning users, any device.
+- **Risk:** Low. **Confirmed working** — user tested cross-device (request on PC, click on phone) successfully after deploy (version eea4768d).
+
+### Session 11EH (web) — /login skips the form for already-signed-in users
+
+- **File changed:** `redivivus-web/src/app/login/page.tsx`
+  - **What changed:** On load, `LoginForm` checks `getUser()`; if a session exists it `window.location.replace`s to the `redirect` param (IDE handshake) or `/download` — showing a brief "Checking your session…" instead of the email form. Signed-out users still get the form.
+  - **Why:** A returning, already-signed-in user clicking "Sign in" was shown the form and forced to request a new magic link — annoying and pointless given sessions persist.
+  - **Risk:** Low — client-side session check; falls back to showing the form on any error.
+- **Deployed:** version 08b33374.
+
+### Session 11EG (web) — Unified onboarding funnel (one source; waitlist only after verification)
+
+**Goal:** Replace the two confusing entry points (waitlist form + magic-link sign-in) with ONE flow: enter email → verify via magic link → auto-added to waitlist (pending) → admin approves → approval email → sign in → use. Key rule: a user is NOT added to the waitlist until their email is verified.
+
+- **File changed:** `redivivus-web/src/lib/approval.ts` — added `ensurePendingWaitlist(user)`: inserts a `pending` waitlist row once, ONLY when called (post-verification). Skips admins, never downgrades an existing approved/denied row, pulls name from auth metadata (magic-link `options.data.name` or GitHub profile).
+- **File changed:** `redivivus-web/src/app/auth/callback/route.ts` — both success paths (PKCE code + token_hash) now run `finishSignIn`: ensure the pending waitlist row, then route — approved → `next` (app/IDE), else → `/pending`. This is where verification happens, so the waitlist row is created here (not at request time).
+- **File created:** `redivivus-web/src/app/pending/page.tsx` — "You're verified — and on the list" screen for verified-but-unapproved users; redirects approved users to /download, signed-out to /login.
+- **File changed:** `redivivus-web/src/app/login/page.tsx` — optional Name field (carried into the verified row + approval email via `signInWithOtp options.data.name`); copy now "Sign in or request access".
+- **File changed:** `redivivus-web/src/components/HeroCTA.tsx` + `src/app/page.tsx` — all CTAs route to `/login`; removed the standalone `WaitlistForm` (the old path created an unverified pending row on submit — exactly what we don't want). `stats` badge retained.
+- **Deployed:** redivivus-web (version 71be2705). Verified: /pending → /login when signed out; homepage funnels to /login; waitlist form gone.
+- **[NEXT] Supabase:** magic-link email template now uses the `token_hash` link to /auth/callback (cross-device safe). User configured Email provider + Resend SMTP + redirect URL.
+
+### Session 11EF (web) — Home hero: removed duplicate "Request Beta Access" button + deployed
+
+- **File changed:** `redivivus-web/src/app/page.tsx`
+  - **What changed:** Removed the static ghost "Request Beta Access →" `<a>` (line 111) — it duplicated `<HeroCTA />`, which already renders that button when signed out (and "Download IDE →" when signed in). Hero is now `[HeroCTA] [View on GitHub]`.
+  - **Why:** Two identical "Request Beta Access" buttons showed in the hero.
+  - **Risk:** None.
+- **Deployed:** redivivus-web to Cloudflare (versions 5a1ece15 then 9eff4450) — this also pushed Sessions 11EA–11EE web work (magic link, gating, waitlist invite/add, reports fidelity, feedback verbatim) live. Supabase magic-link config done by user (Email provider + Resend SMTP + redirect URL).
+
+### Session 11EE (web) — Non-GitHub signup (magic link) + close the beta gate
+
+**Goal:** Let non-GitHub users join + sign up, and restrict download/IDE access to approved emails. Key insight: the download gate and IDE handshake only need a Supabase session (provider-agnostic), so this is mostly a /login + gating change.
+
+- **File created:** `redivivus-web/src/lib/approval.ts`
+  - **What changed:** `isUserAllowed(user)` — true if admin (ADMIN_USER_IDS) or the user's email has an `approved` waitlist row (case-insensitive `ilike`, service-role read).
+  - **Risk:** Low. Admins always allowed so they can't lock themselves out.
+
+- **File changed:** `redivivus-web/src/app/login/page.tsx`
+  - **What changed:** Added passwordless magic-link sign-in (`signInWithOtp`, email field + "check your inbox" state), preserving the `redirect`/`next` param so the IDE handshake survives the round trip. GitHub button kept as the secondary option (fixed: used inline styles, not the non-existent `.btn-secondary` class).
+
+- **File changed:** `redivivus-web/src/app/auth/callback/route.ts`
+  - **What changed:** Added a `token_hash`/`type` `verifyOtp` branch alongside the existing PKCE `code` exchange, so magic links verify regardless of email-template format.
+
+- **File changed:** `redivivus-web/src/app/download/page.tsx`
+  - **What changed:** After the sign-in check, gate on `isUserAllowed`; non-approved signed-in users see a "You're not approved yet" screen with a join-the-waitlist link (`/#beta`) instead of the download.
+
+- **File changed:** `redivivus-web/src/app/auth/ide/route.ts`
+  - **What changed:** Signed-in but non-approved users are redirected to `/download` (the gate screen) instead of being handed an IDE token.
+
+- **File changed:** `redivivus-web/src/app/api/admin/users/welcome/route.ts`
+  - **What changed:** Copy fix — "sign in with this email address (GitHub or an emailed sign-in link)" (was GitHub-only).
+
+**[NEXT] Requires Supabase dashboard config (cannot be done in code):** enable the Email auth provider (magic link); set custom SMTP = Resend; add `https://redivivus.dev/auth/callback` to Auth → Redirect URLs. Until then, magic-link emails won't send.
+
+- **File created:** `redivivus-web/src/app/api/admin/waitlist/add/route.ts` + `AddApprovedEmail.tsx`
+  - **What changed:** Admin-only "Add & Approve" form on the waitlist page — upserts a waitlist row with status='approved' for any email (lowercased), so an existing tester who never used the public form can be whitelisted without being locked out by the new gate. Does not auto-send an invite (use the row's Resend Invite). `router.refresh()` updates the list.
+  - **Why:** The download/IDE gate is now strict (approved emails only); admins need a way to approve people directly.
+  - **Risk:** Admin-gated. Upsert avoids duplicates (updates existing row to approved).
+
+### Session 11ED (web) — Waitlist: approve sends the invite server-side (Resend)
+
+- **Problem:** The "Email Invite" button used a `mailto:` link, which failed on machines with no mail client ("No Apps Available" dialog) — so approved users never got invited.
+
+- **File created:** `redivivus-web/src/app/api/admin/waitlist/invite/route.ts`
+  - **What changed:** Admin-gated POST `{entryId}` — looks up the waitlist entry and sends the beta-invite email via Resend (same FROM + CF env / RESEND_API_KEY pattern as the welcome route), logs `waitlist_invite_sent` to activity_logs. Invite content (beta rules + download link) moved into an HTML email here.
+  - **Why:** Send invites server-side instead of relying on a local mail client.
+  - **Risk:** Sends real email; requires RESEND_API_KEY (already used by the welcome route). Returns a clear error if unconfigured.
+
+- **File changed:** `redivivus-web/src/app/admin/waitlist/WaitlistActions.tsx`
+  - **What changed:** Approve now **approves AND sends the invite** in one action (`approveAndInvite`). The old `mailto:` "Email Invite" link is replaced by a server-side "Resend Invite" button. Added inline status feedback ("Invite sent to …" / failure). Removed the now-unused client-side invite body text.
+  - **Why:** Matches intent — approving a user should email them the invite.
+  - **Risk:** Low — approve still succeeds even if the email send fails (status set first; failure surfaced; Resend Invite available to retry).
+
+### Session 11EC — Health panel: tokens-used + partial balance
+
+- **File created:** `src/ui/panels/chat/chatPanelHealthMetrics.ts`
+  - **What changed:** Moved `readBuildStats` here and added `readUsage(ctx)` — reads the UsageTracker's `globalState` (history + lifetime) and returns lifetime tokens/cost + per-provider token/cost breakdown. Pure reads, no side effects (does not instantiate UsageTracker, so no new session is started).
+  - **Why:** Keep `chatPanelHealthCheck.ts` under 200 lines (Rule 9) and surface real token usage.
+  - **Risk:** None — read-only, returns null when no context.
+
+- **File changed:** `src/ui/panels/chat/chatPanelProviderBalance.ts`
+  - **What changed:** Added real Kimi/Moonshot balance via `GET /v1/users/me/balance` (`fetchKimiBalance`); sets `balance` + `currency` ('&yen;', billed CNY), falls back to key validation on any failure. Added `currency?` to `ProviderBalance`.
+  - **Why:** Show an actual balance where the provider exposes one.
+  - **Risk:** Low — only Kimi changed; others still key-validate. **DeepSeek also has a balance API but is not a wired provider in redivivus (no key in collectKeys), so it can't be added without first adding DeepSeek as a provider.**
+
+- **File changed:** `src/ui/panels/chat/chatPanelHealthCheck.ts`
+  - **What changed:** `collectHealthData(ctx?)` now reads usage; added an "AI Usage (lifetime)" card (total tokens, total cost, per-provider breakdown); balance rendering now honors `currency`. Removed the moved `readBuildStats` (now imported).
+  - **Why:** Surface tokens-used and the live balance in the panel.
+  - **Risk:** Low. The status-only caller (`chatPanelPublicAPI`) passes no ctx → usage null, which is fine.
+
+- **File changed:** `src/core/project/chatPanelMsgRunCommand.ts`
+  - **What changed:** Passes `ChatPanel.extensionContext` into `collectHealthData` so usage can be read.
+  - **Risk:** None.
+
+### Session 11EB — Model-aware token budget (Phase 2)
+
+- **File changed:** `src/services/build/buildContextCollector.ts`
+  - **What changed:** Added `budgetContext(ctx, model)` — trims a CloudBuildContext in place to fit `getInputBudget(model, {serverOverhead:4000})`. Drops/shrinks lowest-value fields first (vault items → gitContext → projectMap → recentBuilds → deadEnds → projectRules → finally shrink existing-file contents). Blueprint and the edit target files are protected. Returns `{dropped, trimmed, usedTokens}`.
+  - **Why:** The cloud path sends a structured context packet that the server turns into the prompt; budgeting the packet client-side prevents silent overflow regardless of server behavior.
+  - **Risk:** Unknown model → conservative 32k window, so trimming only triggers on genuinely large contexts. Validated: 7 assertions (small/large contexts, priority order, blueprint protection, within-budget result).
+
+- **File changed:** `src/services/build/cloudBuildClient.ts`
+  - **What changed:** Calls `budgetContext(context, preferred)` right after collecting context; emits an `onProgress` "Context trimmed to fit … dropped/trimmed" signal when it acts. Applies to the plan, single-file, and multi-file paths (they share this context).
+  - **Why:** Convert silent overflow into a bounded packet + visible signal — the "detection" half that was missing.
+  - **Risk:** Low — no-op when context fits.
+
+### Session 11EA — Bug Report Fidelity (extension side)
+
+**Goal:** Reports must carry everything needed to debug — verbatim original, full logs, screenshots, plus build/env/workspace context. (Admin truncation + AI-summarizing fixed separately in redivivus-web.)
+
+- **File created:** `src/commands/reportDiagnostics.ts`
+  - **What changed:** New `collectDiagnostics(version)` collector — appends Environment (OS, VSCodium, Electron/Node/V8), build identity (version + build timestamp + commit), Workspace state (project name, initialized?, kind), and Recent builds (last 3 from build_history.json, per Rule 17). Never throws.
+  - **Why:** Reports lacked build hash, environment, and last-build context — the things that turn "can't reproduce" into a fix.
+  - **Risk:** Low — read-only, each section degrades gracefully.
+
+- **File changed:** `src/commands/reportIssueHandler.ts`
+  - **What changed:** Appends `collectDiagnostics(version)` to every report body (always on; the big session-log block stays behind the includeLogs opt-in).
+  - **Why:** See above.
+  - **Risk:** None.
+
+- **File changed:** `scripts/postcompile-deploy.js`
+  - **What changed:** build-info.json now includes `commit` (git rev-parse --short HEAD). Falls back to 'unknown' outside git.
+  - **Why:** So reports pin the exact source that produced the build.
+  - **Risk:** None — build-time only.
+
+#### Session 11EA (web) — admin report rendering
+
+- **File changed:** `redivivus-web/src/app/admin/reports/page.tsx`
+  - **What changed:** (1) `renderMd` now renders a safe markdown subset: escapes all HTML first (XSS-safe), then whitelists ```fenced``` code blocks (-> `<pre>`, newlines preserved via placeholder extraction), `<details>`/`<summary>` (collapsible diagnostics), bold, headings, inline code. (2) Removed `r.steps.slice(0,300)` truncation — shows full steps in a scrollable (maxHeight 400) `<pre>`. (3) Screenshot extraction regex made position-independent (`[^\n]+`, not end-anchored) since the IDE now appends diagnostics after the screenshots line.
+  - **Why:** `<details>`/`<summary>` and code fences previously rendered as literal escaped text, making the session log unreadable; steps were cut at 300 chars.
+  - **Risk:** Low — HTML still fully escaped before the whitelist, verified XSS-safe (a `<script>` in a log renders as `&lt;script&gt;`). Rendering validated against a representative report body (details + fenced log + screenshots).
+  - **Note:** Replaced raw NUL-byte placeholders (which had crept into the source and made the file read as binary) with an ASCII `@@CB{n}@@` sentinel.
+
+#### Session 11EA (web) — feedback API stores reports verbatim
+
+- **File changed:** `redivivus-web/src/app/api/feedback/route.ts`
+  - **What changed:** (1) The gpt-4o-mini step no longer rewrites the report — it is used ONLY to set the `is_duplicate` flag; title/description/steps are stored exactly as submitted. (2) Removed the lossy `slice(0,4000)`/`slice(0,2000)` caps; replaced with a generous safety valve (title 300, description 100k, steps 20k) since the columns are unlimited `text`. (3) Dup-check prompt rewritten to dedup-only; only bounded user prose is sent to the model.
+  - **Why:** The AI rewrite summarized away session logs/diagnostics and the 4000-char cap chopped them. Reports exist to debug bugs — they must be verbatim and complete.
+  - **Risk:** AI dedup still works (flag only). Stored reports are larger now (full logs) — acceptable; safety caps prevent abuse. Admin rendering of `<details>`/code handled next.
+
+---
+
+*Earlier sessions:*
+
+*Last updated: May 31, 2026 (Session 11DX: Duplicate detection improved — liberal AI matching + manual admin toggle)*
+
+### Session 11DX (continued) — Duplicate Detection: Liberal Matching + Manual Toggle
+
+**Problem:** The two reports "the R on the top left hand corner..." and "the R in the very top left hand corner..." were clearly the same issue but weren't flagged as duplicates. The AI prompt said "exact same issue" which was too strict.
+
+- **File changed:** `redivivus-web/src/app/api/feedback/route.ts`
+  - **What changed:** Rewrote duplicate detection instructions. Changed "exact same issue" to "same symptom or problem, even if worded differently." Added explicit examples: "top left corner R" and "very top left hand corner R" are the same location. Changed to "be liberal: flag if there is reasonable overlap."
+  - **Why:** Strict matching missed obvious paraphrases of the same bug.
+  - **Risk:** May produce slightly more false-positive duplicate flags. Acceptable — admins can toggle it off.
+
+- **File changed:** `redivivus-web/src/app/admin/reports/actions.ts`
+  - **What changed:** Added `toggleDuplicate(id, isDuplicate)` server action that updates `is_duplicate` on any report.
+  - **Why:** Manual override needed — AI isn't perfect.
+  - **Risk:** None.
+
+- **File created:** `redivivus-web/src/app/admin/reports/DuplicateToggle.tsx`
+  - **What changed:** Client component with a toggle button. Shows red "DUPLICATE ✕" if already a duplicate (click to unmark), shows gray "+ DUPE" if not (click to mark). Uses `useTransition` for optimistic UI.
+  - **Why:** Admins need to manually mark/unmark without reloading.
+  - **Risk:** None.
+
+- **File changed:** `redivivus-web/src/app/admin/reports/page.tsx`
+  - **What changed:** Added `DuplicateToggle` next to each report's status controls.
+  - **Why:** Wires the toggle into the list view.
+  - **Risk:** None.
+
+### Session 11DX (continued) — Duplicate Report Detection Surfaced
+
+**Context:** The backend already detects duplicates (AI compares against last 50 reports, sets `is_duplicate: true`) and the admin row already shows a red DUPLICATE badge. What was missing: a filter tab in admin, and user feedback in the IDE.
+
+- **File changed:** `redivivus-web/src/app/admin/reports/page.tsx`
+  - **What changed:** Added "duplicates (N)" filter tab that links to `?dup=1`. Query now supports `.eq('is_duplicate', true)` when `dup=1` param is present. Tab turns red when active.
+  - **Why:** No way to quickly see all duplicate reports without scrolling.
+  - **Risk:** None.
+
+- **File changed:** `redivivus-web/src/app/api/feedback/route.ts`
+  - **What changed:** Response now returns `{ ok: true, is_duplicate: boolean }` instead of just `{ ok: true }`.
+  - **Why:** IDE needs to know if the submitted report was flagged as a duplicate to show appropriate message.
+  - **Risk:** None — additive change, existing clients ignore unknown fields.
+
+- **File changed:** `src/commands/reportIssue.ts`
+  - **What changed:** IDE reads `res.is_duplicate` from API response. If true: success message shows "Looks like a known issue -- logged and flagged as duplicate. Admin will review." instead of generic success. `showInformationMessage` also adjusts.
+  - **Why:** Users should know their report is a likely duplicate rather than thinking it's a fresh unique report.
+  - **Risk:** None.
+
+### Session 11DX (continued) — Report Panel: Screenshot Upload Fixed
+
+**Problem:** Screenshots attached in the panel were not appearing in the admin area.
+
+**Root cause 1 — 0x0.st is dead:** `curl -F file=@img.png https://0x0.st` times out (exit code 28, CURLE_OPERATION_TIMEDOUT). All uploads silently failed, so no screenshot URLs were generated.
+
+**Root cause 2 — AI reformatter strips image URLs:** The backend GPT-4o-mini reformatter rewrites the description before saving. Image markdown (`![screenshot](url)`) was being stripped. Fix: append screenshot URLs AFTER `buildReport` returns, so they're added directly to the final description string that goes to the API.
+
+- **File changed:** `src/commands/reportIssue.ts`
+  - **What changed:** (1) `uploadWithCurl`: switched from 0x0.st to catbox.moe (`curl -F reqtype=fileupload -F fileToUpload=@path https://catbox.moe/user/api.php`). Added `--max-time 20` to prevent hanging. (2) `buildReport`: removed `screenshotUrls` parameter — screenshots no longer passed through the AI layer. (3) Submit handler: appends screenshot URLs to description AFTER `buildReport` returns as plain-text `**Screenshots:** url1 | url2`.
+  - **Why:** 0x0.st is defunct. AI reformatter was stripping image markdown. Plain-text URL format survives reformatting.
+  - **Risk:** catbox.moe is also a third-party service; could fail. For now it's the best free option without backend changes.
+
+### Session 11DX (continued) — Report Panel: External Script File (Final Fix)
+
+**Root cause (confirmed):** VSCodium's WebView CSP silently blocks ALL inline `<script>` blocks regardless of nonce, HTML structure, or `enableScripts: true`. This is a VSCodium-specific behavior that differs from standard VS Code.
+
+**Fix:** Moved report panel JS to an external file written to `out/ui/reportPanel.js` at panel creation time, served via `panel.webview.asWebviewUri()` with `localResourceRoots: [extensionUri]`. External scripts served from the extension directory are always allowed. This is the same pattern used by `mapPanel.ts` for `tlScript.js`.
+
+- **File changed:** `src/commands/reportIssue.ts`
+  - **What changed:** Added `extensionUri` + `localResourceRoots`, writes `REPORT_PANEL_SCRIPT` string to `out/ui/reportPanel.js` at panel creation, passes `asWebviewUri` URL to `buildReportHtml`. Moved all WebView JS into `REPORT_PANEL_SCRIPT` constant as a browser-compatible IIFE.
+  - **Why:** Inline script was silently blocked by VSCodium's CSP. External script file is the proven working pattern.
+  - **Risk:** Low. Script is written once per panel creation. `out/ui/` directory already exists from other compiled files.
+
+- **File changed:** `src/commands/reportIssueHtml.ts`
+  - **What changed:** Removed all inline JS from HTML. Replaced with `<script src="${scriptUri}"></script>`. `buildReportHtml` now takes `(version, scriptUri)`.
+  - **Why:** HTML now only contains static structure + CSS. All JS is external.
+  - **Risk:** None.
+
+### Session 11DX (continued) — Report Panel: Buttons Dead (Root Cause Found)
+
+**Root cause:** VS Code's WebView preprocessor uses a regex to locate `<html>` and `<head>` for nonce/CSP injection. The report panel HTML had `<html lang="en">` (with attribute) and each tag on a separate line. The working `setupProgressPanelHtml.ts` has `<!DOCTYPE html><html><head><meta charset="UTF-8">` on ONE LINE with no `lang=` attribute, and `</style></head><body>` concatenated. VS Code's preprocessor failed to match the report panel's structure, so no nonce was injected into the `<script>` tag, and VS Code's CSP blocked it silently. Result: HTML rendered fine but all JS was blocked.
+
+A previous attempted fix (adding CSP meta tag + custom nonce) made things WORSE: it conflicted with VS Code's own nonce injection, producing duplicate `nonce` attributes and mismatched policies.
+
+**Fix:** Structural mirror — rewrote `buildReportHtml` to match `buildSetupProgressHtml` exactly:
+- `<!DOCTYPE html><html><head>` on one line, NO `lang=` attribute
+- `</style></head><body>` concatenated (no newlines)
+- Plain `<script>` tag — no nonce, no CSP meta tag
+- `querySelectorAll` + try/catch for event listeners (same pattern as setupProgress)
+- `window.__vscode_api = vscode` (same pattern as setupProgress)
+
+- **File changed:** `src/commands/reportIssueHtml.ts`
+  - **What changed:** Rewrote HTML template to exactly mirror `setupProgressPanelHtml.ts` structure. Removed `lang="en"`, removed line breaks between DOCTYPE/html/head/meta, made `</style></head><body>` one line, removed CSP meta tag, removed nonce from script tag. Also: `querySelectorAll` instead of `getElementById` for button event binding (defensive), `try/catch` around postMessage calls, `window.__vscode_api = vscode`.
+  - **Why:** Structural mismatch prevented VS Code's nonce injection from working. Mirror fix ensures same injection behavior as the working panel.
+  - **Risk:** Low. The structural changes are cosmetic HTML formatting. All functionality is identical.
+
+- **File changed:** `src/commands/reportIssue.ts`
+  - **What changed:** Removed `getNonce()` function and nonce parameter from `buildReportHtml` call.
+  - **Why:** Nonce is no longer needed — VS Code handles it.
+  - **Risk:** None.
+
+### Session 11DX (continued) — Report Panel: WebView Script Not Executing
+
+**Problem:** Report panel opened with correct HTML but all buttons were unresponsive — JS never ran. Debug test confirmed `acquireVsCodeApi()` and `addEventListener` work in the same panel with minimal HTML, so the issue was specific to `buildReportHtml`'s output.
+
+**Root cause:** Missing CSP meta tag + missing `nonce` on `<script>` tag. VS Code/VSCodium injects a Content-Security-Policy into WebView HTML; without a matching nonce on the `<script>` tag, the inline script is silently blocked in the baked VSCodium environment. Additionally, `renderThumbs` built HTML strings with raw `<div>`, `<img>` etc. angle-bracket characters inside the script block, which can confuse some HTML preprocessors.
+
+- **File changed:** `src/commands/reportIssueHtml.ts`
+  - **What changed:** (1) `buildReportHtml(version, nonce)` — nonce now required. (2) Added `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'nonce-${nonce}';">`. (3) `<script nonce="${nonce}">`. (4) `renderThumbs` now uses DOM APIs (createElement/appendChild) instead of innerHTML with HTML string literals — eliminates `<` angle brackets in script body. (5) Changed `var vscode` to `const vscode`. (6) Removed debug self-test lines.
+  - **Why:** Proper VS Code WebView pattern requires CSP + nonce for scripts to execute in production environments. Baked VSCodium enforces this; dev extension host was more permissive.
+  - **Risk:** Low. CSP allows inline styles and data: image URLs which are all this panel needs.
+
+- **File changed:** `src/commands/reportIssue.ts`
+  - **What changed:** Added `getNonce()` utility. Removed debug HTML and `dbg` logging. Removed unused `os` import. Restored `_panel.webview.html = buildReportHtml(version, nonce)`.
+  - **Why:** Clean up debug scaffolding and wire in the nonce.
+  - **Risk:** None.
+
+### Session 11DX (continued) — In-IDE Report Panel
+
+**Problem:** The Report button opened an external GitHub URL via `vscode.env.openExternal`, triggering VSCodium's "open external site?" dialog, then landing on an empty GitHub issue form. No AI assistance, no image support.
+
+**Fix:** Replaced with a self-contained WebviewPanel (`reportIssue.ts` + `reportIssueHtml.ts`).
+
+- **File changed:** `src/commands/reportIssue.ts` (REPLACED)
+  - **What changed:** Replaced 13-line GitHub redirect with a WebviewPanel command that opens an in-IDE form. Handles submit, copy, and open-github messages. Saves attached images to `/tmp/redivivus-report-TIMESTAMP/`. Calls AI to generate a structured debugging prompt from the user's freeform description.
+  - **Why:** GitHub redirect was two friction points: browser dialog + empty form. Users wanted in-IDE reporting with AI assistance.
+  - **Risk:** Low. Panel is a singleton; dispose cleans up properly.
+
+- **File changed:** `src/commands/reportIssueHtml.ts` (NEW)
+  - **What changed:** HTML form with category dropdown, description textarea, drag-and-drop image upload with thumbnails, and result area showing AI-generated debug prompt + Copy + Open GitHub Issue buttons.
+  - **Why:** Rule 9 split — HTML kept separate from panel logic.
+  - **Risk:** None.
+
+- **File changed:** `src/extensionCommands.ts` (line 138)
+  - **What changed:** Pass `routingService` to `registerReportIssueCommand` so the panel can call AI for prompt generation.
+  - **Why:** Report panel needs routing to generate structured debug prompts.
+  - **Risk:** None.
+
+- **File changed:** `src/commands/reportIssue.ts` + `src/commands/reportIssueHtml.ts` (revision 2)
+  - **What changed:** (1) Fixed `[object Object]` — `routing.prompt()` returns `AIResponse {text}`, not a string; now extracts `.text`. (2) Submit now POSTs to `${getApiBase()}/report` (admin backend) instead of showing the debug prompt to the user. Falls back to GitHub issue if backend unreachable. Button renamed "Submit Report".
+  - **Why:** User feedback: report should go to admin at redivivus.dev, not display prompt to user.
+  - **Risk:** Low. Backend failure degrades gracefully to GitHub flow.
+
+- **File changed:** `src/commands/reportIssue.ts` + `src/commands/reportIssueHtml.ts` (revision 3, same session)
+  - **What changed:** Read `redivivus-web/src/app/api/feedback/route.ts` — exact endpoint is `POST https://redivivus.dev/api/feedback` with fields `{type, title, description, steps, version, source:'ide'}`. Removed all client-side AI (backend already uses GPT-4o-mini for formatting + dupe detection). Submit now posts directly to the site. Result is a simple success/error message (no debug prompt shown). Added Steps field to the form. Button label: "Submit Report".
+  - **Why:** Discovered actual endpoint from website source. Backend handles AI — no need to duplicate it client-side.
+  - **Risk:** Low. CORS-open endpoint; anonymous reports allowed.
+
+- **File changed:** `src/commands/reportIssue.ts` (revision 4)
+  - **What changed:** (1) Screenshots uploaded to `0x0.st` for public URLs — remote admin can now view images. (2) AI routing generates structured Claude debugging steps (bullet points: files to check, log locations) appended to the description before submission. (3) `vscode.window.showInformationMessage` now confirms success visibly. (4) In-panel success box shows screenshot URLs.
+  - **Why:** User reported: no visible confirmation, poor formatting (no context for debugging), screenshots not accessible to remote admin.
+  - **Risk:** Low. 0x0.st upload failure is silent (report still submits without image URLs).
+
+### Session 11DX — May 31, 2026: Indefinite Spinner Freeze on Flask/New Project Build
+
+**Root cause:** `callCloudBuild` used `AbortSignal.timeout()` on the `/plan` fetch (30 s), `/build` fetch (120 s), and `/build/complete` fetch (120 s). In Electron's fetch implementation, `AbortSignal.timeout()` does not reliably abort pending requests — the same bug that was already fixed in `executeMultiFileBuild` with `Promise.race`. When the plan or instruction API request hung (network issue, server slowdown), `callCloudBuild` awaited indefinitely. `runBuildAfterGates` was stuck awaiting `callCloudBuild`, so its `finally { set-status: ready }` never fired. The webview spinner ran forever, freezing the UI.
+
+- **File changed:** `src/services/build/cloudBuildClient.ts`
+  - **What changed:** Replaced all three `AbortSignal.timeout()` calls with `Promise.race([fetch(...), makeTimeout(...)])` using a new `makeTimeout` helper.
+  - **Why:** `AbortSignal.timeout()` is unreliable in Electron's fetch; `Promise.race` with a manual `setTimeout` is the tested-and-working pattern (already used in `cloudBuildMultiFile.ts`).
+  - **Risk:** Low. Same pattern as the existing fix. Timeouts now actually fire.
+
+- **File changed:** `src/services/build/cloudBuildClientAI.ts` (NEW — Rule 9 split)
+  - **What changed:** Extracted `executeClientAI` and `createFetchWithTimeout` from `cloudBuildClient.ts` to bring that file from 201 → 172 lines.
+  - **Why:** Rule 9 requires splitting files at 200 lines before editing.
+  - **Risk:** None. Pure extraction; logic unchanged.
+
+- **File changed:** `src/services/build/cloudBuildResultProcessor.ts`
+  - **What changed:** Removed `updateWorkspaceFolders(0, 0, root)` call. The folder is no longer added to the workspace mid-build.
+  - **Why:** `updateWorkspaceFolders` fires `onDidChangeWorkspaceFolders` mid-build. In "Untitled (Workspace)" / multi-root state, this can restart the extension host, killing `runBuildAfterGates` before it pushes the result card. The `__OPEN_WORKSPACE__` button in the result card handles workspace switching safely after the build completes.
+  - **Risk:** Low. Users now need to click "Open Workspace" in the result card instead of having it auto-added. The button was already being generated by `chatPanelBuildRunner.ts`.
+
+- **File changed:** `src/ui/panels/chat/chatPanelPublicAPI.ts` (`saveConversation`)
+  - **What changed:** Added `.filter(m => !m.content?.includes('__BUILD_WORKING__'))` before persisting conversation to globalState.
+  - **Why:** If the extension host restarts mid-build (e.g., from workspace change), `restoreConversation` would reload the stale "⚙️ Building..." working message. The new host has no in-flight build, so the working message stays forever. Filtering it out at persist time ensures host restarts start clean.
+  - **Risk:** None. Working messages are transient; excluding them from persistence is correct.
+
 *Last updated: May 30, 2026 (Session 11DW: no-workspace chat + template button fix)*
 
 - **File changed:** `src/core/project/chatPanelMsgRunCommand.ts`
@@ -4891,6 +6021,15 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 
 ---
 
+## Recent Fixes — June 2, 2026 (Session: Wire placement gate into build flow)
+
+| File | What Changed | Why | Risk |
+|------|-------------|-----|------|
+| `src/ui/panels/chat/chatPanelGates.ts` | Added `runPlacementGate()` function — calls `checkBuildPlacement`, shows placement modal if ambiguous, creates new project folder + opens it if user chooses "new project" | `checkBuildPlacement` was imported in `chatPanelIntent.ts` but never called — Express server built into open calculator project with no warning | Low — only fires when project is initialized and task shares zero keywords with project name |
+| `src/core/ai/chatPanelIntent.ts` | Added one-line placement gate call after workspace check, before scope clarification; removed dead `checkBuildPlacement` and `awaitPlacementConfirmation` imports | Wire the gate into the build flow | None |
+
+---
+
 ## Recent Fixes — May 13, 2026 (Session 4d: Debug Logging for open-existing-project)
 
 | File | What Changed | Why | Risk |
@@ -4943,3 +6082,82 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 - **Issue:** The AI intent classifier mistakenly labeled natural language surgical edit requests (like "make the game resize automatically") as new project scaffold tasks when the local configuration check (`deps.redivivus.isInitialized()`) briefly lost its absolute context across window reloads, resulting in the creation of redundant new files. Monolithic files were also violating Rule 9.
 - **Fix:** Added a robust `isModificationRequest` inference check directly into `chatPanelMsgSendBuildIntent.ts` and `chatPanelMsgIntentActions.ts`. If the inference detects a modification task and the project directory is valid, it forcibly intercepts the scaffold/build requests and routes them directly to `handleFixRequest()`. This guarantees in-place editing. Extracted `MessageHandlerDeps` to `chatPanelMessageDeps.ts` and roster logic to `routingServiceRoster.ts` to reduce `chatPanelMessages.ts` and `routingService.ts` to under 200 lines.
 - **Risk:** Low. Tightens the validation of build intents to prioritize editing existing files.
+
+### Session 12 — May 31, 2026: Windows Auth Fix + Full Win32 Branding
+
+**File changed:** `scripts/build-windows.sh`
+**What changed:** Expanded product.json branding patch to set all Windows-specific fields: `dataFolderName`, `win32MutexName`, `win32DirName`, `win32NameVersion`, `win32RegValueName`, `win32AppUserModelId`, `win32ShellNameShort`, `win32TunnelServiceMutex`, `win32TunnelMutex`, `win32ContextMenu`. Also added `.ico` generation via ImageMagick from the Redivivus PNG icon, and copies both 256px and 512px PNGs to win32 resources.
+**Why:** Windows build only patched 3 of ~10 product.json branding fields, leaving "VSCodium" showing in taskbar, task manager, shell context menu, and registry.
+**Risk:** Low. `dataFolderName` change (`.vscode-oss` → `.redivivus`) means existing Windows users get a fresh settings folder on reinstall. Data migration not handled — acceptable for current early user base.
+
+**File changed:** `redivivus-backend/src/app/auth/ide/page.tsx`
+**What changed:** Replaced `window.location.href = scheme://deep-link` + `fetch('http://127.0.0.1:PORT')` with a single `window.location.href = 'http://127.0.0.1:PORT?token=...'` redirect.
+**Why:** Chrome's Private Network Access (PNA) policy blocks `fetch()` calls from HTTPS pages to localhost on Windows (Chrome 94+). The deep link scheme was also dead code — no URI handler is registered in the extension. The browser redirect approach is the standard OAuth callback pattern and works on all platforms.
+**Risk:** None. Browser navigation to localhost is identical in effect to the fetch for the extension's HTTP server, but without the CORS/PNA restriction.
+
+### Session 13 — Jun 1, 2026: Full Audit, Security, Auth, Sidebar, Polish
+
+**File changed:** `scripts/release.sh` / `scripts/nightly-release.sh`
+**What changed:** Removed hardcoded CLOUDFLARE_API_TOKEN and GH_TOKEN. Replaced with env var guards (`${VAR:?not set}`). Both scripts now source `~/.bashrc` at startup for cron compatibility.
+**Why:** Security — tokens were plaintext in version-controlled files.
+**Risk:** If tokens not set in ~/.bashrc, scripts fail loudly instead of silently.
+
+**File changed:** `src/services/build/cloudBuildClient.ts`
+**What changed:** `makeTimeout()` now sets `err.name = 'TimeoutError'` on the rejection.
+**Why:** The catch block checked `err?.name === 'TimeoutError'` but `new Error()` defaults to `name: 'Error'` — timeouts always fell through to "Network error".
+**Risk:** None.
+
+**File changed:** `src/services/gitAutoCommitService.ts`
+**What changed:** Switched from `execSync('git commit -m "..."')` to `execFileSync('git', ['commit', '-m', msg])`.
+**Why:** Shell injection — backticks and `$()` inside double-quoted shell strings execute. Array form bypasses shell entirely.
+**Risk:** None.
+
+**File changed:** `src/commands/misc.ts`
+**What changed:** `redivivus.wizard` ("New Project") now opens chat panel and calls `showNewProject()` instead of `redivivusSidebar.focus` (which did nothing).
+**Why:** Clicking "New Project" in the sidebar was a no-op — just focused the sidebar you were already on.
+**Risk:** Low. Opens chat if not already open.
+
+**File changed:** `src/commands/logging.ts`
+**What changed:** `redivivus.log` and `redivivus.deadends` now show an info message when not initialized (instead of silent return). Also auto-open chat panel if it's not already open.
+**Why:** Silent no-op gave no feedback to users. Requiring chat pre-open was bad UX.
+**Risk:** None.
+
+**File changed:** `redivivus-web/src/app/auth/ide/route.ts`
+**What changed:** Port validation now checks `1024 ≤ port ≤ 65535`. Also uses forwarded host headers for redirect URL.
+**Why:** Old regex `/^\d{4,5}$/` allowed invalid ports like 99999. Redirect URL was building to `localhost:3000` behind Fly proxy.
+**Risk:** None.
+
+**File changed:** `redivivus-web/src/app/auth/callback/route.ts`
+**What changed:** Uses `x-forwarded-host` / `x-forwarded-proto` headers to build the post-auth redirect URL.
+**Why:** `req.url` behind Fly proxy resolves to internal `localhost:3000` — post-login redirect was going to localhost instead of `redivivus.dev`.
+**Risk:** None.
+
+**File changed:** `src/commands/signIn.ts`
+**What changed:** Auth URL now hardcoded to `redivivus.dev/auth/ide` instead of derived from `apiBase`.
+**Why:** `apiBase` points to `redivivus-backend.fly.dev` which doesn't have GitHub OAuth registered with Supabase. Auth must happen on `redivivus.dev`.
+**Risk:** Low. `redivivus.dev` is the canonical auth domain. Custom `apiBase` users still work — only auth URL changed.
+
+**File changed:** `redivivus-web/src/lib/v1/buildPipeline.ts` (WORKER_RULES Rule 9) + `src/services/ai/redivivusWorkerRules.ts`
+**What changed:** Rule 9 for browser games now mandates: gradient backgrounds, styled UI panel outside canvas, Web Audio API sounds, animated CSS overlays, localStorage high score, pause key, responsive layout.
+**Why:** Default game builds were bare-bones (flat colors, no sound, canvas-drawn score). Windsurf comparison showed a 204-line vs 778-line quality gap on identical prompts.
+**Risk:** Slightly larger output files. None for correctness.
+
+**File changed:** `redivivus-web/src/app/admin/reports/page.tsx`
+**What changed:** Fixed/wontfix reports now hidden from default view (archived). New `archived (N)` tab in filter row shows them on demand.
+**Why:** Fixed reports were cluttering the active reports view.
+**Risk:** None. Archive tab always accessible.
+
+**File changed:** `redivivus-web/.dockerignore`
+**What changed:** Added `.wrangler` (1.1GB), `.open-next`, `.dev.vars` to exclusion list.
+**Why:** Build context was 1.17GB — Fly deploys took 3+ minutes. Now ~2MB.
+**Risk:** None.
+
+**File changed:** `src/core/build/chatPanelBuildRunner.ts` + `src/extensionResumeState.ts`
+**What changed:** Cloud build path now auto-opens workspace after result card renders. If workspace has folders: `updateWorkspaceFolders` (no restart). If empty workspace: saves conversation to `pendingRescueConversation`, opens folder after 500ms, restores on reload via `pendingBuildComplete` flag.
+**Why:** "Open Project in Explorer" button kept reappearing as a manual step — users expected auto-open.
+**Risk:** Low. 500ms delay gives result card time to render before reload.
+
+**File changed:** `redivivus-web/src/app/api/v1/build/route.ts`
+**What changed:** Surgical edit fallback now logs `console.warn` when search blocks don't match and full rewrite is used.
+**Why:** Silent fallback made it impossible to know when surgical edits failed.
+**Risk:** None.

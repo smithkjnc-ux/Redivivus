@@ -77,6 +77,23 @@ export function validateAndFixHtmlAnimation(code: string): ValidationResult {
     issues.push('dx or dy declared as const — must be let since velocity reverses on wall bounce');
   }
 
+  // ── Check 8: const array/object reassigned via filter/map/concat (TypeError at runtime) ──
+  const constNames = [...fixed.matchAll(/\bconst\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*=\s*[\[{]/g)].map(m => m[1]);
+  for (const name of constNames) {
+    if (new RegExp(`\\b${name}\\s*=\\s*(?:${name}\\.(?:filter|map|concat|slice)\\(|\\[)`).test(fixed)) {
+      issues.push(`'${name}' declared const but reassigned — must be let (causes TypeError at runtime)`);
+      fixed = fixed.replace(new RegExp(`(\\bconst)(\\s+${name}\\s*=\\s*[\\[{])`), 'let$2');
+      autoFixed = true;
+    }
+  }
+
+  // ── Check 9: ctx.translate(0,0) used as reset — does not undo previous translate ──
+  if (/ctx\.translate\(\s*0\s*,\s*0\s*\)/.test(fixed)) {
+    issues.push('ctx.translate(0,0) does not reset the canvas transform — use ctx.setTransform(1,0,0,1,0,0)');
+    fixed = fixed.replace(/ctx\.translate\(\s*0\s*,\s*0\s*\)/g, 'ctx.setTransform(1,0,0,1,0,0)');
+    autoFixed = true;
+  }
+
   return { issues, autoFixed, code: fixed };
 }
 

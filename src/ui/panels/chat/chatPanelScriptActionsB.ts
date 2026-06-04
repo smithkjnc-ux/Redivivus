@@ -166,6 +166,13 @@ export function buildActionsScriptB(): string {
         if (b64) { try { const rawPath = decodeURIComponent(escape(atob(b64))); vscode.postMessage({ type: 'open-workspace-btn', path: rawPath }); } catch(e) {} }
         return;
       }
+      // Run Project button
+      const runBtn = target.closest ? target.closest('.run-project-btn') : null;
+      if (runBtn) {
+        const b64 = runBtn.getAttribute('data-path');
+        if (b64) { try { const rawPath = decodeURIComponent(escape(atob(b64))); vscode.postMessage({ type: 'run-project', path: rawPath }); } catch(e) {} }
+        return;
+      }
     });
   `;
 }

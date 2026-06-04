@@ -10,4 +10,6 @@ export interface AIResponse {
   inputTokens?: number;
   /** Actual tokens received from the AI (completion/output) — parsed from API response, not estimated */
   outputTokens?: number;
+  /** True when the AI hit its output token limit and the response was cut off mid-generation */
+  truncated?: boolean;
 }

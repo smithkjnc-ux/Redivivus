@@ -1,105 +1,58 @@
-// [SCOPE] Redivivus Master Log Aggregator — manages all domain logs and log rotation
+// [SCOPE] Redivivus Master Logger — thin bridge that routes domain logger calls to the unified
+// redivivusLogger (services layer). All domain loggers (chatLogger, buildLogger, etc.) call masterLog()
+// and automatically get structured JSON output, session IDs, and Output Channel dispatch.
+// Log rotation (keep last 3 runs) still applies via the session-based log file naming.
+
+import { log as structuredLog, getCurrentSession } from '../../services/logging/redivivusLogger.js';
+import type { LayerName } from '../../services/logging/logListeners.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
-export type LogLevel = 'DEBUG' | 'INFO' | 'ERROR';
+export type LogLevel = 'DEBUG' | 'INFO' | 'WARN' | 'ERROR';
 
-let currentLogFile: string | null = null;
-let projectRoot: string | null = null;
-let logBuffer: string[] = [];
-let flushTimer: NodeJS.Timeout | null = null;
-
-// Global Configuration
-const LOG_CONFIG = {
-  DEBUG: false,
-  INFO: true,
-  ERROR: true
+// Map domain names (used by existing domain loggers) to onion layer names
+const DOMAIN_TO_LAYER: Record<string, LayerName> = {
+  CHAT: 'ui', RENDER: 'ui', SIDEBAR: 'ui', WIZARD: 'ui', ANALYZER: 'ui', MAP: 'ui',
+  BUILD: 'core', ROUTING: 'core', RETROFIT: 'core', RUNTIME: 'core', DIAGNOSTICS: 'core', INSPECTOR: 'core',
+  AI: 'services', GUARDIAN: 'services', VAULT: 'services', BLUEPRINT: 'services',
+  PROJECT: 'services', WORKSPACE: 'services',
+  COMMANDS: 'commands', SESSION: 'commands',
 };
 
-/** Initialize the master logger and perform log rotation */
-export function initMasterLogger(root: string): void {
-  projectRoot = root;
-  const logsDir = path.join(root, '.redivivus', 'logs', 'master');
-  
-  if (!fs.existsSync(logsDir)) {
-    fs.mkdirSync(logsDir, { recursive: true });
-  }
+const LEVEL_MAP: Record<LogLevel, 'debug' | 'info' | 'warn' | 'error'> = {
+  DEBUG: 'debug', INFO: 'info', WARN: 'warn', ERROR: 'error',
+};
 
-  // Log rotation: Keep last 3 runs
-  const files = fs.readdirSync(logsDir)
-    .filter(f => f.startsWith('redivivus-master-') && f.endsWith('.log'))
-    .sort()
-    .reverse();
+let _debugEnabled = false;
 
-  // Delete everything older than the 2nd most recent (so we keep 3 total when we create the new one)
-  if (files.length >= 3) {
-    const toDelete = files.slice(2);
-    for (const f of toDelete) {
-      try {
-        fs.unlinkSync(path.join(logsDir, f));
-      } catch (e) {
-        console.error('[Redivivus] Failed to delete old log:', e);
-      }
-    }
-  }
-
-  const dateStr = new Date().toISOString().replace(/:/g, '-').replace(/\..+/, '');
-  currentLogFile = path.join(logsDir, `redivivus-master-${dateStr}.log`);
-
-  const header = `=== Redivivus MASTER LOG SESSION START ===\nTimestamp: ${new Date().toISOString()}\nProject: ${root}\n\n`;
-  fs.writeFileSync(currentLogFile, header, 'utf-8');
-}
-
-/** Master log function used by domain loggers */
+/** Called by all domain loggers (chatLogger, buildLogger, routingLogger, etc.) */
 export function masterLog(level: LogLevel, domain: string, message: string, data?: unknown): void {
-  if (!LOG_CONFIG[level]) {return;}
-
-  const timestamp = new Date().toISOString();
-  let logLine = `[${timestamp}] [${level}] [${domain}] ${message}`;
-  
-  if (data !== undefined) {
-    try {
-      logLine += ` | Data: ${JSON.stringify(data)}`;
-    } catch {
-      logLine += ` | Data: [Unserializable Object]`;
-    }
-  }
-
-  if (level === 'ERROR') {
-    console.error(logLine);
-  } else if (level === 'INFO') {
-    console.log(logLine);
-  }
-
-  if (!currentLogFile) {return;}
-
-  logBuffer.push(logLine);
-
-  if (level === 'ERROR') {
-    flushLogs();
-  } else if (!flushTimer) {
-    flushTimer = setTimeout(flushLogs, 50);
-  }
+  if (level === 'DEBUG' && !_debugEnabled) { return; }
+  const layer = DOMAIN_TO_LAYER[domain.toUpperCase()] ?? 'services';
+  const structLevel = LEVEL_MAP[level];
+  structuredLog(structLevel, layer, domain.toLowerCase(), 'masterLog', message, data !== undefined ? { detail: data } as any : undefined);
+  // Mirror errors to console so they appear in Extension Host log too
+  if (level === 'ERROR') { console.error(`[Redivivus:${domain}] ${message}`, data ?? ''); }
 }
 
-/** Flush buffered logs to disk */
-function flushLogs(): void {
-  if (!currentLogFile || logBuffer.length === 0) {return;}
-
-  try {
-    fs.appendFileSync(currentLogFile, logBuffer.join('\n') + '\n', 'utf-8');
-    logBuffer = [];
-  } catch (e) {
-    console.error('[Redivivus] Failed to write master log:', e);
-  }
-
-  if (flushTimer) {
-    clearTimeout(flushTimer);
-    flushTimer = null;
-  }
-}
-
-/** Enable or disable debug logging */
 export function setDebugLogging(enabled: boolean): void {
-  LOG_CONFIG.DEBUG = enabled;
+  _debugEnabled = enabled;
+}
+
+/** Initialize master logger storage (called from extension.ts alongside initRedivivusLogger). */
+export function initMasterLogger(root: string): void {
+  // Keep last 3 session log files — delete older ones
+  const logsDir = path.join(root, '.redivivus', 'logs');
+  if (!fs.existsSync(logsDir)) { return; }
+  const sessionFiles = fs.readdirSync(logsDir)
+    .filter(f => f.startsWith('session-') && f.endsWith('.log'))
+    .sort().reverse();
+  if (sessionFiles.length > 3) {
+    sessionFiles.slice(3).forEach(f => { try { fs.unlinkSync(path.join(logsDir, f)); } catch {} });
+  }
+}
+
+/** Get the current session ID (for correlation in multi-service traces). */
+export function getMasterSessionId(): string | null {
+  return getCurrentSession().sessionId;
 }
