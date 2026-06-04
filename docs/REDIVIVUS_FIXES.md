@@ -5,6 +5,16 @@
 
 ---
 
+## Session 16h — Jun 4, 2026: "close the project" hangs forever on "Closing project..."
+
+**Problem:** Typing "close the project" removed the folder ("NO FOLDER OPENED") but the chat panel stayed stuck on "Closing project..." with the input spinner spinning forever and the old conversation still shown — the close never finished.
+
+**Root cause:** The webview only clears the input spinner / re-enables input on a `set-status` message with status !== 'working' (`setInputBusy(false)` in `chatPanelScriptListener.ts`). The close-project keyword branch ran `updateWorkspaceFolders(0, n)` and returned without ever posting `set-status: ready`. In VSCodium, removing the *last* folder transitions folder→empty **without restarting the extension host**, so `onDidChangeWorkspaceFolders`'s `refresh()` was the only thing that ran — and `refresh()` rebuilds HTML but does NOT clear the webview's busy/spinner state. Result: eternal spinner.
+
+**Fix — File: `src/core/routing/chatPanelMsgSendKeywords.ts`:** After the folder mutation (both the `updateWorkspaceFolders` and the no-folder `closeFolder` paths), explicitly `panel.webview.postMessage({ type: 'set-status', status: 'ready' })` and `refresh()` so the input un-busies and the panel re-renders to the launcher whether or not the window reloads. Also moved the conversation-clear + `userClosedProject` flag set so they run before the mutation on both paths. Risk: low — if the window *does* reload, the post is simply superseded by the fresh activation; if it doesn't, this is what unblocks the panel.
+
+**Verified:** `tsc -p ./` clean (0 errors); compiled + deployed to baked IDE (confirmed `set-status…ready` present in deployed `chatPanelMsgSendKeywords.js`). Live re-test (type "close the project", confirm spinner stops + launcher shows) pending an IDE reload by the user. Committed + pushed to origin/master.
+
 ## Session 16g — Jun 3, 2026: Supervisor (Claude) ran but was invisible — fixed attribution end-to-end
 
 **Problem:** User repeatedly reported "still not using Claude as the supervisor." With 4 keys set (claude, openai, gemini, groq) the backend correctly selects **supervisor=claude, worker=openai(gpt-4o-mini)** — and the single-file two-phase path *does* call Claude to write the prescription. But every reporting layer threw the Supervisor's identity and tokens away, so the usage dashboard showed **Claude (Supervisor): 0 tokens** and the byline always said **"GPT-4o Mini — Planned + built the code, primary builder" (solo)**. The product was structurally incapable of showing Claude supervising even when it did. (The worker being gpt-4o-mini — the provider ranked immediately below Claude — is the fingerprint that Claude *was* selected as supervisor.) This is a Redivivus attribution bug, not a project/game bug.

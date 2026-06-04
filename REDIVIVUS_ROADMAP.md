@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* Jun 3, 2026 — Session 16g: Supervisor (Claude) attribution fixed end-to-end (usage dashboard, byline, build history now show the Supervisor+Worker split instead of hardcoded "solo"); CHASSIS→Redivivus settings fix; cloud-only architecture; supervisor+worker split wired end-to-end.
+*Last updated:* Jun 4, 2026 — Session 16h: fixed "close the project" hanging forever on "Closing project..." (input spinner never reset when last-folder removal doesn't reload the window). Session 16g: Supervisor (Claude) attribution fixed end-to-end (usage dashboard, byline, build history now show the Supervisor+Worker split instead of hardcoded "solo").
 
 ---
 
