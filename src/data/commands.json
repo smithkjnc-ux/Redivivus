@@ -123,5 +123,5 @@
   { "phrases": ["api setup", "set up api", "add api key", "configure api"], "command": "redivivus.openSettings", "label": "Opened API Setup" },
   { "phrases": ["fix terminal error", "fix last error", "fix the error"], "command": "redivivus.injectTerminalError", "label": "Checking terminal for errors..." },
   { "phrases": ["dedup vault", "deduplicate vault", "clean vault", "remove vault duplicates", "vault cleanup"], "command": "redivivus.vaultDedup", "label": "Scanning vault for duplicates..." },
-  { "phrases": ["close project", "close the project", "close folder", "close workspace", "close this project", "close current project"], "command": "workbench.action.closeFolder", "label": "Closed project" }
+  { "phrases": ["close project", "close the project", "close folder", "close workspace", "close this project", "close current project"], "command": "redivivus.closeProject", "label": "Closed project" }
 ]

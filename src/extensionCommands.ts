@@ -59,6 +59,7 @@ import { registerSignInCommand } from './commands/signIn.js';
 import { registerReportIssueCommand } from './commands/reportIssue.js';
 import { registerCheckForUpdatesCommand } from './commands/checkForUpdates.js';
 import { initOutputChannels } from './ui/logging/outputChannelManager.js';
+import { markProjectClosed } from './services/project/closeMarker.js';
 
 export function registerAllCommands(
   context: vscode.ExtensionContext,
@@ -134,6 +135,35 @@ export function registerAllCommands(
   try {   registerScopeCreepCommand(context, redivivusService, routingService); } catch (e) { console.error('Failed to register ' + 'registerScopeCreepCommand(context, redivivusService, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerScopeCreepCommand(context, redivivusService, routingService); failed: ' + e + '\n'); }
   try {   registerDuplicateCodeCommand(context, routingService); } catch (e) { console.error('Failed to register ' + 'registerDuplicateCodeCommand(context, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerDuplicateCodeCommand(context, routingService); failed: ' + e + '\n'); }
   try {   registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); failed: ' + e + '\n'); }
+
+  // ── Close Project ──
+  // [FIX] The dashboard "Close Project" button used workbench.action.closeFolder which bypassed
+  // markProjectClosed(), so the synchronous marker was never written and the auto-open timer
+  // created a duplicate panel on re-activation. This dedicated command writes the marker first.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redivivus.closeProject', async () => {
+      const folders = vscode.workspace.workspaceFolders;
+      // Clear conversation + set flag BEFORE the folder mutation (in case the window reloads)
+      markProjectClosed();
+      if (ChatPanel.currentPanel) {
+        (ChatPanel.currentPanel as any).state.conversation = [];
+        (ChatPanel.currentPanel as any)._initialized = false;
+        await ChatPanel.extensionContext?.globalState.update('redivivus.userClosedProject', true);
+        ChatPanel.currentPanel.refresh();
+      }
+      if (folders && folders.length > 0) {
+        await vscode.workspace.updateWorkspaceFolders(0, folders.length);
+      } else {
+        await vscode.commands.executeCommand('workbench.action.closeFolder');
+      }
+      // Reset input status so the close "completes" even if the window doesn't reload
+      if (ChatPanel.currentPanel) {
+        (ChatPanel.currentPanel as any).getWebview()?.postMessage?.({ type: 'set-status', status: 'ready' });
+        ChatPanel.currentPanel.refresh();
+      }
+    })
+  );
+
   // [FIX] registerInlineCommands was the only registration NOT wrapped in try/catch.
   // If it throws (e.g. terminalErrorService setup, inline command init), signIn and reportIssue
   // were silently never registered. Now wrapped like every other registration.

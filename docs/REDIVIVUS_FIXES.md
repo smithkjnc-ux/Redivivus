@@ -5,6 +5,21 @@
 
 ---
 
+## Session 16N — Jun 4, 2026: Duplicate chat panel when clicking "X Close Project" button
+
+**Problem:** Clicking the "X Close Project" button on the project dashboard created a duplicate chat tab.
+
+**Root cause:** The dashboard button used `data-cmd="workbench.action.closeFolder"` which directly called VS Code's native close-folder command. This **bypassed** `chatPanelMsgSendKeywords.ts` where `markProjectClosed()` wrote the synchronous marker file. Without the marker, `wasProjectClosedRecently()` returned `false` on re-activation, so the auto-open timer (500ms after extension activation) saw `currentPanel=false` and created a second panel.
+
+**Fix:**
+- **File `src/ui/panels/chat/chatPanelDashboard.ts`:** Changed the button from `data-cmd="workbench.action.closeFolder"` to `data-cmd="redivivus.closeProject"`.
+- **File `src/extensionCommands.ts`:** Added the `redivivus.closeProject` command which writes the synchronous marker, clears panel state, sets globalState flags, then removes workspace folders. The same logic the chat-based close used, but now accessible from the button.
+- **File `src/data/commands.json`:** Routed typed "close project" phrases through `redivivus.closeProject` too, so both button and chat path behave identically.
+
+**Risk:** None. The new command reuses the exact same close logic that the chat keyword handler already used.
+
+---
+
 ## Session 16M — Jun 4, 2026: No Run button for Python builds with non-conventional filenames
 
 **Problem:** Building a Python program (e.g. `calculator.py`) produced a result card whose guidance said "Click ▶ Run to start the app (`python calculator.py`)" but **no Run button appeared**.

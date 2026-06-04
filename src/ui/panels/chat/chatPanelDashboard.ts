@@ -74,7 +74,7 @@ export function buildProjectDashboard(header: ChatHeaderInfo, progress: SetupPro
     <button class="dash-action-pill" data-cmd="redivivus.startSession" title="Start a focused work session with goals and tracking">&#x25B6;&#xFE0F; Start Session</button>
     <button class="dash-action-pill" data-cmd="redivivus.buildFromVault" title="Build new code using your saved Vault snippets">&#x1F3D7;&#xFE0F; Build from Vault</button>
     <button class="dash-action-pill" data-action="start-new-project" data-mode="direct" title="Start a different project">&#x2795; New Project</button>
-    <button class="dash-action-pill dash-action-close" data-cmd="workbench.action.closeFolder" title="Close this project and return to the launcher">&#x2716; Close Project</button>
+    <button class="dash-action-pill dash-action-close" data-cmd="redivivus.closeProject" title="Close this project and return to the launcher">&#x2716; Close Project</button>
   </div>`;
   return `<div class="empty-state dash-root">
     <div class="dash-hero"><span class="dash-hero-icon">&#x1F680;</span><div class="dash-hero-text"><div class="onboarding-title" style="font-size:18px;font-weight:700;">${name}</div>${statsRow}</div></div>
