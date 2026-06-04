@@ -5,6 +5,16 @@
 
 ---
 
+## Session 16L — Jun 4, 2026: Duplicate chat tab on reload — ROOT CAUSE (deserialize never set _instance)
+
+**Problem:** 16k did not fix it — reload still spawned a second chat tab.
+
+**Actual root cause:** `ChatPanel._instance` (what `currentPanel` returns) is ONLY assigned in `doShowChatPanel` (`chatPanelShow.ts`). The `ChatPanel` constructor does NOT set it. `deserializeWebviewPanel` restores a tab via `new ChatPanel(webviewPanel, ...)` directly — so it created the panel but **never registered it as `_instance`**. `currentPanel` stayed `null` after a restore, so the auto-open timer always saw "no panel" and created a SECOND tab. My 16i/16k guards checked `_instance` but it was never being set on the deserialize path, so they never fired. This was pre-existing; 16i/16k addressed the wrong layer (a real but secondary async-gap race).
+
+**Fix — File: `src/extension.ts`:** In `deserializeWebviewPanel`, after `new ChatPanel(...)`, add `(ChatPanel as any)._instance = panel;`. Now a restored tab is the registered singleton, so auto-open sees it and skips. Combined with the 16k post-await re-check, exactly one tab in every ordering.
+
+**Verified:** `tsc -p ./` clean; compiled + deployed (`_instance = panel` confirmed in deployed extension.js). Live reload re-test pending the user — but this is a concrete missing-assignment bug (not a timing race), so confidence is high. Pushed to master.
+
 ## Session 16k — Jun 4, 2026: Every window reload spawned a duplicate chat tab
 
 **Problem:** A plain Developer: Reload Window created a second "Redivivus Chat" tab (confirmed by user). Debug log: `[auto-open-timer] currentPanel=false ... currentRoot=undefined` on the reload — auto-open opened a panel while the serializer ALSO restored the orphaned tab.

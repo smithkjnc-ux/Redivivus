@@ -238,6 +238,10 @@ export function activate(context: vscode.ExtensionContext) {
         const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
         if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} return; }
         const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
+        // [FIX] THE root cause of duplicate tabs on reload: the constructor does NOT set _instance
+        // (only doShowChatPanel does, at chatPanelShow.ts). So a serializer-restored panel left
+        // currentPanel === null, and the auto-open timer then created a SECOND tab. Register it here.
+        (ChatPanel as any)._instance = panel;
         // If user closed the project, clear conversation and force launcher view
         // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag,
         // which is unreliable here — without it the restored panel keeps the stale project dashboard.
