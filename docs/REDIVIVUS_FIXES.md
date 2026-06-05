@@ -398,6 +398,28 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16Q — Jun 5, 2026: Proactive model health checks — auto-detect deprecated/renamed models
+
+**Problem:** When AI providers deprecate or rename models (as Anthropic did with `claude-sonnet-4`), builds fail silently with cryptic 400 errors and the system falls back to a lesser model without warning. This happened repeatedly and required manual code edits to fix.
+
+**Fix — new `redivivus-backend/src/lib/ai/modelHealthCheck.ts`:**
+- On every build request, fires a minimal 10-token test prompt to each configured provider's supervisor and worker models in parallel (fire-and-forget, results cached in memory for the process lifetime).
+- Classifies errors as: `deprecated`, `not_found`, `invalid_param`, `quota`, `unknown`.
+- `getHealthyModel(provider, role, primaryModel)` returns the primary model if healthy, or `FALLBACK_MODELS[provider]` (a known-good conservative model) if the primary is flagged.
+
+**Updated `routingService.ts`:**
+- `getSupervisorModel()` and `getWorkerModel()` now call `getHealthyModel()` — so any deprecated model is automatically replaced with the fallback before the build even starts.
+
+**Updated `executor.ts`:**
+- `executeAI()` now has a try/catch: if a model error is caught mid-build (deprecated/not-found pattern), it calls `invalidateModelHealth(provider)` and retries once with `RUNTIME_FALLBACKS[provider]`.
+- This gives two layers of protection: proactive (startup probe) + reactive (runtime retry).
+
+**Updated `route.ts`:** Removed stale `temperature: 0.3` from supervisor call (Claude rejects it).
+
+**Risk:** The health probes add ~1-2 API calls per provider per process restart. They are fire-and-forget and never block a build. Quota errors are caught and marked separately — they don't cause a fallback (model is fine, just rate-limited).
+
+---
+
 ## Session 16P — Jun 5, 2026: Claude supervisor fails with 400 — "temperature is deprecated for this model"
 
 **Problem:** Every build with Claude as Supervisor failed with `400 invalid_request_error: temperature is deprecated for this model`, falling back to Gemini solo. Additionally, Claude was never used as a streaming Worker despite having a key.
