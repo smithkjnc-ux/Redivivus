@@ -19,17 +19,39 @@ export async function processBuildResults(
 ): Promise<CloudBuildResult> {
   // If the cloud streamed the raw text back, we must extract the files locally
   if (meta.overrideResponseText && data.files.length === 0) {
-    const codeBlockRegex = /```(\w+)?\s*(?:path:\s*(.*?)\s*\n)?([\s\S]*?)```/g;
+    // [FIX] Enhanced extraction — AIs use many formats for naming files in code blocks:
+    //   1. ```html path: index.html        (rare)
+    //   2. ```html:index.html              (Claude-style)
+    //   3. ### index.html  ...  ```html    (header before fence)
+    //   4. **index.html**  ...  ```html    (bold before fence)
+    //   5. ```html filename="index.html"   (attribute-style)
+    //   6. ```html                         (no filename — infer from language)
+    const rawText = meta.overrideResponseText;
+    const fenceRe = /```(\w+)?(?::([^\s`]+))?\s*(?:path:\s*([^\n]+?)\s*\n|filename="([^"]+)"\s*\n)?\n?([\s\S]*?)```/g;
+    // Pre-scan for header-style filenames: look for ### filename or **filename** within 3 lines before a fence
+    const headerMap = new Map<number, string>();
+    const headerRe = /(?:^|\n)(?:#{1,4}\s+|(?:\*\*))([^\n*]+?)(?:\*\*)?[ \t]*\n(?:[ \t]*\n)?```/g;
+    let hm;
+    while ((hm = headerRe.exec(rawText)) !== null) {
+      const fenceStart = rawText.indexOf('```', hm.index + hm[0].indexOf('\n'));
+      if (fenceStart >= 0) { headerMap.set(fenceStart, hm[1].trim().replace(/^`|`$/g, '')); }
+    }
+
     let match;
-    while ((match = codeBlockRegex.exec(meta.overrideResponseText)) !== null) {
-      const [, language, path, content] = match;
-      if (path && content) {
-        data.files.push({ path: path.trim(), content: content.trim(), isNew: true });
-      } else if (content) {
-        // Fallback for missing path
-        const ext = language === 'javascript' ? 'js' : (language === 'html' ? 'html' : 'ts');
-        data.files.push({ path: `generated.${ext}`, content: content.trim(), isNew: true });
+    const extMap: Record<string, string> = { javascript: 'js', typescript: 'ts', html: 'html', css: 'css', python: 'py', json: 'json', jsx: 'jsx', tsx: 'tsx', go: 'go', rust: 'rs', java: 'java', ruby: 'rb', shell: 'sh', bash: 'sh', sh: 'sh' };
+    let fileIndex = 0;
+    while ((match = fenceRe.exec(rawText)) !== null) {
+      const [fullMatch, language, colonPath, inlinePath, attrPath, content] = match;
+      if (!content?.trim()) { continue; }
+      // Priority: inline path > colon path > attribute path > header path > inferred
+      let filePath = inlinePath?.trim() || colonPath?.trim() || attrPath?.trim() || headerMap.get(match.index) || '';
+      if (!filePath && language) {
+        const ext = extMap[language.toLowerCase()] || language.toLowerCase();
+        filePath = fileIndex === 0 ? `index.${ext}` : `file${fileIndex}.${ext}`;
       }
+      if (!filePath) { filePath = fileIndex === 0 ? 'index.html' : `file${fileIndex}.txt`; }
+      data.files.push({ path: filePath, content: content.trim(), isNew: true });
+      fileIndex++;
     }
   }
   // Ensure .redivivus/ structure exists — always, even for single-file builds.
