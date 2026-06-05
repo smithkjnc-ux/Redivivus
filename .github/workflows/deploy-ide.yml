@@ -1,0 +1,150 @@
+name: Deploy IDE Binaries
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  deploy:
+    if: "!contains(github.event.head_commit.message, 'chore: release')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Redivivus
+        uses: actions/checkout@v4
+        with:
+          path: redivivus
+          token: ${{ secrets.REPO_PAT }}
+          fetch-depth: 0
+
+      - name: Checkout Redivivus-Build
+        uses: actions/checkout@v4
+        with:
+          repository: smithkjnc-ux/redivivus-build
+          path: redivivus-build
+          token: ${{ secrets.REPO_PAT }}
+
+      - name: Checkout Redivivus-Web
+        uses: actions/checkout@v4
+        with:
+          repository: smithkjnc-ux/redivivus-web
+          path: redivivus-web
+          token: ${{ secrets.REPO_PAT }}
+
+      - name: Setup Workspace Structure
+        run: |
+          mkdir -p $HOME/projects
+          mv redivivus $HOME/projects/redivivus
+          mv redivivus-build $HOME/projects/redivivus-build
+          mv redivivus-web $HOME/projects/redivivus-web
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        working-directory: ${{ runner.workspace }}/../../home/runner/projects/redivivus
+        run: npm ci
+
+      - name: Install Cloudflare Wrangler
+        run: npm install -g wrangler
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run Build and Release
+        env:
+          GH_TOKEN: ${{ secrets.REPO_PAT }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        working-directory: ${{ runner.workspace }}/../../home/runner/projects/redivivus
+        run: |
+          # 1. Bump version
+          NEW_VERSION=$(node -e "
+          const fs = require('fs');
+          const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
+          const [major, minor, patch] = pkg.version.split('.').map(Number);
+          pkg.version = \`\${major}.\${minor}.\${patch + 1}\`;
+          fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+          console.log(pkg.version);
+          ")
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          TARBALL="$HOME/redivivus-$NEW_VERSION.tar.gz"
+          WIN_ZIP="$HOME/redivivus-win32-x64-v$NEW_VERSION.zip"
+          
+          # 2. Compile
+          npm run compile
+          
+          # 3. Build Linux IDE Shell
+          echo "▶  Building Linux IDE Shell..."
+          ./scripts/update-linux-base.sh
+          
+          cd $HOME/projects/redivivus-build
+          FOLDER="redivivus-$NEW_VERSION"
+          mv VSCode-linux-x64 "$FOLDER"
+          tar -czf "$TARBALL" "$FOLDER"
+          mv "$FOLDER" VSCode-linux-x64
+          
+          # 4. Build Windows IDE Shell
+          cd $HOME/projects/redivivus
+          echo "▶  Building Windows IDE Shell..."
+          ./scripts/build-windows.sh --skip-compile
+          
+          # 5. Create GitHub Release
+          TAG="v$NEW_VERSION"
+          echo "▶  Creating GitHub Release..."
+          gh release create "$TAG" "$TARBALL" "$WIN_ZIP" \
+            --repo smithkjnc-ux/Redivivus \
+            --title "Redivivus IDE $TAG" \
+            --notes "Standalone builds for Linux and Windows. Download, extract, and run.
+
+          ## Linux Install
+          \`\`\`bash
+          tar -xzf redivivus-${NEW_VERSION}.tar.gz
+          cd redivivus-${NEW_VERSION} && ./redivivus
+          \`\`\`
+
+          ## Windows Install
+          Extract the zip and double-click \`redivivus.exe\`"
+            
+          # 6. Upload to Cloudflare R2
+          echo "▶  Uploading to Cloudflare R2..."
+          # Delete previous versions
+          PREV_VERSION=$(node -e "
+          const [major, minor, patch] = '$NEW_VERSION'.split('.').map(Number);
+          console.log(major + '.' + minor + '.' + (patch - 1));
+          ")
+          wrangler r2 object delete "redivivus-downloads/redivivus-$PREV_VERSION.tar.gz" --remote 2>/dev/null || true
+          wrangler r2 object delete "redivivus-downloads/redivivus-win32-x64-v$PREV_VERSION.zip" --remote 2>/dev/null || true
+
+          r2_upload() {
+            local key="\$1" file="\$2" type="\$3"
+            for attempt in 1 2 3; do
+              wrangler r2 object put "redivivus-downloads/\$key" --file="\$file" --content-type="\$type" --remote && return 0
+              echo "   R2 upload attempt \$attempt failed for \$key — retrying in 5s..."
+              sleep 5
+            done
+            echo "   ⚠ R2 upload failed after 3 attempts for \$key"
+          }
+          r2_upload "redivivus-$NEW_VERSION.tar.gz" "$TARBALL" "application/gzip"
+          r2_upload "redivivus-win32-x64-v$NEW_VERSION.zip" "$WIN_ZIP" "application/zip"
+          
+          # 7. Update Web Download Links and Push
+          echo "▶  Triggering Web App Update..."
+          cd $HOME/projects/redivivus-web
+          node -e "
+          const fs = require('fs');
+          const file = 'src/lib/latest-release.ts';
+          const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOWNLOAD_URL_LINUX = \\\`https://downloads.redivivus.dev/redivivus-\\\${LATEST_VERSION}.tar.gz\\\`\nexport const DOWNLOAD_URL_WINDOWS = \\\`https://downloads.redivivus.dev/redivivus-win32-x64-v\\\${LATEST_VERSION}.zip\\\`\n\`;
+          fs.writeFileSync(file, content);
+          "
+          git commit -am "chore: update IDE download links for v$NEW_VERSION"
+          git push origin master
+          
+          # 8. Push Version Bump to Redivivus
+          cd $HOME/projects/redivivus
+          git commit -am "chore: release $NEW_VERSION"
+          git push origin master

@@ -5,6 +5,125 @@
 
 ---
 
+## Session — Jun 4, 2026: IDE Binary Automation (GitHub Actions)
+
+**Problem:** The IDE binaries (Linux, Windows) were being packaged and uploaded to Cloudflare R2 by a local cron script (`nightly-release.sh`) that ran daily at 9 PM. This required the local machine to be on and meant binaries were out of sync with code pushes.
+
+**Fix:**
+- Disabled the local 9 PM cron job.
+- Renamed `scripts/release.sh` to `scripts/local-release.sh` for manual usage.
+- Created `.github/workflows/deploy-ide.yml` in the `Redivivus` repository to fully automate the pipeline.
+- The new cloud Action triggers on code push, checks out the `redivivus-build` codebase, injects the new extension into the prebuilt VSCodium shells (via `update-linux-base.sh` and `build-windows.sh`), publishes the `.tar.gz`/`.zip` to Cloudflare R2, and commits an update to `latest-release.ts` in the `redivivus-web` repo, triggering the site deployment.
+
+**Risk:** Medium — requires PAT token for cross-repo access and Cloudflare R2 tokens. Any token expiration will halt the pipeline.
+
+---
+
+## Session — Jun 4, 2026: Admin Users Dashboard Shows Incorrect Dates & False "At-Risk" Users
+
+**Problem:** Users who just signed up a few days ago were incorrectly flagged as "at risk" (no sign-in for 30+ days) and the dates in the table were off by a day for US timezones (e.g. showing 6/5 instead of 6/4).
+
+**Root cause:** 
+1. **At-Risk Filter:** The filter flagged any user whose `last_sign_in` was empty/null, completely ignoring their `created_at` date. If they created an account 2 days ago but haven't signed back in since, they were flagged.
+2. **Dates:** `admin/users/page.tsx` is a Server Component, meaning `toLocaleDateString()` ran on the Cloudflare server (UTC), shifting evening signups into the next day.
+
+**Fix:**
+- Added a `LocalDate` client component to push date formatting to the browser, ensuring dates are rendered in the admin's local timezone.
+- Updated the `atRisk` filter to strictly check `const lastSeen = u.last_sign_in || u.created_at`. If they signed up recently, they are no longer falsely flagged.
+
+**Risk:** Low — cosmetic fixes to the admin dashboard.
+
+---
+
+## Session — Jun 4, 2026: Admin Notification Email Silently Failing on Cloudflare
+
+**Problem:** The admin notification email was working locally (and previously on Vercel) but silently stopped working after migrating the site to Cloudflare Pages.
+
+**Root cause:** The `fetch` call to `/api/notify-signup` inside the `auth/callback` route was originally designed as "fire-and-forget" (not awaited). While standard Node.js/Vercel environments allow dangling promises to finish in the background, Cloudflare Workers *aggressively terminate* all background execution the exact millisecond the route returns a response (`NextResponse.redirect`). The `fetch` was being killed mid-flight before it could ever hit the Resend API.
+
+**Fix — `auth/callback/route.ts`:**
+- Added `await` to the `fetch` call. By explicitly awaiting it, we force Cloudflare to keep the worker alive until the Resend API successfully receives the email payload, and *then* we return the redirect.
+
+**Risk:** Negligible — adds a ~200ms block to the signup redirect, but guarantees 100% email delivery.
+
+---
+
+## Session — Jun 4, 2026: Admin Users List Shows Unapproved Users
+
+**Problem:** Users who failed the auth flow (like the phone PKCE error) or were just added to the waitlist were showing up in the "Users" list on the admin dashboard instead of just the Waitlist.
+
+**Root cause:** When a user requests a code, Supabase creates a record in `auth.users` immediately. If they never finish the auth flow, they never get added to the `waitlist` table. The filter in `admin/users/page.tsx` was `wlStatus !== 'pending' && wlStatus !== 'denied'`. If they weren't in the waitlist table at all, `wlStatus` was `undefined`, which bypassed the filter and incorrectly included them in the active users list.
+
+**Fix — `admin/users/page.tsx`:**
+- Changed the negative filter to an explicit allowlist: `wlStatus === 'approved'`.
+- Now, only explicitly approved users (and admins) will show up on the Users page. Everyone else is filtered out.
+
+**Risk:** None — strictly hardens the display logic.
+
+---
+
+## Session — Jun 4, 2026: UI OTP Verification Fails for New Users
+
+**Problem:** Users typing the 6-digit code into the website were getting an "Authentication failed" error if they were a brand new user.
+
+**Root cause:** The `verifyCode` function in `login/page.tsx` hardcoded the verification type to `type: 'email'`. Supabase requires the type to be exactly `'signup'` for brand new users. 
+
+**Fix — `login/page.tsx`:**
+- Rewrote the OTP verification to fall back through multiple types (`'email'`, `'magiclink'`, `'signup'`).
+- The code now correctly identifies brand new users and successfully verifies their 6-digit code.
+
+**Risk:** None — properly handles all Supabase OTP types now.
+
+---
+
+## Session — Jun 4, 2026: Chat Panel Duplicate on Project Close (Deserialization Race)
+
+**Problem:** Clicking "X Close Project" caused VS Code to reload and left behind TWO chat windows: the original project window (orphaned, broken) and a new "Redivivus Chat" launcher. Also showed error: `Command failed: chatPanel_1.ChatPanel.currentPanel.getWebvie...`
+
+**Root cause:** `closeProject` kept the panel alive while calling `updateWorkspaceFolders(0, N)`. Removing the last folder from a single-folder workspace causes VS Code to convert to "Untitled (Workspace)" and reload the entire window. On reload, VS Code visually restored the orphaned tab (creating tab #1), then the auto-open timer saw no `_instance` and created a fresh launcher (tab #2). Previous approaches (in-place reset, deserialization flag guards) all failed because VS Code's internal tab restoration happens before the serializer callback runs.
+
+**Fix — `extensionCommands.ts` (v3 — dispose before close):**
+- `ChatPanel.close()` disposes the panel BEFORE `updateWorkspaceFolders` removes folders. This kills the tab so VS Code has nothing to serialize or visually restore.
+- On reload: the serializer has nothing to restore (never called), and the auto-open timer creates exactly ONE fresh launcher panel.
+- Removed the broken `getWebview()` call entirely.
+
+**Fix — `extension.ts` & `chatPanel.ts` (deserialization race guard, retained):**
+- Introduced a `ChatPanel._isDeserializing` static flag and `checkAndShow` polling loop.
+- Auto-open timer yields while the deserializer is active (defense-in-depth for other reload scenarios).
+
+**Risk:** Low — brief tab flash during close transition, but guaranteed exactly ONE panel on the other side.
+
+---
+
+## Session — Jun 4, 2026: Dynamic Preview/Run Pill Button
+
+**Problem:** The top navigation bar always showed a "▶ Preview" pill button, which didn't make sense for Python, Go, Rust, or other non-web projects (or when editing backend files). Clicking Preview on `calculator.py` opened a blank iframe with "Nothing to preview yet."
+
+**Fix — `chatPanelHeader.ts` & `chatPanelHtml.ts`:**
+- Updated `ChatHeaderInfo` to accept a dynamic `primaryAction` object.
+- In `buildHeaderInfo`, check the `vscode.window.activeTextEditor` for the active file extension (e.g. `.py`, `.go`, `.rs`, `.sh`). If it's a backend file, set the button to "▶ Run" (`redivivus.runProject`).
+- **v2 fix:** The initial fallback used `detectPostBuildInfo(workspaceRoot, [])` which missed files like `calculator.py` because it only checks hardcoded entry names (`main.py`, `app.py`). Replaced with a direct `fs.readdirSync` scan of the workspace root for backend file extensions (`.py`, `.go`, `.rs`, `.sh`, etc). If any backend file exists and no `.html` file exists, the button becomes "▶ Run".
+- The `chatPanelHtml` builder now dynamically applies `actionAttr` (`data-cmd` vs `data-action`) and label/tooltip based on `primaryAction`.
+
+**Risk:** Low — strictly UI logic updating the button label and triggered command based on project context.
+
+---
+
+## Session — Jun 4, 2026: Hide waitlisted users from admin Users page
+
+**Problem:** When a new user makes an account, they were appearing in the `Users` list in the admin dashboard even though they were still unapproved on the waitlist. 
+
+**Root cause:** The `Users` page simply listed all users from `auth.users`. Because `auth/callback` handles new logins by adding them to `auth.users` and then creating a `pending` entry on the `waitlist` table, those users were immediately shown as "Active" on the Users page, confusing administrators.
+
+**Fix — `redivivus-web/src/app/admin/users/page.tsx` & `redivivus-web/src/app/api/admin/users/export/route.ts`:**
+- Fetched the `waitlist` table and built a `waitlistMap`.
+- Added a `.filter()` to the `users` array mapping to exclude any user whose waitlist status is `pending` or `denied`.
+- Admins bypass the filter to ensure they always show up. 
+
+**Risk:** Low — purely visual filtering in the admin panel. Pending users are still visible and manageable on the dedicated `Waitlist` page.
+
+---
+
 ## Session 16N — Jun 4, 2026: Duplicate chat panel when clicking "X Close Project" button
 
 **Problem:** Clicking the "X Close Project" button on the project dashboard created a duplicate chat tab.
