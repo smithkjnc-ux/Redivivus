@@ -2,10 +2,24 @@ out
 dist
 node_modules
 .vscode-test/
+
+# Binaries and release artifacts — never commit these
 *.vsix
+*.zip
+*.tar.gz
+*.tar.xz
+*.exe
+*.dmg
+*.AppImage
+*.deb
+*.rpm
 tmp-binaries/
 tmp-ide/
+releases/
+
+# Scratch / throwaway scripts
 scratch-*.js
+scratch-*.ts
 
 # Redivivus session data (blueprints and logs are tracked)
 .redivivus/sessions/
