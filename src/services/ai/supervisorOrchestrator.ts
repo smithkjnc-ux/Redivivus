@@ -5,6 +5,7 @@
 import { AI_CAPABILITIES } from './guardianAI.js';
 import type { AIResponse } from './routingTypes.js';
 import { getWorkerRules } from '../api/apiClientKnowledge.js';
+import { log } from '../logging/redivivusLogger.js';
 
 export interface PlanStep {
   stepNumber: number;
@@ -128,7 +129,7 @@ function parsePlan(text: string, availableAIs: string[]): PlanStep[] {
     const parsed = JSON.parse(clean);
     if (!Array.isArray(parsed)) { throw new Error('Not an array'); }
 
-    return parsed.slice(0, 4).map((item: any, i: number) => {
+    const plan = parsed.slice(0, 4).map((item: any, i: number) => {
       const ai = availableAIs.includes(item.ai) ? item.ai : availableAIs[1] || availableAIs[0];
       const cap = AI_CAPABILITIES[ai];
       return {
@@ -143,7 +144,10 @@ function parsePlan(text: string, availableAIs: string[]): PlanStep[] {
         type: 'code' as const,
       };
     });
-  } catch {
+    log('debug', 'services', 'supervisorOrchestrator', 'parsePlan', 'Supervisor Plan Parsed Successfully', { plan });
+    return plan;
+  } catch (err) {
+    log('error', 'services', 'supervisorOrchestrator', 'parsePlan', 'Supervisor Plan Parse Failed', { rawText: text, error: String(err) });
     // Parse failed — single step to best worker
     const worker = availableAIs[1] || availableAIs[0];
     const cap = AI_CAPABILITIES[worker];
@@ -182,7 +186,20 @@ export async function executeStep(
     ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nSTRICT CONTRACT FOR YOUR STEP:\n${specText}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`
     : `${workerPersona}You are building: "${task}"\n${planBlock}\nSTRICT CONTRACT:\n${specText}\n\nImplement exactly as prescribed. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`;
 
+  log('debug', 'services', 'supervisorOrchestrator', 'executeStep', `Worker Prompt for Step ${step.stepNumber}`, {
+    ai: step.assignedAI,
+    contract: specText,
+    fullPrompt: stepPrompt
+  });
+
   const res = await callAI(step.assignedAI, stepPrompt);
+  
+  log('debug', 'services', 'supervisorOrchestrator', 'executeStep', `Worker Output for Step ${step.stepNumber}`, {
+    success: res.success,
+    tokens: Math.ceil((res.text || '').length / 4),
+    fullResponse: res.text
+  });
+
   if (!res.success) { return { code: '', tokens: 0 }; }
   const tokens = Math.ceil((res.text || '').length / 4);
   return { code: res.text || '', tokens };
@@ -207,7 +224,15 @@ Did the worker strictly follow the exact instructions? Did they create the speci
 - If YES: respond with EXACTLY "REVIEW_PASS"
 - If NO: respond with "REVIEW_FIX:" followed by the complete corrected code. Do NOT output markdown fences if rewriting code.`;
 
+  log('debug', 'services', 'supervisorOrchestrator', 'reviewOutput', 'Guardian Review Prompt', { fullPrompt: prompt });
+
   const res = await callAI(supervisorAI, prompt);
+  
+  log('debug', 'services', 'supervisorOrchestrator', 'reviewOutput', 'Guardian Review Outcome', {
+    success: res.success,
+    fullResponse: res.text
+  });
+
   if (!res.success || !res.text) { return { passed: true, corrected: assembledCode, notes: '' }; }
 
   const text = res.text.trim();

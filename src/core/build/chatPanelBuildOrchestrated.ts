@@ -13,6 +13,7 @@ import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
 import { readProjectRules } from '../routing/chatPanelMsgFixUtils.js';
 import { generatePlanId, formatOrchestratedPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough';
+import { log } from '../../services/logging/redivivusLogger.js';
 import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown } from './chatPanelBuildOrchestratedUtils';
 
 // Re-export utilities so existing importers don't break
@@ -48,12 +49,23 @@ export async function runOrchestratedPhaseBuild(
   // ── Step 1: Supervisor plans ──────────────────────────────────────────────
   deps.conversation.push({
     role: 'assistant',
-    content: `🎯 **${supervisorLabel} (Supervisor)** is planning the ${phase.icon} ${phase.name} phase...`,
+    content: `🧠 **${supervisorLabel} (Supervisor)** planning architecture...`,
     timestamp: Date.now(),
   });
   deps.refresh();
 
-  const planSteps = await createPlan(phaseTask, ranked, context, callAI);
+  log('debug', 'core', 'chatPanelBuildOrchestrated', 'executeOrchestratedPhase', 'Supervisor Planning Requested', {
+    task: phaseTask,
+    availableAIs: ranked,
+    projectRoot: root
+  });
+
+  const planSteps = await createPlan(
+    phaseTask,
+    ranked,
+    context,
+    callAI
+  );
 
   deps.conversation.push({
     role: 'assistant',
