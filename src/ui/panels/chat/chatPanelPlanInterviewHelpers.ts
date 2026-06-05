@@ -114,7 +114,9 @@ Only fill fields that are OBVIOUS from context. Leave empty string for anything 
   try {
     const result = await routing.prompt(prompt, 10_000);
     if (!result?.success || !result.text) { return {}; }
-    const clean = result.text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    let clean = result.text.trim();
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) { clean = match[0]; }
     const parsed = JSON.parse(clean);
     const out: Record<string, string> = {};
     for (const key of ['who', 'where', 'when', 'why']) {

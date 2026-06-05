@@ -76,7 +76,9 @@ export async function inferBlueprintFields(
     const prompt = INFERENCE_PROMPT.replace('{REQUEST}', request.slice(0, 400));
     const res = await (routing as any).prompt(prompt, 15_000);
     if (!res?.text) { return makeFallback(request, sessionId); }
-    const clean = res.text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+    let clean = res.text.trim();
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) { clean = match[0]; }
     const parsed = JSON.parse(clean);
     const fields: InferredW[] = (['who', 'what', 'where', 'when', 'why'] as const).map(f => {
       const raw = parsed[f] || {};

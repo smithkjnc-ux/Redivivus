@@ -104,7 +104,9 @@ export async function createPlan(
 function parsePlan(text: string, availableAIs: string[]): PlanStep[] {
   try {
     // Strip markdown fences if present
-    const clean = text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+    let clean = text.trim();
+    const match = clean.match(/\[[\s\S]*\]/);
+    if (match) { clean = match[0]; }
     const parsed = JSON.parse(clean);
     if (!Array.isArray(parsed)) { throw new Error('Not an array'); }
 

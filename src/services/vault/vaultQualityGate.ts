@@ -78,7 +78,9 @@ export async function evaluateQuality(
     const res = await callAI(prompt);
     if (!res.success || !res.text) { return heuristicVerdict(name, code); }
 
-    const clean = res.text.replace(/```json?\n?/g, '').replace(/```/g, '').trim();
+    let clean = res.text.trim();
+    const match = clean.match(/\{[\s\S]*\}/);
+    if (match) { clean = match[0]; }
     const parsed = JSON.parse(clean);
 
     const aiTags = Array.isArray(parsed.tags) ? parsed.tags.map((t: any) => String(t).toLowerCase().trim()).filter((t: string) => t.length >= 3).slice(0, 6) : [];

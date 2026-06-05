@@ -6392,3 +6392,4 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 **What changed:** Surgical edit fallback now logs `console.warn` when search blocks don't match and full rewrite is used.
 **Why:** Silent fallback made it impossible to know when surgical edits failed.
 **Risk:** None.
+- **JSON Parsing Robustness (June 4, 2026)**: Replaced fragile replace() logic across 4 files (`supervisorOrchestrator.ts`, `blueprintInference.ts`, `vaultQualityGate.ts`, `chatPanelPlanInterviewHelpers.ts`) with robust regex extraction to properly parse AI output containing markdown fences or conversational preambles (specifically fixing Gemini failures).
