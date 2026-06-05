@@ -4,6 +4,7 @@
 
 import { AI_CAPABILITIES } from './guardianAI.js';
 import type { AIResponse } from './routingTypes.js';
+import { Redivivus_WORKER_RULES } from './redivivusWorkerRules.js';
 
 /** A single step in the supervisor's execution plan */
 export interface PlanStep {
@@ -48,9 +49,13 @@ ${context ? `PROJECT CONTEXT:\n${context}\n` : ''}
 AVAILABLE AIs AND THEIR STRENGTHS:
 ${aiDescriptions}
 
+PROJECT RULES (MUST COMPLY):
+${Redivivus_WORKER_RULES}
+
 Create a build plan with 1-4 steps (fewer is better). Each step produces code.
 For simple tasks (1 file, straightforward), use just 1 step.
 For complex tasks (multi-file, architecture decisions), use 2-4 steps.
+Ensure you follow all PROJECT RULES, especially single-file requirements for games.
 
 For each step, "spec" must be a precise prescription the Worker can follow without guessing:
 - Include the exact filename
@@ -146,7 +151,7 @@ export async function executeStep(
         return `  Step ${s.stepNumber} ${status}: ${s.spec || s.description}`;
       }).join('\n') + '\n'
     : '';
-  const workerPersona = `You are the mechanic. You turn wrenches. You do not talk to the customer.\nYour output goes to the Guardian, who translates it.\nWrite clean code. Leave clear comments. That's your communication.\nWhen you're unsure: flag it with [WARN] in a comment so the Guardian sees it. Do not guess silently.\n\n`;
+  const workerPersona = `You are the mechanic. You turn wrenches. You do not talk to the customer.\nYour output goes to the Guardian, who translates it.\nWrite clean code. Leave clear comments. That's your communication.\nWhen you're unsure: flag it with [WARN] in a comment so the Guardian sees it. Do not guess silently.\n\nPROJECT RULES (MUST COMPLY):\n${Redivivus_WORKER_RULES}\n\n`;
   const stepPrompt = previousOutput
     ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nPRESCRIPTION FOR YOUR STEP:\n${spec}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Output ONLY code.`
     : `${workerPersona}You are building: "${task}"\n${planBlock}\nPRESCRIPTION:\n${spec}\n\nImplement exactly as prescribed. Output ONLY the complete working code.`;

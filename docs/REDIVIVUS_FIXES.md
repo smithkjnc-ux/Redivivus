@@ -5,6 +5,17 @@
 
 ---
 
+## Session — Jun 5, 2026: Inject Redivivus Rules into Chassis Supervisor
+
+**Problem:** When Adaptive Orchestration (Chassis) ran locally, the `supervisorOrchestrator.ts` used a hardcoded prompt that did not include `Redivivus_WORKER_RULES`. As a result, the Supervisor (e.g. Claude Sonnet) lacked awareness of Rule 9 (BROWSER GAMES AND SIMPLE TOOLS: ALWAYS output a single self-contained index.html) and would plan multi-file builds. The executing Worker also lacked these rules, resulting in games being split into `index.html` and `style.css` and lacking aesthetic constraints.
+
+**Fix — `src/services/ai/supervisorOrchestrator.ts`:**
+- Imported `Redivivus_WORKER_RULES` from `redivivusWorkerRules.ts`.
+- Injected `Redivivus_WORKER_RULES` directly into `buildPlanPrompt` so the Supervisor explicitly plans according to project rules.
+- Injected `Redivivus_WORKER_RULES` into the Worker's `executeStep` prompt so the Worker follows coding and aesthetic constraints (e.g., gradients, single file) during execution.
+
+**Risk:** Negligible. Enforces existing project rules on the local Chassis pipeline.
+
 ## Session — Jun 5, 2026: Migration of AI Orchestration to Backend
 
 **Problem:** Sensitive orchestration logic, secret rule definitions, and proprietary "secret sauce" prompts were exposed in the client-side VS Code extension codebase. This posed a security risk of prompt theft and tampering, and made it difficult to iterate on the orchestration engine without forcing an extension update.
