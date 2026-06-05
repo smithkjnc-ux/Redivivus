@@ -112,7 +112,13 @@ export async function runOrchestratedPhaseBuild(
   });
   deps.refresh();
 
-  const review = await reviewOutput(phaseTask, assembledCode, ranked[0], callAI);
+  const review = await reviewOutput(
+    phaseTask,
+    assembledCode,
+    ranked[0],
+    callAI,
+    planSteps.map(s => `Step ${s.stepNumber}: Create ${s.filesToCreate?.join(', ')} -> ${s.exactInstructions}`).join('\\n')
+  );
   if (!review.passed && review.notes) {
     deps.conversation.push({
       role: 'assistant',

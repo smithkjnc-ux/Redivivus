@@ -6,11 +6,13 @@ import { AI_CAPABILITIES } from './guardianAI.js';
 import type { AIResponse } from './routingTypes.js';
 import { getWorkerRules } from '../api/apiClientKnowledge.js';
 
-/** A single step in the supervisor's execution plan */
 export interface PlanStep {
   stepNumber: number;
   description: string;
-  spec?: string;          // Exact prescription: file + functions + signatures — Worker reads this directly
+  filesToCreate?: string[];
+  dependencies?: string[];
+  exactInstructions?: string;
+  spec?: string;          // Backwards compatibility
   assignedAI: string;     // AI id (e.g., 'gemini', 'claude')
   assignedLabel: string;  // Human label (e.g., 'Gemini')
   type: 'code' | 'review' | 'structure';
@@ -62,18 +64,19 @@ ARCHITECTURAL REASONING (Follow these steps before generating the plan):
 
 Ensure you follow all PROJECT RULES, especially architecture constraints for games.
 
-For each step, "spec" must be a precise prescription the Worker can follow without guessing:
-- Include the exact filename(s) to create or modify.
-- Name every function, class, or variable to implement.
-- For changes: quote exact old → new code.
-- Specify key constants, types, and behaviors.
+For each step, you must output a STRICT CONTRACT for the Worker:
+- filesToCreate: Array of exact filenames to create/modify.
+- dependencies: Array of filenames this step imports or relies on.
+- exactInstructions: Precise prescription. Name every function, class, or variable to implement. Quote exact old → new code for changes.
 
 Respond with ONLY valid JSON, no markdown, no explanation:
 [
   { 
     "step": 1, 
     "description": "Short label describing the logical layer", 
-    "spec": "Precise prescription of the files to write, the exact functions/interfaces to implement, and the constraints.", 
+    "filesToCreate": ["exact_filename.ext"],
+    "dependencies": ["files_this_step_imports.ext"],
+    "exactInstructions": "Precise implementation details...", 
     "ai": "which_ai_id" 
   }
 ]`;
@@ -131,6 +134,9 @@ function parsePlan(text: string, availableAIs: string[]): PlanStep[] {
       return {
         stepNumber: i + 1,
         description: String(item.description || 'Build step'),
+        filesToCreate: Array.isArray(item.filesToCreate) ? item.filesToCreate : undefined,
+        dependencies: Array.isArray(item.dependencies) ? item.dependencies : undefined,
+        exactInstructions: item.exactInstructions ? String(item.exactInstructions) : undefined,
         spec: item.spec ? String(item.spec) : undefined,
         assignedAI: ai,
         assignedLabel: cap?.label || ai,
@@ -153,18 +159,28 @@ export async function executeStep(
   callAI: (ai: string, prompt: string) => Promise<AIResponse>,
   allSteps?: PlanStep[]
 ): Promise<{ code: string; tokens: number }> {
-  const spec = step.spec || step.description;
+  // Reconstruct a strict text contract for the Worker
+  let specText = '';
+  if (step.filesToCreate || step.dependencies || step.exactInstructions) {
+    specText += step.filesToCreate ? `FILES TO CREATE:\n${step.filesToCreate.map(f => `- ${f}`).join('\n')}\n\n` : '';
+    specText += step.dependencies ? `DEPENDENCIES:\n${step.dependencies.map(d => `- ${d}`).join('\n')}\n\n` : '';
+    specText += step.exactInstructions ? `INSTRUCTIONS:\n${step.exactInstructions}` : '';
+  } else {
+    specText = step.spec || step.description;
+  }
+
   const planBlock = allSteps && allSteps.length > 1
     ? `\nFULL BUILD PLAN (all steps — know what each Worker is responsible for):\n` +
       allSteps.map(s => {
         const status = s.stepNumber < step.stepNumber ? '[DONE]' : s.stepNumber === step.stepNumber ? '[YOUR STEP]' : '[PENDING]';
-        return `  Step ${s.stepNumber} ${status}: ${s.spec || s.description}`;
+        const stepSpec = s.filesToCreate ? `Create ${s.filesToCreate.join(', ')}` : (s.spec || s.description);
+        return `  Step ${s.stepNumber} ${status}: ${stepSpec}`;
       }).join('\n') + '\n'
     : '';
   const workerPersona = `You are the mechanic. You turn wrenches. You do not talk to the customer.\nYour output goes to the Guardian, who translates it.\nWrite clean code. Leave clear comments. That's your communication.\nWhen you're unsure: flag it with [WARN] in a comment so the Guardian sees it. Do not guess silently.\n\nPROJECT RULES (MUST COMPLY):\n${getWorkerRules()}\n\n`;
   const stepPrompt = previousOutput
-    ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nPRESCRIPTION FOR YOUR STEP:\n${spec}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`
-    : `${workerPersona}You are building: "${task}"\n${planBlock}\nPRESCRIPTION:\n${spec}\n\nImplement exactly as prescribed. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`;
+    ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nSTRICT CONTRACT FOR YOUR STEP:\n${specText}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`
+    : `${workerPersona}You are building: "${task}"\n${planBlock}\nSTRICT CONTRACT:\n${specText}\n\nImplement exactly as prescribed. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`;
 
   const res = await callAI(step.assignedAI, stepPrompt);
   if (!res.success) { return { code: '', tokens: 0 }; }
@@ -177,9 +193,19 @@ export async function reviewOutput(
   task: string,
   assembledCode: string,
   supervisorAI: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>
+  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
+  planContext?: string
 ): Promise<{ passed: boolean; corrected: string; notes: string }> {
-  const prompt = `You are a senior engineer reviewing assembled code.\n\nORIGINAL TASK: "${task}"\n\nCODE:\n${assembledCode}\n\nDoes this code work correctly and completely fulfill the task?\n- If YES: respond with EXACTLY "REVIEW_PASS"\n- If NO: respond with "REVIEW_FIX:" followed by the complete corrected code`;
+  const prompt = `You are a Senior Architect/Guardian reviewing assembled code from a junior worker.
+
+ORIGINAL TASK: "${task}"
+${planContext ? `\nSTRICT BUILD PLAN (CONTRACT):\n${planContext}\n` : ''}
+CODE FROM WORKER:
+${assembledCode}
+
+Did the worker strictly follow the exact instructions? Did they create the specified files and link the correct dependencies? Does this code work correctly and completely fulfill the task?
+- If YES: respond with EXACTLY "REVIEW_PASS"
+- If NO: respond with "REVIEW_FIX:" followed by the complete corrected code. Do NOT output markdown fences if rewriting code.`;
 
   const res = await callAI(supervisorAI, prompt);
   if (!res.success || !res.text) { return { passed: true, corrected: assembledCode, notes: '' }; }
