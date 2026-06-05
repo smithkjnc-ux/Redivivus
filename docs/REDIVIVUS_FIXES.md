@@ -398,6 +398,21 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16U — Jun 5, 2026: Gemini+2 badge still showing after sentinel fix (Session 16T)
+
+**Problem:** After the duplicate-tab sentinel fix, `Gemini +2` badge persisted on every reload despite the `onSecretKeyStoreReady` callback being correctly wired.
+
+**Root cause:** The sentinel object `{ __sentinel: true }` set in `deserializeWebviewPanel` was still assigned to `_instance` when `onSecretKeyStoreReady` fired. The callback checked `ChatPanel.currentPanel` — truthy (the sentinel) — and called `.refresh()` on it. The sentinel has no `.refresh()` method, so the call was silently a no-op. Badge never updated.
+
+**Fix — `src/extension.ts` `onSecretKeyStoreReady` callback:**
+- Changed from `ChatPanel.currentPanel.refresh()` to a `tryRefresh()` polling loop.
+- Checks `typeof p.refresh === 'function'` before calling — if not a real panel yet, retries after 150ms.
+- Stops immediately if `currentPanel` becomes null (panel closed before init finished).
+
+**Risk:** None. The poll runs at most 2-3 times before the real panel is constructed (~300-400ms window).
+
+---
+
 ## Session 16T — Jun 5, 2026: Two chat tabs open on Restart Extension Host
 
 **Problem:** Every "Restart Extension Host" (or window reload) produced two `Redivivus Chat` tabs.
