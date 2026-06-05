@@ -5,6 +5,21 @@
 
 ---
 
+## Session — Jun 4, 2026: Admin Dashboard "This page couldn't load" Fix
+
+**Problem:** The admin dashboard `/admin/users` was crashing with "This page couldn't load" on production. This was caused by two Next.js SSR issues:
+1. `LocalDate` throwing a `RangeError: Invalid time value` if a user's `created_at` or `last_sign_in_at` date was invalid (e.g., empty string), since `!date` only caught null/undefined.
+2. "Dynamic server usage" errors from a mid-component `await import('@/lib/env')` inside the Server Component.
+
+**Fix — `redivivus-web/src/components/LocalDate.tsx`:**
+- Added a `d.getTime()` `isNaN` check before attempting to call `toLocaleDateString()` to safely fallback to the em dash (`—`) when given an invalid date string.
+
+**Fix — `redivivus-web/src/app/admin/users/page.tsx`:**
+- Converted the mid-body dynamic `await import` to a standard static import at the top of the file to prevent chunk resolution errors in Next.js Server Components.
+- Added missing `[SCOPE]` tag at line 1.
+
+**Risk:** None — strictly hardens SSR rendering logic against invalid dates and dynamic chunk errors.
+
 ## Session — Jun 4, 2026: Admin Dashboard UI Fixes
 
 **Problem:** The admin dashboard overview (`redivivus-web`) showed misleading data: the Waitlist card showed the total historical waitlist count instead of the pending count, and the Recent Activity list was cluttered with high-volume `ai_prompt` events while only showing obscure user UUIDs.
