@@ -5,6 +5,18 @@
 
 ---
 
+## Session — Jun 4, 2026: Cloudflare OpenNext Admin Crash Fix (Missing Public Vars)
+
+**Problem:** The admin dashboard was crashing on Cloudflare Pages/Workers (`redivivus.dev/admin/users`) with "This page couldn't load" despite successful builds. The previous date-handling SSR fix did not resolve it because the root cause was an environment variable issue.
+
+**Root cause:** The migration to Cloudflare and OpenNext automated deployment in `.github/workflows/deploy.yml` successfully created `.dev.vars` for secret keys, but omitted `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. Since these are `NEXT_PUBLIC_` variables, Next.js requires them to be present *during the build step* to inline them. Without them, they evaluated to `undefined`, causing `createAdminClient` to throw an unhandled error (`Missing Supabase admin env vars`) during SSR.
+
+**Fix — `redivivus-web/.github/workflows/deploy.yml`:**
+- Added `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to the `.dev.vars` generation step so they are available at runtime to the Cloudflare Worker.
+- Added `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` directly to the `env:` block of the "Build & Deploy via OpenNext" step to guarantee Next.js can inline them during `next build`.
+
+**Risk:** Negligible — these are safely public publishable keys and resolving them prevents SSR crashes for admin routes.
+
 ## Session — Jun 4, 2026: Admin Dashboard "This page couldn't load" Fix
 
 **Problem:** The admin dashboard `/admin/users` was crashing with "This page couldn't load" on production. This was caused by two Next.js SSR issues:
