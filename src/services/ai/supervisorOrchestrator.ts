@@ -55,6 +55,7 @@ ${getWorkerRules()}
 Create a build plan with 1-4 steps (fewer is better). Each step produces code.
 For simple tasks (1 file, straightforward), use just 1 step.
 For complex tasks (multi-file, architecture decisions), use 2-4 steps.
+IMPORTANT: For games and full web apps, you MUST use 3 steps to separate concerns (e.g., index.html, style.css, and game.js). DO NOT cram games into a single file.
 Ensure you follow all PROJECT RULES, especially architecture constraints for games.
 
 For each step, "spec" must be a precise prescription the Worker can follow without guessing:
@@ -65,7 +66,9 @@ For each step, "spec" must be a precise prescription the Worker can follow witho
 
 Respond with ONLY valid JSON, no markdown, no explanation:
 [
-  { "step": 1, "description": "short label shown in UI", "spec": "File: src/game.js — export function startGame() { ... } — calls requestAnimationFrame at 60fps — const CANVAS_WIDTH=800", "ai": "which_ai_id" }
+  { "step": 1, "description": "HTML structure", "spec": "File: index.html — standard HTML5 boilerplate — includes <link rel='stylesheet' href='style.css'> and <script type='module' src='game.js'> — adds <canvas id='gameCanvas'>", "ai": "which_ai_id" },
+  { "step": 2, "description": "Styling", "spec": "File: style.css — body { margin: 0; background: linear-gradient(...) } — #gameCanvas { box-shadow: 0 0 20px rgba(0,0,0,0.5); border-radius: 8px; }", "ai": "which_ai_id" },
+  { "step": 3, "description": "Game Logic", "spec": "File: game.js — export function startGame() { ... } — requestAnimationFrame game loop — const CANVAS_WIDTH=800", "ai": "which_ai_id" }
 ]`;
 }
 
@@ -153,8 +156,8 @@ export async function executeStep(
     : '';
   const workerPersona = `You are the mechanic. You turn wrenches. You do not talk to the customer.\nYour output goes to the Guardian, who translates it.\nWrite clean code. Leave clear comments. That's your communication.\nWhen you're unsure: flag it with [WARN] in a comment so the Guardian sees it. Do not guess silently.\n\nPROJECT RULES (MUST COMPLY):\n${getWorkerRules()}\n\n`;
   const stepPrompt = previousOutput
-    ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nPRESCRIPTION FOR YOUR STEP:\n${spec}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Output ONLY code.`
-    : `${workerPersona}You are building: "${task}"\n${planBlock}\nPRESCRIPTION:\n${spec}\n\nImplement exactly as prescribed. Output ONLY the complete working code.`;
+    ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nPRESCRIPTION FOR YOUR STEP:\n${spec}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`
+    : `${workerPersona}You are building: "${task}"\n${planBlock}\nPRESCRIPTION:\n${spec}\n\nImplement exactly as prescribed. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`;
 
   const res = await callAI(step.assignedAI, stepPrompt);
   if (!res.success) { return { code: '', tokens: 0 }; }
