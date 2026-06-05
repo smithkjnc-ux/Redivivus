@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* Jun 5, 2026 — Session 16O: fixed chat panel badge showing "Gemini +2" instead of "Claude +5" — panel auto-opens before SecretStorage async reads finish; added `onSecretKeyStoreReady` callback to `secretKeyStore.ts` that invalidates roster cache and refreshes panel after init completes
+*Last updated:* Jun 5, 2026 — Session 16P: fixed Claude supervisor 400 error (deprecated temperature param) and dead Claude streaming case in backend executor.ts. Session 16O: fixed chat panel badge showing "Gemini +2" instead of "Claude +5" — panel auto-opens before SecretStorage async reads finish; added `onSecretKeyStoreReady` callback to `secretKeyStore.ts` that invalidates roster cache and refreshes panel after init completes
 
 ---
 

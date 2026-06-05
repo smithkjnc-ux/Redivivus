@@ -398,6 +398,23 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16P — Jun 5, 2026: Claude supervisor fails with 400 — "temperature is deprecated for this model"
+
+**Problem:** Every build with Claude as Supervisor failed with `400 invalid_request_error: temperature is deprecated for this model`, falling back to Gemini solo. Additionally, Claude was never used as a streaming Worker despite having a key.
+
+**Root cause — two bugs in `redivivus-backend/src/lib/ai/executor.ts`:**
+1. `executeClaude()` (sync, supervisor path): passed `temperature: opts.temperature` to the Anthropic SDK. `claude-sonnet-4` and later models no longer accept this parameter.
+2. `executeAIStream()` (streaming, worker path): the `claude`/`anthropic` case was **dead code** — it was written after a `break` statement inside the `case 'openai':` block, so it was never reachable. Claude fell through to `default` → `Unsupported streaming provider` error.
+
+**Fix — `redivivus-backend/src/lib/ai/executor.ts`:**
+- Removed `temperature` from `executeClaude()` sync call.
+- Moved the Claude streaming block out of the `openai` case into its own `case 'claude': case 'anthropic':` block.
+- Removed `temperature` from the Claude streaming `messages.create()` call.
+
+**Risk:** None. Temperature was being rejected anyway. Claude's sampling is deterministic by default without the param.
+
+---
+
 ## Session 16O — Jun 5, 2026: Chat panel badge shows wrong AI ("Gemini +2" instead of "Claude +5")
 
 **Problem:** The panel header shows `Gemini +2` despite having all 6 keys in SecretStorage.
