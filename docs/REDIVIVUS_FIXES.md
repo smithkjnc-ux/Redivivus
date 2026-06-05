@@ -398,6 +398,23 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16S — Jun 5, 2026: Health panel shows "API reachable: no" even when backend is running
+
+**Problem:** Health panel always showed `API reachable: no` even though builds were completing successfully through the local backend.
+
+**Root cause:** `pingApi()` in `chatPanelHealthCheck.ts` was hitting `GET /api/v1/announcements/` — a route that doesn't exist. Next.js returns **500** (not 404) for unregistered routes via its internal error handler. The reachable check was `res.ok || res.status < 500` — 500 fails both conditions → `reachable: false`.
+
+**Fix — `src/ui/panels/chat/chatPanelHealthCheck.ts`:**
+- Changed `pingApi()` to use `OPTIONS /api/v1/build` (same as `checkBuildApi`).
+- This always returns 204 when the server is up.
+- Changed the `reachable` return to unconditional `true` on any response — only a thrown exception (ECONNREFUSED, timeout) means truly unreachable.
+
+**Also:** Compiled, bumped build stamp to `Jun 5 18:19`, synced to build.
+
+**Risk:** None. `checkBuildApi` still independently checks the build endpoint health. `pingApi` now purely measures reachability + latency.
+
+---
+
 ## Session 16R — Jun 5, 2026: Worker assigned same provider as Supervisor when Supervisor requests ultra tier
 
 **Problem:** When the Supervisor (Claude) returned `"workerTier": "ultra"` in its contract, dynamic worker delegation called `getProviderForTier(keys, 'ultra')` which returned `availableProviders[0]` — the highest-ranked provider — which is **Claude again**. Result: Claude used for both Supervisor and Worker, burning $0.75 on a single build with no diversity benefit.
