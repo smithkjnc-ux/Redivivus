@@ -195,5 +195,27 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     return handlePreviewMessages(panel, msg);
   }
 
+  if (msg.type === 'toggle-provider') {
+    const config = vscode.workspace.getConfiguration('redivivus');
+    const disabled = config.get<string[]>('disabledProviders') || [];
+    const index = disabled.indexOf(msg.providerId);
+    const newDisabled = [...disabled];
+    if (index > -1) {
+      newDisabled.splice(index, 1);
+    } else {
+      newDisabled.push(msg.providerId);
+    }
+    await config.update('disabledProviders', newDisabled, true);
+    
+    // Refresh the API Status view in the chat panel
+    const { ChatPanel } = require('../../ui/panels/chat/chatPanel.js');
+    if (ChatPanel.currentPanel) {
+      // Re-trigger the api status render
+      vscode.commands.executeCommand('redivivus.openSettingsInChat');
+    }
+    vscode.window.showInformationMessage(`Redivivus: ${msg.providerId.toUpperCase()} has been ${index > -1 ? 'enabled' : 'disabled'}!`);
+    return true;
+  }
+
   return false;
 }

@@ -89,8 +89,7 @@ const file = '$WEB_DIR/src/lib/latest-release.ts';
 const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOWNLOAD_URL_LINUX = \\\`https://downloads.redivivus.dev/redivivus-\\\${LATEST_VERSION}.tar.gz\\\`\nexport const DOWNLOAD_URL_WINDOWS = \\\`https://downloads.redivivus.dev/redivivus-win32-x64-v\\\${LATEST_VERSION}.zip\\\`\n\`;
 fs.writeFileSync(file, content);
 "
-cd "$WEB_DIR" && fly deploy -a redivivus-backend 2>&1 | grep -E "✓|deployed|Error|error|v[0-9]" | tail -5
-echo "▶  Deploying web app to Cloudflare Workers (redivivus.dev)..."
+cd "$WEB_DIR" && npm run deploy 2>&1 | grep -E "✓|Deployed|Error|error|success|worker" | tail -5
 cd "$WEB_DIR" && npm run deploy 2>&1 | grep -E "✓|Deployed|Error|error|success|worker" | tail -5
 
 # Update developer's local stable symlink so the .desktop launcher always works

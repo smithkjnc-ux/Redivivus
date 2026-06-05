@@ -102,6 +102,53 @@ export function buildHeaderInfo(
     }
   } catch {}
 
+  // Determine primary action for the header pill (Preview vs Run)
+  let primaryAction = {
+    label: 'Preview',
+    actionAttr: 'data-action',
+    actionValue: 'preview-show',
+    tooltip: 'Live preview of your project',
+    icon: '&#x25B6;'
+  };
+
+  const activeEditor = vscode.window.activeTextEditor;
+  const activeFilePath = activeEditor?.document.uri.fsPath;
+
+  if (activeFilePath) {
+    const ext = path.extname(activeFilePath).toLowerCase();
+    if (['.py', '.go', '.rs', '.sh', '.rb', '.php', '.java', '.c', '.cpp', '.cs'].includes(ext)) {
+      primaryAction = {
+        label: 'Run',
+        actionAttr: 'data-cmd',
+        actionValue: 'redivivus.runProject',
+        tooltip: 'Run your project in the terminal',
+        icon: '&#x25B6;'
+      };
+    }
+  } else if (workspaceRoot) {
+    // [FIX] Scan workspace root directly for backend file extensions.
+    // detectPostBuildInfo with empty builtFiles misses files like calculator.py because
+    // it only checks fixed entry names (main.py, app.py, etc). Direct scan catches all.
+    try {
+      const rootFiles = fs.readdirSync(workspaceRoot);
+      const backendExts = ['.py', '.go', '.rs', '.sh', '.rb', '.php', '.java', '.c', '.cpp', '.cs'];
+      const hasHtml = rootFiles.some((f: string) => f.endsWith('.html'));
+      const hasBackend = rootFiles.some((f: string) => backendExts.some(e => f.endsWith(e)));
+      // Also check for package.json without any .html — pure Node CLI project
+      const hasPackageJson = rootFiles.includes('package.json');
+      const isNodeCli = hasPackageJson && !hasHtml;
+      if ((hasBackend || isNodeCli) && !hasHtml) {
+        primaryAction = {
+          label: 'Run',
+          actionAttr: 'data-cmd',
+          actionValue: 'redivivus.runProject',
+          tooltip: 'Run your project in the terminal',
+          icon: '&#x25B6;'
+        };
+      }
+    } catch {}
+  }
+
   return {
     projectName, aiName, aiLabel: displayModel,
     isFallback: hasKey && available.ai !== selectedAI,
@@ -121,6 +168,7 @@ export function buildHeaderInfo(
     buildMode,
     projectTokens,
     buildStamp,
+    primaryAction,
     vaultItemCount: (() => { try { const { VaultService } = require('../../../services/vault/vaultService.js'); const v = new VaultService(extensionContext); return v.listItems().length; } catch { return 0; } })(),
     isSignedIn: false,
     healthStatus: extensionContext?.globalState.get<'green' | 'yellow' | 'red'>('redivivus.healthStatus'), // populated async below — caller uses refreshHeader() to get updated value

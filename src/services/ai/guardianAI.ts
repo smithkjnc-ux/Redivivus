@@ -24,11 +24,11 @@ export interface GuardianReviewResult {
 // Single-AI: same AI for both roles — pro tier for Guardian, flash tier for Worker
 export const AI_RANK: Record<string, number> = {
   claude: 10,   // Sonnet 4.6 (guardian) / Haiku 4.5 (worker)
-  openai: 9,    // GPT-4o (guardian) / GPT-4o-mini (worker)
-  xai:    8,    // Grok-3 (guardian) / Grok-3-mini (worker)
-  gemini: 7,    // Gemini 2.5-Pro (guardian) / 2.5-Flash (worker)
-  kimi:   6,    // Moonshot 128k (guardian) / 32k (worker)
-  groq:   5,    // Llama 3.3 70B — same model for both (no cheaper tier)
+  gemini: 9,    // Gemini 2.5-Pro (guardian) / 2.5-Flash (worker)
+  openai: 8,    // GPT-4o (guardian) / GPT-4o-mini (worker)
+  groq:   7,    // Llama 4 Maverick / Llama 3.3 70B
+  xai:    6,    // Grok-3 (guardian) / Grok-3-mini (worker)
+  kimi:   5,    // Moonshot 128k (guardian) / 32k (worker)
 };
 
 // [SCOPE] AI capability descriptors — used by the Supervisor to assign work
@@ -43,11 +43,11 @@ export interface AICapability {
 
 export const AI_CAPABILITIES: Record<string, AICapability> = {
   claude: { rank: 10, label: 'Claude', strengths: ['architecture', 'complex logic', 'error handling', 'code review', 'refactoring'], bestFor: 'Complex architecture, multi-file coordination, code review', contextLimit: 200_000 },
-  openai: { rank: 9, label: 'GPT-4o', strengths: ['APIs', 'data processing', 'full-stack', 'documentation'], bestFor: 'API integration, data pipelines, full-stack apps', contextLimit: 128_000 },
-  xai:    { rank: 8, label: 'Grok', strengths: ['reasoning', 'web-aware', 'creative'], bestFor: 'Creative solutions, web-aware tasks', contextLimit: 128_000 },
-  gemini: { rank: 7, label: 'Gemini', strengths: ['rapid generation', 'HTML/CSS', 'browser games', 'prototyping', 'UI'], bestFor: 'Fast prototyping, HTML/CSS/JS, browser games, UI work', contextLimit: 1_000_000 },
-  kimi:   { rank: 6, label: 'Kimi', strengths: ['large files', 'bulk annotation', 'long context'], bestFor: 'Large file processing, bulk operations', contextLimit: 200_000 },
-  groq:   { rank: 5, label: 'Groq', strengths: ['speed', 'simple completions', 'quick iterations'], bestFor: 'Fast simple completions, rapid iteration', contextLimit: 32_000 },
+  gemini: { rank: 9, label: 'Gemini', strengths: ['rapid generation', 'HTML/CSS', 'browser games', 'prototyping', 'UI'], bestFor: 'Fast prototyping, HTML/CSS/JS, browser games, UI work', contextLimit: 1_000_000 },
+  openai: { rank: 8, label: 'GPT-4o', strengths: ['APIs', 'data processing', 'full-stack', 'documentation'], bestFor: 'API integration, data pipelines, full-stack apps', contextLimit: 128_000 },
+  groq:   { rank: 7, label: 'Groq', strengths: ['speed', 'simple completions', 'quick iterations'], bestFor: 'Fast simple completions, rapid iteration', contextLimit: 32_000 },
+  xai:    { rank: 6, label: 'Grok', strengths: ['reasoning', 'web-aware', 'creative'], bestFor: 'Creative solutions, web-aware tasks', contextLimit: 128_000 },
+  kimi:   { rank: 5, label: 'Kimi', strengths: ['large files', 'bulk annotation', 'long context'], bestFor: 'Large file processing, bulk operations', contextLimit: 200_000 },
 };
 
 // [RULE] Guardian === Supervisor — always the highest-ranked available AI, no exceptions.

@@ -137,29 +137,20 @@ export function registerAllCommands(
   try {   registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); failed: ' + e + '\n'); }
 
   // ── Close Project ──
-  // [FIX] The dashboard "Close Project" button used workbench.action.closeFolder which bypassed
-  // markProjectClosed(), so the synchronous marker was never written and the auto-open timer
-  // created a duplicate panel on re-activation. This dedicated command writes the marker first.
+  // [FIX] Dispose the panel BEFORE removing workspace folders. Removing the last folder from a
+  // single-folder workspace causes a full window reload. If the panel still exists at reload time,
+  // VS Code visually restores the orphaned tab and the deserializer + auto-open timer race to
+  // create panels → duplicate tabs. By disposing first, the serializer has nothing to restore
+  // and the auto-open timer creates exactly ONE fresh launcher panel.
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.closeProject', async () => {
       const folders = vscode.workspace.workspaceFolders;
-      // Clear conversation + set flag BEFORE the folder mutation (in case the window reloads)
       markProjectClosed();
-      if (ChatPanel.currentPanel) {
-        (ChatPanel.currentPanel as any).state.conversation = [];
-        (ChatPanel.currentPanel as any)._initialized = false;
-        await ChatPanel.extensionContext?.globalState.update('redivivus.userClosedProject', true);
-        ChatPanel.currentPanel.refresh();
-      }
+      // Dispose the panel — kills the tab so VS Code has nothing to serialize/restore
+      ChatPanel.close();
+      // Remove workspace folders (causes window reload for single-folder workspaces)
       if (folders && folders.length > 0) {
         await vscode.workspace.updateWorkspaceFolders(0, folders.length);
-      } else {
-        await vscode.commands.executeCommand('workbench.action.closeFolder');
-      }
-      // Reset input status so the close "completes" even if the window doesn't reload
-      if (ChatPanel.currentPanel) {
-        (ChatPanel.currentPanel as any).getWebview()?.postMessage?.({ type: 'set-status', status: 'ready' });
-        ChatPanel.currentPanel.refresh();
       }
     })
   );

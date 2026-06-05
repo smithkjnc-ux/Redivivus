@@ -27,20 +27,38 @@ export function registerApiSetupCommand(context: vscode.ExtensionContext): void 
 
 function showApiStatusInChat(): void {
   const config = vscode.workspace.getConfiguration('redivivus');
+  const disabled = config.get<string[]>('disabledProviders') || [];
   const providers = [
-    { name: 'Gemini',  key: config.get<string>('geminiApiKey'),   icon: '&#x1F916;' },
-    { name: 'Claude',  key: config.get<string>('claudeApiKey'),    icon: '&#x1F9E0;' },
-    { name: 'OpenAI',  key: config.get<string>('openaiApiKey'),   icon: '&#x26A1;' },
-    { name: 'Groq',    key: config.get<string>('groqApiKey'),      icon: '&#x1F525;' },
-    { name: 'xAI',     key: config.get<string>('xaiApiKey'),       icon: '&#x1F680;' },
-    { name: 'Kimi',    key: config.get<string>('kimiApiKey'),      icon: '&#x1F52E;' },
+    { id: 'gemini', name: 'Gemini',  key: config.get<string>('geminiApiKey'),   icon: '&#x1F916;' },
+    { id: 'claude', name: 'Claude',  key: config.get<string>('claudeApiKey'),    icon: '&#x1F9E0;' },
+    { id: 'openai', name: 'OpenAI',  key: config.get<string>('openaiApiKey'),   icon: '&#x26A1;' },
+    { id: 'groq',   name: 'Groq',    key: config.get<string>('groqApiKey'),      icon: '&#x1F525;' },
+    { id: 'xai',    name: 'xAI',     key: config.get<string>('xaiApiKey'),       icon: '&#x1F680;' },
+    { id: 'kimi',   name: 'Kimi',    key: config.get<string>('kimiApiKey'),      icon: '&#x1F52E;' },
   ];
   const providerHtml = providers.map(p => {
     const isSet = p.key && p.key.length > 0;
-    const status = isSet ? '&#x2705; Configured' : '&#x274C; Not set';
-    const bg = isSet ? 'rgba(78,201,89,0.1)' : 'rgba(255,83,79,0.1)';
-    const border = isSet ? '#4ec959' : '#ff534f';
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;margin-bottom:8px;background:${bg};border-left:3px solid ${border};border-radius:0 4px 4px 0;"><span><strong>${p.icon} ${p.name}</strong></span><span style="font-size:12px;">${status}</span></div>`;
+    const isDisabled = disabled.includes(p.id);
+    let status = '&#x274C; Not set';
+    let bg = 'rgba(255,83,79,0.1)';
+    let border = '#ff534f';
+    let toggleBtn = '';
+    
+    if (isSet) {
+      if (isDisabled) {
+        status = '&#x26A0;&#xFE0F; Disabled';
+        bg = 'rgba(255,255,255,0.05)';
+        border = '#888';
+        toggleBtn = `<button data-message='{"type":"toggle-provider","providerId":"${p.id}"}' style="margin-left:10px;padding:2px 8px;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);border:1px solid var(--vscode-button-border, transparent);border-radius:2px;cursor:pointer;font-size:11px;">🔓 Enable</button>`;
+      } else {
+        status = '&#x2705; Active';
+        bg = 'rgba(78,201,89,0.1)';
+        border = '#4ec959';
+        toggleBtn = `<button data-message='{"type":"toggle-provider","providerId":"${p.id}"}' style="margin-left:10px;padding:2px 8px;background:var(--vscode-button-secondaryBackground);color:var(--vscode-button-secondaryForeground);border:1px solid var(--vscode-button-border, transparent);border-radius:2px;cursor:pointer;font-size:11px;">🔒 Disable</button>`;
+      }
+    }
+    
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;margin-bottom:8px;background:${bg};border-left:3px solid ${border};border-radius:0 4px 4px 0;"><span><strong>${p.icon} ${p.name}</strong></span><div style="display:flex;align-items:center;"><span style="font-size:12px;">${status}</span>${toggleBtn}</div></div>`;
   }).join('');
   const content = `<div style="font-size:13px;"><p style="margin-bottom:16px;">Configure your AI provider API keys to use Redivivus with different AI models:</p>${providerHtml}<div style="margin-top:16px;padding:12px;background:var(--vscode-input-background);border-radius:6px;font-size:12px;"><strong>&#x1F4A1; How to configure:</strong><br>Click "Open Full Settings" below to enter your API keys, or use VS Code settings directly.</div><button data-cmd="redivivus.openSettings" style="margin-top:12px;padding:8px 16px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border:none;border-radius:4px;cursor:pointer;">&#x2699;&#xFE0F; Open Full Settings</button></div>`;
   ChatPanel.currentPanel?.showPanel('api-status', '&#x1F510; API Setup', content);

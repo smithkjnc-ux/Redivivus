@@ -5,6 +5,37 @@
 
 ---
 
+## Session — Jun 4, 2026: Admin Dashboard UI Fixes
+
+**Problem:** The admin dashboard overview (`redivivus-web`) showed misleading data: the Waitlist card showed the total historical waitlist count instead of the pending count, and the Recent Activity list was cluttered with high-volume `ai_prompt` events while only showing obscure user UUIDs.
+
+**Fix:**
+- Updated `app/admin/page.tsx` to set the Waitlist card's main value to `pendingCount`.
+- Filtered `ai_prompt` and `classify_intent` out of the Recent Activity query to surface meaningful events (builds, errors, signups).
+- Added a `usersData` lookup in the activity list to display the user's name or email instead of their raw `user_id`.
+
+**Risk:** None — pure UI/presentation layer adjustments.
+
+## Session — Jun 4, 2026: AI Provider Ranking Updates
+
+**Problem:** The hardcoded AI provider capability rankings (`AI_RANK`) were slightly misaligned with the latest market realities (e.g., GPT-4o was incorrectly ranked above Gemini 2.5 Pro). This affects which model is selected for Supervisor and Worker roles when multiple API keys are present.
+
+**Fix:**
+- Updated `AI_RANK` and `AI_CAPABILITIES` in the IDE (`guardianAI.ts`) and the backend (`routingService.ts`) to exactly match the latest benchmarks: Claude (100) > Gemini (90) > OpenAI (80) > Groq (70) > xAI (60) > Kimi (50).
+
+**Risk:** Low — this just ensures the Adaptive Orchestration engine selects the most capable models for the heaviest lifting.
+
+## Session — Jun 4, 2026: Adaptive Orchestration (Dynamic Worker Upgrade)
+
+**Problem:** For complex multi-file projects (like games), the default cheap Worker AI (`gpt-4o-mini`) frequently hallucinated file names and dropped logic, creating unstyled/broken applications, while the Supervisor AI accurately prescribed the architecture.
+
+**Fix:**
+- Modified `buildPipeline.ts` (`generateSupervisorPrompt`) to require the Supervisor to evaluate the project complexity and output a `[COMPLEXITY: HIGH]` or `[COMPLEXITY: STANDARD]` tag at the end of its prescription.
+- Modified `cloudBuildClientAI.ts` (`runTwoPhaseBuild`) to parse the tag. If `HIGH`, the extension dynamically upgrades the `workerInstructions` to use the Supervisor's provider and model (Pro-tier) instead of the Mini-tier, ensuring execution matches the architectural rigor of the plan.
+- Stripped the tag from the prescription before injecting it into the Worker prompt to prevent confusing the upgraded Worker.
+
+**Risk:** Low — Token costs for complex builds will increase due to using the Pro-tier model for both phases, but quality is dramatically improved and hallucinations are eliminated for complex tasks.
+
 ## Session — Jun 4, 2026: IDE Binary Automation (GitHub Actions)
 
 **Problem:** The IDE binaries (Linux, Windows) were being packaged and uploaded to Cloudflare R2 by a local cron script (`nightly-release.sh`) that ran daily at 9 PM. This required the local machine to be on and meant binaries were out of sync with code pushes.

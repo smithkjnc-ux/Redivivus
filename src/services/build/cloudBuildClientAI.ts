@@ -112,13 +112,30 @@ export async function runTwoPhaseBuild(
     const supRes = await executeClientAI(supRouting, si.prompt, keys);
     console.log(`[Redivivus] Supervisor: provider=${si.selectedProvider} model=${si.model} success=${supRes.success} textLen=${supRes.text?.length ?? 0} error=${supRes.error ?? 'none'}`);
     if (supRes.success && supRes.text.trim().length > 50) {
-      workerPrompt = workerPrompt.replace('{{PRESCRIPTION}}', supRes.text.trim());
+      // [SCOPE] Adaptive Orchestration — parse Supervisor's complexity assessment
+      const complexityMatch = supRes.text.match(/\[COMPLEXITY:\s*(HIGH|STANDARD)\]/i);
+      const isHighComplexity = complexityMatch?.[1]?.toUpperCase() === 'HIGH';
+
+      // Strip the complexity tag from the prescription before injecting into the Worker prompt
+      const cleanedPrescription = supRes.text.trim().replace(/\[COMPLEXITY:\s*(?:HIGH|STANDARD)\]\s*/gi, '').trim();
+
+      workerPrompt = workerPrompt.replace('{{PRESCRIPTION}}', cleanedPrescription);
       supervisor.ran = true;
       supervisor.provider = si.selectedProvider;
       supervisor.model = si.model;            // model ID the Supervisor ran on (matches what executeClaude selects for 'pro')
       supervisor.inputTokens = supRes.inputTokens;
       supervisor.outputTokens = supRes.outputTokens;
-      onProgress?.(`${instructions.workerInstructions.selectedProvider} building from plan...`);
+
+      // [WARN] Adaptive Worker Upgrade — if Supervisor flags HIGH complexity, promote the Worker
+      // to the Supervisor's provider and pro-tier model to prevent hallucinations on complex builds.
+      if (isHighComplexity && si.selectedProvider !== instructions.workerInstructions.selectedProvider) {
+        console.log(`[Redivivus] HIGH complexity detected — upgrading Worker from ${instructions.workerInstructions.selectedProvider}/${instructions.workerInstructions.model} to ${si.selectedProvider}/${si.model}`);
+        instructions.workerInstructions.selectedProvider = si.selectedProvider;
+        instructions.workerInstructions.model = si.model;
+        onProgress?.('High complexity detected — upgrading Worker AI...');
+      } else {
+        onProgress?.(`${instructions.workerInstructions.selectedProvider} building from plan...`);
+      }
     } else {
       // Supervisor failed — strip the placeholder and let the worker build solo, but keep the reason.
       supervisor.error = supRes.error || 'Supervisor returned an empty or too-short prescription';

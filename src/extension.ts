@@ -228,15 +228,16 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.window.registerWebviewPanelSerializer('redivivusChat', {
       async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel) {
+        (ChatPanel as any)._isDeserializing = true;
         // [FIX] Idempotent — never create a SECOND instance. Guard at entry AND again after the async
         // import: the auto-open timer fires on a 500ms timer and, if it sees currentPanel=false while
         // we're awaiting the import, it creates a panel — that race produced a duplicate chat tab on
         // EVERY window reload. Re-checking after the await (and not nulling _instance, which only widened
         // the window) means whoever wins the race keeps its panel and the other disposes its orphan.
-        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} return; }
+        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
         webviewPanel.webview.options = { enableScripts: true };
         const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
-        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} return; }
+        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
         const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
         // [FIX] THE root cause of duplicate tabs on reload: the constructor does NOT set _instance
         // (only doShowChatPanel does, at chatPanelShow.ts). So a serializer-restored panel left
@@ -252,6 +253,7 @@ export function activate(context: vscode.ExtensionContext) {
           (panel as any)._initialized = false;
           panel?.refresh?.();
         }
+        (ChatPanel as any)._isDeserializing = false;
       }
     })
   );
@@ -273,6 +275,19 @@ export function activate(context: vscode.ExtensionContext) {
     const suppressed = !!(suppressPath && currentRoot && suppressPath === currentRoot);
     if (suppressed) { context.globalState.update('redivivus.suppressAutoOpen', undefined); }
     require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[auto-open-timer] currentPanel=${!!ChatPanel.currentPanel} suppressed=${suppressed} currentRoot=${currentRoot}\n`);
+    
+    // [FIX] Extract to a check loop so we wait if deserialization is actively blocking.
+    // If the window is still deserializing, we don't want to race it and create a duplicate panel.
+    const checkAndShow = () => {
+      if ((ChatPanel as any)._isDeserializing) {
+        setTimeout(checkAndShow, 200);
+        return;
+      }
+      if (!ChatPanel.currentPanel) {
+        ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
+      }
+    };
+
     // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag. The
     // async flag lost the race against the reload, so this branch failed to skip and auto-open created
     // a DUPLICATE panel while the serializer restored the orphaned one. Do NOT delete the marker here —
@@ -283,9 +298,11 @@ export function activate(context: vscode.ExtensionContext) {
       // Fallback: the serializer (deserializeWebviewPanel) normally restores the one orphaned tab as
       // the launcher. If it didn't fire, open one so a close never leaves ZERO panels. The idempotent
       // guard in deserialize prevents this from racing into a duplicate.
-      setTimeout(() => { if (!ChatPanel.currentPanel) { ChatPanel.show(redivivusService, routingService, usageTracker, vaultService); } }, 1200);
+      setTimeout(checkAndShow, 1200);
     }
-    else if (!ChatPanel.currentPanel) { ChatPanel.show(redivivusService, routingService, usageTracker, vaultService); }
+    else {
+      checkAndShow();
+    }
   }, 500);
 
   // ── shared refresh helper ──

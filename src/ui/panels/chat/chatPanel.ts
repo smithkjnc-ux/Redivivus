@@ -34,6 +34,7 @@ export class ChatPanel {
   // [WARN] Singleton: only one chat panel exists at a time. Use show() — never call constructor directly.
   private static _instance: ChatPanel | undefined;
   public static get currentPanel(): ChatPanel | undefined { return ChatPanel._instance; }
+  public static _isDeserializing = false;
   // [WARN] Set true when a new project init is in flight — prevents auto-open timer from racing the poll
   public static suppressAutoOpen = false;
   // [WARN] Callback registered by session.ts to handle start-session messages without circular imports.

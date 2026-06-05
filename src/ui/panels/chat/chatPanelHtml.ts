@@ -45,6 +45,7 @@ export interface ChatHeaderInfo {
   buildStamp?: string;
   isSignedIn?: boolean;
   healthStatus?: 'green' | 'yellow' | 'red';
+  primaryAction?: { label: string; actionAttr: string; actionValue: string; tooltip: string; icon: string };
 }
 
 export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderInfo, progress?: SetupProgress): string {
@@ -86,7 +87,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       <button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>
       <button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>
       <button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Build History">&#x1F4CB; History</button>
-      <button class="header-btn header-btn--preview" data-action="preview-show" title="Live preview of your project">&#x25B6; Preview</button>
+      <button class="header-btn header-btn--preview" ${header.primaryAction?.actionAttr}="${header.primaryAction?.actionValue}" title="${header.primaryAction?.tooltip}">${header.primaryAction?.icon} ${header.primaryAction?.label}</button>
       ` : ''}
       ${header && header.projectTokens ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
       <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
