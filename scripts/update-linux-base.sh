@@ -42,18 +42,23 @@ else
 fi
 
 echo "▶  Injecting Redivivus extension..."
-EXT_SRC="$BUILD_DIR/dev/redivivus"
 EXT_DST="$BUILD_DIR/VSCode-linux-x64/resources/app/extensions/redivivus"
+mkdir -p "$EXT_DST"
+
+EXT_SRC="$BUILD_DIR/dev/redivivus"
 if [ -d "$EXT_SRC" ]; then
-  rm -rf "$EXT_DST"
-  cp -r "$EXT_SRC" "$EXT_DST"
+  cp -r "$EXT_SRC"/* "$EXT_DST/"
   echo "   Extension injected from $EXT_SRC"
 fi
 
-# Copy compiled extension output
+# Copy compiled extension output and package
 OUT_SRC="$PROJECT_DIR/out"
 if [ -d "$OUT_SRC" ]; then
-  cp -r "$OUT_SRC" "$EXT_DST/out"
+  mkdir -p "$EXT_DST/out"
+  cp -r "$OUT_SRC"/* "$EXT_DST/out/"
+fi
+if [ -f "$PROJECT_DIR/package.json" ]; then
+  cp "$PROJECT_DIR/package.json" "$EXT_DST/"
 fi
 
 # Update stable.json to record new base version
