@@ -138,7 +138,7 @@ jobs:
           node -e "
           const fs = require('fs');
           const file = 'src/lib/latest-release.ts';
-          const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOWNLOAD_URL_LINUX = \\\`https://downloads.redivivus.dev/redivivus-\\\${LATEST_VERSION}.tar.gz\\\`\nexport const DOWNLOAD_URL_WINDOWS = \\\`https://downloads.redivivus.dev/redivivus-win32-x64-v\\\${LATEST_VERSION}.zip\\\`\n\`;
+          const content = \`export const LATEST_VERSION = '$NEW_VERSION'\nexport const DOWNLOAD_URL_LINUX = '/api/download/linux'\nexport const DOWNLOAD_URL_WINDOWS = '/api/download/windows'\n\`;
           fs.writeFileSync(file, content);
           "
           git commit -am "chore: update IDE download links for v$NEW_VERSION"
