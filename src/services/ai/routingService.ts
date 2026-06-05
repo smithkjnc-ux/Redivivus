@@ -9,6 +9,7 @@ import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import { AI_RANK } from './guardianAI.js';
 import { routeByComplexityImpl } from './routingComplexity.js';
 import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
+import { supervisorPlanWithFailover } from './routingServiceSupervisor.js';
 import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
 import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
 import { redivivusLog } from '../logging/redivivusLogger.js';
@@ -61,8 +62,9 @@ export class RoutingService {
     return analyzeFileImpl(supervisor, this.vaultContext, this.fetchWithTimeout.bind(this), filePath, content, instruction, cancelToken);
   }
 
-  // [Redivivus] Failover callback — set by caller to show "Gemini timed out, retrying with Kimi..." in chat
+  // [Redivivus] Failover callbacks — set by chat panel to notify user about role changes
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
+  supervisorFailoverCallback?: (msg: string) => void;
 
   async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string, role = 'worker'): Promise<AIResponse & { usingFallback?: string }> {
 
@@ -75,7 +77,12 @@ export class RoutingService {
 
     if (ranked.length === 0) {
       redivivusLog({ operation: 'system', message: 'No AI keys configured', success: false });
-      return { text: '', model: 'none', success: false, error: 'No AI key configured. Add an API key in Redivivus Settings (Files & AI tab).' };
+      return {
+        text: 'To build with Redivivus, you\'ll need at least one AI API key. I can walk you through adding one -- which AI service do you have access to?\n\n- **Anthropic (Claude)** -- console.anthropic.com\n- **Google (Gemini)** -- aistudio.google.com (free tier available)\n- **OpenAI (GPT)** -- platform.openai.com\n- **Other** -- Groq, xAI, Kimi also supported\n\nOpen **Redivivus Settings** (Ctrl+Shift+P -> "Redivivus: Open Settings") to add your key.',
+        model: 'none',
+        success: false,
+        error: 'NO_API_KEY',
+      };
     }
     
     const startTime = Date.now();
@@ -156,7 +163,12 @@ export class RoutingService {
   }
 
   async supervisorPlan(userTask: string, targetFile: string, blueprintContext: string, neverDoContext?: string): Promise<string | null> {
-    return supervisorPlanImpl(this, userTask, targetFile, blueprintContext, neverDoContext);
+    return supervisorPlanWithFailover(this, userTask, targetFile, blueprintContext, neverDoContext);
+  }
+
+  /** Returns true if at least one AI provider key is configured. */
+  hasAnyKey(): boolean {
+    return Object.values(this.getKeyMap()).some(fn => fn());
   }
 
   async guardianReview(originalTask: string, workerResponse: string, workerAI: string, blueprintContext: string) {

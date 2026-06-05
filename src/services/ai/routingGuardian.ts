@@ -1,75 +1,14 @@
-// [SCOPE] AI Routing Service — supervisor planning and guardian review
-// Extracted from routingService.ts
+// [SCOPE] AI Routing — supervisor planning and guardian review (cloud-backend path).
+// Project type helpers extracted to routingGuardianUtils.ts (Rule 9 split).
+// [WARN] Guardian sends keys as X-Provider-Keys header — never in body (avoid logging exposure).
 
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import type { GuardianReviewResult } from './guardianAI.js';
 import { selectGuardianAI } from './guardianAI.js';
 import type { RoutingService } from './routingService.js';
 import { logAICall } from './aiCallLogger.js';
-
-export type ProjectType = 'web' | 'api' | 'game' | 'single';
-
-function detectProjectType(task: string, blueprint: string): ProjectType | null {
-  const text = (task + ' ' + blueprint).toLowerCase();
-
-  // Single-file projects skip folder structure
-  if (/\b(single file|one file|just one|only one|standalone|html file|single page)\b/.test(text)) {
-    return 'single';
-  }
-
-  // Game projects
-  if (/\b(game|unity|phaser|three\.js|canvas|sprite|level|engine|physics|entity|scene)\b/.test(text)) {
-    return 'game';
-  }
-
-  // Node/API projects
-  if (/\b(api|backend|server|node|express|rest|graphql|database|endpoint|middleware|controller|model)\b/.test(text)) {
-    return 'api';
-  }
-
-  // Web apps
-  if (/\b(web|app|react|vue|angular|frontend|website|platform|spa|nextjs|svelte|component|page|hook|style)\b/.test(text)) {
-    return 'web';
-  }
-
-  return null;
-}
-
-function getFolderStructureTemplate(type: ProjectType): string {
-  if (type === 'web') {
-    return `FOLDER STRUCTURE (Web App):
-Place files in the correct subdirectories. Do NOT dump everything in src/.
-  src/
-    components/    — reusable UI components
-    pages/         — route-level page components
-    hooks/         — custom React/Vue hooks
-    utils/         — helper functions and utilities
-    styles/        — CSS, SCSS, or styled-component files
-    assets/        — images, fonts, static files`;
-  }
-  if (type === 'api') {
-    return `FOLDER STRUCTURE (Node/API):
-Place files in the correct subdirectories. Do NOT dump everything in src/.
-  src/
-    routes/        — API endpoint definitions
-    controllers/   — request handlers and business logic
-    models/        — data models and schemas
-    middleware/    — auth, validation, logging middleware
-    utils/         — helper functions
-    config/        — environment and configuration files`;
-  }
-  if (type === 'game') {
-    return `FOLDER STRUCTURE (Game):
-Place files in the correct subdirectories. Do NOT dump everything in src/.
-  src/
-    engine/        — game loop, physics, rendering core
-    entities/      — player, enemies, items, NPCs
-    scenes/        — menu, gameplay, gameover, level screens
-    assets/        — sprites, sounds, tilemaps
-    utils/         — helper functions and math utilities`;
-  }
-  return '';
-}
+import { detectProjectType, getFolderStructureTemplate } from './routingGuardianUtils.js';
+import { collectKeys } from '../api/apiClient.js';
 
 export async function supervisorPlanImpl(
   svc: RoutingService,
@@ -78,15 +17,10 @@ export async function supervisorPlanImpl(
   blueprintContext: string,
   neverDoContext?: string
 ): Promise<string | null> {
-  // Supervisor = highest-ranked available AI by AI_RANK (Claude > OpenAI > xAI > Gemini > Kimi > Groq).
-  // Do NOT use getPreferredAI() here — defaultAI is the user's chat default, not a supervisor override.
   const { supervisor, worker } = svc.selectSupervisorAndWorker();
   if (!worker || worker === supervisor) { return null; }
-  // [FIX] 20s was too short — detailed prescriptions (polygon verts, physics, full API specs) take 30-50s
   const fetch = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, 50_000);
   const neverDoSection = neverDoContext ? `\n${neverDoContext}\n` : '';
-
-  // Detect project type and inject folder structure for multi-file projects
   const projectType = detectProjectType(userTask, blueprintContext || '');
   const folderBlock = (projectType && projectType !== 'single')
     ? `\n\n${getFolderStructureTemplate(projectType)}`
@@ -105,61 +39,50 @@ Rules for how you talk:
 - If the request doesn't match the goal, say so. "You asked for X -- sounds like you need Y. Want me to do Y?"
 
 `;
-  const prompt = `${supervisorPersona}You are the Redivivus Supervisor AI. Your prescription is the Worker's ONLY instruction set. The Worker executes exactly what you write — nothing more, nothing less. If you are vague, the output will be wrong.${neverDoSection}
+  const prompt = `${supervisorPersona}You are the Redivivus Supervisor AI. Your prescription is the Worker's ONLY instruction set. The Worker executes exactly what you write -- nothing more, nothing less. If you are vague, the output will be wrong.${neverDoSection}
 
 USER REQUEST: "${userTask}"
 TARGET FILE: ${targetFile}
 ${blueprintContext ? `PROJECT CONTEXT:\n${blueprintContext}\n` : ''}
 PRESCRIPTION FORMAT:
 ## [filename]
-- \`functionName(params)\` — [complete behavior: exact logic, return value, every meaningful detail]
-- \`CONSTANT_NAME = value\` — explain why this specific value
-- Change \`[exact old code]\` → \`[exact new code]\`
+- \`functionName(params)\` -- [complete behavior: exact logic, return value, every meaningful detail]
+- \`CONSTANT_NAME = value\` -- explain why this specific value
+- Change \`[exact old code]\` -> \`[exact new code]\`
 
-UNIVERSAL PRECISION REQUIREMENT — applies to every build, no exceptions:
+UNIVERSAL PRECISION REQUIREMENT -- applies to every build, no exceptions:
 The Worker has zero judgment. Every blank you leave becomes a wrong guess. Fill every blank.
 
-VISUAL / CANVAS / GAME — for every drawn element:
-  - Exact shape: polygon(N irregular verts) / circle(r) / arc — never just "shape" or "rock"
+VISUAL / CANVAS / GAME -- for every drawn element:
+  - Exact shape: polygon(N irregular verts) / circle(r) / arc -- never just "shape" or "rock"
   - Fill: fillStyle='#rrggbb' or "no fill" | Stroke: strokeStyle='#rrggbb', lineWidth=N or "no stroke"
-  - Polygon vertices: count, how calculated, where stored (e.g. "8 verts, random radius 0.8–1.2×base, pre-calc on spawn into asteroid.verts[]")
+  - Polygon vertices: count, how calculated, where stored (e.g. "8 verts, random radius 0.8-1.2xbase, pre-calc on spawn into asteroid.verts[]")
   - Physics: px/frame speed, deg/frame rotation, wrap or bounce rule | Color palette: every color used
 
-LOGIC / BACKEND / API — for every function:
+LOGIC / BACKEND / API -- for every function:
   - Exact signature, return type | All branches: what each case returns/throws
   - Data shape: exact field names and types | Constants: value + why that value
 
-CSS / STYLING / UI — for every element:
-  - Exact colors (hex) and exact px/rem values — not "dark blue" or "small margin"
+CSS / STYLING / UI -- for every element:
+  - Exact colors (hex) and exact px/rem values -- not "dark blue" or "small margin"
   - Layout: flex/grid direction, gap, alignment | Breakpoints if any | Hover/focus states
 
-STATE / DATA — for every piece of state:
+STATE / DATA -- for every piece of state:
   - Name, type, initial value | Allowed mutations and when | Where it lives
 
 RULE: If you cannot specify something exactly, choose the canonical default and state it explicitly.
-Bad: "\`drawAsteroid(ctx, a)\` — draws an asteroid"
-Good: "\`drawAsteroid(ctx, a)\` — ctx.beginPath(); a.verts.forEach((v,i)=> i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)); ctx.closePath(); ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.stroke(); // no fill"
+Bad: "\`drawAsteroid(ctx, a)\` -- draws an asteroid"
+Good: "\`drawAsteroid(ctx, a)\` -- ctx.beginPath(); a.verts.forEach((v,i)=> i?ctx.lineTo(v.x,v.y):ctx.moveTo(v.x,v.y)); ctx.closePath(); ctx.strokeStyle='#ffffff'; ctx.lineWidth=2; ctx.stroke(); // no fill"
 
-Match EXACT scope of the request — no extra features.${folderBlock ? ' Place each file in the correct subdirectory.' : ''}
+Match EXACT scope of the request -- no extra features.${folderBlock ? ' Place each file in the correct subdirectory.' : ''}
 Reply with ONLY the prescription. No preamble.${folderBlock}`;
   try {
     const startTime = Date.now();
     const res = await callProvider(supervisor, prompt, fetch, 'pro');
     if (res.success && res.text.trim().length > 50) {
-      logAICall({
-        role: 'supervisor',
-        model: res.model || supervisor,
-        prompt,
-        response: res.text,
-        inputTokens: res.inputTokens,
-        outputTokens: res.outputTokens,
-        durationMs: Date.now() - startTime,
-      });
+      logAICall({ role: 'supervisor', model: res.model || supervisor, prompt, response: res.text, inputTokens: res.inputTokens, outputTokens: res.outputTokens, durationMs: Date.now() - startTime });
       let spec = res.text.trim();
-      // Append folder structure directly to the returned spec for multi-file projects
-      if (folderBlock && !spec.includes('FOLDER STRUCTURE')) {
-        spec += '\n\n' + getFolderStructureTemplate(projectType!);
-      }
+      if (folderBlock && !spec.includes('FOLDER STRUCTURE')) { spec += '\n\n' + getFolderStructureTemplate(projectType!); }
       return spec;
     }
   } catch { /* fall through */ }
@@ -178,56 +101,39 @@ export async function guardianReviewImpl(
   if (!guardianAI) {
     return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
   }
-  // [FIX] 20s was too short — detailed prescriptions (polygon verts, physics, full API specs) take 30-50s
-  const fetch = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, 50_000);
-  // [WARN] Guardian uses 'pro' tier (Sonnet/Pro) — it IS the quality gate, same as Supervisor.
-  // [DEAD] Was: default tier (flash/haiku) — cheap model produced vague style critiques that
-  // wasted 4-6 retry calls, costing MORE than one pro-tier guardian call.
+  const fetchFn = (svc as any).fetchWithTimeout.bind(svc);
   const startTime = Date.now();
-  
-  // Call backend Guardian API to secure the "secret sauce" prompt
   try {
-    const base = require('../api/apiClient.js').getApiBase();
-    const token = await require('../api/apiClient.js').getAccountToken();
-    const fetchFn = (svc as any).fetchWithTimeout;
-    
+    const { getApiBase, getAccountToken } = require('../api/apiClient.js');
+    const base = getApiBase();
+    const token = await getAccountToken();
+    // [FIX] Send keys as X-Provider-Keys header, NOT in body.
+    // Previous: keys: keyMap -- keyMap holds function references, JSON.stringify drops them -> {} -> guardian called with no keys -> silently failed every build.
+    const keys = collectKeys();
     const res = await fetchFn(`${base}/guardian`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        task: originalTask,
-        workerResponse,
-        blueprintContext,
-        provider: guardianAI,
-        model: guardianAI, // the backend resolves the tier
-        keys: keyMap
-      })
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'X-Provider-Keys': JSON.stringify(keys),
+      },
+      body: JSON.stringify({ task: originalTask, workerResponse, blueprintContext, provider: guardianAI, model: guardianAI }),
     }, 50_000);
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Guardian API failed');
+    if (!res.ok) { throw new Error(data.error || 'Guardian API failed'); }
 
     const raw = data.text;
     const isPass = raw.includes('GUARDIAN_PASS');
     const issuesMatch = raw.match(/GUARDIAN_ISSUES:([\s\S]*?)(?:GUARDIAN_SCOPE_ALERTS:|$)/);
     const scopeMatch = raw.match(/GUARDIAN_SCOPE_ALERTS:([\s\S]*?)$/);
-
     const issues = issuesMatch ? issuesMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
     const scopeAlerts = scopeMatch ? scopeMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
-
     const result = { passed: isPass && issues.length === 0, correctedText: null, issues, scopeAlerts, guardianAI, workerAI };
-
-    logAICall({
-      role: 'guardian',
-      model: guardianAI,
-      prompt: `[Secure Backend Prompt] TASK: ${originalTask}`,
-      response: JSON.stringify({ passed: result.passed, issues: result.issues, scopeAlerts: result.scopeAlerts }),
-      durationMs: Date.now() - startTime,
-    });
+    logAICall({ role: 'guardian', model: guardianAI, prompt: `[Secure Backend Prompt] TASK: ${originalTask}`, response: JSON.stringify({ passed: result.passed, issues: result.issues, scopeAlerts: result.scopeAlerts }), durationMs: Date.now() - startTime });
     return result;
   } catch (e: any) {
     console.error('Guardian review failed:', e);
-    // Fail-open if backend is unreachable
     return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
   }
 }

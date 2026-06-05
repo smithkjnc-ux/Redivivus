@@ -81,10 +81,14 @@ export async function inferBlueprintFields(
     if (match) { clean = match[0]; }
     const parsed = JSON.parse(clean);
     const fields: InferredW[] = (['who', 'what', 'where', 'when', 'why'] as const).map(f => {
-      const raw = parsed[f] || {};
-      const value = String(raw.value || '').trim();
-      let conf: WConfidence = (['confident', 'assumed', 'unknown'] as const).includes(raw.confidence)
-        ? raw.confidence : 'unknown';
+      const raw = parsed[f];
+      // Handle Gemini returning flat strings instead of objects
+      const isString = typeof raw === 'string';
+      const value = isString ? raw.trim() : String(raw?.value || '').trim();
+      let conf: WConfidence = isString 
+        ? 'unknown' // Will be upgraded to 'assumed' below if not empty
+        : (['confident', 'assumed', 'unknown'] as const).includes(raw?.confidence)
+          ? raw.confidence : 'unknown';
       // [FIX] Non-empty value must be at least "assumed" — "unknown" with a value is contradictory
       if (conf === 'unknown' && value) { conf = 'assumed'; }
       return { field: f, label: LABELS[f], value, confidence: conf };

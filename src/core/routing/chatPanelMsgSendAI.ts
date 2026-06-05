@@ -73,8 +73,11 @@ export async function handleAIChat(
       } else {
         const aiResponse = await routing.prompt(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
         if (!aiResponse.success) {
-          const errMsg = aiResponse.error || 'please try again.';
-          conversation.push({ role: 'assistant', content: `Something went wrong -- ${errMsg}`, timestamp: Date.now() });
+          // NO_API_KEY: show guardian setup message as a normal reply, not an error wrapper
+          const content = aiResponse.error === 'NO_API_KEY'
+            ? (aiResponse.text || 'Add an API key in Redivivus Settings to get started.')
+            : `Something went wrong -- ${aiResponse.error || 'please try again.'}`;
+          conversation.push({ role: 'assistant', content, timestamp: Date.now() });
           refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); clearPendingScopeQuestion(); return;
         }
         lastResponseModel = aiResponse.model;
@@ -87,8 +90,11 @@ export async function handleAIChat(
       // Question / answer path — use cheap models first (Groq/Gemini), save expensive models for code gen
       const aiResponse = await routing.promptCheap(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
       if (!aiResponse.success) {
-        const errMsg = aiResponse.error || 'please try again.';
-        conversation.push({ role: 'assistant', content: `Something went wrong -- ${errMsg}`, timestamp: Date.now() });
+        // NO_API_KEY: show guardian setup message as a normal reply, not an error wrapper
+        const content = aiResponse.error === 'NO_API_KEY'
+          ? (aiResponse.text || 'Add an API key in Redivivus Settings to get started.')
+          : `Something went wrong -- ${aiResponse.error || 'please try again.'}`;
+        conversation.push({ role: 'assistant', content, timestamp: Date.now() });
         refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); clearPendingScopeQuestion(); return;
       }
       lastResponseModel = aiResponse.model;

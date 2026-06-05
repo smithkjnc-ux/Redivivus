@@ -28,10 +28,13 @@ import { runDiagnostic } from './core/diagnostics/selfDiagnostic';
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
 import { initApiClient } from './services/api/apiClient.js';
+import { initSecretKeyStore, onSecretKeyStoreReady } from './services/ai/secretKeyStore.js';
+import { migrateChassisSettings } from './extensionMigration.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
 import { initProjectContextLogger, resetProjectContext } from './services/logging/projectContextLogger.js';
 import { wasProjectClosedRecently } from './services/project/closeMarker.js';
+import { invalidateRosterCache } from './services/ai/routingServiceRoster.js';
 import { initMasterLogger } from './core/logging/masterLogger.js';
 
 // [WARN] Synchronous suppress flag — set BEFORE updateWorkspaceFolders fires onDidChangeWorkspaceFolders.
@@ -42,6 +45,17 @@ export function activate(context: vscode.ExtensionContext) {
   console.log('[Redivivus] Activating...');
   ChatPanel.extensionContext = context;
   initApiClient(context);
+  // Migrate chassis.* → redivivus.* first, then SecretStorage init reads the promoted values.
+  // [FIX] After init resolves, invalidate the roster cache and re-render the panel — the panel
+  // auto-opens at 500ms and reads the roster BEFORE SecretStorage finishes, so the badge shows
+  // a stale pre-init value (Gemini +2). Refreshing here gives it the real key set (Claude +5).
+  migrateChassisSettings(context)
+    .then(() => initSecretKeyStore(context))
+    .catch(err => console.error('[Redivivus] Init failed:', err));
+  onSecretKeyStoreReady(() => {
+    invalidateRosterCache();
+    if (ChatPanel.currentPanel) { ChatPanel.currentPanel.refresh(); }
+  });
 
   // [FIX] Suppress "Do you want to save workspace configuration?" dialog for untitled workspaces.
   // window.confirmSaveUntitledWorkspace=false is the exact setting the "Always discard" checkbox sets.

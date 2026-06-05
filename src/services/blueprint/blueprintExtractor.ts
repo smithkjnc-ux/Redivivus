@@ -14,7 +14,7 @@ export interface ExtractedBlueprint {
 
 const PROMPT = (task: string) => `You are analyzing a user's build request to fill in a project blueprint.
 Extract the most likely answer for each of the 5 blueprint fields below.
-If you cannot confidently infer an answer from the request, return an empty string for that field — do NOT guess.
+If context is omitted, use common sense to fill in likely defaults (e.g. 'Web browser' for where, 'General public' for who, 'Personal use' for why).
 Keep answers concise (under 80 chars each). Return ONLY valid JSON, no markdown, no explanation.
 
 User request: "${task}"

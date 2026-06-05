@@ -1,11 +1,11 @@
-// [SCOPE] Redivivus cloud API client -- routes AI calls through the Fly.io backend instead of calling providers directly
-// Account token stored in VS Code SecretStorage. Keys sent per-request, never persisted server-side.
+// [SCOPE] Redivivus cloud API client -- routes AI calls through the Fly.io backend.
+// Keys: stored in settings.json on device only. Sent to backend as X-Provider-Keys header (not body).
 
 import * as vscode from 'vscode';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from '../ai/routingKeys.js';
 
 const SECRET_KEY = 'redivivus.account.token';
-const API_BASE_DEFAULT = 'https://redivivus-backend.fly.dev/api/v1';
+const API_BASE_DEFAULT = 'http://localhost:3000/api/v1';
 export function getApiBase(): string {
   // [WARN] Never hardcode or rewrite to stale Cloudflare/legacy domains.
   // The extension hits the Fly.io backend directly — redivivus.dev is no longer the API origin.
@@ -60,6 +60,14 @@ export function collectKeys(): Record<string, string> {
   const x = getXAIKey(); if (x) { keys.xai = x; }
   const k = getKimiKey(); if (k) { keys.kimi = k; }
   return keys;
+}
+
+/** Returns AI provider keys as an HTTP header record.
+ *  Use this instead of putting keys in the request body -- headers are excluded from most log configs. */
+export function collectKeyHeaders(): Record<string, string> {
+  const keys = collectKeys();
+  if (Object.keys(keys).length === 0) { return {}; }
+  return { 'X-Provider-Keys': JSON.stringify(keys) };
 }
 
 export function getPreferred(): string | undefined {
@@ -149,13 +157,11 @@ export async function cloudClassify(
   message: string,
   context?: { projectName?: string; workspacePath?: string; blueprintStatus?: string }
 ): Promise<IntentResult> {
-  // [FIX] Let failures throw — classifyIntent's catch runs fallbackClassify(text) on error.
-  // Previous catch returning { type: 'question' } swallowed all API failures silently,
-  // routing every build request to Q&A when the classify endpoint was unreachable.
+  // [FIX] Keys removed from classify body — the classify endpoint only needs account token + message.
+  // Keys belong in X-Provider-Keys header on build/guardian calls only.
   return post<IntentResult>('/classify', {
     message,
     context,
-    keys: collectKeys(),
     preferred: getPreferred(),
   });
 }

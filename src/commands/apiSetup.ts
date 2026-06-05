@@ -1,6 +1,6 @@
-// [SCOPE] Redivivus API Setup — webview panel AND chat panel for configuring AI API keys
-// Chat panel shows read-only status, webview panel allows editing with Apply button.
-// HTML template -> apiSetupHtml.ts
+// [SCOPE] Redivivus API Setup — webview panel AND chat panel for configuring AI API keys.
+// Keys written to VS Code SecretStorage (encrypted). HTML template -> apiSetupHtml.ts.
+// [WARN] Keys are no longer stored in settings.json — they live in SecretStorage only.
 
 import * as vscode from 'vscode';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
@@ -26,15 +26,16 @@ export function registerApiSetupCommand(context: vscode.ExtensionContext): void 
 }
 
 function showApiStatusInChat(): void {
+  const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../services/ai/secretKeyStore.js');
   const config = vscode.workspace.getConfiguration('redivivus');
   const disabled = config.get<string[]>('disabledProviders') || [];
   const providers = [
-    { id: 'gemini', name: 'Gemini',  key: config.get<string>('geminiApiKey'),   icon: '&#x1F916;' },
-    { id: 'claude', name: 'Claude',  key: config.get<string>('claudeApiKey'),    icon: '&#x1F9E0;' },
-    { id: 'openai', name: 'OpenAI',  key: config.get<string>('openaiApiKey'),   icon: '&#x26A1;' },
-    { id: 'groq',   name: 'Groq',    key: config.get<string>('groqApiKey'),      icon: '&#x1F525;' },
-    { id: 'xai',    name: 'xAI',     key: config.get<string>('xaiApiKey'),       icon: '&#x1F680;' },
-    { id: 'kimi',   name: 'Kimi',    key: config.get<string>('kimiApiKey'),      icon: '&#x1F52E;' },
+    { id: 'gemini', name: 'Gemini',  key: getKeyCached('gemini'), icon: '&#x1F916;' },
+    { id: 'claude', name: 'Claude',  key: getKeyCached('claude'), icon: '&#x1F9E0;' },
+    { id: 'openai', name: 'OpenAI',  key: getKeyCached('openai'), icon: '&#x26A1;' },
+    { id: 'groq',   name: 'Groq',    key: getKeyCached('groq'),   icon: '&#x1F525;' },
+    { id: 'xai',    name: 'xAI',     key: getKeyCached('xai'),    icon: '&#x1F680;' },
+    { id: 'kimi',   name: 'Kimi',    key: getKeyCached('kimi'),   icon: '&#x1F52E;' },
   ];
   const providerHtml = providers.map(p => {
     const isSet = p.key && p.key.length > 0;
@@ -74,15 +75,19 @@ class ApiSetupPanel {
     this._panel.webview.html = getApiSetupHtml();
     this._panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'save-keys') {
-        const config = vscode.workspace.getConfiguration('redivivus');
+        const { storeKey, deleteKey } = await import('../services/ai/secretKeyStore.js');
         const toCheck: { id: string, name: string, key: string }[] = [];
-
-        if (msg.geminiKey !== undefined) { await config.update('geminiApiKey', msg.geminiKey || undefined, true); if (msg.geminiKey) {toCheck.push({id: 'gemini', name: 'Gemini', key: msg.geminiKey});} }
-        if (msg.claudeKey !== undefined) { await config.update('claudeApiKey', msg.claudeKey || undefined, true); if (msg.claudeKey) {toCheck.push({id: 'claude', name: 'Claude', key: msg.claudeKey});} }
-        if (msg.openaiKey !== undefined) { await config.update('openaiApiKey', msg.openaiKey || undefined, true); if (msg.openaiKey) {toCheck.push({id: 'openai', name: 'OpenAI', key: msg.openaiKey});} }
-        if (msg.groqKey !== undefined)   { await config.update('groqApiKey',   msg.groqKey   || undefined, true); if (msg.groqKey) {toCheck.push({id: 'groq', name: 'Groq', key: msg.groqKey});} }
-        if (msg.xaiKey !== undefined)    { await config.update('xaiApiKey',    msg.xaiKey    || undefined, true); if (msg.xaiKey) {toCheck.push({id: 'xai', name: 'xAI', key: msg.xaiKey});} }
-        if (msg.kimiKey !== undefined)   { await config.update('kimiApiKey',   msg.kimiKey   || undefined, true); if (msg.kimiKey) {toCheck.push({id: 'kimi', name: 'Kimi', key: msg.kimiKey});} }
+        const pairs: [string, string, string][] = [
+          ['gemini', 'geminiKey', 'Gemini'], ['claude', 'claudeKey', 'Claude'],
+          ['openai', 'openaiKey', 'OpenAI'], ['groq', 'groqKey', 'Groq'],
+          ['xai', 'xaiKey', 'xAI'], ['kimi', 'kimiKey', 'Kimi'],
+        ];
+        for (const [id, msgKey, name] of pairs) {
+          if (msg[msgKey] !== undefined) {
+            if (msg[msgKey]) { await storeKey(id, msg[msgKey]); toCheck.push({ id, name, key: msg[msgKey] }); }
+            else { await deleteKey(id); }
+          }
+        }
         
         // Actively verify keys via network ping
         const errors: { id: string, msg: string }[] = [];

@@ -35,7 +35,8 @@ export interface ChatHeaderInfo {
   workspaceHasRedivivus: boolean;
   workspaceFolderIsOpen: boolean; workspaceIsAssistMode: boolean; assistMode?: boolean;
   recentProjects: Array<{ path: string; name: string; timestamp?: number }>;
-  vaultItemCount?: number;
+  vaultItemCount?: number;  // user-built items only (excludes seeded starters)
+  vaultStarterCount?: number; // seeded starter patterns (redivivus-starter / redivivus-seeded)
   shouldAutoOpenLastProject?: boolean;
   blueprintStatus?: 'complete' | 'incomplete' | 'missing';
   // [Redivivus] AI roster for multi-badge display — all active AIs with roles

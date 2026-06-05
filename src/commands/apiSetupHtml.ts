@@ -7,13 +7,10 @@ import { API_SETUP_CSS } from './apiSetupStyles.js';
 import { buildProviderCards } from './apiSetupHtmlCards.js';
 
 export function getApiSetupHtml(): string {
+  const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../services/ai/secretKeyStore.js');
   const config = vscode.workspace.getConfiguration('redivivus');
-  const geminiKey = config.get<string>('geminiApiKey') || '';
-  const claudeKey  = config.get<string>('claudeApiKey') || '';
-  const openaiKey  = config.get<string>('openaiApiKey') || '';
-  const groqKey    = config.get<string>('groqApiKey') || '';
-  const xaiKey     = config.get<string>('xaiApiKey') || '';
-  const kimiKey    = config.get<string>('kimiApiKey') || '';
+  const [geminiKey, claudeKey, openaiKey, groqKey, xaiKey, kimiKey] =
+    ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi'].map(p => getKeyCached(p) || '');
 
   const disabledProviders = config.get<string[]>('disabledProviders') || [];
   const routing = new RoutingService();

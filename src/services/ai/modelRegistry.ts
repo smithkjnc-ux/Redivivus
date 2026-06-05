@@ -26,7 +26,7 @@ export const MODEL_REGISTRY: ModelDef[] = [
   // ── Gemini (Google) ─────────────────────────────────────────────────────
   { provider: 'gemini', modelId: 'gemini-2.5-pro',          label: 'Gemini 2.5 Pro',     capability: 9,  costTier: 7, contextK: 1000, outputK: 64,  thinking: true,  roles: ['ultra', 'pro'],    strengths: ['huge context', 'reasoning', 'code', 'multimodal'] },
   { provider: 'gemini', modelId: 'gemini-2.5-flash',        label: 'Gemini 2.5 Flash',   capability: 7,  costTier: 2, contextK: 1000, outputK: 64,  roles: ['pro', 'flash'],    strengths: ['fast code gen', 'games', 'UI', 'large output'] },
-  { provider: 'gemini', modelId: 'gemini-2.0-flash',        label: 'Gemini 2.0 Flash',   capability: 6,  costTier: 1, contextK: 1000, outputK: 8,   roles: ['flash'],           strengths: ['speed', 'simple tasks'] },
+
 
   // ── OpenAI ──────────────────────────────────────────────────────────────
   { provider: 'openai', modelId: 'o3',                      label: 'OpenAI o3',          capability: 10, costTier: 10, contextK: 200, outputK: 32,  thinking: true,  roles: ['ultra'],           strengths: ['logical reasoning', 'math', 'architecture', 'complex debugging'] },

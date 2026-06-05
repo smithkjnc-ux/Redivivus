@@ -9,6 +9,7 @@ import type { ChatHeaderInfo } from './chatPanelHtml';
 import { BuildHistoryService } from '../../../services/build/buildHistoryService';
 import { getAccountToken } from '../../../services/api/apiClient.js';
 import * as fs from 'fs';
+import { determineBlueprintStatus } from './chatPanelHeaderUtils.js';
 
 export function buildHeaderInfo(
   redivivus: RedivivusService,
@@ -169,27 +170,21 @@ export function buildHeaderInfo(
     projectTokens,
     buildStamp,
     primaryAction,
-    vaultItemCount: (() => { try { const { VaultService } = require('../../../services/vault/vaultService.js'); const v = new VaultService(extensionContext); return v.listItems().length; } catch { return 0; } })(),
+    // [FIX] Count user-built items separately from seeded starter patterns.
+    // Starters are infrastructure; including them made the count misleading vs. admin panel.
+    ...(() => {
+      try {
+        const { VaultService } = require('../../../services/vault/vaultService.js');
+        const v = new VaultService(extensionContext);
+        const all = v.listItems() as Array<{ sourceProject?: string }>;
+        const SEEDED = new Set(['redivivus-starter', 'redivivus-seeded']);
+        const starters = all.filter(i => SEEDED.has(i.sourceProject || '')).length;
+        return { vaultItemCount: all.length - starters, vaultStarterCount: starters };
+      } catch { return { vaultItemCount: 0, vaultStarterCount: 0 }; }
+    })(),
     isSignedIn: false,
     healthStatus: extensionContext?.globalState.get<'green' | 'yellow' | 'red'>('redivivus.healthStatus'), // populated async below — caller uses refreshHeader() to get updated value
   };
 }
 
-/**
- * Determine blueprint completeness status
- * - 'complete': All 5 W's defined (who, what, where, when, why)
- * - 'incomplete': Some W's defined but not all
- * - 'missing': No blueprint exists
- */
-function determineBlueprintStatus(config: any): 'complete' | 'incomplete' | 'missing' {
-  if (!config?.blueprint) {return 'missing';}
-  
-  const blueprint = config.blueprint;
-  const definedFields = ['who', 'what', 'where', 'when', 'why'].filter(
-    field => blueprint[field] && blueprint[field].trim().length > 0
-  );
-  
-  if (definedFields.length === 5) {return 'complete';}
-  if (definedFields.length > 0) {return 'incomplete';}
-  return 'missing';
-}
+// [DONE] determineBlueprintStatus extracted to chatPanelHeaderUtils.ts (Rule 9 split)

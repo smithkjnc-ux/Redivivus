@@ -48,9 +48,21 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
     : `<div class="launcher-empty-recent">No recent projects</div>`;
 
   const vaultCount = header.vaultItemCount || 0;
-  const vaultLine = vaultCount > 0
-    ? `<div class="launcher-vault-status" data-cmd="redivivus.openVault" title="Open Vault browser -- browse and manage your reusable code library"><span class="lvs-icon">&#x229E;</span>${vaultCount} item${vaultCount !== 1 ? 's' : ''} in your code library</div>`
-    : `<div class="launcher-vault-status launcher-vault-empty" title="Your Vault stores reusable code snippets. It fills automatically as you build."><span class="lvs-icon">&#x229E;</span>Vault empty &mdash; builds will populate it</div>`;
+  const starterCount = header.vaultStarterCount || 0;
+  // [FIX] Show user-built items separately from seeded starters.
+  // "33 items" was misleading — 27 were starters, not user-built code.
+  const vaultLine = (() => {
+    if (vaultCount > 0 && starterCount > 0) {
+      return `<div class="launcher-vault-status" data-cmd="redivivus.openVault" title="Open Vault browser -- browse and manage your reusable code library"><span class="lvs-icon">&#x229E;</span>${vaultCount} from your builds &middot; ${starterCount} starter patterns</div>`;
+    }
+    if (vaultCount > 0) {
+      return `<div class="launcher-vault-status" data-cmd="redivivus.openVault" title="Open Vault browser"><span class="lvs-icon">&#x229E;</span>${vaultCount} item${vaultCount !== 1 ? 's' : ''} from your builds</div>`;
+    }
+    if (starterCount > 0) {
+      return `<div class="launcher-vault-status" data-cmd="redivivus.openVault" title="Your Vault has starter patterns ready -- builds will add your own code"><span class="lvs-icon">&#x229E;</span>${starterCount} starter patterns ready &mdash; builds add yours</div>`;
+    }
+    return `<div class="launcher-vault-status launcher-vault-empty" title="Your Vault stores reusable code snippets. It fills automatically as you build."><span class="lvs-icon">&#x229E;</span>Vault empty &mdash; builds will populate it</div>`;
+  })();
 
   const signInBanner = header.isSignedIn ? '' :
     `<div style="margin-bottom:16px;padding:12px 16px;background:rgba(20,184,166,0.07);border:1px solid rgba(20,184,166,0.25);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">

@@ -12,7 +12,7 @@ export async function executeMultiFileBuild(
   task: string,
   root: string,
   context: any,
-  keys: any,
+  keyHeaders: Record<string, string>,
   token: string,
   base: string,
   preferred: string,
@@ -33,14 +33,14 @@ export async function executeMultiFileBuild(
 
     try {
       const body = JSON.stringify({
-        task, context, keys, preferred,
+        task, context, preferred,
         targetFile: { path: file.path, description: file.description, isNew: file.isNew, fileIndex: i, totalFiles: planFiles.length, siblings },
       });
       // [FIX] Use Promise.race for reliable timeout — AbortController does not abort res.json() in Electron's fetch
       const buildOnce = async () => {
         const res = await fetch(`${base}/build`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...keyHeaders },
           body,
         });
         if (res.status === 401) {

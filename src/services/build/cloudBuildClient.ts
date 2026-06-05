@@ -3,7 +3,7 @@
 // On error: surfaces a clean message — no local fallback (cloud is required for quality builds).
 
 import * as vscode from 'vscode';
-import { getAccountToken, getApiBase, collectKeys, getPreferred } from '../api/apiClient.js';
+import { getAccountToken, getApiBase, collectKeys, collectKeyHeaders, getPreferred } from '../api/apiClient.js';
 import { collectBuildContext, budgetContext } from './buildContextCollector.js';
 import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { VaultService } from '../vault/vaultService';
@@ -52,7 +52,7 @@ export async function callCloudBuild(
 
   const vault = (deps as any).vault as VaultService | undefined;
   const context = await collectBuildContext(root, task, vault, opts.targetFile, opts.isFix, deps.conversation);
-  const keys = collectKeys();
+  const keyHeaders = collectKeyHeaders();
   const base = getApiBase();
   const preferred = getPreferred();
 
@@ -68,16 +68,16 @@ export async function callCloudBuild(
   if (!opts.isFix && !opts.targetFile) {
     try {
       opts.onProgress?.('Planning your build...');
-      const planBody = JSON.stringify({ task, keys, preferred, context: { blueprint: context.blueprint, existingFiles: context.existingFiles } });
+      const planBody = JSON.stringify({ task, preferred, context: { blueprint: context.blueprint, existingFiles: context.existingFiles } });
       // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
       const planRes = await Promise.race([
-        fetch(`${base}/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: planBody }),
+        fetch(`${base}/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...keyHeaders }, body: planBody }),
         makeTimeout(30_000, 'Plan'),
       ]);
       if (planRes.ok) {
         const plan = await planRes.json() as { files: Array<{ path: string; description: string; isNew: boolean }> };
         if (plan.files && plan.files.length > 1) {
-          return await executeMultiFileBuild(task, root, context, keys, token, base, preferred ?? '', plan.files, deps, opts.onProgress);
+          return await executeMultiFileBuild(task, root, context, keyHeaders, token, base, preferred ?? '', plan.files, deps, opts.onProgress);
         }
       }
     } catch { /* plan failed — fall through to single-file build */ }
@@ -90,11 +90,11 @@ export async function callCloudBuild(
     // [FIX] Send workerModel = preferred so the server uses the user's chosen AI for the Worker role,
     // not a cheaper fallback. Without this the server was using GPT-4o as Worker even when Claude
     // was selected, producing incomplete output while Supervisor/Guardian ran on Claude.
-    const requestBody = JSON.stringify({ task, context, keys, preferred, workerModel: preferred });
+    const requestBody = JSON.stringify({ task, context, preferred, workerModel: preferred });
     console.log(`[Redivivus] Build request: taskLen=${task.length}, bodyLen=${requestBody.length}, vaultItems=${context.vaultItems?.length ?? 0}, hasRules=${!!context.projectRules}`);
     // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
     const instructionRes = await Promise.race([
-      fetch(`${base}/build`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: requestBody }),
+      fetch(`${base}/build`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...keyHeaders }, body: requestBody }),
       makeTimeout(240_000, 'Build instruction'),
     ]);
 

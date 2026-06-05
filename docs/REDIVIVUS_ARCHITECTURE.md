@@ -110,11 +110,40 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 
 ---
 
+## AI Role Assignment Architecture
+
+```
+USER ADDS API KEYS (Redivivus Settings → stored in VS Code SecretStorage)
+  └─ Each key = one provider (claude/gemini/openai/groq/xai/kimi)
+  └─ At least 1 required for builds
+  └─ More keys = more Workers = better parallelism
+
+REDIVIVUS RANKS MODELS AUTOMATICALLY (src/core/ai/modelTierList.ts)
+  └─ Built-in tier list per model ID (claude-opus-4-8=100, gemini-2.5-pro=83, etc.)
+  └─ User override: redivivus.modelRankOverrides (Record<modelId, number>)
+
+ROLE ASSIGNMENT (src/core/ai/roleAssignmentService.ts)
+  └─ Rank 1 (highest) = Supervisor AND Guardian
+  └─ Rank 2+ = Workers
+  └─ Single-model mode: all three roles use same model (user notified)
+
+FAILOVER (src/core/ai/roleAssignmentFailover.ts)
+  └─ 2+ failures: model marked 'degraded', next model promoted to Supervisor
+  └─ 3+ failures: model marked 'failed', removed from active assignment
+  └─ Recovery: after 10 min, model restored to active and assignment re-evaluated
+  └─ User notified via Guardian voice on every role change
+```
+
+**Key storage:**
+- All AI provider keys stored in VS Code `SecretStorage` (encrypted)
+- Auto-migrated from `settings.json` on first activation after upgrade
+- Settings.json entries cleared after migration
+
 ## Known Issues
 - Engine version must stay at `^1.70.0` for Windsurf compat (Windsurf 1.110.1)
 - `@types/vscode` must match engine version (currently 1.70.0)
 - AI review/restructure commands need API key — show clear stub when missing
-- API keys stored in VS Code `settings.json` — re-enter after forced extension reinstall
+- Several pre-existing files exceed 200 lines (Rule 9) — split required before editing them
 
 ---
 

@@ -49,9 +49,22 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
     getRecentBuildsContext(root),
     convCtx ? `RECENT CONVERSATION:\n${convCtx}` : '',
   ].filter(Boolean).join('\n\n');
+  // [GATE] Zero-key gate — must fire before any AI call, not at startup
+  if (!routing.hasAnyKey()) {
+    appendMsg(ctx, 'To build with Redivivus, you\'ll need at least one AI API key. I can walk you through adding one -- which AI service do you have access to?\n\n- **Anthropic (Claude)** -- console.anthropic.com\n- **Google (Gemini)** -- aistudio.google.com (free tier available)\n- **OpenAI (GPT)** -- platform.openai.com\n- **Other** -- Groq, xAI, Kimi also supported\n\nOpen **Redivivus Settings** (Ctrl+Shift+P -> "Redivivus: Open Settings") to add your key.');
+    ctx.postToWebview?.({ type: 'set-status', status: 'ready' });
+    return;
+  }
+
   const buildStart = Date.now();
   const ledger = new BuildLedger();
   const { supervisor: supervisorAI } = routing.selectSupervisorAndWorker();
+
+  // Single-model mode notice
+  const roster = routing.buildRoster?.() as any;
+  if (roster?.singleModelMode) {
+    appendMsg(ctx, 'Running in single-model mode -- all roles handled by one AI. Add more API keys for better parallelism.');
+  }
 
   const vaultOn = isVaultEnabled();
   appendMsg(ctx, vaultOn ? '🔍 Checking your saved code library...' : '⚙️ Building...');

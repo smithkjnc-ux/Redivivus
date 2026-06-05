@@ -3,7 +3,184 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 5, 2026: Roster Cache & Role Assignment Bugs (Gemini +2 → Claude +5)
+
+### Problem
+Chat panel showed "Gemini +2" instead of "Claude +5" even after all 6 API keys were saved. Two bugs combined to produce this:
+
+**Bug 1 — `routingServiceRoster.ts` `_settingsKey()` read from settings.json:**
+Keys live in SecretStorage. `cfg.get<string>(k + 'ApiKey')` always returned empty, so the cache key was always `",,,,,,|gemini"` — a constant stale value. On the very first call (during activation, before `initSecretKeyStore` completed), no keys were visible so supervisor defaulted to `'gemini'`. That result was cached, and because the cache key never changed, the cache was NEVER invalidated — even after all 6 keys were added.
+
+**Bug 2 — `roleAssignmentFailover.ts` `getLiveAssignment` compared object references:**
+`getKeyMap()` in `RoutingService` creates a new object on every call. The check `_keyMapRef !== keyMap` was therefore ALWAYS true, causing `refreshRegistrations()` → `buildRegistrations()` to run on every single call. This wiped all failover state (failure counts, degraded status) and rebuilt registrations from scratch on every roster read — an unconditional rebuild loop on every call.
+
+### Fixes
+
+| File | Change | Risk |
+|---|---|---|
+| `src/services/ai/routingServiceRoster.ts` | `_settingsKey()` now calls the imported key getter functions (`getGeminiKey()`, etc.) which read from SecretStorage via `getKeyCached()`. Cache now correctly invalidates when SecretStorage changes. | Low |
+| `src/core/ai/roleAssignmentFailover.ts` | Replaced `_keyMapRef !== keyMap` (object-reference comparison, always true) with `activeKey !== _activeProvidersKey` (content-based: sorted list of providers that have keys). Removed `_keyMapRef`. Registrations now only rebuild when the set of active providers actually changes. Failover state preserved between calls. | Low |
+
+### Verification
+After restart: `selectSupervisorAndWorker()` returns Claude as Supervisor, all 5 other providers as Workers. Chat panel should show "Claude +5".
+
 ---
+
+## Session — Jun 5, 2026: Chassis → Redivivus Namespace Migration + SecretStorage Restored
+
+### Problem
+Product was renamed from Chassis to Redivivus but some users still have API keys stored under `chassis.*` in settings.json (from the old Chassis extension). On machines where users ran Chassis before Redivivus, those keys were invisible to the Redivivus extension, causing "No AI key" warnings. SecretStorage had been previously reverted due to the blank panel bug — but the real cause was the namespace mismatch (reading `redivivus.*` SecretStorage when keys were under `chassis.*` settings), not SecretStorage itself.
+
+### Pre-flight findings
+- `package.json`: Already uses `redivivus.*` for all settings — namespace rename was already done
+- `src/`: One intentional chassis reference in `redivivusService.ts` (`.chassis` folder migration, correct)
+- `secretKeyStore.ts`: Used `redivivus.apikey.*` prefix correctly — no chassis references
+- User Code settings: Had `chassis.defaultAI`, `chassis.kimiApiKey`, `chassis.groqApiKey`, `chassis.geminiApiKey` from old Chassis extension
+- Old Chassis extension: Still installed in Windsurf at `papajoe.chassis-0.2.0` — should be uninstalled if no longer used
+
+### Changes
+
+| File | Change | Risk |
+|---|---|---|
+| `src/extensionMigration.ts` | NEW — `migrateChassisSettings()`: copies `chassis.*` → `redivivus.*` in settings.json. Silent, no-op if already migrated. | Low |
+| `src/extension.ts` | Added `migrateChassisSettings` + `initSecretKeyStore` calls in sequence (migration runs first) | Low |
+| `src/services/ai/secretKeyStore.ts` | Extended fallback chain: SecretStorage → `redivivus.*` settings → `chassis.*` settings → env var | Low |
+| `src/services/ai/routingKeys.ts` | Restored to use `getKeyCached()` from secretKeyStore | Low |
+| `src/commands/apiSetup.ts` | Restored `save-keys` handler to use `storeKey()`/`deleteKey()` (SecretStorage) | Low |
+| `src/commands/apiSetupHtml.ts` | Restored to use `getKeyCached()` for key display. Compacted 6 key reads to 1 array map (saves 4 lines, stays ≤200) | Low |
+
+### Migration sequence (runs on every activation, no-op after first)
+```
+chassis.* settings → redivivus.* settings   (extensionMigration.ts)
+redivivus.* settings → SecretStorage        (secretKeyStore.ts initSecretKeyStore)
+chassis.* settings → SecretStorage          (secretKeyStore.ts fallback, if above missed any)
+```
+
+### Old Chassis extension
+Still installed in Windsurf at `/home/papajoe/.windsurf/extensions/papajoe.chassis-0.2.0/`. If Windsurf no longer uses Chassis, this should be uninstalled to avoid settings conflicts.
+
+---
+
+## Session — Jun 5, 2026: Key Security — Revert SecretStorage, Header-Only Transit
+
+### Problem
+Three issues found:
+1. SecretStorage migration wiped the API Setup display (keys invisible after migration)
+2. `cloudClassify` was sending actual key values to a `/classify` endpoint that doesn't exist (dead code risk)
+3. **Guardian bug**: `keys: keyMap` in the guardian POST sent function references, which `JSON.stringify` drops → `keys: {}` → guardian calls silently failed every single build since launch
+4. All cloud build calls sent keys in the request body (logged by default in most platforms)
+
+### Design decision
+Keys stay in `settings.json` on the user's device — no SecretStorage, no cloud storage. Keys transit to the backend only per-request over HTTPS, as HTTP headers (`X-Provider-Keys`) rather than body (headers are excluded from most log configurations by default).
+
+### Changes
+
+| File | Change | Risk |
+|---|---|---|
+| `src/services/ai/routingKeys.ts` | Reverted to `config.get()` / env var — settings.json only | Low |
+| `src/commands/apiSetup.ts` | Reverted to `config.update()` for save-keys | Low |
+| `src/commands/apiSetupHtml.ts` | Reverted to `config.get()` for display | Low |
+| `src/extension.ts` | Removed `initSecretKeyStore` import and call | Low |
+| `src/services/api/apiClient.ts` | Added `collectKeyHeaders()` helper. Removed `keys: collectKeys()` from `cloudClassify` body | Low |
+| `src/services/build/cloudBuildClient.ts` | Keys moved from body to `X-Provider-Keys` header for `/plan` and `/build` calls | Low |
+| `src/services/build/cloudBuildMultiFile.ts` | `keys` parameter renamed to `keyHeaders`, spread into fetch headers | Low |
+| `src/services/ai/routingGuardian.ts` | **Guardian bug fixed**: was sending `keys: keyMap` (functions stripped by JSON.stringify → `{}` → guardian never ran). Now sends `X-Provider-Keys` header with actual values from `collectKeys()`. Also split to stay under 200 lines. | Medium |
+| `src/services/ai/routingGuardianUtils.ts` | NEW — `detectProjectType` + `getFolderStructureTemplate` extracted (Rule 9 split) | Low |
+| `redivivus-backend/.../build/route.ts` | Reads keys from `x-provider-keys` header; body fallback for old clients | Low |
+| `redivivus-backend/.../guardian/route.ts` | Same header-first key reading | Low |
+
+### Guardian bug impact
+Every cloud build since launch has had Guardian review silently disabled. The Guardian prompt was never actually validating Worker output. This is now fixed — guardian calls will start working with the next build.
+
+---
+
+## Session — Jun 5, 2026: Vault Count Mismatch Audit
+
+### Problem
+Extension showed "33 items in your code library" while admin panel showed 28 community items. Hypotheses 1, 2, and 5 all confirmed:
+- **H1:** 27 seeded starter patterns counted in the 33 (starters are infrastructure, not user-built items)
+- **H2:** 6 auto-captured chess game items are local-only (not in any cloud count)
+- **H5:** Backend `/api/v1/vault?source=community` queried the wrong Supabase table (`vault_items.is_public=true` instead of `vault_community.approved=true`) — the 28 community patterns were completely invisible to the extension
+
+### Root cause breakdown
+The 33 = 27 seeded starters + 6 chess auto-captured items. Zero community items had been merged to local vault. The admin's 28 and the extension's 33 were measuring entirely different, unrelated data sets.
+
+### Fixes
+
+| File | Change | Risk |
+|---|---|---|
+| `redivivus-backend/src/app/api/v1/vault/route.ts` | `source=community` now queries `vault_community.approved=true` instead of `vault_items.is_public=true`. The 28 approved community patterns are now fetchable. | Low |
+| `src/ui/panels/chat/chatPanelHtml.ts` | Added `vaultStarterCount?: number` to `ChatHeaderInfo` interface | Low |
+| `src/ui/panels/chat/chatPanelHeader.ts` | `vaultItemCount` now counts user-built items only (excludes `redivivus-starter`/`redivivus-seeded`). Added `vaultStarterCount` for starters. | Low |
+| `src/ui/panels/chat/chatPanelEmptyState.ts` | Updated vault label to show breakdown: "6 from your builds · 27 starter patterns" instead of "33 items in your code library" | Low |
+| `src/ui/panels/chat/chatPanelHeaderUtils.ts` | NEW — `determineBlueprintStatus` extracted from chatPanelHeader.ts (Rule 9 split at 206 lines) | Low |
+
+### Result
+- Extension now shows: "6 from your builds · 27 starter patterns"
+- Community sync (when called) will now return the 28 approved items from correct table
+- No pending/unapproved items visible to extension (query filters `approved=true`)
+- Cache: none — count is live from disk on every render
+
+---
+
+## Session — Jun 5, 2026: Architecture Audit — AI Role Assignment & Cloud-Only Model
+
+### Problem
+Role assignment was provider-level only (no per-model-ID ranking), API keys were stored in plaintext settings.json instead of SecretStorage, the Supervisor had no failover on failure, there was no explicit single-model mode notice, and the zero-key gate showed a raw error instead of a Guardian-voice setup flow.
+
+### Changes Made
+
+| File | Change | Risk |
+|---|---|---|
+| `src/services/ai/secretKeyStore.ts` | NEW — SecretStorage-backed key store. Encrypts keys, migrates from settings.json on first run. | Low |
+| `src/core/ai/modelTierList.ts` | NEW — Per-model-ID tier list (100 tiers). `getModelRank()` respects `redivivus.modelRankOverrides`. | Low |
+| `src/core/ai/roleAssignmentService.ts` | NEW — `ModelRegistration` + `RoleAssignment` interfaces. Pure `assignRoles()` + `buildRegistrations()`. | Low |
+| `src/core/ai/roleAssignmentFailover.ts` | NEW — Live failure tracking. `recordProviderFailure()` demotes, promotes, notifies user. 10-min recovery. | Low |
+| `src/services/ai/routingServiceSupervisor.ts` | NEW — `supervisorPlanWithFailover()` extracted from routingService.ts (Rule 9 split). | Low |
+| `src/services/ai/routingKeys.ts` | Updated to use `getKeyCached()` from secretKeyStore instead of `config.get()`. | Low |
+| `src/services/ai/routingServiceRoster.ts` | Added `getLiveAssignment()` delegation, `invalidateRosterCache()`, `singleModelMode` flag on `buildRoster()`. | Low |
+| `src/services/ai/routingService.ts` | `supervisorPlan()` now delegates to `supervisorPlanWithFailover()`. Zero-key response uses Guardian voice + setup instructions. Added `hasAnyKey()`. Added `supervisorFailoverCallback` property. | Low |
+| `src/commands/apiSetup.ts` | `save-keys` handler now writes to SecretStorage via `storeKey()`/`deleteKey()` instead of settings.json. `showApiStatusInChat()` reads from `getKeyCached()`. | Low |
+| `src/extension.ts` | Added `initSecretKeyStore(context)` call after `initApiClient`. Keys migrated from settings.json to SecretStorage on first activation. | Low |
+| `src/core/build/chatPanelBuild.ts` | Added zero-key gate before build initiation. Added single-model mode notice. | Low |
+| `src/core/routing/chatPanelMsgSendAI.ts` | `NO_API_KEY` error now shows Guardian setup message as normal reply, not wrapped in "Something went wrong". | Low |
+
+### Architecture Changes
+- API keys: settings.json → SecretStorage (encrypted, migration automatic)
+- Role assignment: provider-level → model-ID-level (modelTierList)
+- Supervisor failover: none → automatic demotion/promotion with user notification
+- Zero-key gate: raw error → Guardian-voice setup flow with provider options
+- Single-model mode: silent → explicit notice to user
+
+---
+
+## Session — Jun 5, 2026: Cloud Build Orchestration Hardening & Blueprint Prompt
+**Problem:** The cloud build pipeline relied on vague string prescriptions from the Supervisor, leading to Worker AI hallucinations. Furthermore, Next.js edge functions were timing out during the Guardian's lengthy verification loop, and local diagnostic visibility was zero. Finally, Gemini was too strict on the blueprint prompt and returned empty fields for obvious defaults.
+
+**Fix — Cloud Pipeline:**
+- **`src/lib/ai/routingService.ts`**: Refactored `generateSupervisorPrompt` to mandate a strict JSON array contract, eliminating Worker AI hallucinations.
+- **`src/app/api/v1/build/route.ts`**: Implemented a Guardian AI verification loop that strictly compares generated code against the Supervisor's JSON contract.
+- **`src/app/api/v1/build/route.ts`**: Wrapped the long-running Guardian check in a `TransformStream` that sends keep-alive whitespaces to prevent Next.js edge-function timeouts.
+- **`src/app/api/v1/build/route.ts`**: Added `writeBackendLog` to save the full payload of every AI interaction to `.redivivus/logs/backend-session-*.log`.
+- **`src/app/api/v1/build/route.ts`**: Stripped 16KB JSON from `X-Supervisor-Meta` to prevent Node.js ByteString header crashes, and manually buffered `executeAIStream` to bypass Anthropic's non-streaming token limits.
+
+**Fix — Blueprint Extractor & AI Model Deprecation:**
+- **`src/services/ai/modelRegistry.ts`**: Removed `gemini-2.0-flash` from `MODEL_REGISTRY` entirely. Google completely deprecated and removed the model from their API, causing silent `404 NOT_FOUND` failures in the inference pipeline that resulted in empty blueprint fields. The system now correctly defaults to `gemini-2.5-flash` for all `flash`-tier roles.
+- **`src/services/blueprint/blueprintInference.ts`**: Handled an edge case where Gemini returned flat strings instead of nested `confidence/value` objects, ensuring the AI's common-sense defaults are properly extracted and upgraded to `assumed` confidence.
+- **`src/services/blueprint/blueprintExtractor.ts`**: Relaxed the AI prompt, instructing models like Gemini to use common sense (e.g. 'Web browser', 'Personal use') instead of rigidly leaving unspecified fields blank.
+
+**Feature — Dynamic Worker Delegation:**
+- **`src/lib/ai/routingService.ts` (Backend)**: Added `workerTier` (`flash` | `pro` | `ultra`) to the mandatory JSON contract schema generated by the Supervisor. Modified `getSupervisorModel` to unconditionally assign the highest-capability ("ultra") reasoning models (e.g., Opus 4.8, o3, Gemini 2.5 Pro) to ensure maximum architectural quality.
+- **`src/app/api/v1/build/route.ts` (Backend)**: Replaced the static Worker upgrade logic with dynamic Worker assignment. The backend now parses the Supervisor's required `workerTier` and selects the cheapest available API key capable of fulfilling that tier, seamlessly aligning computation cost with execution complexity.
+
+**Feature — Orchestration Cascading API Failover:**
+- **`src/app/api/v1/build/route.ts` (Backend)**: Upgraded the single-shot failover to a full cascading failover loop. If the dynamically assigned Worker throws a catastrophic API error (401, 429, etc.), the Orchestrator cycles through every remaining available AI provider (cheapest first) until one succeeds or all are exhausted. Each attempt is logged with `WORKER_FAILOVER` entries for diagnostics.
+- **`src/lib/ai/routingService.ts` (Backend)**: Added `getFailoverProviders()` method that returns all available providers ranked cheapest-first, excluding already-tried ones, enabling the cascading loop.
+
+**Risk:** Low. Significantly hardens the cloud build pipeline and improves user experience on vague prompts.
+
+---
+
 
 ## Session — Jun 5, 2026: Fix Chassis Build Appending and Relax Rule 9
 
@@ -218,6 +395,22 @@
 - Admins bypass the filter to ensure they always show up. 
 
 **Risk:** Low — purely visual filtering in the admin panel. Pending users are still visible and manageable on the dedicated `Waitlist` page.
+
+---
+
+## Session 16O — Jun 5, 2026: Chat panel badge shows wrong AI ("Gemini +2" instead of "Claude +5")
+
+**Problem:** The panel header shows `Gemini +2` despite having all 6 keys in SecretStorage.
+
+**Root cause:** `initSecretKeyStore()` is called as a fire-and-forget `.then()` chain (not awaited). The panel auto-opens on a 500ms timer — before the async SecretStorage reads finish. At that point `_initialized=false`, so `getKeyCached()` falls through to the pre-init fallback which reads `settings.json` (empty for all providers). Only Gemini had a legacy settings value, so the roster showed Gemini as supervisor with only 2 entries.
+
+**Fix — two files changed:**
+- **`src/services/ai/secretKeyStore.ts`:** Added `onSecretKeyStoreReady(cb)` — registers a callback fired once after all SecretStorage reads complete (`_initialized=true`). If already initialized, fires immediately. Callbacks stored in `_readyCallbacks[]`, drained at end of `initSecretKeyStore`.
+- **`src/extension.ts`:** After calling `initSecretKeyStore`, registers `onSecretKeyStoreReady(() => { invalidateRosterCache(); ChatPanel.currentPanel?.refresh(); })`. This re-renders the header badge with the real key set as soon as SecretStorage finishes loading.
+
+**Why event-driven over awaiting:** The panel must open promptly (500ms) for UX. Making `activate()` block on SecretStorage would delay all panel rendering. The event approach lets the panel open fast then auto-corrects the badge within milliseconds of init completing.
+
+**Risk:** Near zero. `refresh()` is idempotent. `invalidateRosterCache()` only drops the in-memory cache — it is designed to be called freely (already called on model failure, key change, etc.).
 
 ---
 
