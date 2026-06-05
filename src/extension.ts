@@ -54,7 +54,15 @@ export function activate(context: vscode.ExtensionContext) {
     .catch(err => console.error('[Redivivus] Init failed:', err));
   onSecretKeyStoreReady(() => {
     invalidateRosterCache();
-    if (ChatPanel.currentPanel) { ChatPanel.currentPanel.refresh(); }
+    // [FIX] currentPanel may be the deserializer sentinel (no .refresh) or not yet constructed.
+    // Poll until a real panel with refresh() is available, then update the badge.
+    const tryRefresh = () => {
+      const p = ChatPanel.currentPanel as any;
+      if (p && typeof p.refresh === 'function') { p.refresh(); }
+      else if (!p) { /* panel not open — nothing to refresh */ }
+      else { setTimeout(tryRefresh, 150); }
+    };
+    tryRefresh();
   });
 
   // [FIX] Suppress "Do you want to save workspace configuration?" dialog for untitled workspaces.
