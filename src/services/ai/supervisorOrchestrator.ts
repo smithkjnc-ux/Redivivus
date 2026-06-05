@@ -58,14 +58,14 @@ For complex tasks (multi-file, architecture decisions), use 2-4 steps.
 Ensure you follow all PROJECT RULES, especially architecture constraints for games.
 
 For each step, "spec" must be a precise prescription the Worker can follow without guessing:
-- Include the exact filename
+- Include the exact filename (Use .js, NOT .ts, for raw web projects that don't have a bundler)
 - Name every function, class, or variable to implement
 - For changes: quote exact old → new code
 - Specify key constants, types, and behaviors
 
 Respond with ONLY valid JSON, no markdown, no explanation:
 [
-  { "step": 1, "description": "short label shown in UI", "spec": "File: src/game.ts — export function startGame(): void — calls requestAnimationFrame at 60fps — CANVAS_WIDTH=800 CANVAS_HEIGHT=600", "ai": "which_ai_id" }
+  { "step": 1, "description": "short label shown in UI", "spec": "File: src/game.js — export function startGame() { ... } — calls requestAnimationFrame at 60fps — const CANVAS_WIDTH=800", "ai": "which_ai_id" }
 ]`;
 }
 
