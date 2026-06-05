@@ -24,8 +24,13 @@ interface HealthData {
 async function pingApi(base: string): Promise<{ reachable: boolean; latencyMs: number | null; error?: string }> {
   const start = Date.now();
   try {
-    const res = await fetch(`${base}/announcements`, { signal: AbortSignal.timeout(8000) });
-    return { reachable: res.ok || res.status < 500, latencyMs: Date.now() - start };
+    // [FIX] Use OPTIONS /build instead of GET /announcements.
+    // /announcements does not exist and Next.js returns 500 via its error handler, which
+    // looked like a server error. OPTIONS /build always returns 204 when the server is up.
+    // Any HTTP response (including 4xx) means the server is reachable — only a network-level
+    // error (ECONNREFUSED, timeout) means truly unreachable.
+    const res = await fetch(`${base}/build`, { method: 'OPTIONS', signal: AbortSignal.timeout(8000) });
+    return { reachable: true, latencyMs: Date.now() - start };
   } catch (e: any) {
     return { reachable: false, latencyMs: null, error: e?.message ?? 'unreachable' };
   }
