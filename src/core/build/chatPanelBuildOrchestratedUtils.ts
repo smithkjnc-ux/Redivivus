@@ -56,7 +56,8 @@ export function parseFileMarkers(code: string, primaryOutput: string): Map<strin
   // parts is: [pre, fileName1, code1, fileName2, code2, ...]
   for (let i = 1; i < parts.length; i += 2) {
     const filePath = parts[i]?.trim();
-    const fileCode = (parts[i + 1] || '').trim();
+    let fileCode = (parts[i + 1] || '').trim();
+    fileCode = fileCode.replace(/^```[a-z]*\n?/gm, '').replace(/```$/gm, '').trim();
     if (filePath) { map.set(filePath, fileCode); }
   }
   return map;

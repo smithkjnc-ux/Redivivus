@@ -98,7 +98,9 @@ export async function runOrchestratedPhaseBuild(
     deps.refresh();
 
     const result = await executeStep(step, phaseTask, assembledCode, callAI, planSteps);
-    assembledCode = result.code || assembledCode;
+    if (result.code) {
+      assembledCode = assembledCode ? assembledCode + '\n\n' + result.code : result.code;
+    }
     totalTokens += result.tokens;
   }
 

@@ -21,7 +21,7 @@ import { inferBuildTarget, runCodeReviewPipeline, applyCodeToFile, runPostBuildA
 import { generatePlanId, formatPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
-import { getCommunityGotchas, fetchCommunityGotchas } from '../../services/api/apiClient.js';
+import { getCommunityGotchas, fetchCommunityGotchas } from '../../services/api/apiClientKnowledge.js';
 import { selectRelevantTurns } from '../ai/contextSelector';
 import { findSimilarCode } from '../../services/code/similarCodeFinder';
 

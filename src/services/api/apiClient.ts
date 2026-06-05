@@ -143,30 +143,7 @@ export function logGotcha(opts: {
   }).catch(() => {});
 }
 
-// Community gotchas -- lazy-fetched once per session, injected into every build prompt.
-let _communityCache: string | null = null, _communityFetching = false;
 
-export function getCommunityGotchas(): string {
-  if (_communityCache === null && !_communityFetching) {
-    _communityFetching = true;
-    fetchCommunityGotchas().catch(() => {});
-  }
-  return _communityCache ?? '';
-}
-
-export async function fetchCommunityGotchas(): Promise<string> {
-  if (_communityCache !== null) { return _communityCache; }
-  try {
-    const res = await fetch(`${getApiBase()}/knowledge/community-gotchas/`, { signal: AbortSignal.timeout(5000) });
-    if (!res.ok) { _communityCache = ''; return ''; }
-    const data = await res.json() as { gotchas: Array<{ promptLine: string }> };
-    const lines = (data.gotchas ?? []).map(g => g.promptLine).filter(Boolean);
-    _communityCache = lines.length > 0
-      ? '\n--- COMMUNITY KNOWLEDGE (patterns caught across all Redivivus users) ---\n' + lines.join('\n') + '\n---\n'
-      : '';
-    return _communityCache;
-  } catch { _communityCache = ''; return ''; }
-}
 
 export async function cloudClassify(
   message: string,

@@ -5,6 +5,19 @@
 
 ---
 
+## Session — Jun 5, 2026: Fix Chassis Build Appending and Relax Rule 9
+
+**Problem:** The local Chassis orchestration (which builds multiple files) was overwriting `assembledCode` at each step instead of appending, meaning only the final file from the Worker survived to be parsed. Furthermore, `parseFileMarkers` was leaving markdown fences in the file contents, resulting in corrupt files. Additionally, the strict Rule 9 forced all games to be a single `index.html` file, which limited user architectural choices.
+
+**Fix — Local Orchestration & Rule 9 Relaxation:**
+- **`chatPanelBuildOrchestrated.ts`**: Changed `assembledCode = result.code || assembledCode` to append the result code properly.
+- **`chatPanelBuildOrchestratedUtils.ts`**: Added regex parsing in `parseFileMarkers` to strip ````html` and ```` markdown fences from the assembled code files.
+- **`redivivus-backend` (Rule 9)**: Updated `redivivusWorkerRules.ts` on the backend so Rule 9 does *not* force single-file HTML unless explicitly requested or for trivial scripts.
+- **`apiClient.ts` / `apiClientKnowledge.ts`**: Created `GET /api/v1/knowledge/worker-rules` in the backend and updated the extension to dynamically fetch `Redivivus_WORKER_RULES` (to avoid storing the "secret sauce" locally in the open-source extension codebase). Extracted knowledge fetching into `apiClientKnowledge.ts` to keep `apiClient.ts` under 200 lines.
+- **`chatPanelClarify.ts`**: Explicitly added "Project structure — Single portable HTML file vs Modular project" to the design questions the AI asks when generating clarifying questions for games/tools.
+
+**Risk:** Low. Fixes a critical regression in local Chassis builds and securely distributes rules.
+
 ## Session — Jun 5, 2026: Inject Redivivus Rules into Chassis Supervisor
 
 **Problem:** When Adaptive Orchestration (Chassis) ran locally, the `supervisorOrchestrator.ts` used a hardcoded prompt that did not include `Redivivus_WORKER_RULES`. As a result, the Supervisor (e.g. Claude Sonnet) lacked awareness of Rule 9 (BROWSER GAMES AND SIMPLE TOOLS: ALWAYS output a single self-contained index.html) and would plan multi-file builds. The executing Worker also lacked these rules, resulting in games being split into `index.html` and `style.css` and lacking aesthetic constraints.

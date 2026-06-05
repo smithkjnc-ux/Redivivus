@@ -81,16 +81,17 @@ Reply with ONLY: yes or no`;
 RULES:
 - Ask 2-4 questions MAX. Not 5, not 6. Only what matters.
 - Each question gets 2-3 concrete options (not open-ended).
-- Focus on what would VISUALLY or BEHAVIORALLY change the output:
+- Focus on what would VISUALLY, BEHAVIORALLY, or STRUCTURALLY change the output:
+  * Project structure — "Single portable HTML file" vs "Modular project (HTML/CSS/JS separated)"
   * Platform/delivery — for games and tools: "Play in web browser" vs "Desktop app" vs "Mobile-friendly web"
   * Visual style, color scheme, layout approach
   * Character/element design (for games)
   * Interaction patterns, difficulty, pacing
   * Tone/personality (playful, professional, minimal)
-- Platform/delivery IS a required question for any game or interactive tool — always include it.
-- Do NOT ask about technical implementation (database, framework, API).
+- Project structure AND Platform/delivery ARE required questions for any game or interactive tool — always include them.
+- Do NOT ask about technical implementation details like database choices unless explicitly brought up by the user.
 - Do NOT ask about things the user already specified.
-- Do NOT offer options that escalate scope (no power-ups, level progression, or multiplayer for a simple game). Questions clarify style, feel, and delivery — not new features.
+- Do NOT offer options that escalate scope (no power-ups, level progression, or multiplayer for a simple game). Questions clarify style, feel, and structure — not new features.
 - Options should be concrete and distinct -- not "Option A" vs "Option B" but "Retro pixel art" vs "Modern cartoon" vs "Minimalist flat".
 - Write questions as a user would understand them, not as a developer would.`;
 

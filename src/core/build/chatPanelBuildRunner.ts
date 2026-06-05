@@ -10,7 +10,8 @@ import type { VaultSearchResult } from '../../services/vault/buildFromVaultSearc
 import { isValidBuildRoot } from './chatPanelBuildUtils';
 import { autoCreateProject } from './chatPanelBuildAutoCreate';
 import { callCloudBuild } from '../../services/build/cloudBuildClient.js';
-import { getAccountToken, getCommunityGotchas, fetchCommunityGotchas } from '../../services/api/apiClient.js';
+import { getAccountToken } from '../../services/api/apiClient.js';
+import { getCommunityGotchas, fetchCommunityGotchas } from '../../services/api/apiClientKnowledge.js';
 import { appendBuildLog } from '../../services/build/buildLogger.js';
 import { buildBreakdownToken, cleanBuildNarration } from './chatPanelBuildBreakdown.js';
 
