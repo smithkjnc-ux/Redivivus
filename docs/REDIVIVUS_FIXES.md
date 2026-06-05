@@ -398,6 +398,24 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16T — Jun 5, 2026: Two chat tabs open on Restart Extension Host
+
+**Problem:** Every "Restart Extension Host" (or window reload) produced two `Redivivus Chat` tabs.
+
+**Root cause:** `deserializeWebviewPanel` is `async`. It sets `_isDeserializing = true` at entry but doesn't set `_instance` until after `await import('./ui/panels/chat/chatPanel.js')`. That import takes ~100-300ms. The auto-open timer fires at 500ms, polls `_isDeserializing` every 200ms — on the first poll it sees `_isDeserializing = false` (import not started yet) OR it polls between the import completing and `_instance` being set, and sees `currentPanel = null` → opens a second tab.
+
+**Fix — `src/extension.ts` `deserializeWebviewPanel`:**
+- Set `_instance` to a truthy sentinel object (`{ __sentinel: true }`) **synchronously before** the `await import()`.
+- The auto-open timer's `ChatPanel.currentPanel` check now returns truthy immediately — no async gap.
+- After the import, check if `_instance === SENTINEL` (nothing else took over) before creating the real panel.
+- Replace sentinel with the real panel instance.
+
+**Why this is correct:** The sentinel closes the race window entirely. No matter how long the import takes, `currentPanel` is truthy from the moment deserialization begins. The `_isDeserializing` flag becomes a secondary safety net, not the primary guard.
+
+**Risk:** Minimal. The sentinel is only ever set inside `deserializeWebviewPanel`, which VS Code only calls when it's handing back a real orphaned tab. The real panel always replaces it within the same microtask queue.
+
+---
+
 ## Session 16S — Jun 5, 2026: Health panel shows "API reachable: no" even when backend is running
 
 **Problem:** Health panel always showed `API reachable: no` even though builds were completing successfully through the local backend.
