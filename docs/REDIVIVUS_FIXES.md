@@ -398,6 +398,28 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16W — Jun 5, 2026: Worker tier under-selected + no escalation when worker can't do the job
+
+**Problem:** A chess build (full engine + minimax AI) was rated `flash` by the Supervisor → assigned `gpt-4o-mini`. It produced broken code, Guardian rejected it, the worker retried (same weak model), and the retry was shipped **without re-verification** — broken board, blank UI. No path existed to use a stronger model.
+
+**Two root causes:**
+1. **Tier under-selection.** The `workerTier` guidance in `generateSupervisorPrompt` was one vague sentence. The Supervisor rated a chess engine as `flash`.
+2. **Guardian retry was a dead end.** On rejection it retried the *same* worker model once, then assigned `finalCode = retryCode` **unconditionally** — never re-verified. Broken retries shipped. No escalation.
+
+**Fix 1 — `routingService.ts` `generateSupervisorPrompt`:**
+- Replaced the one-liner with explicit tier rules. `ultra` now explicitly covers game engines, pathfinding, parsers, simulations, AI/minimax, recursion-heavy code. Rule: when torn, pick the HIGHER tier.
+
+**Fix 2 — `route.ts` Guardian Verification Loop (full rewrite):**
+- Added `runGuardian(code)` and `collectStream(stream)` helpers.
+- Flow is now: verify initial → on fail, retry worker AND **re-verify the retry** → if still failing, **escalate to the Supervisor model** (opus/o3) to implement the full solution directly → verify once more.
+- Ships the best available result. Logs each stage (`worker_retry`, `supervisor_escalation`, `BEST_EFFORT`).
+
+**Cost ladder now:** flash task → flash worker. pro task → pro worker. ultra task → pro worker (tier capped), escalate to Supervisor ultra model only if Guardian fails twice. Per user: *"better to produce good code than none, even if it uses more tokens."*
+
+**Risk:** Escalation uses the expensive supervisor model with full worker maxTokens — but only as a last resort after two failed worker verifications. This is the intended trade-off.
+
+---
+
 ## Session 16V — Jun 5, 2026: Wasted tokens — worker assigned to dead providers (401/403) triggering failover chain
 
 **Problem:** A chess build assigned `kimi` as the worker. Kimi's key was invalid (401), so it failed, then failover tried `xai` (403 — no credits), then `groq` (413 — rate limit), finally landing on `openai`. Three wasted round-trips before a working provider, on top of an already-expensive Claude Opus supervisor call. User: *"this is a bad thing to waste AI tokens like this."*

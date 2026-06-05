@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* Jun 5, 2026 — Session 16V: stopped token waste — getDeadProviders() excludes providers with 401/403 (bad key/no credits) from worker/supervisor/failover selection. See docs/REDIVIVUS_FIXES.md for full session history (16N-16V).
+*Last updated:* Jun 5, 2026 — Session 16W: strengthened workerTier guidance (game engines/algorithms now rate ultra) + Guardian now re-verifies worker retry and escalates to the Supervisor model if still failing, so correct code ships over broken. See docs/REDIVIVUS_FIXES.md for full session history (16N-16W).
 
 ---
 
