@@ -243,19 +243,18 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.registerWebviewPanelSerializer('redivivusChat', {
       async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel) {
         (ChatPanel as any)._isDeserializing = true;
-        // [FIX] Idempotent — never create a SECOND instance. Guard at entry AND again after the async
-        // import: the auto-open timer fires on a 500ms timer and, if it sees currentPanel=false while
-        // we're awaiting the import, it creates a panel — that race produced a duplicate chat tab on
-        // EVERY window reload. Re-checking after the await (and not nulling _instance, which only widened
-        // the window) means whoever wins the race keeps its panel and the other disposes its orphan.
         if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
+        // [FIX] Set _instance to a truthy sentinel BEFORE the async import so the auto-open timer's
+        // ChatPanel.currentPanel check returns truthy immediately and never races to open a second tab.
+        // The sentinel is replaced with the real panel instance below. This closes the race window
+        // entirely — no amount of import() delay can sneak the timer through.
+        const SENTINEL = { __sentinel: true };
+        (ChatPanel as any)._instance = SENTINEL;
         webviewPanel.webview.options = { enableScripts: true };
         const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
-        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
+        // If something else set _instance to a real panel while we were importing, discard this webview
+        if ((ChatPanel as any)._instance !== SENTINEL) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
         const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
-        // [FIX] THE root cause of duplicate tabs on reload: the constructor does NOT set _instance
-        // (only doShowChatPanel does, at chatPanelShow.ts). So a serializer-restored panel left
-        // currentPanel === null, and the auto-open timer then created a SECOND tab. Register it here.
         (ChatPanel as any)._instance = panel;
         // If user closed the project, clear conversation and force launcher view
         // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag,
