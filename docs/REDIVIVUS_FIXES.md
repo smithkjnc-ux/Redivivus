@@ -398,6 +398,27 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16V — Jun 5, 2026: Wasted tokens — worker assigned to dead providers (401/403) triggering failover chain
+
+**Problem:** A chess build assigned `kimi` as the worker. Kimi's key was invalid (401), so it failed, then failover tried `xai` (403 — no credits), then `groq` (413 — rate limit), finally landing on `openai`. Three wasted round-trips before a working provider, on top of an already-expensive Claude Opus supervisor call. User: *"this is a bad thing to waste AI tokens like this."*
+
+**Root cause:** The model health check **correctly detected** kimi (401) and xai (403) as failing — but classified both as `unknown`, and `getProviderForTier` never consulted the health results. So the dead providers were still selectable. A 401/403 is a **provider-level** failure (bad key / no credits) — no fallback *model* on the same provider can recover it, yet the old code only swapped models, not providers.
+
+**Fix — `redivivus-backend/src/lib/ai/modelHealthCheck.ts`:**
+- Added `'auth'` to `HealthStatus`.
+- `classifyError` now detects HTTP 401/403 and auth/credit phrases → returns `'auth'` (and 429 → `'quota'`).
+- New `getDeadProviders()` returns the set of providers whose every probed role failed with `'auth'` — i.e. the account/key is unusable.
+
+**Fix — `redivivus-backend/src/lib/ai/routingService.ts`:**
+- `selectSupervisorAndWorker`, `getProviderForTier`, and `getFailoverProviders` all now filter out `getDeadProviders()`.
+- Dead providers are never assigned and never retried.
+
+**Effect:** With kimi+xai dead, the worker now goes straight to a live provider (gemini/groq/openai). No failover chain, no wasted tokens. The health check runs before worker delegation, so the data is available.
+
+**Risk:** Low. A provider is only marked dead when *all* its probed roles return 401/403. Transient network errors classify as `'unknown'`, not `'auth'`, so a provider is never wrongly excluded.
+
+---
+
 ## Session 16U — Jun 5, 2026: Gemini+2 badge still showing after sentinel fix (Session 16T)
 
 **Problem:** After the duplicate-tab sentinel fix, `Gemini +2` badge persisted on every reload despite the `onSecretKeyStoreReady` callback being correctly wired.

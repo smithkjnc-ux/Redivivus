@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* Jun 5, 2026 — Session 16T: fixed duplicate chat tab on reload — sentinel blocks auto-open timer race during deserializeWebviewPanel async import (pingApi was hitting /announcements which returns 500, switched to OPTIONS /build which returns 204). Build stamp bumped to Jun 5 18:19 when Supervisor requests ultra tier — added excludeSupervisor param to getProviderForTier, capped worker tier at pro to backend (modelHealthCheck.ts) — probes each provider's models at build time, auto-falls back on deprecation/rename. Two-layer protection: proactive probe + reactive retry in executor.ts — panel auto-opens before SecretStorage async reads finish; added `onSecretKeyStoreReady` callback to `secretKeyStore.ts` that invalidates roster cache and refreshes panel after init completes
+*Last updated:* Jun 5, 2026 — Session 16V: stopped token waste — getDeadProviders() excludes providers with 401/403 (bad key/no credits) from worker/supervisor/failover selection. See docs/REDIVIVUS_FIXES.md for full session history (16N-16V).
 
 ---
 
