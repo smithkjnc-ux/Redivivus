@@ -53,22 +53,29 @@ PROJECT RULES (MUST COMPLY):
 ${getWorkerRules()}
 
 Create a build plan with 1-4 steps (fewer is better). Each step produces code.
-For simple tasks (1 file, straightforward), use just 1 step.
-For complex tasks (multi-file, architecture decisions), use 2-4 steps.
-IMPORTANT: For games and full web apps, you MUST use 3 steps to separate concerns (e.g., index.html, style.css, and game.js). DO NOT cram games into a single file.
+
+ARCHITECTURAL REASONING (Follow these steps before generating the plan):
+1. Environment Assessment: Evaluate the runtime environment. If there is no build tool (e.g. Vite, Webpack) prescribed in the blueprint, you MUST use natively executable languages (e.g. standard HTML, CSS, Vanilla JS) for browsers. Do NOT use TypeScript or JSX unless you also prescribe the build configuration to compile it.
+2. Infrastructure First: If the request requires a modern framework, your first step must establish the infrastructure (e.g. package.json, config files).
+3. Logical Decomposition: Break the project down into logical layers (e.g. State, Engine, UI, Styling) rather than arbitrary files.
+4. Interface Contracts: Ensure your step specifications clearly name the functions and interfaces so the workers can piece them together perfectly.
+
 Ensure you follow all PROJECT RULES, especially architecture constraints for games.
 
 For each step, "spec" must be a precise prescription the Worker can follow without guessing:
-- Include the exact filename (Use .js, NOT .ts, for raw web projects that don't have a bundler)
-- Name every function, class, or variable to implement
-- For changes: quote exact old → new code
-- Specify key constants, types, and behaviors
+- Include the exact filename(s) to create or modify.
+- Name every function, class, or variable to implement.
+- For changes: quote exact old → new code.
+- Specify key constants, types, and behaviors.
 
 Respond with ONLY valid JSON, no markdown, no explanation:
 [
-  { "step": 1, "description": "HTML structure", "spec": "File: index.html — standard HTML5 boilerplate — includes <link rel='stylesheet' href='style.css'> and <script type='module' src='game.js'> — adds <canvas id='gameCanvas'>", "ai": "which_ai_id" },
-  { "step": 2, "description": "Styling", "spec": "File: style.css — body { margin: 0; background: linear-gradient(...) } — #gameCanvas { box-shadow: 0 0 20px rgba(0,0,0,0.5); border-radius: 8px; }", "ai": "which_ai_id" },
-  { "step": 3, "description": "Game Logic", "spec": "File: game.js — export function startGame() { ... } — requestAnimationFrame game loop — const CANVAS_WIDTH=800", "ai": "which_ai_id" }
+  { 
+    "step": 1, 
+    "description": "Short label describing the logical layer", 
+    "spec": "Precise prescription of the files to write, the exact functions/interfaces to implement, and the constraints.", 
+    "ai": "which_ai_id" 
+  }
 ]`;
 }
 
