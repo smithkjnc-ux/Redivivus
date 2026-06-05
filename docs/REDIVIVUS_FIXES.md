@@ -398,6 +398,30 @@ Role assignment was provider-level only (no per-model-ID ranking), API keys were
 
 ---
 
+## Session 16R — Jun 5, 2026: Worker assigned same provider as Supervisor when Supervisor requests ultra tier
+
+**Problem:** When the Supervisor (Claude) returned `"workerTier": "ultra"` in its contract, dynamic worker delegation called `getProviderForTier(keys, 'ultra')` which returned `availableProviders[0]` — the highest-ranked provider — which is **Claude again**. Result: Claude used for both Supervisor and Worker, burning $0.75 on a single build with no diversity benefit.
+
+**Root cause — two bugs in `routingService.ts` + `route.ts`:**
+1. `getProviderForTier()` had no `excludeSupervisor` param — it could return the same provider as the supervisor.
+2. The worker tier was not capped — `ultra` (supervisor-only tier) was passed through to `getProviderForTier`, returning the top-ranked provider (same as supervisor).
+
+**Fix — `redivivus-backend/src/lib/ai/routingService.ts`:**
+- Added `excludeSupervisor?: string` param to `getProviderForTier()`.
+- Worker tier capped at `pro` internally — if `ultra` is requested, effective tier is `pro`.
+- Provider selection now filters out `excludeSupervisor` before ranking.
+
+**Fix — `redivivus-backend/src/app/api/v1/build/route.ts`:**
+- Dynamic worker delegation now passes `supervisorProvider` as the exclude param.
+- Logs effective tier so it's visible in server output when the cap applies.
+- Graceful fallback message when only one provider is available (same-provider unavoidable).
+
+**Expected behavior after fix:** With Claude as Supervisor, dynamic delegation for any tier assigns Gemini (rank 2) as Worker. Claude's expensive Opus model is used only for the prescription phase.
+
+**Risk:** None. `selectSupervisorAndWorker` (initial assignment) was already correct — it always returned the second-ranked provider. Only the dynamic override path was broken.
+
+---
+
 ## Session 16Q — Jun 5, 2026: Proactive model health checks — auto-detect deprecated/renamed models
 
 **Problem:** When AI providers deprecate or rename models (as Anthropic did with `claude-sonnet-4`), builds fail silently with cryptic 400 errors and the system falls back to a lesser model without warning. This happened repeatedly and required manual code edits to fix.

@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* Jun 5, 2026 — Session 16Q: added proactive model health checks to backend (modelHealthCheck.ts) — probes each provider's models at build time, auto-falls back on deprecation/rename. Two-layer protection: proactive probe + reactive retry in executor.ts — panel auto-opens before SecretStorage async reads finish; added `onSecretKeyStoreReady` callback to `secretKeyStore.ts` that invalidates roster cache and refreshes panel after init completes
+*Last updated:* Jun 5, 2026 — Session 16R: fixed worker being assigned same provider as supervisor when Supervisor requests ultra tier — added excludeSupervisor param to getProviderForTier, capped worker tier at pro to backend (modelHealthCheck.ts) — probes each provider's models at build time, auto-falls back on deprecation/rename. Two-layer protection: proactive probe + reactive retry in executor.ts — panel auto-opens before SecretStorage async reads finish; added `onSecretKeyStoreReady` callback to `secretKeyStore.ts` that invalidates roster cache and refreshes panel after init completes
 
 ---
 
