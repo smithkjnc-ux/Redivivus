@@ -35,8 +35,11 @@ tar -xzf "$TMPDIR/vscodium.tar.gz" -C "$TMPDIR/vscodium"
 
 echo "▶  Replacing VSCode-linux-x64 base..."
 rm -rf "$BUILD_DIR/VSCode-linux-x64"
-mv "$TMPDIR/vscodium/VSCodium-linux-x64" "$BUILD_DIR/VSCode-linux-x64" 2>/dev/null || \
-mv "$TMPDIR/vscodium"/* "$BUILD_DIR/VSCode-linux-x64"
+if [ -d "$TMPDIR/vscodium/VSCodium-linux-x64" ]; then
+  mv "$TMPDIR/vscodium/VSCodium-linux-x64" "$BUILD_DIR/VSCode-linux-x64"
+else
+  mv "$TMPDIR/vscodium" "$BUILD_DIR/VSCode-linux-x64"
+fi
 
 echo "▶  Injecting Redivivus extension..."
 EXT_SRC="$BUILD_DIR/dev/redivivus"
