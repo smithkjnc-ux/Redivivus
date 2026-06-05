@@ -3,7 +3,7 @@
 
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import type { GuardianReviewResult } from './guardianAI.js';
-import { selectGuardianAI, runGuardianReview } from './guardianAI.js';
+import { selectGuardianAI } from './guardianAI.js';
 import type { RoutingService } from './routingService.js';
 import { logAICall } from './aiCallLogger.js';
 
@@ -184,14 +184,50 @@ export async function guardianReviewImpl(
   // [DEAD] Was: default tier (flash/haiku) — cheap model produced vague style critiques that
   // wasted 4-6 retry calls, costing MORE than one pro-tier guardian call.
   const startTime = Date.now();
-  const caller = (ai: string, prompt: string) => callProvider(ai, prompt, fetch, 'pro');
-  const result = await runGuardianReview(originalTask, workerResponse, workerAI, guardianAI, blueprintContext, caller);
-  logAICall({
-    role: 'guardian',
-    model: guardianAI,
-    prompt: `TASK: ${originalTask}\n\nWORKER (${workerAI}) OUTPUT:\n${workerResponse}`,
-    response: JSON.stringify({ passed: result.passed, issues: result.issues, scopeAlerts: result.scopeAlerts }),
-    durationMs: Date.now() - startTime,
-  });
-  return result;
+  
+  // Call backend Guardian API to secure the "secret sauce" prompt
+  try {
+    const base = require('../api/apiClient.js').getApiBase();
+    const token = await require('../api/apiClient.js').getAccountToken();
+    const fetchFn = (svc as any).fetchWithTimeout;
+    
+    const res = await fetchFn(`${base}/guardian`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        task: originalTask,
+        workerResponse,
+        blueprintContext,
+        provider: guardianAI,
+        model: guardianAI, // the backend resolves the tier
+        keys: keyMap
+      })
+    }, 50_000);
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Guardian API failed');
+
+    const raw = data.text;
+    const isPass = raw.includes('GUARDIAN_PASS');
+    const issuesMatch = raw.match(/GUARDIAN_ISSUES:([\s\S]*?)(?:GUARDIAN_SCOPE_ALERTS:|$)/);
+    const scopeMatch = raw.match(/GUARDIAN_SCOPE_ALERTS:([\s\S]*?)$/);
+
+    const issues = issuesMatch ? issuesMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
+    const scopeAlerts = scopeMatch ? scopeMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
+
+    const result = { passed: isPass && issues.length === 0, correctedText: null, issues, scopeAlerts, guardianAI, workerAI };
+
+    logAICall({
+      role: 'guardian',
+      model: guardianAI,
+      prompt: `[Secure Backend Prompt] TASK: ${originalTask}`,
+      response: JSON.stringify({ passed: result.passed, issues: result.issues, scopeAlerts: result.scopeAlerts }),
+      durationMs: Date.now() - startTime,
+    });
+    return result;
+  } catch (e: any) {
+    console.error('Guardian review failed:', e);
+    // Fail-open if backend is unreachable
+    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
+  }
 }

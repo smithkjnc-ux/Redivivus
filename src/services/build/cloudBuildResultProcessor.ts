@@ -15,8 +15,23 @@ export async function processBuildResults(
   task: string,
   root: string,
   deps: BuildRequestDeps,
-  meta: BuildMeta = { source: 'cloud' },
+  meta: BuildMeta & { overrideResponseText?: string; supervisor?: any; workerProvider?: string } = { source: 'cloud' },
 ): Promise<CloudBuildResult> {
+  // If the cloud streamed the raw text back, we must extract the files locally
+  if (meta.overrideResponseText && data.files.length === 0) {
+    const codeBlockRegex = /```(\w+)?\s*(?:path:\s*(.*?)\s*\n)?([\s\S]*?)```/g;
+    let match;
+    while ((match = codeBlockRegex.exec(meta.overrideResponseText)) !== null) {
+      const [, language, path, content] = match;
+      if (path && content) {
+        data.files.push({ path: path.trim(), content: content.trim(), isNew: true });
+      } else if (content) {
+        // Fallback for missing path
+        const ext = language === 'javascript' ? 'js' : (language === 'html' ? 'html' : 'ts');
+        data.files.push({ path: `generated.${ext}`, content: content.trim(), isNew: true });
+      }
+    }
+  }
   // Ensure .redivivus/ structure exists — always, even for single-file builds.
   // scaffoldAt is idempotent: it skips files that already exist.
   if (!fs.existsSync(path.join(root, '.redivivus', 'config.json'))) {

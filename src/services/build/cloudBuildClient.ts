@@ -9,7 +9,6 @@ import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { VaultService } from '../vault/vaultService';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
 import { executeMultiFileBuild } from './cloudBuildMultiFile.js';
-import { runTwoPhaseBuild } from './cloudBuildClientAI.js';
 
 export interface CloudBuildResult {
   success: boolean
@@ -121,54 +120,48 @@ export async function callCloudBuild(
       return { success: false, error: errMsg, failureSource: 'cloud' };
     }
 
-    const instructions = await instructionRes.json() as {
-      supervisorInstructions: {
-        selectedProvider: string; model: string; prompt: string; systemMessage: string; maxTokens: number;
-      } | null;
-      workerInstructions: {
-        selectedProvider: string; fallbackProviders: string[]; model: string; promptTemplate: string;
-        systemMessage: string; maxTokens: number; temperature: number;
-      };
-      context: any;
-      requiresClientExecution: boolean;
-    };
-
-    // Step 2: Two-phase execution — supervisor writes prescription, worker builds from it.
-    // [FIX] Capture the Supervisor outcome (model, tokens, success/error) so it can be attributed
-    // downstream. Previously this block ran the Supervisor but threw its identity and tokens away,
-    // so Claude always showed 0 tokens and the byline always said "solo / primary builder".
-    const { aiResponse, supervisor } = await runTwoPhaseBuild(instructions, keys, opts.onProgress, opts.onChunk);
-    if (!aiResponse.success) {
-      return { success: false, error: aiResponse.error || 'AI call failed', failureSource: 'cloud' };
+    // Step 2: Read SSE Stream directly from backend
+    // The backend now executes the AI securely to protect proprietary prompts.
+    if (!instructionRes.body) {
+      throw new Error('No response body from build API');
     }
 
-    // Step 3: Send AI response back to backend for processing
-    // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
-    const completionRes = await Promise.race([
-      fetch(`${base}/build/complete`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify({ task, aiResponse: aiResponse.text, model: aiResponse.model, context: instructions.context }) }),
-      makeTimeout(120_000, 'Build completion'),
-    ]);
-
-    if (!completionRes.ok) {
-      if (completionRes.status === 401) {
-        const { clearAccountToken } = await import('../api/apiClient.js');
-        await clearAccountToken();
-        vscode.commands.executeCommand('redivivus.refreshChat');
-      }
-      const err = await completionRes.json().catch(() => ({ error: completionRes.statusText })) as any;
-      return { success: false, error: err.error || `Build completion API ${completionRes.status}`, failureSource: 'cloud' };
+    const reader = instructionRes.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let fullText = '';
+    
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      fullText += chunk;
+      opts.onChunk?.(chunk);
     }
 
-    const data = await completionRes.json() as {
-      files: Array<{ path: string; content: string; isNew: boolean }>
-      narration: string; model: string; inputTokens: number; outputTokens: number;
+    const supervisorMetaRaw = instructionRes.headers.get('X-Supervisor-Meta');
+    const workerProvider = instructionRes.headers.get('X-Worker-Provider') || preferred || 'claude';
+    
+    let supervisor: any = { ran: false, error: '' };
+    if (supervisorMetaRaw) {
+      try { supervisor = JSON.parse(supervisorMetaRaw); } catch {}
+    }
+
+    // Step 3: Parse the streamed code blocks into files locally
+    const aiResponse = { text: fullText, model: workerProvider, success: true };
+    const data = {
+      files: [], // Extracted by processBuildResults
+      narration: '',
+      model: workerProvider,
+      inputTokens: 0,
+      outputTokens: Math.ceil(fullText.length / 4)
     };
 
     const built = await processBuildResults(data, task, root, deps, {
       source: 'cloud',
-      vaultItemNames: context.vaultItems?.map(v => v.name),
+      vaultItemNames: context.vaultItems?.map((v: any) => v.name),
       supervisor,
-      workerProvider: instructions.workerInstructions.selectedProvider,
+      workerProvider,
+      overrideResponseText: fullText
     });
     // Attach two-phase attribution so the build runner can render an honest Supervisor + Worker byline.
     return {
@@ -179,7 +172,7 @@ export async function callCloudBuild(
       supervisorInputTokens: supervisor.inputTokens,
       supervisorOutputTokens: supervisor.outputTokens,
       supervisorError: supervisor.error,
-      workerProvider: instructions.workerInstructions.selectedProvider,
+      workerProvider: workerProvider,
     };
 
   } catch (err: any) {

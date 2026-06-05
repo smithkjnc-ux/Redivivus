@@ -5,7 +5,6 @@
 // Guardian should always be the "better" (more capable) AI, not the same as the worker.
 
 import * as vscode from 'vscode';
-import { buildGuardianPrompt } from './guardianAIPrompt.js';
 
 export interface GuardianReviewResult {
   passed: boolean;
@@ -77,52 +76,4 @@ export function guardianEnabled(keyMap: Record<string, () => string | null>): bo
   return keysSet >= 1;
 }
 
-/** Run guardian review. Returns corrected text or null if passed. */
-export async function runGuardianReview(
-  originalTask: string,
-  workerResponse: string,
-  workerAI: string,
-  guardianAI: string,
-  blueprintContext: string,
-  callProvider: (ai: string, prompt: string) => Promise<{ text: string; success: boolean; inputTokens?: number; outputTokens?: number }>
-): Promise<GuardianReviewResult> {
-  const isSoloMode = guardianAI === workerAI;
-  const prompt = buildGuardianPrompt(originalTask, workerResponse, blueprintContext, workerAI, isSoloMode);
 
-  let reviewText = '';
-  let inputTokens: number | undefined;
-  let outputTokens: number | undefined;
-  try {
-    const res = await callProvider(guardianAI, prompt);
-    if (!res.success) {
-      return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI, workerAI };
-    }
-    reviewText = res.text.trim();
-    inputTokens = res.inputTokens;
-    outputTokens = res.outputTokens;
-  } catch {
-    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI, workerAI };
-  }
-
-  // GUARDIAN_PASS — no issues, no scope violations
-  if (reviewText.startsWith('GUARDIAN_PASS')) {
-    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI, workerAI, inputTokens, outputTokens };
-  }
-
-  // Parse issues and scope alerts — Guardian never returns corrected code, only review feedback
-  const issues: string[] = [];
-  const scopeAlerts: string[] = [];
-
-  const issueMatch = reviewText.match(/GUARDIAN_ISSUES:\n([\s\S]*?)(?=GUARDIAN_SCOPE_ALERTS:|$)/);
-  if (issueMatch) { issues.push(...issueMatch[1].trim().split('\n').map(l => l.replace(/^[-*\d.]+\s*/, '').trim()).filter(Boolean)); }
-
-  const scopeMatch = reviewText.match(/GUARDIAN_SCOPE_ALERTS:\n([\s\S]*?)(?=$)/);
-  if (scopeMatch) { scopeAlerts.push(...scopeMatch[1].trim().split('\n').map(l => l.replace(/^[-*\d.]+\s*/, '').trim()).filter(Boolean)); }
-
-  // Scope alerts only (no real bugs) — pass through and surface alerts to user
-  if (issues.length === 0) {
-    return { passed: true, correctedText: null, issues: [], scopeAlerts, guardianAI, workerAI, inputTokens, outputTokens };
-  }
-
-  return { passed: false, correctedText: null, issues, scopeAlerts, guardianAI, workerAI, inputTokens, outputTokens };
-}

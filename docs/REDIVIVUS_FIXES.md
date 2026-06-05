@@ -5,6 +5,19 @@
 
 ---
 
+## Session — Jun 5, 2026: Migration of AI Orchestration to Backend
+
+**Problem:** Sensitive orchestration logic, secret rule definitions, and proprietary "secret sauce" prompts were exposed in the client-side VS Code extension codebase. This posed a security risk of prompt theft and tampering, and made it difficult to iterate on the orchestration engine without forcing an extension update.
+
+**Fix — Migrated core agentic orchestration to `redivivus-backend`:**
+- Centralized all agentic task execution into the `POST /api/v1/execute` endpoint.
+- Added specialized prompt types (`agent-orchestrator`, `agent-supervisor`, `fix-supervisor`, `fix-worker`) to the backend, ensuring sensitive orchestration rules are strictly server-side.
+- Removed proprietary Redivivus prompt logic from the client-side `guardianAIPrompt.ts`, `redivivusWorkerRules.ts`, `agentSupervisor.ts`, `agentService.ts`, and `chatPanelMsgFixPhases.ts`, replacing them with generic fallback rules.
+- Moved `prescriptions.json` to the backend.
+- Refactored `cloudBuildClient.ts` to consume SSE streams directly from the backend API instead of executing AI calls client-side.
+
+**Risk:** Low — AI connectivity is now fully dependent on the cloud backend, but this was already the architectural direction. Fallbacks exist but produce degraded (standard AI) results.
+
 ## Session — Jun 4, 2026: Cloudflare OpenNext Admin Crash Fix (Missing Public Vars)
 
 **Problem:** The admin dashboard was crashing on Cloudflare Pages/Workers (`redivivus.dev/admin/users`) with "This page couldn't load" despite successful builds. The previous date-handling SSR fix did not resolve it because the root cause was an environment variable issue.

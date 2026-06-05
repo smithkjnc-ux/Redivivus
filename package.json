@@ -622,7 +622,7 @@
   },
   "scripts": {
     "vscode:prepublish": "tsc -p ./",
-    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && cp src/data/prescriptions.json out/data/prescriptions.json && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
+    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
     "package": "npm run compile && vsce package --no-dependencies",
     "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
     "watch": "tsc -watch -p ./",

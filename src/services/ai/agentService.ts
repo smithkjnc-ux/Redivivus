@@ -10,6 +10,7 @@ import { getAllTools, callTool } from '../mcpService.js';
 import { BuildLedger } from '../build/buildLedgerService.js';
 import { extractAgentThought, narrateTool, friendlyModelName } from './agentNarrator.js';
 import { runSupervisorPreplanning } from './agentSupervisor.js';
+import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
   success: boolean;
@@ -36,25 +37,7 @@ export async function executeAgentTask(
     ).join('\n\n');
   }
 
-  let history = `You are Redivivus Agent Mode, a highly capable autonomous software engineer.
-You have access to a set of tools to read files, write code, run terminal commands, and ask the user questions.
-You must solve the user's task by thinking step-by-step and using these tools.
-
-CRITICAL RULES FOR Redivivus AGENT:
-1. ZERO MANUAL INSTRUCTIONS. You are strictly forbidden from writing "How-To" guides, checklists, or telling the user to "Go to", "Open", or "Run" anything. 
-2. AUTOMATE EVERYTHING. If the user asks for something to be runnable, installed, or deployed, YOU MUST use the \`run_command\` tool or write a setup script. You are an autonomous agent, not a chat bot.
-3. NO HALLUCINATIONS. Do not claim that files, folders (like 'dist/'), or executables exist unless you have actively verified them or created them yourself using tools.
-4. NEVER GUESS FILE PATHS. Always use \`list_dir\` or \`search_code\` to verify the exact path of the files you intend to modify before using \`write_file\`.
-5. Be concise in your final answer. The user wants results, not a wall of text.
-6. VERIFY YOUR WORK (MANDATORY RUNTIME TESTING). You are strictly forbidden from declaring "the fix is complete" or outputting your final answer unless you have actually executed a command via \`run_command\` that tests and proves the system works. If you wrote or edited code, run a test script, compile script, or start the server. You MUST explicitly cite the exact command you ran and the resulting command output in your final answer as proof. If you do not run a command to verify your work, your solution is incomplete and invalid.
-7. DIAGNOSE BEFORE FIXING. Read the relevant files FIRST. Understand the actual root cause before proposing a fix. If the user says "X doesn't work" and you add defensive null checks without finding the real bug, you have failed.
-8. BROWSER PROJECTS. If the project uses ES modules (\`<script type="module">\`), it MUST be served via HTTP, not opened from \`file://\`. If you run a server (e.g. \`python3 -m http.server\`), you MUST run it in the background and detach output to prevent freezing your session: \`python3 -m http.server 8000 > server.log 2>&1 &\`.
-9. PROPER WEB STRUCTURE. If you create an \`.html\` file, it MUST contain a valid, fully-formed HTML5 structure (\`<!DOCTYPE html><html><body>...\`). DO NOT just write raw JavaScript or CSS directly into an \`.html\` file.
-10. NO FLAT FILES. Every file lives in a folder that matches its responsibility — UI in UI, logic in logic, and so on. This applies to projects Redivivus builds and to Redivivus itself. No exceptions.
-11. ACTUALLY WRITE THE CODE. If the user asks you to build an app, game, or project, you MUST use the \`write_file\` tool to create the actual source files. Do NOT just output a text description, markdown checkboxes, or a plan of the project in your final answer. The user expects a working, runnable project in their workspace.
-12. DO NOT USE ask_user WHEN A SUPERVISOR PRESCRIPTION IS PROVIDED. The prescription already resolves all ambiguity. If you see "SUPERVISOR PRESCRIPTION" below, implement it directly -- no questions, no choices presented to the user.
-
-AVAILABLE TOOLS:
+  let history = `AVAILABLE TOOLS:
 ${getToolInstructions()}${mcpInstructions}
 
 HOW TO USE A TOOL:
@@ -80,8 +63,6 @@ TASK: ${task}
 PROJECT CONTEXT:
 ${context}
 
-${Redivivus_WORKER_RULES}
-
 Begin. Think step-by-step.`;
 
   const ledger = new BuildLedger();
@@ -96,10 +77,37 @@ Begin. Think step-by-step.`;
   }
 
   onUpdate('🧠 **Autonomous Agent** spinning up — analysing your task and preparing a plan...');
+  const base = require('../api/apiClient.js').getApiBase();
+  const token = await require('../api/apiClient.js').getAccountToken();
+  const keyMap = routing.getKeyMap();
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
-    const res: AIResponse = await routing.prompt(history, 60_000, undefined, undefined, undefined, `agent-iter-${iterations}`);
+    
+    // Use secure backend endpoint for agent iterations
+    let res: AIResponse;
+    try {
+      const fetchFn = (routing as any).fetchWithTimeout;
+      const apiRes = await fetchFn(`${base}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          provider: supervisor, // using supervisor AI for agent loop
+          model: supervisor,
+          keys: keyMap,
+          promptType: 'agent-orchestrator',
+          prompt: history,
+          maxTokens: 4000,
+          temperature: 0.1
+        })
+      }, 60_000);
+      
+      const data = await apiRes.json();
+      if (!apiRes.ok) throw new Error(data.error || 'Agent execute failed');
+      res = { text: data.text, success: true, model: supervisor, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
+    } catch (e: any) {
+      res = { text: '', success: false, error: e.message, model: supervisor };
+    }
     
     // Track tokens for this iteration
     const inTok = res.inputTokens || 0;
