@@ -57,6 +57,19 @@ export async function runBuildAfterGates(
       return;
     }
   }
+  // [FIX] If the project was just created (no workspace open), the user can't see the files being built.
+  // We automatically pop open the session log file in a split editor so they can watch the AI logs in real-time.
+  if (autoCreated) {
+    try {
+      const { getCurrentSession } = require('../../services/logging/redivivusLogger.js');
+      const session = getCurrentSession();
+      if (session.logFile) {
+        setTimeout(() => {
+          vscode.commands.executeCommand('vscode.open', vscode.Uri.file(session.logFile), { preview: false, viewColumn: vscode.ViewColumn.Beside });
+        }, 1000);
+      }
+    } catch {}
+  }
 
   // Show which files are being read before building starts
   const existingFileList = (() => {
