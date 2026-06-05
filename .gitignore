@@ -3,6 +3,9 @@ dist
 node_modules
 .vscode-test/
 *.vsix
+tmp-binaries/
+tmp-ide/
+scratch-*.js
 
 # Redivivus session data (blueprints and logs are tracked)
 .redivivus/sessions/
