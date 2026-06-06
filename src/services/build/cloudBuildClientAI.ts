@@ -111,6 +111,8 @@ export async function runTwoPhaseBuild(
     };
     const supRes = await executeClientAI(supRouting, si.prompt, keys);
     console.log(`[Redivivus] Supervisor: provider=${si.selectedProvider} model=${si.model} success=${supRes.success} textLen=${supRes.text?.length ?? 0} error=${supRes.error ?? 'none'}`);
+    // [trace] Mirror to the debug log so one `tail -f ~/redivivus_debug.log` captures the full build path.
+    try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[buildtrace] supervisor nominal=${si.model} actualRan=${supRes.model} provider=${si.selectedProvider} success=${supRes.success} in=${supRes.inputTokens ?? '?'} out=${supRes.outputTokens ?? '?'} err=${supRes.error ?? 'none'}\n`); } catch {}
     if (supRes.success && supRes.text.trim().length > 50) {
       // [SCOPE] Adaptive Orchestration — parse Supervisor's complexity assessment
       const complexityMatch = supRes.text.match(/\[COMPLEXITY:\s*(HIGH|STANDARD)\]/i);
@@ -122,7 +124,11 @@ export async function runTwoPhaseBuild(
       workerPrompt = workerPrompt.replace('{{PRESCRIPTION}}', cleanedPrescription);
       supervisor.ran = true;
       supervisor.provider = si.selectedProvider;
-      supervisor.model = si.model;            // model ID the Supervisor ran on (matches what executeClaude selects for 'pro')
+      // [FIX] Record the model the provider ACTUALLY ran (supRes.model), not the nominal si.model.
+      // claudeProvider selects its model from `tier` (here 'pro' -> claude-sonnet-4-6) and ignores
+      // si.model, so si.model was often 'claude-opus-4-8' while the real call was Sonnet. That made the
+      // byline lie ("Opus 4.8") AND over-reported cost ~5x (Sonnet tokens priced at Opus $15/$75 rates).
+      supervisor.model = supRes.model || si.model;
       supervisor.inputTokens = supRes.inputTokens;
       supervisor.outputTokens = supRes.outputTokens;
 
@@ -146,6 +152,8 @@ export async function runTwoPhaseBuild(
   }
 
   const aiResponse = await executeClientAI(instructions.workerInstructions, workerPrompt, keys, onChunk);
+  // [trace] Worker provider/model + actual model that ran + token spend.
+  try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[buildtrace] worker nominal=${instructions.workerInstructions.selectedProvider}/${instructions.workerInstructions.model} actualRan=${aiResponse.model} success=${aiResponse.success} in=${aiResponse.inputTokens ?? '?'} out=${aiResponse.outputTokens ?? '?'} err=${aiResponse.error ?? 'none'}\n`); } catch {}
   return { aiResponse, supervisor };
 }
 

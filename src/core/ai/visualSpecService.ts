@@ -108,5 +108,5 @@ export async function orchestrateVisualSpec(
   // Strategy 3: defaults + infer feel from request
   const feel = await inferFeel(text, routing);
   const spec: VisualSpec = { palette: DEFAULT_SPEC.palette, typography: DEFAULT_SPEC.typography, spacing: DEFAULT_SPEC.spacing, feel, confidence: 0.4, source: 'defaulted', referenceComponents: [] };
-  return { spec, statusMsg: "New project -- I'll use clean defaults. You can tune the look after I build, or tell me a style direction now." };
+  return { spec, statusMsg: "Using clean defaults for styling — you can tune the look after I build, or describe a style direction now." };
 }

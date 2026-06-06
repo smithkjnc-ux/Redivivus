@@ -16,6 +16,35 @@ async function openPanel(args: ShowArgs, delayMs = 800, innerDelayMs = 400): Pro
   await new Promise(r => setTimeout(r, innerDelayMs));
 }
 
+// [FIX] Resolve once SecretStorage keys have loaded so a resumed build uses the real roster
+// (Claude supervisor) instead of the stale pre-init default. Times out after 8s so a failed/slow
+// key init never hangs the build forever — it proceeds with whatever keys are available by then.
+async function awaitKeysReady(timeoutMs = 8000): Promise<void> {
+  try {
+    const { onSecretKeyStoreReady } = await import('./services/ai/secretKeyStore.js');
+    await Promise.race([
+      new Promise<void>(resolve => onSecretKeyStoreReady(() => resolve())),
+      new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
+    ]);
+  } catch { /* non-blocking — proceed without gating */ }
+}
+
+// [FIX] Wait for whatever panel the deserializer or auto-open timer naturally produces, instead of
+// calling ChatPanel.show() ourselves — show() crashes on the deserializer sentinel and racing it
+// against the auto-open timer spawns a duplicate tab. Resolves with the live panel or undefined.
+async function waitForPanel(timeoutMs = 4000): Promise<any> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const cp = ChatPanel.currentPanel;
+    if (cp && !(ChatPanel as any)._isDeserializing) {
+      await new Promise(r => setTimeout(r, 200)); // let it settle
+      return ChatPanel.currentPanel;
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  return undefined;
+}
+
 export function resumePendingState(
   context: vscode.ExtensionContext,
   showArgs: ShowArgs,
@@ -28,36 +57,49 @@ export function resumePendingState(
     if (rescuedConv && rescuedConv.length > 0) {
       context.globalState.update('redivivus.pendingRescueConversation', undefined);
       (async () => {
-        await openPanel(showArgs, 100, 400);
-        if (ChatPanel.currentPanel) {
-          const conv = ChatPanel.currentPanel.getConversation();
+        const cp = await waitForPanel();
+        if (cp) {
+          const conv = cp.getConversation();
           conv.splice(0, conv.length, ...rescuedConv);
-          (ChatPanel.currentPanel as any).refresh();
+          cp.refresh();
         }
       })();
     }
     return;
   }
 
-  // ── resume build task after extension reload (updateWorkspaceFolders 0→1 folder causes restart) ──
-  // [FIX] Saved by onNewProject BEFORE updateWorkspaceFolders so the task survives the reload.
+  // ── resume build task after reload (openFolder / updateWorkspaceFolders 0→1 restarts the host) ──
+  // [FIX] Saved by onNewProject and the auto-create build path BEFORE the reload so the task survives.
+  // The auto-create path opens the folder FIRST so the Explorer shows the scaffold and files appear
+  // live as the resumed build writes them.
   const pendingResumeRaw = context.globalState.get<string>('redivivus.pendingResumeTask');
   if (pendingResumeRaw) {
     context.globalState.update('redivivus.pendingResumeTask', undefined);
     try {
       const { task, projectRoot } = JSON.parse(pendingResumeRaw);
       (async () => {
-        await openPanel(showArgs, 100, 400);
-        if (ChatPanel.currentPanel) {
-          // [FIX] Restore chat history wiped by the window reload
+        // Focus the Explorer so the user watches files appear as the resumed build writes them.
+        vscode.commands.executeCommand('workbench.view.explorer').then(undefined, () => {});
+        const cp = await waitForPanel();
+        if (cp) {
+          // Restore chat history wiped by the window reload
           const rescuedConv = context.globalState.get<any[]>('redivivus.pendingRescueConversation');
           if (rescuedConv && rescuedConv.length > 0) {
              context.globalState.update('redivivus.pendingRescueConversation', undefined);
-             const conv = ChatPanel.currentPanel.getConversation();
+             const conv = cp.getConversation();
              conv.splice(0, conv.length, ...rescuedConv);
-             (ChatPanel.currentPanel as any).refresh();
+             cp.refresh();
           }
-          ChatPanel.currentPanel.resumeBuildTask(task, projectRoot);
+          // [FIX] Wait for SecretStorage keys to load BEFORE resuming — otherwise the build runs
+          // with the stale pre-init roster (Gemini +2) instead of the real key set (Claude +5),
+          // and the Supervisor call fails (400 / missing key) producing a 0-file "built solo" result.
+          // Invalidate the roster cache after keys load so the right models are selected.
+          await awaitKeysReady();
+          try {
+            const { invalidateRosterCache } = await import('./services/ai/routingServiceRoster.js');
+            invalidateRosterCache();
+          } catch { /* non-blocking */ }
+          cp.resumeBuildTask(task, projectRoot);
         }
       })();
     } catch { /* ignore parse errors from stale entries */ }

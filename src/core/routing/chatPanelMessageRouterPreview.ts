@@ -9,12 +9,13 @@ import { BuildHistoryService } from '../../services/build/buildHistoryService';
 import { handleRearrangeStart, handleRearrangeMove, handleRearrangeFinish, handleRearrangeUndo, stripRearrangeMarkers } from './chatPanelMessageRouterRearrange';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getActiveProjectRoot } from '../../services/project/activeProjectRoot';
 
 export async function handlePreviewMessages(panel: any, msg: any): Promise<boolean> {
   const _panel = (panel as any)._panel;
 
   if (msg.type === 'start-preview') {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = getActiveProjectRoot(panel);
     if (!root) {
       _panel.webview.postMessage({ type: 'preview-error', message: 'No project folder open.' });
       return true;
@@ -59,7 +60,7 @@ export async function handlePreviewMessages(panel: any, msg: any): Promise<boole
   if (msg.type === 'rearrange-undo') return handleRearrangeUndo(panel, msg);
 
   if (msg.type === 've-open-request') {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = getActiveProjectRoot(panel);
     if (!root) { return true; }
     let builtFiles: string[] = [];
     try { const h = new BuildHistoryService(root); const last = h.list()[0]; builtFiles = last?.files ?? []; } catch {}
@@ -72,7 +73,7 @@ export async function handlePreviewMessages(panel: any, msg: any): Promise<boole
   }
 
   if (msg.type === 'visual-apply-all') {
-    const root = msg.projectRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = msg.projectRoot || getActiveProjectRoot(panel);
     if (!root || !msg.pending) { return true; }
     let builtFiles: string[] = [];
     try { const h = new BuildHistoryService(root); const last = h.list()[0]; builtFiles = last?.files ?? []; } catch {}

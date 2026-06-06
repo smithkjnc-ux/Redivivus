@@ -72,14 +72,10 @@ export class ChatPanel {
     this.usageTracker = usageTracker;
     this._panel = panel;
     this.loadBlueprintContext();
-    // [FIX] Skip restoring old conversation when a new project was just opened.
-    // The open-workspace-btn handler sets this flag before vscode.openFolder reloads the window.
-    const skipRestore = ChatPanel.extensionContext?.globalState.get<boolean>('redivivus.skipConversationRestore');
-    if (skipRestore) {
-      ChatPanel.extensionContext?.globalState.update('redivivus.skipConversationRestore', undefined);
-    } else {
-      restoreConversation(this);
-    }
+    // restoreConversation handles, in priority order: (1) a build's rescued conversation stashed across
+    // an openFolder reload (restored synchronously so the panel opens already populated — no launcher
+    // flash), (2) skipConversationRestore for a fresh project, (3) the saved per-project history.
+    restoreConversation(this);
     if (this.state.conversation.length === 0) { loadLastSessionContext(this.redivivus, this.state.conversation); }
     this._panel.webview.options = { enableScripts: true };
     this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('../../../core/routing/chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
@@ -87,9 +83,11 @@ export class ChatPanel {
     // [Redivivus] Rebuild full HTML when workspace folder changes — clear old conversation so new project starts fresh
     // [FIX] suppressConversationClear: build pipeline sets this so result card survives the folder add.
     this._disposables.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
+      // [FIX] Check synchronous flag first — globalState is async and loses the race
+      const suppressSync = ChatPanel.suppressAutoOpen;
       const suppress = ChatPanel.extensionContext?.globalState.get<boolean>('redivivus.suppressConversationClear');
       ChatPanel.extensionContext?.globalState.update('redivivus.suppressConversationClear', undefined);
-      if (!suppress) { this.state.conversation = []; try {
+      if (!suppressSync && !suppress) { this.state.conversation = []; try {
         const newRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         if (newRoot && ChatPanel.extensionContext) { const { chatHistoryKey } = require('./chatPanelPublicAPI.js'); ChatPanel.extensionContext.globalState.update(chatHistoryKey(newRoot), undefined); }
       } catch {} }

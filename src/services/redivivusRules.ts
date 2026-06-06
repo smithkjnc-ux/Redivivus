@@ -5,32 +5,21 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Blueprint } from '../types/index.js';
 import type { RedivivusPaths } from './project/redivivusPaths.js';
+import { writeEnabledShims } from './editorRuleFiles.js';
 
 export function generateRules(paths: RedivivusPaths, projectName: string, blueprint: Blueprint, targetPath?: string): void {
   const root = targetPath || paths.getWorkspaceRoot();
   if (!root) {return;}
 
+  // Canonical rules — always written. Redivivus reads these directly; they are the source of truth.
   const rulesPath = path.join(root, '.redivivus', 'rules.md');
   const rules = buildRulesContent(projectName, blueprint);
   fs.writeFileSync(rulesPath, rules);
 
-  // Write FULL rules into every shim — not just a pointer.
-  // This ensures Windsurf, Cursor, Claude Code, Copilot, and any other
-  // AI editor reads and follows these rules even if Redivivus is not installed.
-  const shims: { file: string; content: string }[] = [
-    { file: '.cursorrules',                    content: rules },
-    { file: '.windsurfrules',                  content: rules },
-    { file: 'CLAUDE.md',                       content: `# CLAUDE.md — ${projectName}\n\n${rules}` },
-    { file: 'GEMINI.md',                       content: `# GEMINI.md — ${projectName}\n\n${rules}` },
-    { file: '.clinerules',                     content: rules },
-    { file: '.github/copilot-instructions.md', content: rules },
-  ];
-  for (const shim of shims) {
-    const shimPath = path.join(root, shim.file);
-    const shimDir = path.dirname(shimPath);
-    if (!fs.existsSync(shimDir)) { fs.mkdirSync(shimDir, { recursive: true }); }
-    fs.writeFileSync(shimPath, shim.content);
-  }
+  // AI-editor shims (CLAUDE.md, .cursorrules, etc.) are OFF by default — only the editors the user
+  // opted into (redivivus.editorRuleFiles) are written, so we don't litter projects with files for
+  // editors they don't use. Configure via "Redivivus: Configure Editor Rule Files".
+  writeEnabledShims(root, rules, projectName);
 }
 
 function buildRulesContent(projectName: string, blueprint: Blueprint): string {

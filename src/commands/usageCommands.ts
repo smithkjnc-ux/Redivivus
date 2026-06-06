@@ -6,6 +6,7 @@ import type { UsageTracker} from '../services/usageTracker.js';
 import { UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
 import type { RoutingService } from '../services/ai/routingService.js';
 import { showInChatPanel } from '../services/chatPanelContent.js';
+import { getActiveProjectRoot } from '../services/project/activeProjectRoot.js';
 
 export function registerUsageCommands(context: vscode.ExtensionContext, usageTracker: UsageTracker, routing?: RoutingService): void {
   // View Usage Report (in separate panel)
@@ -33,7 +34,8 @@ export function registerUsageCommands(context: vscode.ExtensionContext, usageTra
   // View Project Usage Report (in separate panel)
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.viewProjectUsage', async () => {
-      const projectName = vscode.workspace.workspaceFolders?.[0] ? require('path').basename(vscode.workspace.workspaceFolders[0].uri.fsPath) : undefined;
+      const _projRoot = getActiveProjectRoot();
+      const projectName = _projRoot ? require('path').basename(_projRoot) : undefined;
       if (!projectName) {
         vscode.commands.executeCommand('redivivus.viewUsage');
         return;

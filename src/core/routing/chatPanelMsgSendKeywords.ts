@@ -87,11 +87,12 @@ export async function handleKeywordShortcuts(
     conversation.push({ role: 'assistant', content: 'Closing project...', timestamp: Date.now() });
     refresh();
     const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
-    // Clear conversation in-place + set the flag BEFORE the folder mutation, in case the window reloads.
-    if (ChatPanel.currentPanel) {
-      (ChatPanel.currentPanel as any).state.conversation = [];
-      (ChatPanel.currentPanel as any)._initialized = false;
-    }
+    // [FIX] Dispose the panel BEFORE removing workspace folders (matches redivivus.closeProject command).
+    // Removing the last folder from a single-folder workspace causes a full window reload. If the panel
+    // still exists at reload time, VS Code visually restores the orphaned tab and the deserializer +
+    // auto-open timer race to create panels → duplicate tabs. By disposing first, the serializer has
+    // nothing to restore and the auto-open timer creates exactly ONE fresh launcher panel.
+    ChatPanel.close();
     // [FIX] Synchronous marker survives the reload that removing the last folder triggers — the async
     // globalState flag below loses that race, which let the auto-open timer create a DUPLICATE panel.
     markProjectClosed();
@@ -101,13 +102,6 @@ export async function handleKeywordShortcuts(
     } else {
       await vscode.commands.executeCommand('workbench.action.closeFolder');
     }
-    // [FIX] Removing the last folder transitions folder->empty WITHOUT restarting the extension host
-    // in VSCodium, so onDidChangeWorkspaceFolders' refresh alone leaves the input spinner (set on send)
-    // spinning forever — the close "never finishes". Explicitly reset the input status and re-render to
-    // the launcher so the close completes whether or not the window reloads. (set-status:ready is the
-    // only thing that calls setInputBusy(false) in the webview — refresh() does not clear the spinner.)
-    panel.webview.postMessage({ type: 'set-status', status: 'ready' });
-    refresh();
     return true;
   }
 

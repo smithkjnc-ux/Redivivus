@@ -5,6 +5,7 @@
 import * as vscode from 'vscode';
 import type { GitHubBackupService } from '../services/githubBackupService.js';
 import { getHubHtml } from './setupHubHtml.js';
+import { getKeyCached } from '../services/ai/secretKeyStore.js';
 
 let _panel: vscode.WebviewPanel | undefined;
 
@@ -51,13 +52,15 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
   );
   _panel.onDidDispose(() => { _panel = undefined; });
 
+  // [FIX] Read keys from SecretStorage (via getKeyCached) — not settings.json. Keys were migrated
+  // to SecretStorage in the architecture audit; reading from cfg.get() always returned '' after that.
   const cfg = vscode.workspace.getConfiguration('redivivus');
-  const geminiKey    = cfg.get<string>('geminiApiKey') || '';
-  const openaiKey    = cfg.get<string>('openaiApiKey') || '';
-  const anthropicKey = cfg.get<string>('anthropicApiKey') || '';
-  const kimiKey      = cfg.get<string>('kimiApiKey') || '';
-  const groqKey      = cfg.get<string>('groqApiKey') || '';
-  const xaiKey       = cfg.get<string>('xaiApiKey') || '';
+  const geminiKey    = getKeyCached('gemini')    || '';
+  const openaiKey    = getKeyCached('openai')    || '';
+  const anthropicKey = getKeyCached('claude')    || '';
+  const kimiKey      = getKeyCached('kimi')      || '';
+  const groqKey      = getKeyCached('groq')      || '';
+  const xaiKey       = getKeyCached('xai')       || '';
   const githubCfg    = githubBackupService.getConfig();
   const hasGitHub    = await githubBackupService.isConnected();
   const hasAI        = !!(geminiKey || openaiKey || anthropicKey || kimiKey || groqKey || xaiKey);

@@ -21,24 +21,43 @@ export function buildHeaderInfo(
   assistMode?: boolean,
 ): ChatHeaderInfo {
   const available = routing.getAvailableAI();
-  const isInitialized = redivivus.isInitialized();
-  const config = isInitialized ? redivivus.loadConfig() : null;
+
+  // [FIX] Effective project root — the no-reload build flow shows the project in the Redivivus
+  // "Project Files" tree WITHOUT adding it to the VS Code workspace, so workspaceFolders is empty.
+  // Fall back to the active build root (ProjectFilesProvider) and then the redivivus service root so
+  // the header still recognizes the project (Preview pill, Blueprint, etc.). A workspace folder, when
+  // present, always wins. `svc` is a service pointed at the effective root for config/isInitialized.
+  const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  let effectiveRoot = wsRoot;
+  if (!effectiveRoot) {
+    let activeRoot: string | undefined;
+    try { activeRoot = require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); } catch {}
+    if (!activeRoot) { activeRoot = redivivus.getWorkspaceRoot(); }
+    if (activeRoot && fs.existsSync(path.join(activeRoot, '.redivivus'))) { effectiveRoot = activeRoot; }
+  }
+  let svc = redivivus;
+  if (effectiveRoot && redivivus.getWorkspaceRoot() !== effectiveRoot) {
+    try { svc = new (redivivus as any).constructor(effectiveRoot); } catch { svc = redivivus; }
+  }
+
+  const isInitialized = svc.isInitialized();
+  const config = isInitialized ? svc.loadConfig() : null;
   const hasBlueprint = !!config?.blueprint?.who;
   const blueprintLocked = config?.blueprint?.locked || false;
-  const projectName = config?.projectName || (vscode.workspace.workspaceFolders?.[0] ? path.basename(vscode.workspace.workspaceFolders[0].uri.fsPath) : 'No Project');
+  const projectName = config?.projectName || (effectiveRoot ? path.basename(effectiveRoot) : 'No Project');
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  const workspaceFolderIsOpen = !!vscode.workspace.workspaceFolders?.length;
+  // A project is "open" if there is an effective root (workspace folder OR active build root) AND it is initialized.
+  const workspaceFolderIsOpen = !!effectiveRoot;
   const hasProjectOpen = workspaceFolderIsOpen && isInitialized;
 
   // [DEBUG] Log header state to diagnose header button issue
   require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-    `[buildHeaderInfo] ws0=${vscode.workspace.workspaceFolders?.[0]?.uri.fsPath} isInit=${isInitialized} hasProject=${hasProjectOpen} wsFolderOpen=${workspaceFolderIsOpen}\n`);
+    `[buildHeaderInfo] ws0=${wsRoot} effRoot=${effectiveRoot} isInit=${isInitialized} hasProject=${hasProjectOpen} wsFolderOpen=${workspaceFolderIsOpen}\n`);
 
-  // Check if current workspace has a .redivivus/ folder or .redivivus-assist shim
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const fs = require('fs');
+  // Check if effective root has a .redivivus/ folder or .redivivus-assist shim
+  const workspaceRoot = effectiveRoot;
   const workspaceHasRedivivus = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.redivivus')) : false;
   // [FIX] Check .redivivus-assist regardless of whether .redivivus/ exists — .redivivus/ now exists in both modes
   const workspaceIsAssistMode = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.redivivus-assist')) : false;

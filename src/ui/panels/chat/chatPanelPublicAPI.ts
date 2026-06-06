@@ -67,9 +67,28 @@ export function chatHistoryKey(root?: string): string {
 /** Restore saved conversation from globalState. Call in ChatPanel constructor before refresh(). */
 export function restoreConversation(panel: any): void {
   try {
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const ctx = ChatPanel.extensionContext;
-    if (!ctx || !root) { return; }
+    if (!ctx) { return; }
+    // [FIX] Priority 1: a build that opened the project folder (openFolder reload) stashes the live
+    // conversation in pendingRescueConversation. Restore it synchronously so the panel opens already
+    // populated — otherwise it shows the empty launcher and the conversation is injected ~300ms later,
+    // which reads as the chat "closing and reopening". Consuming it here means resumePendingState
+    // won't re-inject; it only resumes the build task.
+    const rescue = ctx.globalState.get<any[]>('redivivus.pendingRescueConversation');
+    if (rescue && Array.isArray(rescue) && rescue.length > 0) {
+      ctx.globalState.update('redivivus.pendingRescueConversation', undefined);
+      ctx.globalState.update('redivivus.skipConversationRestore', undefined);
+      panel.state.conversation = rescue as ChatMessage[];
+      return;
+    }
+    // [FIX] Priority 2: skip restoring old history when a new project was just opened.
+    if (ctx.globalState.get<boolean>('redivivus.skipConversationRestore')) {
+      ctx.globalState.update('redivivus.skipConversationRestore', undefined);
+      return;
+    }
+    // Priority 3: saved per-project history.
+    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    if (!root) { return; }
     const saved = ctx.globalState.get<string>(chatHistoryKey(root));
     if (saved) {
       const msgs: ChatMessage[] = JSON.parse(saved);
@@ -148,6 +167,13 @@ export async function panelRefresh(panel: any): Promise<void> {
     htmlToInject = buildEmptyStateHtml(headerInfo, progress);
   }
   _panel.webview.postMessage({ type: 'update-conversation', html: htmlToInject });
+  // [FIX] Surgically refresh the header + input pills so the project is recognized (Preview/Blueprint/
+  // Map/History/Run) after a no-reload build — without replacing webview.html (which risks a duplicate
+  // tab). Buttons use document-level data-cmd delegation, so innerHTML replacement keeps them clickable.
+  try {
+    const { renderHeaderRightInner, renderInputLeftInner } = require('./chatPanelHeaderRender.js');
+    _panel.webview.postMessage({ type: 'update-header', headerRight: renderHeaderRightInner(headerInfo), inputLeft: renderInputLeftInner(headerInfo) });
+  } catch {}
   // Persist conversation on every update
   const root2 = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   saveConversation(state, root2);

@@ -13,6 +13,7 @@ import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel';
 import { MapPanel } from './ui/map/mapPanel.js';
 import type { GitHubBackupService } from './services/githubBackupService.js';
 import { ChatPanel } from './ui/panels/chat/chatPanel';
+import { getActiveProjectRoot } from './services/project/activeProjectRoot.js';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
@@ -57,9 +58,9 @@ export function registerInlineCommandsB(
   // [WARN] Defer close+open to next tick — disposing panel mid-handler can swallow MapPanel.show()
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.showMap', () => {
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const root = getActiveProjectRoot();
       if (!root) { vscode.window.showErrorMessage('Redivivus: No workspace folder open.'); return; }
-      const projectName = redivivusService.loadConfig()?.projectName || vscode.workspace.workspaceFolders?.[0]?.name || 'Project';
+      const projectName = redivivusService.loadConfig()?.projectName || require('path').basename(root) || 'Project';
       debugLog(root, 'showMap', `fired -- root: ${root}, project: ${projectName}`);
       setTimeout(() => {
         debugLog(root, 'showMap', 'setTimeout fired -- closing chat, opening MapPanel');

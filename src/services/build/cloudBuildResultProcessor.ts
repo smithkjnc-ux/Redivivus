@@ -39,20 +39,47 @@ export async function processBuildResults(
 
     let match;
     const extMap: Record<string, string> = { javascript: 'js', typescript: 'ts', html: 'html', css: 'css', python: 'py', json: 'json', jsx: 'jsx', tsx: 'tsx', go: 'go', rust: 'rs', java: 'java', ruby: 'rb', shell: 'sh', bash: 'sh', sh: 'sh' };
-    let fileIndex = 0;
+
+    // [FIX] Two-pass so the single-file fallback recovers REAL filenames instead of file1.js/file2.js
+    // (which break wiring — index.html references board.js but the block was saved as file2.js).
+    // Pass 1: collect blocks + their explicit path (if any). Pass 2: infer names for the unnamed ones
+    // from a first-line filename comment, then from the HTML's <script src>/<link href> refs by extension.
+    const { extractHtmlAssetRefs, filenameFromFirstLine, nextRefForExt } = require('./cloudBuildFileNamer.js');
+    interface Blk { language?: string; content: string; explicit: string; ext: string; }
+    const blocks: Blk[] = [];
     while ((match = fenceRe.exec(rawText)) !== null) {
-      const [fullMatch, language, colonPath, inlinePath, attrPath, content] = match;
+      const [, language, colonPath, inlinePath, attrPath, content] = match;
       if (!content?.trim()) { continue; }
-      // Priority: inline path > colon path > attribute path > header path > inferred
-      let filePath = inlinePath?.trim() || colonPath?.trim() || attrPath?.trim() || headerMap.get(match.index) || '';
-      if (!filePath && language) {
-        const ext = extMap[language.toLowerCase()] || language.toLowerCase();
-        filePath = fileIndex === 0 ? `index.${ext}` : `file${fileIndex}.${ext}`;
+      const explicit = inlinePath?.trim() || colonPath?.trim() || attrPath?.trim() || headerMap.get(match.index) || '';
+      const ext = language ? (extMap[language.toLowerCase()] || language.toLowerCase()) : '';
+      blocks.push({ language, content: content.trim(), explicit, ext });
+    }
+
+    // Gather asset references from any HTML block so unnamed js/css blocks can claim their real names.
+    const htmlRefs: string[] = [];
+    for (const b of blocks) {
+      if (b.ext === 'html' || /^\s*<!doctype html|<html[\s>]/i.test(b.content)) {
+        htmlRefs.push(...extractHtmlAssetRefs(b.content));
       }
+    }
+    const usedRefs = new Set<string>();
+    const usedPaths = new Set<string>();
+    let fileIndex = 0;
+    for (const b of blocks) {
+      let filePath = b.explicit || filenameFromFirstLine(b.content) || '';
+      if (!filePath && b.ext && b.ext !== 'html') { filePath = nextRefForExt(htmlRefs, usedRefs, b.ext) || ''; }
+      if (!filePath && b.ext === 'html') { filePath = 'index.html'; }
+      if (!filePath && b.ext) { filePath = fileIndex === 0 ? `index.${b.ext}` : `file${fileIndex}.${b.ext}`; }
       if (!filePath) { filePath = fileIndex === 0 ? 'index.html' : `file${fileIndex}.txt`; }
-      data.files.push({ path: filePath, content: content.trim(), isNew: true });
+      // Avoid collisions if inference produced a duplicate.
+      if (usedPaths.has(filePath)) { const dot = filePath.lastIndexOf('.'); filePath = dot > 0 ? `${filePath.slice(0, dot)}-${fileIndex}${filePath.slice(dot)}` : `${filePath}-${fileIndex}`; }
+      usedPaths.add(filePath);
+      data.files.push({ path: filePath, content: b.content, isNew: true });
       fileIndex++;
     }
+    // [trace] Final parsed filenames from the single-file fallback — shows whether the safety net
+    // recovered real names (board.js…) or still fell back to file{N}. htmlRefs lists what the HTML expects.
+    try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[buildtrace] single-file parse: blocks=${blocks.length} htmlRefs=[${htmlRefs.join(', ')}] -> files=[${data.files.map((f: any) => f.path).join(', ')}]\n`); } catch {}
   }
   // Ensure .redivivus/ structure exists — always, even for single-file builds.
   // scaffoldAt is idempotent: it skips files that already exist.

@@ -9,11 +9,12 @@ import * as os from 'os';
 import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
 import { SnapshotService } from '../../services/snapshotService.js';
 import { buildHistoryHtml } from './buildHistoryPanelHtml.js';
+import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
 
 let _panel: vscode.WebviewPanel | undefined;
 
 export function showBuildHistoryPanel(context: vscode.ExtensionContext): void {
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = getActiveProjectRoot();
   if (!root) { vscode.window.showWarningMessage('No project folder open.'); return; }
 
   if (_panel) { _panel.reveal(vscode.ViewColumn.Beside); _panel.webview.postMessage({ type: 'refresh' }); return; }

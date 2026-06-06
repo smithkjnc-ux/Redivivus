@@ -57,18 +57,27 @@ export async function runBuildAfterGates(
       return;
     }
   }
-  // [FIX] If the project was just created (no workspace open), the user can't see the files being built.
-  // We automatically pop open the session log file in a split editor so they can watch the AI logs in real-time.
-  if (autoCreated) {
+  // [FIX] Show the project in the Redivivus "Project Files" tree (read from disk) instead of adding it
+  // to the VS Code workspace. The native Explorer requires a workspace folder, and adding the first
+  // folder to an empty window ALWAYS reloads the extension host (killing the in-flight build and racing
+  // duplicate panels). The custom tree needs no workspace folder, so there is NO reload — it populates
+  // live as the build writes files. The build continues in-process below. The result card still offers
+  // an "Open Project in Explorer" button for users who want the native Explorer (accepts one reload).
+  const _wsfNow = vscode.workspace.workspaceFolders ?? [];
+  const _rootInWs = !!root && _wsfNow.some(f => path.resolve(f.uri.fsPath) === path.resolve(root!));
+  if (root && !_rootInWs) {
     try {
-      const { getCurrentSession } = require('../../services/logging/redivivusLogger.js');
-      const session = getCurrentSession();
-      if (session.logFile) {
-        setTimeout(() => {
-          vscode.commands.executeCommand('vscode.open', vscode.Uri.file(session.logFile), { preview: false, viewColumn: vscode.ViewColumn.Beside });
-        }, 1000);
-      }
-    } catch {}
+      const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
+      PFP.instance?.setRoot(root);
+      PFP.instance?.startLiveRefresh();
+      // Reveal the Project Files tree so the user watches the skeleton + files appear.
+      vscode.commands.executeCommand('redivivusProjectFiles.focus').then(undefined, () => {});
+    } catch (e) {
+      console.warn('[Redivivus] Could not populate Project Files tree:', e);
+    }
+  } else if (root && _rootInWs) {
+    // Folder is already an open workspace folder — the native Explorer shows it live. Just focus it.
+    vscode.commands.executeCommand('workbench.view.explorer').then(undefined, () => {});
   }
 
   // Show which files are being read before building starts
@@ -171,7 +180,14 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
     const openWorkspaceToken = files.length > 0 && root && !vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === root)
       ? `\n${TOK_OPEN_WORKSPACE}${root}${DELIM}${TOK_OPEN_WORKSPACE_END}`
       : '';
-    const htmlFile = files.find(f => f.path.endsWith('.html'));
+    // [FIX] Skip scaffold placeholder index.html (content is just the filename text).
+    // Prefer the largest HTML file — scaffold stubs are tiny, built files are substantial.
+    const htmlFiles = files.filter(f => f.path.endsWith('.html'));
+    const htmlFile = htmlFiles.length > 1
+      ? htmlFiles.reduce((best, f) => {
+          try { const sz = require('fs').statSync(path.join(root, f.path)).size; const bsz = require('fs').statSync(path.join(root, best.path)).size; return sz > bsz ? f : best; } catch { return best; }
+        })
+      : htmlFiles[0];
     const previewToken = htmlFile
       ? `\n${TOK_PREVIEW_BROWSER}${path.join(root, htmlFile.path)}${DELIM}${TOK_PREVIEW_BROWSER_END}`
       : '';
@@ -186,10 +202,12 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
     const tokens = (result.inputTokens ?? 0) + (result.outputTokens ?? 0);
     const breakdownToken = buildBreakdownToken(result, modelLabel, tokens);
     const narration = cleanBuildNarration(result.narration);
+    // Smart model-switching: show WHY this model was chosen (from the backend's strategy + difficulty).
+    const modelLine = result.modelRationale ? `\n\n🧠 ${result.modelRationale}` : '';
 
     deps.conversation.push({
       role: 'assistant',
-      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''}\n\n${fileList}${narration}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${breakdownToken}`,
+      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${breakdownToken}`,
       timestamp: Date.now(),
     });
     deps.refresh();
@@ -203,35 +221,14 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
       }).catch(() => {});
     }
 
-    // Auto-open the project in Explorer after the result card renders.
-    const _wsf = vscode.workspace.workspaceFolders ?? [];
-    const _inWs = _wsf.some(wf => path.resolve(wf.uri.fsPath) === path.resolve(root!));
-    if (!_inWs) {
-      if (_wsf.length > 0) {
-        // Workspace already open — add folder without restarting the extension host
-        vscode.workspace.updateWorkspaceFolders(_wsf.length, null, { uri: vscode.Uri.file(root!) });
-        vscode.commands.executeCommand('workbench.view.explorer').then(undefined, () => {});
-      } else {
-        // No workspace — openFolder restarts the extension host. Save conversation first so it survives.
-        setTimeout(() => {
-          try {
-            const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
-            if (CP?.extensionContext) {
-              CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', deps.conversation);
-              CP.extensionContext.globalState.update('redivivus.pendingBuildComplete', true);
-            }
-          } catch {}
-          vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root!), { forceNewWindow: false });
-        }, 500);
-      }
-    }
-
     if (isFixRequest) {
       vscode.commands.executeCommand('redivivus.resolveFix', task, files.map(f => path.join(root!, f.path)));
     }
   } finally {
     deps.setActiveBuildCtx(undefined);
     deps.postToWebview({ type: 'set-status', status: 'ready' });
+    // Stop the live poll and do a final render so the Project Files tree shows the completed file set.
+    try { require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.stopLiveRefresh(); } catch {}
   }
 }
 

@@ -7,6 +7,7 @@ import type { GuideService } from '../services/guideService.js';
 import type { RulesService } from '../services/rulesService.js';
 import type { RedivivusWebviewProvider } from '../ui/views/redivivusWebviewProvider.js';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import { registerConfigureEditorRules } from './configureEditorRules.js';
 
 export function registerMiscCommands(
   context: vscode.ExtensionContext,
@@ -18,6 +19,7 @@ export function registerMiscCommands(
   refreshAll: () => void
 ): void {
   registerCoreCommands(context, redivivus, guideService, rulesService, refreshAll);
+  registerConfigureEditorRules(context, redivivus, rulesService, refreshAll);
   registerGitCommands(context, redivivus);
   registerUndoCommands(context);
   registerBrowserCommands(context);

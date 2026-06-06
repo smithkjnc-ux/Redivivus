@@ -3,6 +3,290 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 6, 2026: Fix-pipeline crash — wrong apiClient require path (bug report 3d95de89)
+
+User-reported (v0.3.69, Windows): `[FAIL] Supervisor phase failed: Cannot find module '../api/apiClient.js'` from `out/core/routing/chatPanelMsgFixPhases.js`.
+
+**Root cause:** `chatPanelMsgFixPhases.ts` (in `src/core/routing/`) used `require('../api/apiClient.js')` (4×) which resolves to the non-existent `core/api/apiClient.js`. Correct path is `../../services/api/apiClient.js` (what sibling files use). Introduced by commit `0bb1807` (backend-orchestration migration, Jun 5) — same commit behind this session's other regressions. Only the FIX pipeline's supervisor phase exercises it, so it shipped uncaught. **Lesson (do not forget): dynamic `require()` paths are NOT validated by tsc — they compile fine and fail only at runtime.** Worth a lint/grep guard for `require('../...')` paths under src/core/.
+
+**Fix:** `chatPanelMsgFixPhases.ts` — all 4 `require('../api/apiClient.js')` → `require('../../services/api/apiClient.js')`. tsc clean, compiled, verified in baked JS (4 correct, 0 stale). Ships in next release (dev is 0.3.68; reporter was on 0.3.69).
+
+### Friendly error + Retry button (same session)
+All raw `[FAIL] … phase failed: …` strings replaced with user-friendly messages + a ↩ Retry button.
+
+| File | Change |
+|---|---|
+| `src/core/routing/chatPanelMsgFix.ts` | Both catch blocks now show `⚠️ Something went wrong…` with a hint (API key vs network hiccup) + Retry button that re-submits the original request via `send-message`. |
+| `src/core/routing/chatPanelMsgFixAgentHandoff.ts` | `[FAIL] Agent Handoff failed` → friendly + Retry. |
+| `src/ui/panels/chat/chatPanelScriptActionsB.ts` | Added `.retry-fix-btn` click handler (base64 `data-retry`, decodes + posts `{type:'send-message',text}`). |
+
+**Reporter's secondary ask (also fixed):** replaced raw `[FAIL]` leaks with friendly messages + a ↩ Retry button. See below.
+
+---
+
+## Session — Jun 6, 2026: Setup Hub shows "No API key set" after key configured (bug 56966369)
+
+User-reported (v0.3.69, Windows): Setup Hub showed "No API key set" even after configuring a Gemini key.
+
+**Root cause:** `setupHub.ts` read keys via `cfg.get<string>('geminiApiKey')` (settings.json). Since the Jun 5 architecture audit, keys are stored in VS Code **SecretStorage** (encrypted, OS keychain), not settings.json. So settings.json is always empty after the migration → Setup Hub always showed "No API key set" regardless of what was actually configured. No other UI surfaces had this bug — health check, roster, and the chat header all used `getKeyCached()` correctly already.
+
+**Fix:** `src/commands/setupHub.ts` — replaced 6 `cfg.get<string>('…ApiKey')` calls with `getKeyCached(provider)` from `secretKeyStore.ts`. Added the import. `cfg` kept for `guardianEnabled` (a real settings.json entry). tsc clean, compiled, deployed.
+
+---
+
+## Session — Jun 6, 2026: Smart model switching (strategy × difficulty) — backend + extension
+
+User goal: stop always using Opus. Pick the right model per build via (1) a user strategy preference and (2) the task's difficulty (weighted by NOVELTY, not size). Setting: economy/balanced/quality, default balanced; escalate to ultra only on genuinely hard/novel tasks. Show the user WHY each model was chosen.
+
+### Backend (redivivus-backend, fly.dev)
+| File | Change |
+|---|---|
+| `src/lib/ai/modelStrategy.ts` | NEW (secret sauce). `assessDifficulty(task)` → simple/standard/hard via novelty signal regexes (crypto/parser/concurrency/algorithm/etc = hard; "simple/snippet/single file" + short = simple; else standard). `pickSupervisorTier(strategy, difficulty)` matrix: economy {flash,flash,pro}, balanced {flash,pro,ultra}, quality {pro,pro,ultra}. `buildRationale(...)` one-line explanation. |
+| `src/lib/build/buildPipeline.ts` | Supervisor model now = `getModelForTier(provider, pickSupervisorTier(strategy, difficulty))` instead of always `getSupervisorModel` (ultra). Returns `modelDecision {strategy,difficulty,tier,model,rationale}`. Reads `request.strategy`. |
+| `src/app/api/v1/build/route.ts` | Reads `strategy` from body; returns `X-Model-Decision` header with the modelDecision. |
+
+### Extension (redivivus)
+| File | Change |
+|---|---|
+| `package.json` | NEW setting `redivivus.modelStrategy` (economy/balanced/quality, default balanced) with enum descriptions. |
+| `src/services/build/cloudBuildClient.ts` | Sends `strategy` in the build request; reads `X-Model-Decision` header; threads `modelRationale`/`modelStrategy`/`modelTier` onto `CloudBuildResult`. |
+| `src/core/build/chatPanelBuildRunner.ts` | Result card now shows a `🧠 <rationale>` line explaining the model choice. |
+
+### Notes
+- Default balanced = pro-tier supervisor for most builds (the chess-game finding: textbook work doesn't need Opus), ultra only for hard/novel. Worker tier stays supervisor-driven (already adaptive).
+- Difficulty is a fast heuristic (free, server-side); can be upgraded to a small AI classifier later if needed.
+- Both tsc-clean. Extension compiled+deployed (setting verified in baked package.json). Backend deploying to fly.dev.
+
+---
+
+## Session — Jun 6, 2026: BACKEND — generic filenames root cause + deploy-blocking syntax bug (fly.dev v59)
+
+Cross-repo fixes in `~/projects/redivivus-backend` (Next.js, deploys to fly.dev via `fly deploy`).
+
+### Root cause of generic file1.js…file7.js
+The cloud multi-file pipeline was never completed: `/api/v1/plan` route does NOT exist (404), and `/api/v1/build` has no per-file/`targetFile` mode (always streams one blob). So every build falls to the single-file path and the worker's one-blob output gets split into generic names by the client parser. Decided NOT to build the full `/plan` + per-file `/build` pipeline (large). Instead fixed the actual regression: the worker prompt only said "return code in markdown code blocks with file paths" (vague) → AI emitted unlabeled blocks.
+
+### Fixes
+| File | Change |
+|---|---|
+| `src/lib/build/buildPipeline.ts` | Worker prompt instruction #7 rewritten to MANDATE the exact `language:path` fence format the client parser reads (` ```js:js/board.js `), one block per file, real folder paths, HTML refs must match emitted paths, never generic names. |
+| `src/lib/ai/redivivusWorkerRules.ts` | **DEPLOY-BLOCKING BUG**: line 28 had literal markdown backticks around `.js`/`.ts` INSIDE the backtick-delimited `Redivivus_WORKER_RULES` template literal → prematurely closed the string → `next build` type error → **every backend deploy since this file was added had been silently failing**. Removed the stray backticks. |
+
+### Impact
+Because the syntax bug blocked all deploys, prod (was v58) had been running WITHOUT the entire `Redivivus_WORKER_RULES` quality block (multi-file architecture, quality bar, security/error-handling rules) AND the prompt-format fix. v59 ships all of it at once — should improve build quality broadly, not just filenames. Deployed to fly.dev, v59 live + healthy (401 on /build = auth-gated alive, root 200).
+
+### Model-tier finding (chess game review)
+Reviewed the built `chess-ai-game/game.js` (531 lines: full move-gen, castling/en-passant/promotion, check/mate/stalemate, minimax + alpha-beta). Verdict: a textbook minimax chess engine does NOT need Opus 4.8 — a pro-tier model (Sonnet 4.6 / Gemini 2.5 Pro / GPT-4o) matches it at ~1/5 cost. Routing signal should be NOVELTY/difficulty, not size: reserve ultra/Opus for genuinely hard, ambiguous, or safety-critical work; well-known app/game patterns → pro tier.
+
+---
+
+## Session — Jun 6, 2026: Supervisor cost over-reported 5× (recorded Opus, ran Sonnet)
+
+### Problem
+User compared Anthropic billing (≈$0.39 actual) vs Redivivus "Project Usage" (Claude Supervisor $0.6816 for 10,330 tokens). Redivivus over-reported Claude cost ~5×/1.75×.
+
+### Root cause
+In `cloudBuildClientAI.ts runTwoPhaseBuild`, the supervisor call uses `tier: 'pro'` (line 110). `claudeProvider` selects its model **from the tier** (`bestModelForRole('claude','pro')` → `claude-sonnet-4-6`) and IGNORES the passed `si.model`. So the supervisor actually ran on **Sonnet 4.6** ($3/$15). But line 125 recorded `supervisor.model = si.model` (nominal `claude-opus-4-8`), so:
+- The byline lied ("Claude Opus 4.8" when it ran Sonnet 4.6).
+- `usageTracker.calcCost` priced Sonnet tokens at **Opus rates** ($15/$75 vs $3/$15) = ~5× over-report on the supervisor row.
+
+### Fix
+`supervisor.model = supRes.model || si.model` — record the model the provider ACTUALLY returned (Sonnet 4.6), making both the cost and the byline honest. (cloudBuildClientAI.ts)
+
+### Open decisions (NOT yet changed — need user direction)
+1. **Should the supervisor run Opus 4.8 (ultra) or Sonnet 4.6 (pro)?** The hardcoded `tier:'pro'` forces Sonnet. If the intent is "Claude Opus supervises," change the supervisor tier to `'ultra'` (better quality, ~5× supervisor cost). If Sonnet is intentional (cost), the byline now honestly shows Sonnet.
+2. **Build-quality regression — generic filenames (file1.js…file7.js).** User confirms Sonnet 4.6 built this game GREAT before, so it is NOT a model problem — a PIPELINE regression. Trace: `callCloudBuild` only takes the structured multi-file path (`executeMultiFileBuild`, real names from `plan.files[].path`) when `/plan` returns >1 file (`cloudBuildClient.ts:79`). Otherwise it falls to the single-file path, whose parser (`cloudBuildResultProcessor.ts:50-52`) splits a multi-file blob into `file${i}.${ext}`. The chess build went single-file → so `/plan` returned ≤1 file or failed (the failure was SILENTLY swallowed). Likely tied to commit `0bb1807 "migrate AI orchestration logic to backend"` (the "AI structure change" the user means) — before it, client-side orchestration produced proper multi-file builds; after, the server `/plan` decides and complex builds are degrading to single-file. `/plan` is server-side (fly.dev), not in this repo. **Added diagnostics** (`cloudBuildClient.ts`): the plan branch now logs to `~/redivivus_debug.log` whether /plan was ok, how many files it returned, the paths, and whether it took the multi-file or single-file path (incl. throw reason). NEXT: user runs one chess build, then read `[plan]` lines to confirm whether /plan is returning ≤1 file (server fix) vs failing client-side.
+
+**CLIENT-SIDE SAFETY NET (added):** Even when the build degrades to the single-file path, it now recovers REAL filenames instead of `file1.js…file7.js` (which broke wiring — index.html referenced `board.js` but the block was saved as `file2.js`, so nothing loaded = empty board). NEW `src/services/build/cloudBuildFileNamer.ts`: `extractHtmlAssetRefs` (reads `<script src>`/`<link href>` from the HTML block), `filenameFromFirstLine` (first-line filename comment), `nextRefForExt` (claim next unused ref by extension in document order). `cloudBuildResultProcessor.ts` now does a two-pass parse: collect blocks → gather HTML asset refs → assign each unnamed block a name from (explicit path → first-line comment → HTML ref by ext → index/file fallback), with collision-dedupe. So a chess game saved as a single blob now gets `index.html` + the real `board.js`/`engine.js`/`style.css` the HTML references, and the board renders. This is a SAFETY NET — the proper fix is still getting `/plan` to return a real multi-file plan (pending the `[plan]` log diagnosis). NOTE: does not retroactively fix already-built broken projects; rebuild to get correct names.
+
+---
+
+## Session — Jun 6, 2026: Editor rule files now opt-in (off by default)
+
+### Change
+The AI-editor shim files (CLAUDE.md, .cursorrules, .windsurfrules, GEMINI.md, .clinerules, .github/copilot-instructions.md) were written into EVERY project unconditionally — clutter for editors the user doesn't use. Now they are **off by default**; the user opts into the editors they actually use. The canonical `.redivivus/rules.md` is still always written (it's what Redivivus itself reads to enforce rules), so turning shims off does NOT weaken enforcement.
+
+### Implementation
+| File | Change |
+|---|---|
+| `src/services/editorRuleFiles.ts` | NEW — registry (`EDITOR_RULE_FILES`), `getEnabledEditorKeys`/`setEnabledEditorKeys` (reads/writes `redivivus.editorRuleFiles`), `writeEnabledShims`, `removeDisabledShims` (only deletes files containing the `Redivivus Project Rules` marker — never hand-written ones). Uses `wrapForClaude`/`wrapForGemini` for richer headers. |
+| `src/services/redivivusRules.ts` | `generateRules` always writes `.redivivus/rules.md`, then `writeEnabledShims` (was: 6 shims unconditionally). |
+| `src/services/rulesService.ts` | `generateAll(root, name, keys?)` now delegates to `writeEnabledShims` (was: 6 shims unconditionally). |
+| `src/commands/configureEditorRules.ts` | NEW — `redivivus.configureEditorRules`: multiSelect QuickPick (pre-checked = current setting), saves the setting, offers to apply to the active project (write enabled + remove disabled Redivivus shims). |
+| `package.json` | NEW setting `redivivus.editorRuleFiles` (array, default `[]`); NEW command `redivivus.configureEditorRules`. |
+| `src/commands/misc.ts` | Register the new command. |
+| `src/ui/sidebar/redivivusSidebar.ts` | Setup section: added "🧩 Editor Rule Files" button. |
+| `src/services/project/setupProgressSteps.ts` | Step 4 now verifies `.redivivus/rules.md` (not the opt-in shims). |
+| `src/ui/views/wizardSteps.ts` | Scaffold preview notes editor files are opt-in via Setup. |
+
+### Notes
+- Default `[]` = no editor shim files. Enforcement unaffected (Redivivus reads `.redivivus/rules.md`).
+- Access: command palette "Redivivus: Configure Editor Rule Files", or Setup section "Editor Rule Files", or the `redivivus.editorRuleFiles` setting.
+- `package.json` edited (Rule 20) — verified `editorRuleFiles` + `configureEditorRules` in baked locations; needs a window reload.
+
+---
+
+## Session — Jun 6, 2026: Duplicate Panels on New Build (0→1 Folder Restart)
+
+### Problem
+Starting a new build from the launcher (no workspace open) opened 2–3 chat panels and the actual build never finished. Sequence:
+
+1. User confirms blueprint → `handleBlueprintCardConfirm` → `handleSendMessage` → `runBuildAfterGates`
+2. `autoCreateProject` creates the project dir (`autoCreated=true`, `wsf.length=0`)
+3. Build runner called `updateWorkspaceFolders(0, 0, root)` to add the folder immediately
+4. Adding the **first** folder to an empty workspace triggers a **full extension host restart** (same as `openFolder`) — the comment "no restart" was wrong for the 0→1 case
+5. Restart kills the in-flight cloud build
+6. After restart: `CP.suppressAutoOpen` reset to false (module state gone) → auto-open timer fires with `currentPanel=false` → new panel spawned
+7. Deserializer restores orphaned pre-restart panel → 2nd panel
+8. `runAutoInit` fires from `onDidChangeWorkspaceFolders` → potentially 3rd panel
+
+Also: clicking the `__OPEN_WORKSPACE__` button after a build (0 folders) caused the same restart, losing the result card conversation.
+
+### Fixes
+
+| File | Change | Risk |
+|---|---|---|
+| `src/core/build/chatPanelBuildRunner.ts` | Only add folder to workspace during build if `wsf.length > 0` (1→2 is safe). Skip for empty workspace — `__OPEN_WORKSPACE__` token handles it after build completes. | Low |
+| `src/core/routing/chatPanelMessageRouterEarlyExits.ts` | `open-workspace-btn` handler now saves conversation to `pendingRescueConversation` + sets `pendingBuildComplete=true` before `updateWorkspaceFolders`, so the result card is restored by `resumePendingState` after the restart. | Low |
+
+### Verification
+Build "create a button that counts clicks" from launcher (no workspace). Should see exactly ONE chat panel, build runs to completion, result card appears, then ~1.5s later window reloads into the project folder with result card restored.
+
+### Follow-up (16X-b): Auto-open workspace + preview fix
+After 16X, user confirmed single panel and completed build. Two regressions:
+1. **Explorer didn't auto-open** — result card showed but workspace never opened (user had to click button)
+2. **Preview in Browser opened scaffold placeholder** — `index.html` from scaffold had "index.html" as content; preview picked it first over the real built file
+
+| File | Change | Risk |
+|---|---|---|
+| `src/core/build/chatPanelBuildRunner.ts` | After build completes for `autoCreated` + no-workspace case: save conversation to `pendingRescueConversation`, set `pendingBuildComplete=true`, then auto-trigger `updateWorkspaceFolders(0→1)` after 1500ms delay. `resumePendingState` restores result card after reload. | Low |
+| `src/core/build/chatPanelBuildRunner.ts` | Preview token now picks the **largest** HTML file among results instead of the first. Scaffold placeholders are tiny (bytes); built files are substantial. | Low |
+
+### Follow-up (16X-c): Extra chat panel after workspace open
+After 16X-b, build completed and workspace auto-opened, but a NEW blank chat appeared instead of restoring the result card.
+
+**Root cause:** `resumePendingState`'s `pendingBuildComplete` path called `openPanel()` → `ChatPanel.show()`. If the deserializer had already set its `_instance` SENTINEL (truthy), `show()` tried `sentinel._panel.reveal()` → TypeError thrown silently → IIFE failed. Auto-open timer at 500ms saw `currentPanel=null` → created a second blank panel.
+
+| File | Change | Risk |
+|---|---|---|
+| `src/extensionResumeState.ts` | Replaced `openPanel()` call in `pendingBuildComplete` branch with a polling loop that waits up to 3s for `currentPanel` to be non-null AND `_isDeserializing=false`, then injects rescued conversation. No panel created here — deserializer or auto-open timer produces it; we just restore into it. | Low |
+
+### Follow-up (16X-d): Restructure to open-folder-FIRST — Explorer at build start + kill duplicate tab
+After 16X-c, build worked and workspace opened, but: (1) a duplicate "Redivivus Chat" orphan tab still appeared, and (2) Explorer never showed the project at the START of the build (user explicitly wants to watch files appear live).
+
+**Root cause of the duplicate:** debug log showed `[auto-open-timer] currentPanel=false` after the `updateWorkspaceFolders(0→1)` restart — the 500ms auto-open timer fired before the deserializer set `_instance`, creating panel A ("click-counter-button"), while the deserializer separately restored the orphan webview ("Redivivus Chat") = two tabs. Building-then-adding-the-folder is fundamentally fragile (restart kills/races) and can never show Explorer at the start.
+
+**Fix — open the folder BEFORE building:** When `autoCreated` and 0 workspace folders, the build path now saves `pendingResumeTask` + rescue conversation, then calls `vscode.openFolder(root)` and returns. The window navigates to the new folder as a single-folder workspace (so the old empty-window webview is NOT restored as an orphan — different workspace scope), Explorer shows the scaffold immediately, and `resumePendingState` resumes the build via `resumeBuildTask` with the folder already open (`autoCreated=false` on that pass → no re-scaffold). Files appear live in Explorer as the resumed build writes them.
+
+| File | Change | Risk |
+|---|---|---|
+| `src/core/build/chatPanelBuildRunner.ts` | Empty-workspace autoCreate now `openFolder`-first + saves `pendingResumeTask`/rescue conv + returns, instead of build-then-add. Removed the post-build `updateWorkspaceFolders(0,0)` + `pendingBuildComplete` block. 1→2 folder case unchanged (no restart). | Med — relies on resumePendingState resuming correctly post-reload |
+| `src/extensionResumeState.ts` | Added `waitForPanel()` helper (polls for the auto-open/deserializer panel, never calls `show()` itself). `pendingResumeTask` path now uses it + focuses Explorer, instead of `openPanel()` which raced the auto-open timer into a 2nd tab. | Low |
+
+### Follow-up (16X-e): Resumed build ran before keys loaded → 0 files / wrong models
+After 16X-d, the panel/Explorer/single-tab issues were ALL fixed (verified: one tab, Explorer open with scaffold). But the resumed build **failed with 0 files**: byline showed "Gemini +2" (stale pre-init roster) and "built solo — Supervisor unavailable: [GoogleGenerativeAI Error] gemini-2.5-pro 400 Bad Request", worker=groq 131 tokens.
+
+**Root cause:** `resumePendingState` resumes the build immediately after the reload, BEFORE `initSecretKeyStore` finishes loading keys from SecretStorage. So the roster fell back to the pre-init default (Gemini), and the Supervisor call used a model/key that wasn't ready → 400 → solo fallback → empty build. (This is the same pre-init-roster race extension.ts already documents for the badge; it now also affected the resumed build.)
+
+| File | Change | Risk |
+|---|---|---|
+| `src/extensionResumeState.ts` | Added `awaitKeysReady()` (resolves via `onSecretKeyStoreReady`, 8s timeout fallback). `pendingResumeTask` path now awaits keys + calls `invalidateRosterCache()` before `resumeBuildTask`, so the resumed build uses the real roster (Claude supervisor) instead of the stale Gemini default. | Low |
+
+### Follow-up (16X-f): Open-folder-first only fired for auto-created folders — missed service-resolved roots
+After 16X-e, the build succeeded with the correct models (Claude +5, Claude Opus supervisor, real file written), but: (1) NO Explorer shown, (2) two generic "Redivivus Chat" tabs, title stayed "Untitled (Workspace)".
+
+**Root cause:** debug log showed `ws0=undefined wsFolderOpen=false isInit=true` throughout the build. `getLiveRoot()` resolved the build root from the **redivivus service** (`getWorkspaceRoot()` — restored from `lastActiveProject` on the fresh window via `chatPanelShow.ts`), NOT from an open workspace folder. So `autoCreated=false`, and the open-folder-first block (gated on `autoCreated`) was skipped. Files were written to the correct path, but the folder was never opened in VS Code → no Explorer, generic panel title. The two tabs were leftover orphans from empty-window reload cycles that never got discarded (folder never opened to navigate away).
+
+**Fix:** Open-folder-first now triggers whenever the resolved `root` is **not already an open workspace folder**, regardless of how it was resolved (auto-created OR service/lastActiveProject). Empty window → `openFolder` + resume; existing folders → `updateWorkspaceFolders` add (no restart). On the resumed pass `root` IS in the workspace, so the gate is skipped and the build runs in place — one panel, live Explorer, files appear as written. Answers user's request: "open an explorer window with the skeleton, then add to it as the project builds."
+
+| File | Change | Risk |
+|---|---|---|
+| `src/core/build/chatPanelBuildRunner.ts` | Replaced `autoCreated`-gated open-folder blocks with a single gate keyed on `root && !rootInWorkspace`. Covers service-resolved roots (the missed case). | Med — changes when a folder-open/reload is triggered for builds |
+
+### Follow-up (16X-h): NO-RELOAD project view — custom "Project Files" live tree
+User asked: "open the explorer panel with nothing loaded and populate it as the build progresses" — i.e. avoid the reload entirely. The NATIVE Explorer cannot do this (it is bound to workspace folders, and adding the first folder to an empty window always reloads the extension host). Chose (user-confirmed) the custom-tree approach: a Redivivus-owned tree view that reads the project folder from disk — no workspace folder, no reload — and populates live as files are written.
+
+**Implementation:**
+- NEW `src/ui/sidebar/projectFilesProvider.ts` — `ProjectFilesProvider implements TreeDataProvider`. Static singleton (`ProjectFilesProvider.instance`). `setRoot(dir)` points it at the active build folder; `getChildren` reads the dir from disk lazily; clicking a file runs `vscode.open`. `startLiveRefresh()` polls every 1s for the build duration (Linux `fs.watch` recursive is unreliable, so a light poll is the robust choice); `stopLiveRefresh()` ends it with a final render.
+- `package.json` — added `redivivusProjectFiles` tree view to the `redivivusView` container.
+- `src/extension.ts` — register the provider, set `ProjectFilesProvider.instance`, seed with the open workspace folder if any.
+- `src/core/build/chatPanelBuildRunner.ts` — **removed the openFolder/updateWorkspaceFolders reload path**. When the build root is not an open workspace folder, it now calls `PFP.setRoot(root)` + `startLiveRefresh()` + reveals the tree (`redivivusProjectFiles.focus`) and the build continues IN-PROCESS — no reload, no rescue/resume, no duplicate-panel race. `finally` calls `stopLiveRefresh()`. If the root IS already a workspace folder, the native Explorer shows it (just focus it).
+
+**Result:** building from the launcher no longer reloads at all. The Project Files tree shows the skeleton immediately and files appear live as the build writes them; the chat panel stays put. The result card still offers "Open Project in Explorer" for users who want the native Explorer (opt-in, one reload). The `pendingResumeTask`/rescue machinery remains for the wizard path but is no longer exercised by launcher builds.
+
+**Note (Rule 20):** package.json was edited (new view contribution) — the deploy script copies package.json to all baked locations; verified `redivivusProjectFiles` is present in both. Requires a window reload to register the view.
+
+### Follow-up (16X-i): Project Files on top, Redivivus menu HIDDEN
+User wanted the Profile/Setup/etc menu (the `redivivusSidebar` webview) out of the way. Reordered `redivivusView`: `redivivusProjectFiles` FIRST (`"visibility": "visible"`); `redivivusSidebar` (renamed "Redivivus Menu") SECOND with `"visibility": "hidden"` — fully off the panel, re-enableable via the view container's `...` (Views) menu. `package.json` only — verified `hidden` in baked locations; needs a reload.
+
+### Follow-up (16X-j): Chat header didn't recognize the no-reload project (no Preview/Blueprint pills)
+After a no-reload build, the chat header showed no project pills (Preview, Blueprint, Map, History, Run). Two causes:
+
+1. **`buildHeaderInfo` keyed off `vscode.workspace.workspaceFolders`**, which is empty in the no-reload flow (project shown via the custom tree, not added to the workspace). Fixed: compute an `effectiveRoot = workspaceFolder ?? ProjectFilesProvider.instance.getRoot() ?? redivivus.getWorkspaceRoot()`, gate it on `.redivivus` existing, and build a service `svc` pointed at it for `isInitialized`/config. `hasProjectOpen`, `projectName`, file scans, and `workspaceFolderIsOpen` all use `effectiveRoot`.
+2. **The header is only rendered in the full HTML** (`_initialized=false`); refresh with `_initialized=true` only updated the conversation, never the header — and replacing `webview.html` after first load risks a duplicate tab (chatPanel.ts:62). Fixed with a SURGICAL update: extracted the project-dependent header-right + input-left markup into `chatPanelHeaderRender.ts` (`renderHeaderRightInner`/`renderInputLeftInner`), used by both the full HTML and a new `update-header` postMessage. Webview handler replaces `.header-right` and `#input-left` innerHTML (buttons use document-level `data-cmd` delegation, so they stay clickable). No full-HTML replacement → no duplicate-tab risk.
+
+| File | Change | Risk |
+|---|---|---|
+| `src/ui/panels/chat/chatPanelHeader.ts` | `effectiveRoot`/`svc` fallback so a no-workspace project is recognized; removed shadowing `const fs = require('fs')` (TDZ error). | Low |
+| `src/ui/panels/chat/chatPanelHeaderRender.ts` | NEW — shared `renderHeaderRightInner`/`renderInputLeftInner`. | Low |
+| `src/ui/panels/chat/chatPanelHtml.ts` | Use the shared renderers (net -15 lines). | Low |
+| `src/ui/panels/chat/chatPanelPublicAPI.ts` | `panelRefresh` posts `update-header` (headerRight + inputLeft) on every refresh. | Low |
+| `src/ui/panels/chat/chatPanelScriptListener.ts` | Handle `update-header` — replace `.header-right` + `#input-left` innerHTML. | Low |
+
+### Follow-up (16X-k): Project ACTIONS (Preview/Run/History/Map/Usage) failed in the no-reload flow
+After 16X-j the header pills appeared, but clicking **Preview** showed "No project folder open" — the action handlers still resolved the root via `vscode.workspace.workspaceFolders`, which is empty when the project is shown via the Project Files tree (not a workspace folder).
+
+**Fix:** NEW `src/services/project/activeProjectRoot.ts` → `getActiveProjectRoot(panel?)` = `workspaceFolder ?? ProjectFilesProvider.instance.getRoot() ?? panel.redivivus.getWorkspaceRoot()`. Applied to every project-action handler that read workspaceFolders directly:
+
+| File | Handler |
+|---|---|
+| `src/core/routing/chatPanelMessageRouterPreview.ts` | `start-preview`, `ve-open-request`, `visual-apply-all` |
+| `src/core/project/chatPanelMsgRunCommand.ts` | `redivivus.runProject` (Run pill) |
+| `src/ui/views/buildHistoryPanel.ts` | `showBuildHistoryPanel` (History pill) |
+| `src/extensionInlineCommandsB.ts` | `redivivus.showMap` (Map pill) |
+| `src/commands/usageCommands.ts` | `redivivus.viewProjectUsage` (tokens pill) |
+| `src/core/project/chatPanelMsgFileOps.ts` | `handleOpenHtmlByName` |
+
+`handlePreviewBrowser` already used an absolute path from the token (no change). **Known remaining:** `redivivus.blueprintInterview` opens via the shared `redivivusService` instance (activation-time root), not `getActiveProjectRoot` — may not load config for a no-reload project; deferred (separate concern, not user-reported).
+
+### Follow-up (16X-g): Cosmetic — chat flashed empty (launcher) during the openFolder reload
+After 16X-f, the full flow worked (one panel, Explorer with skeleton, live build, app runs). User: the openFolder reload "clears the first chat screen and then opens the new one" — looks ugly.
+
+**Constraint (documented for future):** VS Code ALWAYS reloads the window when the first folder is added to an empty window (both `openFolder` and `updateWorkspaceFolders(0→1)` terminate+restart the extension host). The chat webview is necessarily disposed and recreated. The reload itself is unavoidable; only the visible flash can be removed.
+
+**Root cause of the flash:** the post-reload panel was created empty (launcher), then `resumePendingState` injected the rescued conversation ~300ms later → looked like close-then-reopen.
+
+**Fix:** restore the rescued conversation SYNCHRONOUSLY in the panel constructor (via `restoreConversation`) so the panel opens already populated — the reload now reads as "the Explorer appears" rather than "the chat closes and reopens".
+
+| File | Change | Risk |
+|---|---|---|
+| `src/ui/panels/chat/chatPanelPublicAPI.ts` | `restoreConversation()` now restores `pendingRescueConversation` first (priority 1, consumes it), then `skipConversationRestore`, then saved per-project history. | Low |
+| `src/ui/panels/chat/chatPanel.ts` | Constructor delegates all restore logic to `restoreConversation()` (net -16 lines). `resumePendingState` no longer needs to inject — constructor already populated it; it only resumes the build task. | Low |
+
+---
+
+## Session — Jun 5, 2026: Duplicate Chat Panel Race on updateWorkspaceFolders
+
+### Problem
+When the build runner called `updateWorkspaceFolders` to add the newly-created project folder mid-build, `onDidChangeWorkspaceFolders` fired immediately. Two race conditions produced duplicate chat panels:
+
+1. **Build runner set async `globalState` flags** (`suppressAutoOpen`, `suppressConversationClear`) but `onDidChangeWorkspaceFolders` handlers read them BEFORE the async write completed. So `runAutoInit` fired and created a panel, and the conversation was cleared to 0.
+
+2. **Extension.ts `_suppressNextFolderAdd`** was declared as a module-level `let` but was NEVER set to `true` anywhere in the codebase. The synchronous fast-path branch was dead code.
+
+### Fixes
+
+| File | Change | Risk |
+|---|---|---|
+| `src/core/build/chatPanelBuildRunner.ts` | Set `ChatPanel.suppressAutoOpen = true` (synchronous boolean) immediately before `updateWorkspaceFolders`, in addition to the async globalState path. | Low |
+| `src/extension.ts` | Replaced dead `_suppressNextFolderAdd` check with `ChatPanel.suppressAutoOpen` synchronous boolean check in `onDidChangeWorkspaceFolders` handler. Now correctly skips `runAutoInit` when the build runner added the folder. | Low |
+| `src/ui/panels/chat/chatPanel.ts` | `onDidChangeWorkspaceFolders` handler now checks `ChatPanel.suppressAutoOpen` (sync) BEFORE the async `suppressConversationClear` globalState flag. Prevents conversation wipe during mid-build folder add. | Low |
+
+### Verification
+Build "create a button that counts clicks" in empty workspace. Should see exactly ONE chat panel, folder structure visible in Explorer immediately, and conversation survives the folder add.
+
+---
+
 ## Session — Jun 5, 2026: Roster Cache & Role Assignment Bugs (Gemini +2 → Claude +5)
 
 ### Problem

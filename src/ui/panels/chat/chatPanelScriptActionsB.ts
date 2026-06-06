@@ -159,6 +159,13 @@ export function buildActionsScriptB(): string {
         if (b64) { try { const root = decodeURIComponent(escape(atob(b64))); vscode.postMessage({ type: 'open-visual-editor', root }); } catch(e) {} }
         return;
       }
+      // Retry fix button — re-sends the original request as if the user typed it again.
+      const retryBtn = target.closest ? target.closest('.retry-fix-btn') : null;
+      if (retryBtn) {
+        const b64 = retryBtn.getAttribute('data-retry');
+        if (b64) { try { const text = decodeURIComponent(escape(atob(b64))); vscode.postMessage({ type: 'send-message', text }); } catch(e) {} }
+        return;
+      }
       // Open Workspace button
       const openWsBtn = target.closest ? target.closest('.open-workspace-btn') : null;
       if (openWsBtn) {

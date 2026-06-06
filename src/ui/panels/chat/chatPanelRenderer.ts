@@ -72,6 +72,11 @@ export function renderMessages(conversation: ChatMessage[]): string {
       const b64 = encodeBase64(rootPath);
       return `<div class="build-result" style="margin-top:6px;"><button class="run-project-btn" data-path="${b64}" style="background:linear-gradient(135deg,#7c3aed,#5b21b6);">&#9654; Run Project</button></div>`;
     });
+    // [FIX] Retry button token — raw <button> in content gets escaped by escapeHtml; use token instead
+    html = html.replace(/__RETRY_FIX__:([^_]+)__END_RETRY__/g, (_m, b64) => {
+      return `<button class="retry-fix-btn" data-retry="${b64}" style="margin-top:6px;padding:6px 14px;background:#0e639c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">&#x21A9; Retry</button>`;
+    });
+
     // [FALLBACK] If regex fails, strip any remaining raw BUILD_RESULT tokens to prevent chat blocking
     html = html.replace(/__BUILD_RESULT__[^\n]*/g, '');
     html = html.replace(/__PREVIEW_BROWSER__[^\n]*/g, '');

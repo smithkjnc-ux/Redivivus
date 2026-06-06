@@ -7,6 +7,7 @@ import * as path from 'path';
 import * as os from 'os';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import type { MessageHandlerDeps } from '../routing/chatPanelMessages';
+import { getActiveProjectRoot } from '../../services/project/activeProjectRoot';
 
 export async function handleUndoBuild(msg: any, deps: MessageHandlerDeps, conversation: ChatMessage[], refresh: () => void): Promise<void> {
   const { snapshotId } = msg;
@@ -97,9 +98,9 @@ export async function handlePreviewBrowser(msg: any): Promise<void> {
 export async function handleOpenHtmlByName(msg: any): Promise<void> {
   const { filename } = msg;
   if (!filename) { return; }
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = getActiveProjectRoot();
   if (!root) {
-    vscode.window.showInformationMessage(`Can't open ${filename} — no workspace folder is open. Use File → Open Folder first.`);
+    vscode.window.showInformationMessage(`Can't open ${filename} — no project is active.`);
     return;
   }
   const filePath = require('path').join(root, filename);

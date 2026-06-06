@@ -57,6 +57,11 @@ export function buildListenerScript(): string {
       }
       if (msg.type === 'inject-text' && input && msg.text) { input.value = msg.text; input.focus(); }
       if (msg.type === 'update-title') { var ts = document.querySelector('.header-left strong'); if (ts && msg.html) { ts.innerHTML = msg.html; } }
+      if (msg.type === 'update-header') {
+        var hr = document.querySelector('.header-right'); if (hr && msg.headerRight !== undefined) { hr.innerHTML = msg.headerRight; }
+        var il = document.getElementById('input-left'); if (il && msg.inputLeft !== undefined) { il.innerHTML = msg.inputLeft; }
+        return;
+      }
       if (msg.type === 'bi-start') showBlueprintInterview();
       if (msg.type === 'bi-layers') { window._biLayers = msg.layers || []; window._biLayerIdx = 0; window._biRender(window._biLayers[0]); }
       if (msg.type === 'bi-done') { document.getElementById('blueprint-interview-root')?.remove(); document.body.style.overflow = ''; }

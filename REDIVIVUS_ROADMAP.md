@@ -7,7 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* Jun 5, 2026 — Session 16W: strengthened workerTier guidance (game engines/algorithms now rate ultra) + Guardian now re-verifies worker retry and escalates to the Supervisor model if still failing, so correct code ships over broken. See docs/REDIVIVUS_FIXES.md for full session history (16N-16W).
+*Last updated:* Jun 6, 2026 — BACKEND (fly.dev v59): fixed generic-filename root cause (worker prompt now mandates `language:path` fences in buildPipeline.ts) + a template-literal syntax bug in redivivusWorkerRules.ts that had been silently blocking ALL backend deploys (prod was missing the whole worker-rules quality block). Also: cloud multi-file pipeline (`/plan` + per-file `/build`) was never completed — chose the prompt fix over building it. Extension: supervisor cost-attribution + client filename safety net. See docs/REDIVIVUS_FIXES.md.
+
+*Prior:* Jun 6, 2026 — Session 16X: (a..h) Empty-workspace builds = NO RELOAD via new "Project Files" tree (projectFilesProvider.ts) read from disk; (j..k) header + Preview/Run/History/Map/Usage recognize the no-reload project via getActiveProjectRoot(); editor shim files (CLAUDE.md/.cursorrules/etc.) now OPT-IN (off by default, redivivus.editorRuleFiles + "Configure Editor Rule Files" command; .redivivus/rules.md always written). See docs/REDIVIVUS_FIXES.md.
 
 ---
 

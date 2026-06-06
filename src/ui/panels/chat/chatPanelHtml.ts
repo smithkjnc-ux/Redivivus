@@ -8,6 +8,7 @@ import { buildChatScript } from './chatPanelScript';
 import type { DashboardData } from './chatPanelDashboard';
 import { buildProjectDashboard } from './chatPanelDashboard';
 import { buildEmptyStateHtml } from './chatPanelEmptyState';
+import { renderHeaderRightInner, renderInputLeftInner } from './chatPanelHeaderRender';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -84,17 +85,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       ${header?.buildStamp ? `<span title="Compiled: ${header.buildStamp}" style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.6;margin-left:6px;font-family:monospace;user-select:none;">${header.buildStamp}</span>` : ''}<span style="font-size:9px;font-weight:700;letter-spacing:0.08em;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 5px;margin-left:6px;user-select:none;">BETA</span>
     </div>
     <div class="header-right">
-      ${header && header.hasProjectOpen ? `
-      <button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>
-      <button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>
-      <button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Build History">&#x1F4CB; History</button>
-      <button class="header-btn header-btn--preview" ${header.primaryAction?.actionAttr}="${header.primaryAction?.actionValue}" title="${header.primaryAction?.tooltip}">${header.primaryAction?.icon} ${header.primaryAction?.label}</button>
-      ` : ''}
-      ${header && header.projectTokens ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
-      <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
-      <button class="header-btn" data-cmd="redivivus.showSystemHealth" title="Network, AI keys, account status, and build log stats" style="${header?.healthStatus === 'green' ? 'border-color:#4caf50;color:#4caf50;' : header?.healthStatus === 'yellow' ? 'border-color:#ff9800;color:#ff9800;' : header?.healthStatus === 'red' ? 'border-color:#f44336;color:#f44336;' : ''}">${header?.healthStatus ? '&#x25CF;' : '&#x25CE;'} Health</button>
-      <button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.showChatGettingStarted' : 'redivivus.showCapabilities'}" title="${header && header.hasProjectOpen ? 'How to use Redivivus with your project' : 'What is Redivivus?'}">? Help</button>
-      <button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">&#x1F41B; Report</button>
+      ${renderHeaderRightInner(header)}
     </div>
   </div>
   ${headerHtml}
@@ -106,13 +97,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
       </div>
       <div id="input-bottom">
         <div id="input-left">
-          <button class="input-pill" data-cmd="redivivus.openVault" title="Browse Vault">&#x229E; Vault</button>
-          ${header && header.hasProjectOpen ? `<button class="input-pill input-pill--run" data-cmd="redivivus.runProject" title="Run your project in the terminal">&#x25B6; Run</button>` : ''}
-          ${header ? (header.rosterDisplay && header.rosterDisplay.length > 0
-            ? `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="AI Team: ${header.rosterDisplay.map(r => r.emoji + ' ' + r.label + ' (' + r.role + ')').join(', ')}">${header.rosterDisplay[0].emoji} ${header.rosterDisplay[0].label}${header.rosterDisplay.length > 1 ? ' +' + (header.rosterDisplay.length - 1) : ''}</span>`
-            : `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="Click to configure AI model">${!header.hasKey ? '⚠️ No AI key' : '🧠 ' + header.aiLabel}</span>`
-          ) : ''}
-          <span class="input-pill input-pill--adaptive" data-action="show-agent-info" title="Adaptive Mode: Supervisor auto-routes each prompt to the optimal AI. Click for info.">&#x1F500; Adaptive</span>
+          ${renderInputLeftInner(header)}
         </div>
         <div id="input-right">
           <button id="send-btn" title="Send (Enter)">↑</button>

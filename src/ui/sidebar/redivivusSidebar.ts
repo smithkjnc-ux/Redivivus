@@ -58,6 +58,7 @@ export function getSidebarHtml(): string {
       <button class="item" data-cmd="redivivus.guide">&#10067; Getting Started</button>
       <button class="item" data-cmd="redivivus.openSettings">&#128273; AI API Keys</button>
       <button class="item" data-cmd="redivivus.generateRules">&#128196; Generate Rules</button>
+      <button class="item" data-cmd="redivivus.configureEditorRules">&#129513; Editor Rule Files</button>
       <button class="item" data-cmd="redivivus.retrofit">&#128296; Retrofit</button>
     </div>
   </div>

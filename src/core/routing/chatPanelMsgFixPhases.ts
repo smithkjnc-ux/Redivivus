@@ -48,8 +48,8 @@ Source files:
 ${filesBlock}${projectDeadEnds ? `\n\nPREVIOUSLY FAILED APPROACHES (DO NOT suggest these again):\n${projectDeadEnds}` : ''}${projectRules ? `\n\nPROJECT RULES (your fix must not violate these):\n${projectRules}` : ''}
 ${buildSupervisorNotes(activePatterns)}`;
 
-  const base = require('../api/apiClient.js').getApiBase();
-  const token = await require('../api/apiClient.js').getAccountToken();
+  const base = require('../../services/api/apiClient.js').getApiBase();
+  const token = await require('../../services/api/apiClient.js').getAccountToken();
   const fetchFn = (deps.routing as any).fetchWithTimeout;
   const keyMap = deps.routing.getKeyMap();
   const { supervisor } = deps.routing.selectSupervisorAndWorker();
@@ -113,8 +113,8 @@ ${filesBlock}
 ${buildWorkerRules(activePatterns, 9)}`;
 
   const workerAI = deps.routing.selectSupervisorAndWorker().worker || deps.routing.getAvailableAI().ai;
-  const base = require('../api/apiClient.js').getApiBase();
-  const token = await require('../api/apiClient.js').getAccountToken();
+  const base = require('../../services/api/apiClient.js').getApiBase();
+  const token = await require('../../services/api/apiClient.js').getAccountToken();
   const keyMap = deps.routing.getKeyMap();
   
   let workerResponse = '';

@@ -106,7 +106,7 @@ function renderCreating(data: WizardData): string {
         <div>📄 README.md</div>
         <div>⚙️ .gitignore</div>
         <div>🔧 .redivivus/rules.md</div>
-        <div>🔗 .cursorrules / .windsurfrules / CLAUDE.md</div>
+        <div style="opacity:0.6">🔗 Editor rule files (CLAUDE.md, .cursorrules…) — opt-in via Setup</div>
       </div>
     </div>`;
 }

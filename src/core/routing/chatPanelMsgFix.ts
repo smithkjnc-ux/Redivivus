@@ -94,7 +94,14 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     fixLog('Phase 1: Supervisor diagnosis received', { diagnosisPreview: diagnosis.substring(0, 500) });
     supervisorLabel = p1.supervisorLabel;
   } catch (err) {
-    conversation[conversation.length - 1].content = `[FAIL] Supervisor phase failed: ${err instanceof Error ? err.message : String(err)}`;
+    const _errMsg = err instanceof Error ? err.message : String(err);
+    const _hint = (_errMsg.includes('key') || _errMsg.includes('auth') || _errMsg.includes('401'))
+      ? 'This looks like an API key issue — check **Setup → AI API Keys**.'
+      : 'This is usually a temporary network hiccup.';
+    const _b64 = Buffer.from(userText, 'utf8').toString('base64');
+    conversation[conversation.length - 1].content =
+      `⚠️ **Something went wrong while analysing your fix.** ${_hint}\n\n` +
+      `__RETRY_FIX__:${_b64}__END_RETRY__`;
     refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
@@ -121,7 +128,14 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       guardianNote += escalation.escalated ? ' (escalated to best model)' : ` (${escalation.retryCount} retries)`;
     }
   } catch (err) {
-    conversation[conversation.length - 1].content = `[FAIL] Fix pipeline failed: ${err instanceof Error ? err.message : String(err)}`;
+    const _errMsg2 = err instanceof Error ? err.message : String(err);
+    const _hint2 = (_errMsg2.includes('key') || _errMsg2.includes('auth') || _errMsg2.includes('401'))
+      ? 'This looks like an API key issue — check **Setup → AI API Keys**.'
+      : 'This is usually a temporary network hiccup.';
+    const _b642 = Buffer.from(userText, 'utf8').toString('base64');
+    conversation[conversation.length - 1].content =
+      `⚠️ **Something went wrong while writing the fix.** ${_hint2}\n\n` +
+      `<button class="retry-fix-btn" data-retry="${_b642}" style="margin-top:6px;padding:6px 14px;background:#0e639c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">↩ Retry</button>`;
     refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 

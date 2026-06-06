@@ -10,6 +10,7 @@ import { ChatPanel } from '../../ui/panels/chat/chatPanel';
 import { BuildHistoryService } from '../../services/build/buildHistoryService';
 import { detectPostBuildInfo, createHtmlWrapperIfNeeded } from '../build/chatPanelPostBuild';
 import { getLastTerminalError } from '../../services/workspace/terminalErrorService';
+import { getActiveProjectRoot } from '../../services/project/activeProjectRoot';
 
 export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel: vscode.WebviewPanel): Promise<void> {
   const command = msg.command;
@@ -63,7 +64,8 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
       debugLog(_root, 'run-command', `executed OK: ${command}`);
     } else if (command === 'redivivus.runProject') {
       // [FIX] Run directly — VS Code command dispatch unreliable for this command
-      const runRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      // [FIX] Use the active project root (Project Files tree) so Run works in the no-reload flow.
+      const runRoot = getActiveProjectRoot();
       if (!runRoot) { vscode.window.showWarningMessage('No project folder open.'); return; }
       const recentFiles = new BuildHistoryService(runRoot).list().filter(e => !e.undone).slice(0, 1).flatMap(e => e.files);
       try {

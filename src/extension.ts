@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
+import { ProjectFilesProvider } from './ui/sidebar/projectFilesProvider.js';
 import { seedVault } from './services/vault/vaultSeeder.js';
 import { RedivivusService } from './services/redivivusService.js';
 import { BlueprintService } from './services/blueprint/blueprintService.js';
@@ -209,9 +210,11 @@ export function activate(context: vscode.ExtensionContext) {
       } else if (e.added.length > 0) {
         // New folder added externally (not by onNewProject) — trigger init
         // onNewProject handles its own init inline; this only fires for external folder additions
-        // [WARN] Check synchronous flag FIRST — globalState.update is async and loses the race
-        if (_suppressNextFolderAdd) {
-          _suppressNextFolderAdd = false;
+        // [FIX] Check the synchronous ChatPanel.suppressAutoOpen flag FIRST — the build runner sets
+        // this before calling updateWorkspaceFolders. globalState.update is async and loses the race.
+        const _cp = require('./ui/panels/chat/chatPanel.js').ChatPanel;
+        if (_cp?.suppressAutoOpen) {
+          _cp.suppressAutoOpen = false;
           context.globalState.update('redivivus.suppressAutoOpen', undefined);
         } else {
           const suppressPath = context.globalState.get<string>('redivivus.suppressAutoOpen');
@@ -282,6 +285,13 @@ export function activate(context: vscode.ExtensionContext) {
   // ── sidebar view with Redivivus functions ──
   const sidebarProvider = new (RedivivusSidebarProvider as any)(redivivusService, sessionService);
   context.subscriptions.push(vscode.window.registerWebviewViewProvider(RedivivusSidebarProvider.viewType, sidebarProvider));
+
+  // ── Project Files tree — shows the active build's folder from disk (no workspace folder, no reload) ──
+  const projectFilesProvider = new ProjectFilesProvider();
+  ProjectFilesProvider.instance = projectFilesProvider;
+  context.subscriptions.push(vscode.window.registerTreeDataProvider('redivivusProjectFiles', projectFilesProvider));
+  // If a workspace folder is already open, seed the tree with it so the view is never empty.
+  { const _r = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (_r) { projectFilesProvider.setRoot(_r); } }
 
   // ── auto-open chat panel on startup (first activation only) ──
   // Open panel at startup if none is running. suppressAutoOpen only prevents DUPLICATES (currentPanel exists).

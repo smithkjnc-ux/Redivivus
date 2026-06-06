@@ -101,6 +101,13 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     if (ChatPanel.extensionContext) {
       ChatPanel.extensionContext.globalState.update('redivivus.suppressAutoOpen', msg.path);
       ChatPanel.extensionContext.globalState.update('redivivus.suppressConversationClear', true);
+      // [FIX] Save conversation BEFORE updateWorkspaceFolders — going from 0→1 folders restarts the
+      // extension host (same as openFolder), wiping in-memory state. resumePendingState restores it.
+      const _conv = (panel as any).state?.conversation;
+      if (_conv?.length > 0) {
+        ChatPanel.extensionContext.globalState.update('redivivus.pendingRescueConversation', _conv);
+        ChatPanel.extensionContext.globalState.update('redivivus.pendingBuildComplete', true);
+      }
     }
     if (!vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === msg.path)) { vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(msg.path) }); }
     else { (panel as any)._initialized = false; panel.refresh(); }

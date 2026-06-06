@@ -32,10 +32,10 @@ export async function checkStep3({ redivivus }: Ctx): Promise<SetupStep> {
 }
 
 export async function checkStep4({ root }: Ctx): Promise<SetupStep> {
-  const ruleFiles = ['.cursorrules', '.windsurfrules', 'CLAUDE.md', 'GEMINI.md', '.clinerules'];
-  const results = await Promise.all(ruleFiles.map(f => pathExists(path.join(root, f))));
-  const completed = results.every(Boolean);
-  return { id: 4, title: 'Editor rules generated (.cursorrules, CLAUDE.md, etc.)', completed, inProgress: false, action: completed ? undefined : 'Run "generate rules" to create editor shim files' };
+  // Editor shim files are opt-in now. The canonical rules live in .redivivus/rules.md — that's what
+  // this step verifies. Editor-specific files (CLAUDE.md, .cursorrules, etc.) are configured separately.
+  const completed = await pathExists(path.join(root, '.redivivus', 'rules.md'));
+  return { id: 4, title: 'Project rules generated (.redivivus/rules.md)', completed, inProgress: false, action: completed ? undefined : 'Run "generate rules" to create the project rules' };
 }
 
 export async function checkStep5({ redivivus }: Ctx): Promise<SetupStep> {

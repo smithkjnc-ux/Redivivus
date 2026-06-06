@@ -28,6 +28,10 @@ export interface CloudBuildResult {
   supervisorOutputTokens?: number
   supervisorError?: string
   workerProvider?: string
+  // Smart model-switching: why this model was chosen (strategy + difficulty + tier).
+  modelRationale?: string
+  modelStrategy?: string
+  modelTier?: string
 }
 
 // [WARN] AbortSignal.timeout() does not reliably abort in Electron's fetch — use Promise.race instead.
@@ -65,7 +69,11 @@ export async function callCloudBuild(
   }
 
   // ── Step 0: Get build plan (skip for fix requests — always single-file) ──
+  // [WARN] If /plan returns <=1 file (or fails), a multi-file project like a game falls through to the
+  // single-file path, whose parser splits the blob into generic file1.js/file2.js names. The plan
+  // failure used to be silently swallowed — now logged so we can see WHY a build went single-file.
   if (!opts.isFix && !opts.targetFile) {
+    const _planLog = (m: string) => { try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[plan] ${m}\n`); } catch {} };
     try {
       opts.onProgress?.('Planning your build...');
       const planBody = JSON.stringify({ task, preferred, context: { blueprint: context.blueprint, existingFiles: context.existingFiles } });
@@ -76,11 +84,18 @@ export async function callCloudBuild(
       ]);
       if (planRes.ok) {
         const plan = await planRes.json() as { files: Array<{ path: string; description: string; isNew: boolean }> };
+        _planLog(`ok status=${planRes.status} files=${plan.files?.length ?? 0} paths=${(plan.files ?? []).map(f => f.path).join(', ')}`);
         if (plan.files && plan.files.length > 1) {
+          _planLog(`-> multi-file path (executeMultiFileBuild)`);
           return await executeMultiFileBuild(task, root, context, keyHeaders, token, base, preferred ?? '', plan.files, deps, opts.onProgress);
         }
+        _planLog(`-> single-file path (plan returned <=1 file)`);
+      } else {
+        _planLog(`NOT ok status=${planRes.status} -> single-file path`);
       }
-    } catch { /* plan failed — fall through to single-file build */ }
+    } catch (e) {
+      _planLog(`THREW: ${e instanceof Error ? e.message : String(e)} -> single-file path`);
+    }
   }
 
   opts.onProgress?.('Building your project...');
@@ -90,7 +105,9 @@ export async function callCloudBuild(
     // [FIX] Send workerModel = preferred so the server uses the user's chosen AI for the Worker role,
     // not a cheaper fallback. Without this the server was using GPT-4o as Worker even when Claude
     // was selected, producing incomplete output while Supervisor/Guardian ran on Claude.
-    const requestBody = JSON.stringify({ task, context, preferred, workerModel: preferred });
+    // User's cost/quality preference — backend combines it with task difficulty to pick the model tier.
+    const strategy = vscode.workspace.getConfiguration('redivivus').get<string>('modelStrategy') || 'balanced';
+    const requestBody = JSON.stringify({ task, context, preferred, workerModel: preferred, strategy });
     console.log(`[Redivivus] Build request: taskLen=${task.length}, bodyLen=${requestBody.length}, vaultItems=${context.vaultItems?.length ?? 0}, hasRules=${!!context.projectRules}`);
     // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
     const instructionRes = await Promise.race([
@@ -140,10 +157,68 @@ export async function callCloudBuild(
 
     const supervisorMetaRaw = instructionRes.headers.get('X-Supervisor-Meta');
     const workerProvider = instructionRes.headers.get('X-Worker-Provider') || preferred || 'claude';
-    
+    const skeletonMetaRaw = instructionRes.headers.get('X-Skeleton-Meta');
+    const modelDecisionRaw = instructionRes.headers.get('X-Model-Decision');
+
     let supervisor: any = { ran: false, error: '' };
     if (supervisorMetaRaw) {
       try { supervisor = JSON.parse(supervisorMetaRaw); } catch {}
+    }
+    // Smart model-switching decision (strategy + difficulty + chosen model + rationale).
+    let modelDecision: any = null;
+    if (modelDecisionRaw) {
+      try { modelDecision = JSON.parse(modelDecisionRaw); } catch {}
+    }
+
+    // [FIX] Skeleton-first workflow: create folder/file structure BEFORE code arrives
+    // This shows the project architecture in Explorer immediately, following proper engineering practices.
+    if (skeletonMetaRaw && root) {
+      try {
+        const skeleton = JSON.parse(skeletonMetaRaw) as { filesToCreate: string[]; foldersToCreate: string[] };
+        const fs = await import('fs');
+        const path = await import('path');
+        
+        opts.onProgress?.(`Creating project structure: ${skeleton.foldersToCreate?.length || 0} folders, ${skeleton.filesToCreate?.length || 0} files...`);
+        
+        // Create folders first
+        if (skeleton.foldersToCreate && skeleton.foldersToCreate.length > 0) {
+          for (const folderPath of skeleton.foldersToCreate) {
+            const fullPath = path.join(root, folderPath);
+            try {
+              if (!fs.existsSync(fullPath)) {
+                fs.mkdirSync(fullPath, { recursive: true });
+              }
+            } catch (e) {
+              console.warn(`[Redivivus] Could not create folder ${folderPath}:`, e);
+            }
+          }
+        }
+        
+        // Create empty files (will be filled in by code processor)
+        if (skeleton.filesToCreate && skeleton.filesToCreate.length > 0) {
+          for (const filePath of skeleton.filesToCreate) {
+            const fullPath = path.join(root, filePath);
+            try {
+              const dir = path.dirname(fullPath);
+              if (!fs.existsSync(dir)) {
+                fs.mkdirSync(dir, { recursive: true });
+              }
+              if (!fs.existsSync(fullPath)) {
+                fs.writeFileSync(fullPath, '', 'utf-8');
+              }
+            } catch (e) {
+              console.warn(`[Redivivus] Could not create file ${filePath}:`, e);
+            }
+          }
+        }
+        
+        // Refresh explorer to show skeleton
+        await vscode.commands.executeCommand('redivivus.refreshProjectMap');
+        opts.onProgress?.('Project structure created. Generating code...');
+      } catch (e) {
+        console.warn('[Redivivus] Skeleton creation failed:', e);
+        // Continue anyway - code will still be written
+      }
     }
 
     // Step 3: Parse the streamed code blocks into files locally
@@ -173,6 +248,9 @@ export async function callCloudBuild(
       supervisorOutputTokens: supervisor.outputTokens,
       supervisorError: supervisor.error,
       workerProvider: workerProvider,
+      modelRationale: modelDecision?.rationale,
+      modelStrategy: modelDecision?.strategy,
+      modelTier: modelDecision?.tier,
     };
 
   } catch (err: any) {
