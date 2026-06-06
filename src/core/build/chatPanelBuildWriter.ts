@@ -10,6 +10,33 @@ import type { BuildContext } from './chatPanelBuild';
 
 export interface WriteOptions { root?: string; task?: string; }
 
+/**
+ * Detects when the AI wrote placeholder/skeleton code instead of real implementations.
+ * Returns an error string if the code is stub-only, null if it looks real.
+ * Catches the pattern seen in screenshot bug: CSS blocks with only comments like
+ * "/* 3D effect styles similar to black-pawn *\/" and no actual property declarations.
+ */
+export function detectPlaceholderCode(code: string, ext: string): string | null {
+  const e = ext.toLowerCase()
+  if (e === '.css' || e === '.scss') {
+    const blocks = [...code.matchAll(/\{([^}]*)\}/g)].map(m => m[1].trim()).filter(Boolean)
+    if (blocks.length === 0) return null
+    const stubBlocks = blocks.filter(inner => {
+      const lines = inner.split('\n').map(l => l.trim()).filter(Boolean)
+      return lines.length > 0 && lines.every(l => l.startsWith('/*') || l.startsWith('*') || l.startsWith('//'))
+    })
+    if (stubBlocks.length > 0 && stubBlocks.length === blocks.length) {
+      return 'The AI wrote placeholder comments instead of real CSS properties — nothing was applied. Ask it to write the actual CSS values (e.g. "text-shadow: 0 2px 4px rgba(0,0,0,0.5)") instead of stubs.'
+    }
+  }
+  // Generic: catch "/* existing styles */" and "/* same as above */" patterns in any file
+  const stubComments = (code.match(/\/\*\s*(existing|your|same as|placeholder|add here|implement|TODO)\s*(code|styles?|logic|content)?\s*\*\//gi) ?? []).length
+  if (stubComments >= 2) {
+    return `The AI wrote ${stubComments} placeholder stub comments instead of real code. Ask it to write the complete implementation.`
+  }
+  return null
+}
+
 export function writeBuiltFile(absPath: string, code: string, options?: WriteOptions): void {
   const isNewFile = !fs.existsSync(absPath);
   let finalCode = code;
@@ -30,6 +57,9 @@ export function writeBuiltFile(absPath: string, code: string, options?: WriteOpt
       finalCode = finalCode.slice(0, closeMatch.index + closeMatch[0].length).trim();
     }
   }
+
+  const placeholderErr = detectPlaceholderCode(finalCode, path.extname(absPath))
+  if (placeholderErr) { throw new Error(placeholderErr) }
 
   const dir = path.dirname(absPath);
   if (!fs.existsSync(dir)) {fs.mkdirSync(dir, { recursive: true });}
