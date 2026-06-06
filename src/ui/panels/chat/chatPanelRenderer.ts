@@ -38,7 +38,15 @@ export function renderMessages(conversation: ChatMessage[]): string {
     const storyHtml = renderStoryBlock(msg.content, timeStr, bubbleClass);
     if (storyHtml) {return storyHtml;}
 
-    let html = escapeHtml(msg.content);
+    // [FIX] Strip internal pipeline enrichments from user bubbles — these should never be visible.
+    // routedText sometimes gets stored as the user message content when pipeline stages inject context.
+    const displayContent = isUser
+      ? msg.content
+          .replace(/\n\nUSER EXPERIENCE LEVEL:[^\n]*/g, '')
+          .replace(/\n\nVISUAL CONTRACT \(locked[^)]*\):[\s\S]*?(?=\n\n[A-Z]|\n*$)/g, '')
+          .trim()
+      : msg.content;
+    let html = escapeHtml(displayContent);
     html = html.replace(/ ?__BUILD_WORKING__/g, '');
     html = html.replace(/GUARDIAN_PASS\s*/g, '');
     html = html.replace(/📝 (.+)/g, (_m, t) => `<div class="story-line"><span class="story-dot">✅</span><span>${escapeHtml(t)}</span></div>`);
