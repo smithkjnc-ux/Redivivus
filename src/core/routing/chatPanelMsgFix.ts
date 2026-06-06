@@ -95,12 +95,12 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     supervisorLabel = p1.supervisorLabel;
   } catch (err) {
     const _errMsg = err instanceof Error ? err.message : String(err);
-    const _hint = (_errMsg.includes('key') || _errMsg.includes('auth') || _errMsg.includes('401'))
-      ? 'This looks like an API key issue — check **Setup → AI API Keys**.'
-      : 'This is usually a temporary network hiccup.';
+    const _isKeyErr = /401|403|invalid.{0,10}(api.)?key|api.key.{0,10}(invalid|missing|expired)|unauthorized/i.test(_errMsg);
+    const _hint = _isKeyErr ? 'This looks like an API key issue — check **Setup → AI API Keys**.' : 'This is usually a temporary network hiccup — try again.';
     const _b64 = Buffer.from(userText, 'utf8').toString('base64');
     conversation[conversation.length - 1].content =
       `⚠️ **Something went wrong while analysing your fix.** ${_hint}\n\n` +
+      `_Details: ${_errMsg.slice(0, 300)}_\n\n` +
       `__RETRY_FIX__:${_b64}__END_RETRY__`;
     refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
@@ -129,13 +129,13 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     }
   } catch (err) {
     const _errMsg2 = err instanceof Error ? err.message : String(err);
-    const _hint2 = (_errMsg2.includes('key') || _errMsg2.includes('auth') || _errMsg2.includes('401'))
-      ? 'This looks like an API key issue — check **Setup → AI API Keys**.'
-      : 'This is usually a temporary network hiccup.';
+    const _isKeyErr2 = /401|403|invalid.{0,10}(api.)?key|api.key.{0,10}(invalid|missing|expired)|unauthorized/i.test(_errMsg2);
+    const _hint2 = _isKeyErr2 ? 'This looks like an API key issue — check **Setup → AI API Keys**.' : 'This is usually a temporary network hiccup — try again.';
     const _b642 = Buffer.from(userText, 'utf8').toString('base64');
     conversation[conversation.length - 1].content =
       `⚠️ **Something went wrong while writing the fix.** ${_hint2}\n\n` +
-      `<button class="retry-fix-btn" data-retry="${_b642}" style="margin-top:6px;padding:6px 14px;background:#0e639c;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;font-weight:600;">↩ Retry</button>`;
+      `_Details: ${_errMsg2.slice(0, 300)}_\n\n` +
+      `__RETRY_FIX__:${_b642}__END_RETRY__`;
     refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
