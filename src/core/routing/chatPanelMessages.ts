@@ -28,7 +28,9 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     // [Redivivus] Plan mode: if interview is active (including project-name step), route to handler
     if (deps.buildMode === 'plan' && deps.planInterview && (deps.planInterview.step < 8 || deps.planInterview.needsProjectName)) {
       const { handlePlanInterviewAnswer } = await import('../../ui/panels/chat/chatPanelPlanInterview.js');
-      await handlePlanInterviewAnswer(msg, deps);
+      // [FIX] try-catch guarantees set-status:ready even if the handler throws or an AI call hangs
+      try { await handlePlanInterviewAnswer(msg, deps); }
+      catch (e) { console.error('[plan-interview] error:', e); deps.conversation.push({ role: 'assistant', content: 'Something went wrong — please try again.', timestamp: Date.now() }); deps.refresh(); }
       // Unlock input — the build pipeline will re-lock with set-status:working if a build starts
       const _iv = deps.planInterview as any;
       if (!_iv || !(_iv.step >= 8 && !_iv.needsProjectName)) {

@@ -5,6 +5,12 @@ on:
     branches:
       - master
 
+# Only one release runs at a time. If a new push arrives while one is running,
+# cancel the old one and let the latest commit win — avoids same-tag conflicts.
+concurrency:
+  group: release
+  cancel-in-progress: true
+
 jobs:
   deploy:
     if: "!contains(github.event.head_commit.message, 'chore: release')"
@@ -47,9 +53,6 @@ jobs:
         working-directory: /home/runner/projects/redivivus
         run: npm ci
 
-      - name: Install Cloudflare Wrangler
-        run: npm install -g wrangler
-
       - name: Configure Git
         run: |
           git config --global user.name "github-actions[bot]"
@@ -58,8 +61,6 @@ jobs:
       - name: Run Build and Release
         env:
           GH_TOKEN: ${{ secrets.REPO_PAT }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         working-directory: /home/runner/projects/redivivus
         run: |
           # 1. Bump version
@@ -74,45 +75,50 @@ jobs:
           echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
           TARBALL="$HOME/redivivus-$NEW_VERSION.tar.gz"
           WIN_ZIP="$HOME/redivivus-win32-x64-v$NEW_VERSION.zip"
-          
-          # 2. Compile
+          TAG="v$NEW_VERSION"
+
+          # 2. Skip if this tag was already released (race guard for rapid pushes)
+          if gh release view "$TAG" --repo smithkjnc-ux/Redivivus &>/dev/null; then
+            echo "⚠  Release $TAG already exists — skipping to avoid duplicate."
+            exit 0
+          fi
+
+          # 3. Compile
           npm run compile
-          
-          # 3. Build Linux IDE Shell
+
+          # 4. Build Linux IDE Shell
           echo "▶  Building Linux IDE Shell..."
           ./scripts/update-linux-base.sh
-          
+
           cd $HOME/projects/redivivus-build
           FOLDER="redivivus-$NEW_VERSION"
           mv VSCode-linux-x64 "$FOLDER"
           tar -czf "$TARBALL" "$FOLDER"
           mv "$FOLDER" VSCode-linux-x64
-          
-          # 4. Build Windows IDE Shell
+
+          # 5. Build Windows IDE Shell
           cd $HOME/projects/redivivus
           echo "▶  Building Windows IDE Shell..."
           ./scripts/build-windows.sh --skip-compile
-          
-          # 5. Create GitHub Release
-          TAG="v$NEW_VERSION"
-          echo "▶  Creating GitHub Release..."
+
+          # 6. Create GitHub Release
+          echo "▶  Creating GitHub Release $TAG..."
           gh release create "$TAG" "$TARBALL" "$WIN_ZIP" \
             --repo smithkjnc-ux/Redivivus \
             --title "Redivivus IDE $TAG" \
             --notes "Standalone builds for Linux and Windows. Download, extract, and run.
 
-          ## Linux Install
-          \`\`\`bash
-          tar -xzf redivivus-${NEW_VERSION}.tar.gz
-          cd redivivus-${NEW_VERSION} && ./redivivus
-          \`\`\`
+## Linux Install
+\`\`\`bash
+tar -xzf redivivus-${NEW_VERSION}.tar.gz
+cd redivivus-${NEW_VERSION} && ./redivivus
+\`\`\`
 
-          ## Windows Install
-          Extract the zip and double-click \`redivivus.exe\`"
-            
+## Windows Install
+Extract the zip and double-click \`redivivus.exe\`"
 
-          # 7. Update Web Download Links and Push
-          echo "▶  Triggering Web App Update..."
+          # 7. Update Web Download Links
+          echo "▶  Updating web download links to $NEW_VERSION..."
           cd $HOME/projects/redivivus-web
           node -e "
           const fs = require('fs');
@@ -122,7 +128,7 @@ jobs:
           "
           git commit -am "chore: update IDE download links for v$NEW_VERSION"
           git push origin master
-          
+
           # 8. Push Version Bump to Redivivus
           cd $HOME/projects/redivivus
           git commit -am "chore: release $NEW_VERSION"

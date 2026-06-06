@@ -25,8 +25,8 @@ echo "$(date): New commits detected. Triggering release..."
 # 3. GH_TOKEN must be set in the environment (e.g. ~/.bashrc) — never hardcoded here.
 if [ -z "$GH_TOKEN" ]; then echo "ERROR: GH_TOKEN not set — skipping release."; exit 1; fi
 
-# Run the user's release script
-./scripts/release.sh
+# Run the release script (local-release.sh handles full pipeline)
+./scripts/local-release.sh
 
 # 4. The release script modifies package.json, so we should commit and push it
 git commit -am "chore: release $(node -p "require('./package.json').version")"

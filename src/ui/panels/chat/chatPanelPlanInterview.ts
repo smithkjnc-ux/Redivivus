@@ -132,7 +132,8 @@ export async function handlePlanInterviewAnswer(msg: any, deps: any): Promise<vo
   // [RULE 18] After 'what' answered (step just became 2): AI infers obvious remaining W's so we skip them
   if (interview.step === 2 && deps.routing) {
     try {
-      const inferred = await inferRemainingWs(interview.answers.what || '', deps.routing);
+      const _inferTimeout = new Promise<Record<string, string>>(r => setTimeout(() => r({}), 8000));
+      const inferred = await Promise.race([inferRemainingWs(interview.answers.what || '', deps.routing), _inferTimeout]);
       if (Object.keys(inferred).length > 0) {
         Object.assign(interview.answers, inferred);
         const labels = Object.entries(inferred)
@@ -165,7 +166,8 @@ export async function handlePlanInterviewAnswer(msg: any, deps: any): Promise<vo
   }
 
   if (interview.step === 6) {
-    const followups = await generateFollowups(interview.answers, deps.routing);
+    const _fupTimeout = new Promise<string[]>(r => setTimeout(() => r([]), 8000));
+    const followups = await Promise.race([generateFollowups(interview.answers, deps.routing), _fupTimeout]).catch(() => [] as string[]);
     if (followups.length > 0) {
       interview.followupQuestions = followups;
       interview.followupIndex = 0;
