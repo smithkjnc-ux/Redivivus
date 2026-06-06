@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.3.68",
+  "version": "0.3.69",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -33,10 +33,18 @@
     "views": {
       "redivivusView": [
         {
+          "id": "redivivusProjectFiles",
+          "name": "Project Files",
+          "type": "tree",
+          "icon": "resources/redivivus-icon-v2.svg",
+          "visibility": "visible"
+        },
+        {
           "id": "redivivusSidebar",
-          "name": "Redivivus",
+          "name": "Redivivus Menu",
           "type": "webview",
-          "icon": "resources/redivivus-icon-v2.svg"
+          "icon": "resources/redivivus-icon-v2.svg",
+          "visibility": "hidden"
         }
       ]
     },
@@ -60,6 +68,10 @@
       {
         "command": "redivivus.progress",
         "title": "Redivivus: Show Progress Map"
+      },
+      {
+        "command": "redivivus.configureEditorRules",
+        "title": "Redivivus: Configure Editor Rule Files"
       },
       {
         "command": "redivivus.log",
@@ -519,6 +531,37 @@
           "type": "string",
           "default": "",
           "description": "Override the Redivivus cloud API base URL (leave blank for production). Example: http://localhost:3001/api/v1"
+        },
+        "redivivus.modelStrategy": {
+          "type": "string",
+          "default": "balanced",
+          "enum": [
+            "economy",
+            "balanced",
+            "quality"
+          ],
+          "enumDescriptions": [
+            "Economy — cheapest viable model for the job. Lowest cost; small risk of bugs on tricky tasks. Never uses top-tier.",
+            "Balanced (recommended) — pro-tier model for most builds; escalates to the top model only for genuinely hard/novel tasks. Best cost-to-quality.",
+            "Quality — favors the strongest models; escalates to top-tier readily. Highest quality, highest cost."
+          ],
+          "markdownDescription": "How Redivivus picks the AI model for each build. The build's difficulty (weighted by novelty, not size) is combined with this preference to choose the supervisor tier. **Balanced** keeps most builds on a pro-tier model and only uses the top model (e.g. Opus) for genuinely hard work. The build result card shows why each model was chosen."
+        },
+        "redivivus.editorRuleFiles": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string",
+            "enum": [
+              "claude",
+              "cursor",
+              "windsurf",
+              "gemini",
+              "cline",
+              "copilot"
+            ]
+          },
+          "markdownDescription": "Which AI-editor rule files to generate in new projects (CLAUDE.md, .cursorrules, .windsurfrules, GEMINI.md, .clinerules, copilot-instructions). Default is **none** — the canonical rules always live in `.redivivus/rules.md`. Enable only the editors you actually use. Run **Redivivus: Configure Editor Rule Files** for a checklist."
         },
         "redivivus.defaultAI": {
           "type": "string",
