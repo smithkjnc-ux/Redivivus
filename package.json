@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.3.72",
+  "version": "0.3.73",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
