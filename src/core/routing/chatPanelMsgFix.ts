@@ -77,13 +77,15 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // Phase 1: Supervisor diagnoses ALL bugs
   conversation.push({ role: 'assistant', content: 'Reading your project files...', timestamp: Date.now() });
   refresh();
-  let diagnosis = ''; let supervisorLabel = 'AI';
+  let diagnosis = ''; let supervisorLabel = 'AI'; let subtasks: string[] = []; let executionMode: 'parallel' | 'sequential' = 'sequential';
   try {
     const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
     fixLog('Phase 1: Running Supervisor diagnosis...');
     const p1 = await runPhase1Supervisor(userText, filesBlock, buildContext, activePatterns, projectDeadEnds, projectRules, deps, root, imageBase64, imageType);
     if (!p1) {return;} // shouldn't happen based on throw
     diagnosis = p1.diagnosis;
+    subtasks = p1.subtasks;
+    executionMode = p1.executionMode || 'sequential';
     // If Supervisor fetched additional files, expand Worker context and allowedRels
     if (p1.expandedFilesBlock !== filesBlock) {
       filesBlock = p1.expandedFilesBlock;
@@ -93,6 +95,41 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     }
     fixLog('Phase 1: Supervisor diagnosis received', { diagnosisPreview: diagnosis.substring(0, 500) });
     supervisorLabel = p1.supervisorLabel;
+
+    if (p1.requiresAssetFetch && p1.fetchInstructions) {
+      fixLog('Phase 1.5: Executing Agentic Asset Fetch...');
+      conversation.push({
+          role: 'assistant',
+          content: `> 🔄 **Agentic Asset Fetch Initiated:** Task requires massive external assets. Handing off to Terminal Agent to download them safely...`,
+          timestamp: Date.now()
+      });
+      deps.refresh();
+      
+      try {
+          const { executeAgentTask } = await import('../../services/ai/agentService.js');
+          const agentCtx: any = {
+              root: root,
+              task: `[ASSET FETCH] ${p1.fetchInstructions}. Use cross-platform Node.js scripts (e.g. using 'https' or 'fs') instead of OS-specific tools like wget or curl if possible. DO NOT MODIFY EXISTING PROJECT CODE. ONLY download raw assets into the requested raw directory.\n\nANTI-BOT EVASION: If your fetch script fails with HTTP 403 or 429, you must dynamically adapt:\n1. First, modify your script to spoof a real browser User-Agent header.\n2. If the source still blocks you, immediately PIVOT and write a new script to download the assets from a developer-friendly mirror (like raw.githubusercontent.com or an open API) instead of fighting the firewall.`,
+              log: (msg: string) => { conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() }); deps.refresh(); },
+              modifiedFiles: new Set<string>(),
+              snapshotId: undefined,
+              routing: deps.routing,
+              blueprintContext: ''
+          };
+          await executeAgentTask(agentCtx.task, 'Project Context: Downloading massive assets', deps.routing, agentCtx, agentCtx.log);
+          
+          conversation.push({
+              role: 'assistant',
+              content: `> ✅ **Assets Fetched!** Returning to Surgical Worker to modularize them into the codebase...`,
+              timestamp: Date.now()
+          });
+          deps.refresh();
+      } catch (e) {
+          fixLog('Phase 1.5: Agentic Fetch Failed', { error: String(e) });
+          throw new Error("Agentic Asset Fetch Failed: " + String(e));
+      }
+    }
+
   } catch (err) {
     const _errMsg = err instanceof Error ? err.message : String(err);
     const _isKeyErr = /401|403|invalid.{0,10}(api.)?key|api.key.{0,10}(invalid|missing|expired)|unauthorized/i.test(_errMsg);
@@ -106,26 +143,51 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   }
 
   // Phase 2+3: Worker generates fix → Guardian reviews → retry/escalate if rejected
-  conversation[conversation.length - 1].content = 'Found the issue — writing the fix now...';
-  refresh();
   let finalResponse = ''; let workerLabel = 'AI'; let guardianLabel = 'AI'; let guardianNote = ''; let scopeNote = ''; let needsAgentHandoff = false;
+  let written: string[] = []; let failed: string[] = []; let skipped: string[] = []; let fixSnapId: string | undefined;
+
   try {
-    const { runEscalationLoop } = await import('./chatPanelMsgFixEscalation.js');
-    fixLog('Phase 2: Starting Worker fix application...');
-    const escalation = await runEscalationLoop({ diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel });
-    finalResponse = escalation.finalResponse;
-    workerLabel = escalation.workerLabel;
-    fixLog('Phase 2: Worker response received', { 
-      preview: finalResponse.substring(0, 500), 
-      totalLength: finalResponse.length,
-      workerLabel
-    });
-    guardianLabel = escalation.guardianLabel;
-    guardianNote = escalation.guardianNote;
-    scopeNote = escalation.scopeNote;
-    needsAgentHandoff = escalation.needsAgentHandoff;
-    if (escalation.retryCount > 0) {
-      guardianNote += escalation.escalated ? ' (escalated to best model)' : ` (${escalation.retryCount} retries)`;
+    if (subtasks.length > 0) {
+      fixLog('Phase 2: Starting Iterative Subtasks Loop...', { subtasksCount: subtasks.length });
+      const { runSubtasksLoop } = await import('./chatPanelMsgFixSubtasks.js');
+      const subtaskRes = await runSubtasksLoop({ subtasks, executionMode, diagnosis, fileNames, filesBlock, activePatterns, allowedRels, deps, root, supervisorLabel, userText });
+      written = subtaskRes.written;
+      failed = subtaskRes.failed;
+      skipped = subtaskRes.skipped;
+      fixSnapId = subtaskRes.fixSnapId;
+      workerLabel = subtaskRes.workerLabel;
+      guardianLabel = subtaskRes.guardianLabel;
+      guardianNote = subtaskRes.guardianNote;
+      scopeNote = subtaskRes.scopeNote;
+      needsAgentHandoff = subtaskRes.needsAgentHandoff;
+      fixLog('Phase 3: Iterative Application complete', { written, failed, skipped });
+    } else {
+      conversation[conversation.length - 1].content = 'Found the issue — writing the fix now...';
+      refresh();
+      const { runEscalationLoop } = await import('./chatPanelMsgFixEscalation.js');
+      fixLog('Phase 2: Starting Worker fix application...');
+      const escalation = await runEscalationLoop({ diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel });
+      finalResponse = escalation.finalResponse;
+      workerLabel = escalation.workerLabel;
+      fixLog('Phase 2: Worker response received', { 
+        preview: finalResponse.substring(0, 500), 
+        totalLength: finalResponse.length,
+        workerLabel
+      });
+      guardianLabel = escalation.guardianLabel;
+      guardianNote = escalation.guardianNote;
+      scopeNote = escalation.scopeNote;
+      needsAgentHandoff = escalation.needsAgentHandoff;
+      if (escalation.retryCount > 0) {
+        guardianNote += escalation.escalated ? ' (escalated to best model)' : ` (${escalation.retryCount} retries)`;
+      }
+
+      // [FIX] Try surgical edits first (SEARCH/REPLACE), fall back to full-file parsing
+      fixLog('Phase 3: Applying fix content...');
+      const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
+      const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
+      written = applyRes.written; failed = applyRes.failed; skipped = applyRes.skipped; fixSnapId = applyRes.fixSnapId;
+      fixLog('Phase 3: Application complete', { written, failed, skipped });
     }
   } catch (err) {
     const _errMsg2 = err instanceof Error ? err.message : String(err);
@@ -138,17 +200,10 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       `__RETRY_FIX__:${_b642}__END_RETRY__`;
     refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
-
-  // [FIX] Try surgical edits first (SEARCH/REPLACE), fall back to full-file parsing
-  fixLog('Phase 3: Applying fix content...');
-  const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
-  const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
-  let { written, failed, skipped, fixSnapId } = applyRes;
-  fixLog('Phase 3: Application complete', { written, failed, skipped });
   
-  if (written.length === 0 && failed.length === 0) {
+  if (written.length === 0) {
     const { retryNoOutput } = await import('./chatPanelMsgFixRetry.js');
-    const retryResult = await retryNoOutput({ diagnosis, filesBlock, fileNames, activePatterns, allowedRels, deps, userText, conversation, refresh, supervisorLabel, root });
+    const retryResult = await retryNoOutput({ diagnosis, filesBlock, fileNames, activePatterns, allowedRels, deps, userText, conversation, refresh, supervisorLabel, root, failedErrors: failed });
     if (retryResult.written.length > 0) {
       written = retryResult.written; failed = retryResult.failed; skipped = retryResult.skipped; fixSnapId = retryResult.fixSnapId; workerLabel = retryResult.workerLabel;
     } else {

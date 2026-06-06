@@ -11,7 +11,7 @@ function stripSeparatorArtifacts(content: string): string {
   return content.split('\n').filter(l => l.trim() !== '===').join('\n');
 }
 
-export async function applyFixContent(finalResponse: string, root: string, allowedRels: Set<string>, userText: string): Promise<{ written: string[], failed: string[], skipped: string[], fixSnapId: string | undefined, usedSurgical: boolean }> {
+export async function applyFixContent(finalResponse: string, root: string, allowedRels: Set<string>, userText: string, options?: { disableLastResort?: boolean }): Promise<{ written: string[], failed: string[], skipped: string[], fixSnapId: string | undefined, usedSurgical: boolean }> {
   const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits, parseUnifiedDiff } = await import('../../services/build/surgicalEditService.js');
   const responseFormat = detectResponseFormat(finalResponse);
   fixLog('Apply: Response format detected', { format: responseFormat, responseLength: finalResponse.length });
@@ -85,9 +85,9 @@ export async function applyFixContent(finalResponse: string, root: string, allow
   // [FIX] Last-resort fallback: Worker wrapped code in prose/narrative headers (no ## Fix: format).
   // Extract the largest fenced code block and write it to the best-matching allowed file.
   // [WARN] Only triggers when ALL other parsers found zero files — never overwrites successful parses.
-  if (written.length === 0 && failed.length === 0 && allowedRels.size > 0) {
+  if (!options?.disableLastResort && written.length === 0 && failed.length === 0 && allowedRels.size > 0) {
     fixLog(`Apply: Trying last-resort code block extraction`);
-    const codeBlockRe = /```[a-z]*\n([\s\S]*?)```/g;
+    const codeBlockRe = /```(?!json\b)[a-z]*\n([\s\S]*?)```/gi;
     let largest = ''; let blockMatch: RegExpExecArray | null;
     while ((blockMatch = codeBlockRe.exec(finalResponse)) !== null) {
       const block = blockMatch[1].trimEnd();

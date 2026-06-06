@@ -69,15 +69,17 @@ export async function runSupervisorPreplanning(
     const fetchFn = (routing as any).fetchWithTimeout;
     const base = require('../api/apiClient.js').getApiBase();
     const token = await require('../api/apiClient.js').getAccountToken();
-    const keyMap = routing.getKeyMap();
+    const keysPayload = require('../api/apiClient.js').collectKeys();
+    const { bestModelForRole } = require('./modelRegistry.js');
+    const actualModel = bestModelForRole(supervisor, 'pro')?.modelId || supervisor;
     
     const apiRes = await fetchFn(`${base}/execute`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         provider: supervisor,
-        model: supervisor,
-        keys: keyMap,
+        model: actualModel,
+        keys: keysPayload,
         promptType: 'agent-supervisor',
         prompt: `USER REQUEST: "${task}"\n\nPROJECT CONTEXT:\n${context}\n${fileSection}`,
         maxTokens: 4000,

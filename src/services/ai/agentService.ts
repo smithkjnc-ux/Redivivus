@@ -79,7 +79,9 @@ Begin. Think step-by-step.`;
   onUpdate('🧠 **Autonomous Agent** spinning up — analysing your task and preparing a plan...');
   const base = require('../api/apiClient.js').getApiBase();
   const token = await require('../api/apiClient.js').getAccountToken();
-  const keyMap = routing.getKeyMap();
+  const keysPayload = require('../api/apiClient.js').collectKeys();
+  const { bestModelForRole } = require('./modelRegistry.js');
+  const actualModel = bestModelForRole(supervisor, 'pro')?.modelId || supervisor;
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -93,8 +95,8 @@ Begin. Think step-by-step.`;
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           provider: supervisor, // using supervisor AI for agent loop
-          model: supervisor,
-          keys: keyMap,
+          model: actualModel,
+          keys: keysPayload,
           promptType: 'agent-orchestrator',
           prompt: history,
           maxTokens: 4000,

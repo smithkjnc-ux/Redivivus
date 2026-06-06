@@ -54,7 +54,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // [RULE 18] Kept as structural fast-path: short explicit agreement + prior conversation context lookup.
   // The cloud classifier cannot reach back into conversation history — this must stay as code.
   const _BUILD_CONFIRM = /\b(build\s+it|lets\s+(build|do)\s+it|go\s+ahead|make\s+it|start\s+building|lets\s+go)\b/i;
-  const _AGREEMENT = /\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
+  const _AGREEMENT = /^\s*(yes|yeah|yep|do it|proceed|go ahead|sure|ok|okay|sounds good)\s*[.!]?$|\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
   if ((_BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText)) && lowerText.length < 80) {
     let foundRequest = '';
     for (let i = conversation.length - 2; i >= 0; i--) {

@@ -72,7 +72,19 @@ export async function presentFixResult(params: {
   const commitPayload = written.length > 0 ? Buffer.from(JSON.stringify({ files: written, message: plainSummary || `fix: ${userText.slice(0, 80)}` })).toString('base64') : '';
   const commitToken = commitPayload ? `\n__GITHUB_COMMIT__${commitPayload}|||END_GITHUB_COMMIT__` : '';
 
-  const aiLabels = `\n\n*Pipeline: Supervisor (${supervisorLabel}) → Worker (${workerLabel}) → Guardian (${guardianLabel})*`;
+  let aiLabels = `\n\n*Pipeline: Supervisor (${supervisorLabel}) → Worker (${workerLabel}) → Guardian (${guardianLabel})*`;
+  
+  if (deps.usageTracker) {
+    try {
+      const report = deps.usageTracker.getReport(path.basename(root));
+      if (report && report.session && report.session.byAI) {
+        const aiStats = report.session.byAI.map((ai: any) => `- ${ai.aiProvider}: ${ai.tokens.toLocaleString()} tokens ($${ai.cost.toFixed(4)})`).join('\n');
+        aiLabels += `\n\n**Pipeline Usage:**\n${aiStats}\n**Total Session Cost:** $${report.session.cost.toFixed(4)}`;
+      }
+    } catch (e) {
+      // Ignore if usage tracker fails
+    }
+  }
   
   conversation[conversation.length - 1].content =
     (plainSummary ? `**What I found:** ${plainSummary}\n\n` : '') +

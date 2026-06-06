@@ -3,6 +3,64 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 06, 2026: Agent Model Resolution Fix
+
+User-reported: Agent failed with `404 not_found_error: model: claude`
+
+**Root cause:** When `/execute` payload was sent from the agent service/supervisor, it correctly set `provider: supervisor` (e.g. `claude`), but erroneously set `model: supervisor` (e.g. `claude`). The backend executor treats `model` as the literal API model name and blindly passed `"claude"`, causing a 404 from Anthropic since the model ID must be fully qualified like `claude-sonnet-4-6`.
+
+**Fix:** Imported `bestModelForRole` from `modelRegistry.js` in `agentService.ts` and `agentSupervisor.ts`, using `bestModelForRole(supervisor, 'pro')?.modelId || supervisor` to resolve the precise model name before constructing the payload.
+
+---
+
+## Session — Jun 06, 2026: Iterative Subtask Chunking for Massive Edits
+
+User-reported: AI attempted to replace 12 chess pieces with inline SVGs, but kept failing after 4 retries because the generation of 10,000+ characters of vector coordinates triggered token cut-offs or placeholder hallucinations (`//...`).
+
+**Architecture Change (Plan & Apply Loop):**
+- Updated Phase 1 Supervisor (`chatPanelMsgFixPhases.ts`) to detect massive file change requests and break them down into a JSON array of sequential subtasks instead of a single string diagnosis.
+- Created `chatPanelMsgFixSubtasks.ts` to process these subtasks sequentially.
+- Modified `chatPanelMsgFix.ts` to detect `subtasks.length > 0` and seamlessly handoff to the new iterative loop, which fires the Phase 2 Worker independently for each subtask and accumulates the file edits incrementally. This strictly constrains the Worker's context window per subtask, preventing LLM laziness and context truncation.
+
+**Subtask JSON Parse Fix:**
+- Fixed a major bug where `chatPanelMsgFixPhases.ts` failed to parse the JSON subtasks if the Supervisor prepended any introductory text (resulting in the Worker blindly echoing the JSON, which the last-resort code-block fallback then wrote over the user's files). Implemented robust regex extraction and blocked the last-resort fallback from extracting `json` blocks.
+
+---
+
+## Session — Jun 06, 2026: Chat Panel Overflow Fix
+
+User-reported: Text inside the "Technical analysis" expandable block was overflowing horizontally outside of the chat bubble in the UI.
+
+**Root cause:** The technical analysis block used a `<pre>` HTML tag, which defaults to `overflow: visible` and `width: auto`. Because its parent container (the chat bubble) used `display: inline-block`, the text forced the bubble's layout width open and then overflowed it completely because long lines inside `<pre>` tags sometimes resist CSS text-wrapping within flexbox/inline layouts without explicit strict container bounds.
+
+**Fix:** Modified `src/ui/panels/chat/chatPanelRenderer.ts` to replace the inline `<pre>` element with a standard `<div style="font-family:monospace;overflow-x:auto;">`. Since the renderer already globally replaces `\n` with `<br>`, the `<pre>` tag was completely redundant. The `<div>` respects flexbox container boundaries and properly applies `white-space: pre-wrap; word-break: break-word`, fixing the horizontal overflow.
+
+## Session — Jun 06, 2026: Auto-Retry on Surgical Edit SEARCH Mismatch
+
+User-reported: AI attempted to apply a surgical edit to `style.css` but failed with "Search block not found" because it hallucinated a `<<<< SEARCH` block that didn't perfectly match the file. The pipeline printed the error and gave up.
+
+**Root cause:** The `chatPanelMsgFix.ts` pipeline only fell back to the `retryNoOutput` logic if both `written.length === 0` AND `failed.length === 0`. Because a surgical edit failure results in `failed.length > 0`, the retry logic was completely bypassed.
+
+**Fix:** Changed the retry trigger condition in `chatPanelMsgFix.ts` to simply `written.length === 0`, and updated `retryNoOutput` in `chatPanelMsgFixRetry.ts` to accept a `failedErrors` array. If an edit fails, the AI is now automatically retried with an explicit prompt containing the exact errors and instructions to output perfectly matching SEARCH blocks or verbatim file contents.
+
+## Session — Jun 06, 2026: Fix Pipeline Model Resolution & Auth Fix
+
+User-reported: "Something went wrong while analysing your fix... Supervisor returned no response. Error: Could not resolve authentication method."
+
+**Root cause:** The exact same bugs that affected the Agent pipeline (passing function references for API keys, and passing provider name as the model ID) were also present in the edit/fix pipeline (`chatPanelMsgFixPhases.ts`), causing both the Supervisor (Phase 1) and Worker (Phase 2) `/execute` requests to fail.
+
+**Fix:** Replaced `deps.routing.getKeyMap()` with `collectKeys()` and used `bestModelForRole` to resolve the actual model IDs in both `runPhase1Supervisor` and `runPhase2Worker` within `src/core/routing/chatPanelMsgFixPhases.ts`.
+
+## Session — Jun 06, 2026: Agent Auth payload fix
+
+User-reported: Agent failed to authenticate with "Could not resolve authentication method. Expected one of apiKey..."
+
+**Root cause:** `keys: keyMap` in the `/execute` payload for agent service and agent supervisor used the `keyMap` object which contained getter functions. `JSON.stringify` drops function values, so the keys payload was sent as an empty object `{}`. Consequently, the backend executor failed to instantiate the AI SDK client (like Anthropic) because the API key was `undefined`.
+
+**Fix:** Replaced `keys: keyMap` with `keys: require('../api/apiClient.js').collectKeys()` in both `src/services/ai/agentService.ts` and `src/services/ai/agentSupervisor.ts`. This evaluates the getter functions and properly populates the stringified JSON payload with actual API keys. tsc clean, compiled.
+
+---
+
 ## Session — Jun 6, 2026: Fix-pipeline crash — wrong apiClient require path (bug report 3d95de89)
 
 User-reported (v0.3.69, Windows): `[FAIL] Supervisor phase failed: Cannot find module '../api/apiClient.js'` from `out/core/routing/chatPanelMsgFixPhases.js`.
@@ -7094,3 +7152,24 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 - **JSON Parsing Robustness (June 4, 2026)**: Replaced fragile replace() logic across 4 files (`supervisorOrchestrator.ts`, `blueprintInference.ts`, `vaultQualityGate.ts`, `chatPanelPlanInterviewHelpers.ts`) with robust regex extraction to properly parse AI output containing markdown fences or conversational preambles (specifically fixing Gemini failures).
 - **IDE Build Shell Fix (June 4, 2026)**: Fixed `update-linux-base.sh` extracting VSCodium tarballs. Switched from a fragile `mv` wildcard fallback to a robust directory rename to prevent 'No such file or directory' errors during the GitHub Actions release pipeline.
 - **IDE Build Shell Fix (June 4, 2026)**: Fixed `update-linux-base.sh` extension injection to correctly create the target directory and copy `package.json` before copying the `out` folder. This prevents 'cannot create directory' failures during CI when injecting the extension into a fresh VSCodium base.
+| `src/core/routing/chatPanelMsgSendMessage.ts` | **Fixed**: Improved `_AGREEMENT` regex to catch standalone affirmative responses ("yes", "yeah", "proceed", "go ahead") when confirming a build. | Before this fix, responding "yes" to a build confirmation would fall through to the AI Chat pipeline, causing the AI to hallucinate a response (like `[实施代码更改和测试]`) without actually modifying files. | Low — just regex adjustments. |
+| `src/core/routing/chatPanelMsgFixSubtasks.ts` | **Fixed**: Added explicit XML surgical edit instructions to `chunkDiagnosis` and passed `{ disableLastResort: true }` to `applyFixContent`. | Prevented the "dark blank screen" bug where the last-resort fallback was overwriting entire files with small subtask code snippets when the Worker failed to use the proper diff format. | High — Prevents data loss during large file subtask modifications. |
+| `src/core/routing/chatPanelMsgFixApply.ts` | **Updated**: Added `disableLastResort` option to `applyFixContent`. | Allows the caller to explicitly disable the dangerous last-resort full-file replacement fallback. | Low — additive only. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Fixed**: Restored robust JSON parser for Supervisor output. | Supervisor occasionally returned JSON without markdown fences, causing the parser to fail and the system to silently degrade to the single-shot pipeline (leading to LLM laziness). The regex now robustly extracts JSON objects regardless of backticks. | High — ensures the subtask pipeline triggers reliably for massive refactors. |
+| `src/core/routing/chatPanelMsgFixEscalation.ts` | **Fixed**: properly re-thrown Supervisor logic rejection errors. | Previously, if the pro Supervisor model rejected a Worker's generated code, the error was silently swallowed after retries exhausted, allowing the code to fall through to the weaker Guardian model which would often incorrectly approve it. Now, it explicitly throws an error to safely abort the subtask. | High — Prevents the Guardian from hallucinating approvals for logically incorrect code. |
+| `src/core/routing/chatPanelMsgFixSubtasks.ts` | **Updated**: Added explicit anti-laziness instruction to the Worker prompt. | Large objects or arrays (like replacing 12 pieces with SVG strings) were causing LLM laziness where the Worker only replaced one or two items. The instruction forces the Worker to be comprehensive and avoid placeholders. | High — Ensures large refactoring subtasks actually complete their payloads. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Refactored**: Implemented Large-Scale Asset Orchestration (Batch-File Protocol). | The Supervisor now natively detects "High-Density" requests (e.g., SVG sets, massive asset libraries) and forces the Worker to use a Batch-File Protocol. This instructs the Worker to create an Asset Manifest first, then populate the static data in strict batches of no more than 3 assets per subtask, bypassing LLM laziness and token truncation. | High — Resolves the architecture boundary limitation where LLMs fail to generate massive amounts of static data from memory. |
+| `src/core/routing/chatPanelMsgFixSubtasks.ts` | **Updated**: Enforced Batch-File Protocol in chunk prompt. | Added explicit instructions to ensure the Worker APPENDS new batches to the manifest array/object instead of overwriting previous batches during iterative execution. | High — Prevents data loss during chunked asset generation. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Fixed**: Added Anti-Hallucination constraint for external assets. | The Supervisor was previously demanding the Worker to generate exact "Wikimedia SVG paths" from memory. Because the LLM does not have this specific data memorized, it resulted in repeating algorithmic gibberish (`h1.5v1.5`) and eventual subtask failure. Added a strict instruction telling the Supervisor to request SIMPLE geometric/text SVGs or placeholders instead of complex external assets from memory. | High — Resolves the root cause of the "mindless repetition" and truncation failures during asset generation. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Refactored**: Implemented Hybrid Agentic Fetch pipeline in Supervisor. | The Supervisor now natively flags `requiresAssetFetch` and provides `fetchInstructions` when detecting requests for massive external assets, instead of forcing the Surgical Worker to hallucinate them from memory. | High — Resolves LLM truncation limits on massive static data while preparing for post-fetch modularization. |
+| `src/core/routing/chatPanelMsgFix.ts` | **Added**: Agentic Interception block (Phase 1.5). | Intercepts the routing flow between Phase 1 and Phase 2. If `requiresAssetFetch` is true, it temporarily spins up the OBD2 Terminal Agent to fetch assets into a raw directory using cross-platform Node scripts, before resuming the Surgical Worker loop to modularize them. | High — Bridges the OBD1 and OBD2 pipelines to solve the Trade-off #3 "Code Modularity" issue perfectly. |
+| `src/services/ai/agentTools.ts` | **Feature**: Added native `search_web` and `read_url` Agent Tools. | To give Redivivus full web-browsing autonomy without requiring users to configure external MCP servers, I added two new built-in tools. `search_web` uses standard Node `fetch` to parse DuckDuckGo HTML results, and `read_url` uses `fetch` and Regex to strip HTML tags and read clean text from documentation pages. | High — Transforms Redivivus from an isolated Terminal Agent into a fully autonomous Web Agent capable of Googling solutions before writing code. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Feature**: Added Parallel Execution logic to Supervisor schema. | Added `[PARALLEL EXECUTION PROTOCOL]` to instruct the Supervisor to determine if subtasks are safely independent (parallel) or dependent (sequential), returning an `executionMode` flag. | High — Enables concurrent multi-agent builds. |
+| `src/core/routing/chatPanelMsgFixSubtasks.ts` | **Feature**: Implemented `Promise.all` Multi-Agent orchestration. | Refactored the core chunked execution loop to accept `executionMode`. If set to `parallel`, the Orchestrator spawns simultaneous Phase 2 Surgical Workers via `Promise.all` instead of running a synchronous `for` loop, drastically cutting build times for Rule 9 modular file scaffolding. | High — Transforms Redivivus into a true parallel multi-agent system. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Fixed**: Increased Phase 1 Supervisor Timeout. | The complex JSON format required by the Large-Scale Asset Fetch and Parallel Execution prompts caused the Supervisor LLM generation to exceed the default 60-second fetch timeout (`AbortSignal.timeout`). Increased the fetch timeout to `120_000` ms (120 seconds) to match the Cloud Build timeout and prevent `AbortError` failures on massive context generations. | High — Prevents the IDE from silently freezing or returning network errors during deep analysis. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Updated**: Hardened Supervisor JSON enforcement for Asset Fetching. | The Supervisor was bypassing the JSON Orchestration Schema and outputting plain text if it decided an asset generation task was "small" (e.g., generating 12 SVG strings inline). This caused the system to fall back to a single-pass Worker sequence which inevitably exceeded token limits or threw syntax errors due to the volume of static data. Updated the prompt to explicitly forbid plain-text output if the task requires *any* external assets, forcing it to use the `requiresAssetFetch` JSON pipeline even for small counts. | High — Prevents the Supervisor from lazily deciding to generate static assets from memory instead of using the Agentic Fetch. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Fixed**: Escalate to Supervisor Model correctly. | The `escalated` flag in the Escalation Loop was correctly printing "Escalating to Supervisor" in the UI, but `runPhase2Worker` was inadvertently still hardcoded to use the `Worker` model. Passed the `escalated` flag through so the Worker API call actually upgrades to the Supervisor model on the final attempt. | High — Ensures that exhausted subtasks actually get handed to the Pro tier model for a final rescue attempt instead of just rerunning the same failed model. |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Fixed**: Terminal Agent Execution Prompt. | The Terminal Agent in Phase 1.5 was writing the Node.js fetch script perfectly but skipping execution because the Supervisor's prompt example merely stated "Write a Node.js script" instead of "Write AND EXECUTE". The Agent took the instructions literally and skipped the `node <script>` command. Updated the prompt example to explicitly enforce execution before returning control to the pipeline. | High — Prevents the Terminal Agent from prematurely reporting success without actually downloading the requested assets. |
+| `src/core/routing/chatPanelMsgFix.ts` | **Feature**: Anti-Bot Evasion for Agentic Fetch. | Updated `agentCtx.task` to empower the Terminal Agent with explicit instructions to adapt to HTTP 403 or 429 errors by spoofing the User-Agent header or pivoting to alternative sources like GitHub. | Low |
+| `src/core/routing/chatPanelMsgFixOutput.ts` | **Feature**: Pipeline Usage Summary. | Extracted AI cost and token breakdowns from `deps.usageTracker.getReport()` and appended a formatted Markdown block (`usageStats`) to the end of the fix pipeline output card (`aiLabels`). | Low |
+| `src/core/routing/chatPanelMsgFixPhases.ts` | **Fixed**: Surgical Worker Context Architecture Bug. | Identified a critical architectural flaw where the Supervisor was instructing the Surgical Worker to inline massive downloaded assets from Phase 1.5, despite the Worker not having those newly downloaded files injected into its prompt context. The Guardian caught the Worker hallucinating placeholder SVG strings. Updated the Supervisor schema to explicitly forbid instructing the Worker to inline file contents mid-pipeline, forcing the Worker to use standard file referencing (e.g. `<img src="...">`) instead. | High — Prevents the Worker from hallucinating file contents and failing Guardian checks. |

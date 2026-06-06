@@ -113,7 +113,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
       const content = raw.replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&#039;/g,"'");
       const safe = content.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/`/g, '&#96;');
       return `<details style="margin-top:12px;"><summary style="cursor:pointer;font-size:11px;color:var(--vscode-descriptionForeground);user-select:none;padding:4px 0;">&#x25B6; Technical analysis</summary>`
-        + `<pre style="font-size:11px;white-space:pre-wrap;word-break:break-word;background:rgba(0,0,0,0.2);border-radius:6px;padding:10px;margin-top:8px;color:var(--vscode-descriptionForeground);line-height:1.5;">${safe}</pre></details>`;
+        + `<div style="font-family:monospace;font-size:11px;white-space:pre-wrap;word-break:break-word;overflow-x:auto;background:rgba(0,0,0,0.2);border-radius:6px;padding:10px;margin-top:8px;color:var(--vscode-descriptionForeground);line-height:1.5;">${safe}</div></details>`;
     });
 
     // [Redivivus] GitHub commit button — shown on fix/build result cards when GitHub is connected

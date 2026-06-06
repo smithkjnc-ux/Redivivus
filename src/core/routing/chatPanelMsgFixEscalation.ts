@@ -60,7 +60,7 @@ export async function runEscalationLoop(params: {
         updateStatus(conversation, supervisorLabel, `generating fix${retryLabel}...`, attempt, escalated, streamAccum);
         refresh();
       };
-      const p2 = await runPhase2Worker(diagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk);
+      const p2 = await runPhase2Worker(diagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk, escalated);
       if (!p2) { throw new Error('Worker returned null'); }
       workerResponse = p2.workerResponse;
       workerLabel = p2.workerLabel;
@@ -97,9 +97,12 @@ export async function runEscalationLoop(params: {
             `[2/4] Worker (${workerLabel}): Supervisor rejected logic \u2014 "${logicIssue.slice(0, 100)}". Retrying (${attempt + 1}/${maxRetries})...`;
           refresh();
           continue;
+        } else {
+          throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${logicIssue}`);
         }
       }
     } catch (e: any) {
+      if (e.message?.startsWith('Supervisor rejected Worker output')) throw e;
       fixLog(`Supervisor verify skipped (error): ${e?.message || e}`);
     }
 

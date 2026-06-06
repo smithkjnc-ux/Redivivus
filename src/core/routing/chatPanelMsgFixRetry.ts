@@ -65,21 +65,35 @@ export async function retryPatternFix(params: {
   return { written, workerLabel: 'AI', retried: true };
 }
 
-/** Retry when Worker produced no file output — re-runs with explicit format instructions. */
+/** Retry when Worker produced no file output or edits failed to apply. */
 export async function retryNoOutput(params: {
   diagnosis: string; filesBlock: string; fileNames: string; activePatterns: any[];
   allowedRels: Set<string>; deps: MessageHandlerDeps; userText: string;
   conversation: any[]; refresh: () => void; supervisorLabel: string; root: string;
+  failedErrors?: string[];
 }): Promise<{ written: string[]; failed: string[]; skipped: string[]; fixSnapId: string | undefined; workerLabel: string }> {
-  const { diagnosis, filesBlock, fileNames, activePatterns, allowedRels, deps, userText, conversation, refresh, supervisorLabel, root } = params;
-  conversation[conversation.length - 1].content = 'Retrying with explicit format instructions...';
-  refresh();
-  const formatDiagnosis =
-    `${diagnosis}\n\n` +
-    `CRITICAL: Your previous response produced NO parseable code changes.\n` +
-    `You MUST output every changed file using this exact format:\n` +
-    `FILE: filename\n\`\`\`html\n[complete file content]\n\`\`\`\n` +
-    `Write actual code — not instructions, not explanations, not partial snippets.`;
+  const { diagnosis, filesBlock, fileNames, activePatterns, allowedRels, deps, userText, conversation, refresh, supervisorLabel, root, failedErrors } = params;
+  
+  let formatDiagnosis = '';
+  if (failedErrors && failedErrors.length > 0) {
+    conversation[conversation.length - 1].content = 'Fix failed to apply. Retrying with explicit match instructions...';
+    refresh();
+    formatDiagnosis = 
+      `${diagnosis}\n\n` +
+      `CRITICAL: Your previous response failed to apply. Errors:\n${failedErrors.join('\n')}\n\n` +
+      `This happens when your SEARCH blocks do not exactly match the file content. You MUST output exact file contents or perfectly matching SEARCH blocks.\n` +
+      `Write actual code — not instructions.`;
+  } else {
+    conversation[conversation.length - 1].content = 'Retrying with explicit format instructions...';
+    refresh();
+    formatDiagnosis =
+      `${diagnosis}\n\n` +
+      `CRITICAL: Your previous response produced NO parseable code changes.\n` +
+      `You MUST output every changed file using this exact format:\n` +
+      `## Fix: filename\n\`\`\`html\n[complete file content]\n\`\`\`\n` +
+      `Write actual code — not instructions, not explanations, not partial snippets.`;
+  }
+
   try {
     const { runEscalationLoop } = await import('./chatPanelMsgFixEscalation.js');
     const escalation = await runEscalationLoop({ diagnosis: formatDiagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel });
