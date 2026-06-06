@@ -155,7 +155,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     if (root) {
       try {
         const { shouldRunVisualSpec, orchestrateVisualSpec, formatVisualContractBlock, setCurrentSpec } = await import('../ai/visualSpecService.js');
-        if (shouldRunVisualSpec(routedText, _jobTier)) {
+        if (shouldRunVisualSpec(routedText, _jobTier, root)) {
           const { spec, statusMsg } = await orchestrateVisualSpec(routedText, root, deps.routing);
           setCurrentSpec(spec);
           routedText += formatVisualContractBlock(spec);

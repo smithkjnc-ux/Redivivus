@@ -41,8 +41,19 @@ const UI_SURFACE_SIGNALS = /\b(page|screen|component|button|form|modal|card|layo
 // Skip for non-visual work
 const NON_VISUAL_SIGNALS = /\b(api|endpoint|route|middleware|auth|database|query|util|helper|config|env|secret|token|fix.*(bug|error|crash)|refactor|rename|delete)\b/i;
 
-export function shouldRunVisualSpec(text: string, tier: string): boolean {
+export function shouldRunVisualSpec(text: string, tier: string, root?: string): boolean {
   if (tier === 'tell-them' || tier === 'look-it-up') { return false; }
+  // If the project already has CSS/style files it already has a visual identity — don't overwrite with defaults
+  if (root) {
+    try {
+      const fs = require('fs') as typeof import('fs');
+      const path = require('path') as typeof import('path');
+      const hasStyles = require('fs').readdirSync(root).some((f: string) =>
+        f.endsWith('.css') || f.endsWith('.scss') || f.endsWith('.sass') || f === 'tailwind.config.js'
+      );
+      if (hasStyles) { return false; }
+    } catch { /* best-effort — fall through if fs check fails */ }
+  }
   if (NON_VISUAL_SIGNALS.test(text) && !UI_SURFACE_SIGNALS.test(text)) { return false; }
   return UI_SURFACE_SIGNALS.test(text) || tier === 'explore-with-them' || tier === 'offer-choices';
 }
