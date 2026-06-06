@@ -103,19 +103,25 @@ jobs:
 
           # 6. Create GitHub Release
           echo "▶  Creating GitHub Release $TAG..."
+          NOTES_FILE=$(mktemp)
+          cat > "$NOTES_FILE" << 'RELEASE_NOTES'
+          Standalone builds for Linux and Windows. Download, extract, and run.
+
+          ## Linux Install
+          ```bash
+          tar -xzf redivivus-VERSION.tar.gz
+          cd redivivus-VERSION && ./redivivus
+          ```
+
+          ## Windows Install
+          Extract the zip and double-click `redivivus.exe`
+          RELEASE_NOTES
+          sed -i "s/VERSION/$NEW_VERSION/g" "$NOTES_FILE"
           gh release create "$TAG" "$TARBALL" "$WIN_ZIP" \
             --repo smithkjnc-ux/Redivivus \
             --title "Redivivus IDE $TAG" \
-            --notes "Standalone builds for Linux and Windows. Download, extract, and run.
-
-## Linux Install
-\`\`\`bash
-tar -xzf redivivus-${NEW_VERSION}.tar.gz
-cd redivivus-${NEW_VERSION} && ./redivivus
-\`\`\`
-
-## Windows Install
-Extract the zip and double-click \`redivivus.exe\`"
+            --notes-file "$NOTES_FILE"
+          rm -f "$NOTES_FILE"
 
           # 7. Update Web Download Links
           echo "▶  Updating web download links to $NEW_VERSION..."
