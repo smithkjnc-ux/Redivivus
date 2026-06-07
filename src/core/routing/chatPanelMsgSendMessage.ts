@@ -89,42 +89,33 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
 
   if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh); return; }
 
-  // Terminal actions — answered by Claude directly, no pipeline needed
+  // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it. Must call on all non-build paths.
+  const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
+  const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
+
   if (chatResult.action === 'answer' || chatResult.action === 'clarify') {
-    const providerLabel: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
-    const byline = providerLabel[chatResult.provider] ?? 'Claude';
-    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${byline}*`, timestamp: Date.now() });
-    refresh();
+    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${PROVIDER_LABEL[chatResult.provider] ?? 'Claude'}*`, timestamp: Date.now() });
+    refresh(); releaseInput();
     await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
     return;
   }
-  // [FIX] offtopic is no longer blocked — user's tokens, user's choice.
-  // Falls through to answer path so Haiku answers naturally (e.g. "what time is it" gets the real time).
-  if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
   if (chatResult.action === 'command' && chatResult.task) {
-    const label = chatResult.task.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
     await vscode.commands.executeCommand(chatResult.task);
-    conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
-    refresh(); return;
+    conversation.push({ role: 'assistant', content: `Done -- **${chatResult.task.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim()}**`, timestamp: Date.now() });
+    refresh(); releaseInput(); return;
   }
   if (chatResult.action === 'personality-picker') {
-    const providerLabel: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
-    const byline = providerLabel[chatResult.provider] ?? 'Claude';
-    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${byline}*`, timestamp: Date.now() });
-    refresh();
-    setTimeout(() => import('../../services/api/apiClientChat.js').then(() => import('../../commands/personalityPicker.js').then(m => m.pickPersonality())), 400);
+    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${PROVIDER_LABEL[chatResult.provider] ?? 'Claude'}*`, timestamp: Date.now() });
+    refresh(); releaseInput();
+    setTimeout(() => import('../../commands/personalityPicker.js').then(m => m.pickPersonality()), 400);
     return;
   }
-  if (chatResult.action === 'run') { await handleRunIntent({ type: 'run' }, deps, conversation, refresh); return; }
+  if (chatResult.action === 'run') { releaseInput(); await handleRunIntent({ type: 'run' }, deps, conversation, refresh); return; }
   if (chatResult.action === 'convert') { await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return; }
 
-  // For build/fix/scaffold/service — use Claude's extracted task as the grounded instruction
   const intent = { type: chatResult.action as 'build' | 'fix' | 'scaffold' | 'service' };
   const _claudeTask = chatResult.task || userText;
-
-  // ── Job sizing — classify tier before any clarify/build fires (Stage 2) ──
-  // [JobSizer] Replaces shouldClarify() binary check with 4-tier intake control.
-  // tell-them=0 questions, look-it-up=1, offer-choices=3, explore-with-them=5.
   if (msg.fromBlueprintCard && intent.type === 'build') { conversation.push({ role: 'assistant', content: 'Analyzing your build... __BUILD_WORKING__', timestamp: Date.now() }); refresh(); }
   let clarify = { cancelled: false, routedText: userText };
   let _jobTier = 'offer-choices'; // hoisted for Stage 4 diagnostic
