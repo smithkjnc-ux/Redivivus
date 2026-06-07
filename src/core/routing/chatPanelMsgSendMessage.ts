@@ -88,14 +88,17 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
   if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh); return; }
-
-  // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it. Must call on all non-build paths.
+  // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it on all non-build paths.
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
-  const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
 
+  const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const _m = chatResult.model || '', _pr = PROVIDER_LABEL[chatResult.provider] ?? 'Claude';
+  const _ms = _m.includes('haiku')?'Haiku':_m.includes('sonnet')?'Sonnet':_m.includes('opus')?'Opus':_m.includes('flash')?'Flash':_m.includes('4o-mini')?'GPT-4o mini':_m.includes('4o')?'GPT-4o':'';
+  const _byline = `${_pr}${_ms&&_ms!==_pr?' '+_ms:''} · ↑${chatResult.inputTokens??0} ↓${chatResult.outputTokens??0} tok`;
+
   if (chatResult.action === 'answer' || chatResult.action === 'clarify') {
-    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${PROVIDER_LABEL[chatResult.provider] ?? 'Claude'}*`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
     refresh(); releaseInput();
     await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
     return;
@@ -106,7 +109,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     refresh(); releaseInput(); return;
   }
   if (chatResult.action === 'personality-picker') {
-    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${PROVIDER_LABEL[chatResult.provider] ?? 'Claude'}*`, timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
     refresh(); releaseInput();
     setTimeout(() => import('../../commands/personalityPicker.js').then(m => m.pickPersonality()), 400);
     return;
