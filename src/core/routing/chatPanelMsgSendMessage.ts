@@ -44,9 +44,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
 
   const lowerText = userText.toLowerCase();
 
-  if (await handleKeywordShortcuts(userText, lowerText, deps)) { return; }
-  if (await handleUrlRead(userText, lowerText, conversation, refresh)) { return; }
-  if (await handleWebSearch(userText, lowerText, conversation, refresh)) { return; }
+  // [FIX] Skip keyword shortcuts for blueprint card confirmations — the enriched task text contains
+  // portfolio/project language that trips the "my.*project" keyword pattern and shows the wrong picker.
+  if (!msg.fromBlueprintCard && await handleKeywordShortcuts(userText, lowerText, deps)) { return; }
+  if (!msg.fromBlueprintCard && await handleUrlRead(userText, lowerText, conversation, refresh)) { return; }
+  if (!msg.fromBlueprintCard && await handleWebSearch(userText, lowerText, conversation, refresh)) { return; }
   if (await handleRememberIntent(userText, conversation, refresh)) { return; }
   if (await handleReadResult(lowerText, conversation, refresh)) { return; }
 
