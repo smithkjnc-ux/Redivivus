@@ -202,12 +202,15 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
     const tokens = (result.inputTokens ?? 0) + (result.outputTokens ?? 0);
     const breakdownToken = buildBreakdownToken(result, modelLabel, tokens);
     const narration = cleanBuildNarration(result.narration);
-    // Smart model-switching: show WHY this model was chosen (from the backend's strategy + difficulty).
     const modelLine = result.modelRationale ? `\n\n🧠 ${result.modelRationale}` : '';
+    const elapsedMs = Date.now() - workingTs;
+    const elapsedStr = elapsedMs < 60000
+      ? `${Math.round(elapsedMs / 1000)}s`
+      : `${Math.floor(elapsedMs / 60000)}m ${Math.round((elapsedMs % 60000) / 1000)}s`;
 
     deps.conversation.push({
       role: 'assistant',
-      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${breakdownToken}`,
+      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''} in ${elapsedStr}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${breakdownToken}`,
       timestamp: Date.now(),
     });
     deps.refresh();
