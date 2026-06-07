@@ -1,5 +1,5 @@
 // [SCOPE] Iterative subtask execution for multi-step fix requests.
-// [PHASE-1-HARDENING] Parallel execution and Batch-File Protocol removed — moves to backend in Phase 2.
+// [PHASE-1-HARDENING] Simplified for Phase 2 server-side orchestration.
 // Always runs subtasks sequentially; executionMode param retained for API compatibility.
 
 import type { MessageHandlerDeps } from './chatPanelMessages';

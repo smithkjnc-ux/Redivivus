@@ -21,7 +21,7 @@ export async function runPhase1Supervisor(
   imageBase64?: string,
   imageType?: string,
   isRetry = false
-): Promise<{ diagnosis: string, subtasks: string[], executionMode?: 'parallel' | 'sequential', requiresAssetFetch?: boolean, fetchInstructions?: string, supervisorLabel: string, expandedFilesBlock: string } | null> {
+): Promise<{ diagnosis: string, subtasks: string[], executionMode?: 'parallel' | 'sequential', supervisorLabel: string, expandedFilesBlock: string } | null> {
   const _cfg = deps.redivivus?.loadConfig?.();
   const _bp = _cfg?.blueprint;
   const _bpBlock = _bp
@@ -97,7 +97,7 @@ ${buildSupervisorNotes(activePatterns)}`;
     }
   }
   diagnosis = diagnosis.replace(/\nNEEDS_FILES:\n[\s\S]*$/, '').trim();
-  return { diagnosis, subtasks, executionMode, requiresAssetFetch: false, fetchInstructions: '', supervisorLabel, expandedFilesBlock: filesBlock };
+  return { diagnosis, subtasks, executionMode, supervisorLabel, expandedFilesBlock: filesBlock };
 }
 
 export async function runPhase2Worker(
