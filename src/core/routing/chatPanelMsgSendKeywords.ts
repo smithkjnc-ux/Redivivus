@@ -81,7 +81,12 @@ export async function handleKeywordShortcuts(
     const named = nameMatch ? projects.find(p => p.name.toLowerCase().includes(nameMatch[1].toLowerCase())) : null;
     if (named) {
       conversation.push({ role: 'assistant', content: `Opening **${named.name}**...`, timestamp: Date.now() }); refresh();
-      panel.webview.postMessage({ type: 'open-workspace-btn', path: named.fullPath });
+      // Open directly via VS Code API — postMessage to webview won't work here (wrong direction)
+      if (!vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === named.fullPath)) {
+        vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(named.fullPath) });
+      } else {
+        vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(named.fullPath), false);
+      }
     } else {
       const reply = projects.length ? `Found **${projects.length} project${projects.length === 1 ? '' : 's'}** -- opening the picker now.` : 'No Redivivus projects found in your projects directory.';
       conversation.push({ role: 'assistant', content: reply, timestamp: Date.now() }); refresh();
