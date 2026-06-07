@@ -27,13 +27,25 @@ export async function executeMultiFileBuild(
   let lastModel = '';
   const slug = path.basename(root);
 
+  // Track files built so far so each new file can see the APIs of previously built files
+  const builtSoFar: Array<{ path: string; content: string }> = [];
+
   for (let i = 0; i < planFiles.length; i++) {
     const file = planFiles[i];
     onProgress?.(`Building ${file.path} (${i + 1}/${planFiles.length})...`);
 
     try {
+      // Merge pre-existing files with files built so far in this session so the Worker
+      // knows the exact APIs of every sibling when writing coordinator/entry-point files.
+      const contextWithBuilt = {
+        ...context,
+        existingFiles: [
+          ...(context?.existingFiles ?? []),
+          ...builtSoFar,
+        ],
+      };
       const body = JSON.stringify({
-        task, context, preferred,
+        task, context: contextWithBuilt, preferred,
         targetFile: { path: file.path, description: file.description, isNew: file.isNew, fileIndex: i, totalFiles: planFiles.length, siblings },
       });
       // [FIX] Use Promise.race for reliable timeout — AbortController does not abort res.json() in Electron's fetch
@@ -73,6 +85,8 @@ export async function executeMultiFileBuild(
         path: f.path.startsWith(slug + '/') ? f.path.slice(slug.length + 1) : f.path,
       }));
       allFiles.push(...normalised);
+      // Accumulate for next file's context so it sees sibling APIs
+      builtSoFar.push(...normalised.map(f => ({ path: f.path, content: f.content })));
       totalInputTokens += data.inputTokens ?? 0;
       totalOutputTokens += data.outputTokens ?? 0;
       lastModel = data.model ?? lastModel;
