@@ -82,6 +82,9 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const chatResult = await cloudChat(userText, {
     blueprint: _cfgBlueprint,
     recentMessages: conversation.slice(-6).map(m => ({ role: m.role, content: m.content })),
+    currentTime: new Date().toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }),
+    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    personality: vscode.workspace.getConfiguration('redivivus').get<string>('personality', 'plain'),
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
   if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh); return; }
@@ -95,10 +98,9 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
     return;
   }
-  if (chatResult.action === 'offtopic') {
-    conversation.push({ role: 'assistant', content: "I'm a coding assistant -- I can help you build, fix, explain, or review code. What are you building today?", timestamp: Date.now() });
-    refresh(); return;
-  }
+  // [FIX] offtopic is no longer blocked — user's tokens, user's choice.
+  // Falls through to answer path so Haiku answers naturally (e.g. "what time is it" gets the real time).
+  if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
   if (chatResult.action === 'command' && chatResult.task) {
     const label = chatResult.task.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
     await vscode.commands.executeCommand(chatResult.task);

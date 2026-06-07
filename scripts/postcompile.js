@@ -81,14 +81,13 @@ try {
 
   // [WARN] File system operation: `fs.existsSync` can fail due to permissions or path issues.
   if (fs.existsSync(sessionsDir)) {
-    // [WARN] File system operation: `fs.readdirSync` can fail due to permissions or path issues.
     const sessionFiles = fs.readdirSync(sessionsDir).filter(f => f.endsWith('.json'));
-    if (sessionFiles.length > 0) {
-      const lastSessionFile = sessionFiles[sessionFiles.length - 1];
-      // [WARN] File system operation: `fs.readFileSync` can fail.
-      // [WARN] JSON parsing: `JSON.parse` can throw an error if the content is not valid JSON.
-      const lastSession = JSON.parse(fs.readFileSync(path.join(sessionsDir, lastSessionFile), 'utf-8'));
-      sessionGoal = lastSession.goal || 'no session';
+    // Only pick up an ACTIVE session (no endedAt). Closed sessions are historical — don't surface their goal.
+    for (const f of sessionFiles) {
+      try {
+        const s = JSON.parse(fs.readFileSync(path.join(sessionsDir, f), 'utf-8'));
+        if (s && !s.endedAt && s.goal) { sessionGoal = s.goal; }
+      } catch { /* skip malformed */ }
     }
   }
 

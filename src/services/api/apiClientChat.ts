@@ -18,6 +18,9 @@ export interface ChatContext {
   blueprint?: any;
   projectName?: string;
   recentMessages?: Array<{ role: string; content: string }>;
+  currentTime?: string;
+  timezone?: string;
+  personality?: string;
 }
 
 export async function cloudChat(

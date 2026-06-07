@@ -161,6 +161,11 @@ export function registerAllCommands(
   try { registerInlineCommands(context, redivivusService, routingService, usageTracker, vaultService, statusBar, refreshAll, githubBackupService, guardianService, _suppressNextFolderAdd); } catch (e) { console.error('Failed to register inline commands', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerInlineCommands failed: ' + e + '\n'); }
   try { registerSignInCommand(context, statusBar); } catch (e) { console.error('Failed to register signIn command', e); }
   try { registerReportIssueCommand(context, routingService); } catch (e) { console.error('Failed to register reportIssue command', e); }
+  try {
+    context.subscriptions.push(vscode.commands.registerCommand('redivivus.changePersonality', () =>
+      import('./commands/personalityPicker.js').then(m => m.pickPersonality())
+    ));
+  } catch (e) { console.error('Failed to register changePersonality command', e); }
   try { registerCheckForUpdatesCommand(context); } catch (e) { console.error('Failed to register checkForUpdates command', e); }
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
 

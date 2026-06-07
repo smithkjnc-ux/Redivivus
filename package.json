@@ -361,6 +361,11 @@
         "command": "redivivus.reportIssue",
         "title": "Redivivus: Report an Issue",
         "category": "Redivivus"
+      },
+      {
+        "command": "redivivus.changePersonality",
+        "title": "Redivivus: Change Personality",
+        "category": "Redivivus"
       }
     ],
     "viewsWelcome": [
@@ -562,6 +567,26 @@
             ]
           },
           "markdownDescription": "Which AI-editor rule files to generate in new projects (CLAUDE.md, .cursorrules, .windsurfrules, GEMINI.md, .clinerules, copilot-instructions). Default is **none** — the canonical rules always live in `.redivivus/rules.md`. Enable only the editors you actually use. Run **Redivivus: Configure Editor Rule Files** for a checklist."
+        },
+        "redivivus.personality": {
+          "type": "string",
+          "default": "plain",
+          "enum": ["plain","friendly","scifi","horror","hillbilly","pirate","snarky","butler","trashy","surfer","hacker","roast"],
+          "enumDescriptions": [
+            "Plain — neutral, professional. No personality modifier.",
+            "Friendly 😊 — warm, encouraging, upbeat. Makes coding feel supportive.",
+            "Sci-Fi 🚀 — starship computer vibes. Precise, dramatic, very on-brand.",
+            "Horror 🕯️ — gothic, atmospheric. Bugs are omens. Fixes are rituals.",
+            "Hillbilly 🤠 — folksy country wisdom. Sharp as a tack but y'all-certified.",
+            "Pirate 🏴‍☠️ — arrr matey, the code be needin' a fix. Swashbuckling accuracy.",
+            "Snarky 🙄 — dry wit, mild exasperation, secretly helpful. Senior dev energy.",
+            "Butler 🎩 — impeccably formal. 'Might I suggest, sir, a different approach.'",
+            "Trashy 💅 — reality TV drama. Oh HONEY. The audacity of this bug.",
+            "Surfer 🏄 — gnarly, stoked, zero stress. Very chill, very accurate.",
+            "Hacker 💻 — terse, underground, slightly conspiratorial. Secret mission vibes.",
+            "Roast 🔥 — busts your chops first, then gives you the right answer. A friend with opinions."
+          ],
+          "markdownDescription": "Personality style for Redivivus responses. Changes the **tone** only — technical accuracy is always maintained. Run **Redivivus: Change Personality** for a preview picker."
         },
         "redivivus.defaultAI": {
           "type": "string",
