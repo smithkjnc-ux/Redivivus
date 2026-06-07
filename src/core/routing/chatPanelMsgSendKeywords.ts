@@ -81,11 +81,21 @@ export async function handleKeywordShortcuts(
     const named = nameMatch ? projects.find(p => p.name.toLowerCase().includes(nameMatch[1].toLowerCase())) : null;
     if (named) {
       conversation.push({ role: 'assistant', content: `Opening **${named.name}**...`, timestamp: Date.now() }); refresh();
-      // Open directly via VS Code API — postMessage to webview won't work here (wrong direction)
+      // Set suppression flags BEFORE updateWorkspaceFolders — without them the auto-open
+      // mechanism creates a duplicate panel when the extension host reloads on folder change.
+      const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
+      if (ChatPanel.extensionContext) {
+        const _ctx = ChatPanel.extensionContext;
+        _ctx.globalState.update('redivivus.suppressAutoOpen', named.fullPath);
+        _ctx.globalState.update('redivivus.suppressConversationClear', true);
+        const _conv = (ChatPanel.currentPanel as any)?.state?.conversation;
+        if (_conv?.length) { _ctx.globalState.update('redivivus.pendingRescueConversation', _conv); }
+      }
       if (!vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === named.fullPath)) {
         vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(named.fullPath) });
       } else {
-        vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(named.fullPath), false);
+        // Already open — just focus the Redivivus project files tree
+        vscode.commands.executeCommand('redivivusProjectFiles.focus');
       }
     } else {
       const reply = projects.length ? `Found **${projects.length} project${projects.length === 1 ? '' : 's'}** -- opening the picker now.` : 'No Redivivus projects found in your projects directory.';
