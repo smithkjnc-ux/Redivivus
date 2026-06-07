@@ -8,7 +8,7 @@ import type { RoutingService } from './routingService.js';
 // to the expensive Agent loop. When in doubt, let the AI classifier decide.
 const COMPLEX_TASK_FAST_PATHS = /\b(npm\s+(install|run|start|test|build)|yarn\s+(add|run|start)|pip\s+install|cargo\s+(build|run|test)|go\s+(build|run|test)|docker\s+(build|run|compose)|deploy|start\s+(the\s+)?server|run\s+(the\s+)?(app|project|build|tests?|server)|bundle|compile\s+and\s+(test|run|verify)|launch|execute|terminal|shell|command\s+line)\b/i;
 
-const SIMPLE_TASK_FAST_PATHS = /\b(make|create|build)\s+(me\s+)?(a\s+)?(?:[a-zA-Z0-9\-_]+\s+)*(game|app)|change\s+(the\s+)?(color|font|size|text|style|margin|padding|border|background)|fix\s+(the\s+)?(typo|spelling|indent|alignment|css)|add\s+a\s+comment|rename\s+(the\s+)?(variable|function|class|file)|update\s+(the\s+)?(import|export|version)|remove\s+(the\s+)?(unused|dead|old)\b/i;
+const SIMPLE_TASK_FAST_PATHS = /\b(make|create|build)\s+(me\s+)?(a\s+)?(?:[a-zA-Z0-9\-_]+\s+)*(game|app|website|site|page|portfolio|dashboard|calculator|tracker|timer|tool|widget|form|ui)|change\s+(the\s+)?(color|font|size|text|style|margin|padding|border|background)|fix\s+(the\s+)?(typo|spelling|indent|alignment|css)|add\s+a\s+comment|rename\s+(the\s+)?(variable|function|class|file)|update\s+(the\s+)?(import|export|version)|remove\s+(the\s+)?(unused|dead|old)\b/i;
 
 // [FIX] Visual / layout bug reports are simple code edits — never route to agent
 const VISUAL_BUG_FAST_PATHS = /\b(cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|center|align|position|margin|padding|width|height|layout)\b/i;
@@ -45,9 +45,10 @@ User request: "${userText.slice(0, 300)}"
 
 Rules:
 - Code changes, bug fixes, CSS edits, adding features, refactoring → simple
-- Creating entirely new applications, games, or projects from scratch → simple
-- Installing dependencies, running builds, starting servers, testing, deployment → complex
-- If the request mentions BOTH code AND environment tasks → complex
+- Creating entirely new websites, apps, games, portfolios, tools, or projects from scratch → simple (code-only output)
+- ANY request where the output is files (HTML, CSS, JS, Python, etc.) → simple
+- Installing dependencies, running builds, starting servers, testing, deployment, CI/CD → complex
+- ONLY route complex if the task REQUIRES a running terminal or environment — not just because the task is large
 
 Respond with ONLY the word: simple or complex`;
 
