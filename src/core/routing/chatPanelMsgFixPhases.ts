@@ -1,13 +1,12 @@
-// [SCOPE] Phase 1 (Supervisor) and Phase 2 (Worker) LLM invocations for the fix pipeline.
-// [PHASE-1-HARDENING] Prompts are intentionally minimal — orchestration logic lives server-side.
-// The extension sends context; the backend handles prompt engineering.
+// [SCOPE] Phase 1 (Supervisor) and Phase 2 (Worker) — thin client wrappers.
+// Extension sends raw context to backend endpoints; all prompt engineering is server-side.
+// Phase 1 → /v1/fix-supervisor  |  Phase 2 → /v1/fix-worker
 
 import * as fs from 'fs';
 import * as path from 'path';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { modelLabel } from './chatPanelMsgFixUtils';
 import { buildSupervisorNotes, buildWorkerRules } from './chatPanelMsgFixPatterns';
-import { streamProvider } from '../../services/ai/streamingProviders';
 
 export async function runPhase1Supervisor(
   userText: string,
@@ -24,14 +23,21 @@ export async function runPhase1Supervisor(
 ): Promise<{ diagnosis: string, subtasks: string[], executionMode?: 'parallel' | 'sequential', supervisorLabel: string, expandedFilesBlock: string } | null> {
   const _cfg = deps.redivivus?.loadConfig?.();
   const _bp = _cfg?.blueprint;
-  const _bpBlock = _bp
-    ? `PROJECT CONTEXT: ${_bp.what || ''}${_bp.where ? ` for ${_bp.where}` : ''}\n\n`
-    : '';
 
-  const diagPrompt = `${_bpBlock}${buildContext ? buildContext + '\n\n' : ''}User request: "${userText}"
+  // Parse structured files from filesBlock for the new endpoint
+  const files: { path: string, content: string }[] = [];
+  const fileBlocks = filesBlock.split(/\n\/\/ === FILE: /).slice(1);
+  for (const blk of fileBlocks) {
+    const nl = blk.indexOf('\n');
+    if (nl === -1) continue;
+    const relPath = blk.slice(0, nl).replace(/\s*===\s*$/, '').trim();
+    const content = blk.slice(nl + 1);
+    files.push({ path: relPath, content });
+  }
 
-${filesBlock}${projectDeadEnds ? `\n\nPreviously tried (do not suggest): ${projectDeadEnds}` : ''}${projectRules ? `\n\nProject rules:\n${projectRules}` : ''}
-${buildSupervisorNotes(activePatterns)}`;
+  // Build roadmap snippet for context
+  let roadmapSnippet = '';
+  try { const rp = path.join(root, 'REDIVIVUS_ROADMAP.md'); if (fs.existsSync(rp)) { roadmapSnippet = fs.readFileSync(rp, 'utf-8').slice(-700).trim(); } } catch {}
 
   const base = require('../../services/api/apiClient.js').getApiBase();
   const token = await require('../../services/api/apiClient.js').getAccountToken();
@@ -39,65 +45,44 @@ ${buildSupervisorNotes(activePatterns)}`;
   const keysPayload = require('../../services/api/apiClient.js').collectKeys();
   const { supervisor } = deps.routing.selectSupervisorAndWorker();
   const { bestModelForRole } = require('../../services/ai/modelRegistry.js');
-  const actualSupervisorModel = bestModelForRole(supervisor, 'pro')?.modelId || supervisor;
+  const supervisorModel = bestModelForRole(supervisor, 'pro')?.modelId || supervisor;
 
   let diagRes: any;
   try {
-    const res = await fetchFn(`${base}/execute`, {
+    const res = await fetchFn(`${base}/v1/fix-supervisor`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
-        provider: supervisor,
-        model: actualSupervisorModel,
+        userText,
+        files,
+        context: {
+          blueprint: _bp || undefined,
+          projectRules: projectRules || undefined,
+          deadEnds: projectDeadEnds || undefined,
+          roadmapSnippet: roadmapSnippet || undefined,
+          patternNotes: buildSupervisorNotes(activePatterns) || undefined,
+        },
+        supervisor,
+        supervisorModel,
         keys: keysPayload,
-        promptType: 'fix-supervisor',
-        prompt: diagPrompt,
-        maxTokens: 4000,
-        temperature: 0.1
       })
     }, 120_000);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Supervisor API failed');
-    diagRes = { success: true, text: data.text, model: supervisor, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
+    diagRes = data;
   } catch (err: any) {
-    diagRes = { success: false, error: err.message };
+    throw new Error(err.message || 'Supervisor request failed');
   }
 
-  if (!diagRes.success || !diagRes.text?.trim()) {
-    throw new Error(`Supervisor returned no response. Error: ${diagRes.error || 'unknown'}.`);
-  }
-  let diagnosis = diagRes.text.trim();
-  let subtasks: string[] = [];
-  let executionMode: 'parallel' | 'sequential' = 'sequential';
+  const { diagnosis, subtasks = [], executionMode = 'sequential', inputTokens, outputTokens } = diagRes;
+  if (!diagnosis) throw new Error('Supervisor returned no diagnosis.');
 
-  try {
-    let cleanJson = '';
-    const jsonBlockMatch = diagnosis.match(/```(?:json)?\n([\s\S]*?)\n```/);
-    if (jsonBlockMatch) { cleanJson = jsonBlockMatch[1].trim(); }
-    else { const m = diagnosis.match(/\{[\s\S]*"subtasks"[\s\S]*\}/); if (m) cleanJson = m[0]; }
-    if (cleanJson) {
-      const parsed = JSON.parse(cleanJson);
-      if (parsed.diagnosis && Array.isArray(parsed.subtasks)) {
-        diagnosis = parsed.diagnosis;
-        subtasks = parsed.subtasks;
-        if (parsed.executionMode === 'parallel') executionMode = 'parallel';
-      }
-    }
-  } catch { /* treat as plain text */ }
+  deps.usageTracker?.recordUsage(
+    Math.ceil((diagnosis.length) / 4), 0, supervisor,
+    inputTokens, outputTokens, 'supervisor', path.basename(root)
+  );
 
-  const supervisorLabel = modelLabel(diagRes.model);
-  deps.usageTracker?.recordUsage(Math.ceil((diagPrompt.length + diagnosis.length) / 4), 0, diagRes.model || 'claude', diagRes.inputTokens, diagRes.outputTokens, 'supervisor', require('path').basename(root));
-
-  if (!isRetry) {
-    const reqd = (diagnosis.match(/NEEDS_FILES:\n([\s\S]*?)(?=\n\n|$)/)?.[1] || '').trim().split('\n').map((l: string) => l.trim()).filter((l: string) => l && !l.includes('..') && !l.startsWith('/'));
-    const extra = reqd.slice(0, 8).flatMap((rel: string) => { try { return [{ rel, content: fs.readFileSync(path.join(root, rel), 'utf-8') }]; } catch { return []; } });
-    if (extra.length > 0) {
-      const expanded = filesBlock + '\n\n' + extra.map((f: any) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
-      return runPhase1Supervisor(userText, expanded, buildContext, activePatterns, projectDeadEnds, projectRules, deps, root, imageBase64, imageType, true);
-    }
-  }
-  diagnosis = diagnosis.replace(/\nNEEDS_FILES:\n[\s\S]*$/, '').trim();
-  return { diagnosis, subtasks, executionMode, supervisorLabel, expandedFilesBlock: filesBlock };
+  return { diagnosis, subtasks, executionMode, supervisorLabel: modelLabel(supervisor), expandedFilesBlock: filesBlock };
 }
 
 export async function runPhase2Worker(
@@ -110,30 +95,39 @@ export async function runPhase2Worker(
   onChunk?: (chunk: string) => void,
   escalated?: boolean
 ): Promise<{ workerResponse: string, workerLabel: string } | null> {
-  const fixPrompt = `${diagnosis}
+  // Parse structured files from filesBlock
+  const files: { path: string, content: string }[] = [];
+  const fileBlocks = filesBlock.split(/\n\/\/ === FILE: /).slice(1);
+  for (const blk of fileBlocks) {
+    const nl = blk.indexOf('\n');
+    if (nl === -1) continue;
+    const relPath = blk.slice(0, nl).replace(/\s*===\s*$/, '').trim();
+    files.push({ path: relPath, content: blk.slice(nl + 1) });
+  }
 
-Files: ${fileNames}
-
-${filesBlock}
-${buildWorkerRules(activePatterns, 9)}`;
-
-  let workerAI = deps.routing.selectSupervisorAndWorker().worker || deps.routing.getAvailableAI().ai;
-  if (escalated) { workerAI = deps.routing.selectSupervisorAndWorker().supervisor || workerAI; }
   const base = require('../../services/api/apiClient.js').getApiBase();
   const token = await require('../../services/api/apiClient.js').getAccountToken();
   const keysPayload = require('../../services/api/apiClient.js').collectKeys();
+  const { supervisor, worker } = deps.routing.selectSupervisorAndWorker();
+  const workerAI = escalated ? supervisor : (worker || deps.routing.getAvailableAI().ai);
   const { bestModelForRole } = require('../../services/ai/modelRegistry.js');
-  const actualWorkerModel = bestModelForRole(workerAI, 'flash')?.modelId || workerAI;
-  let workerResponse = '';
-  const workerLabel = modelLabel(workerAI);
+  const workerModel = bestModelForRole(workerAI, 'flash')?.modelId || workerAI;
 
+  let workerResponse = '';
   try {
-    const res = await fetch(`${base}/execute`, {
+    const res = await fetch(`${base}/v1/fix-worker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
-        provider: workerAI, model: actualWorkerModel, keys: keysPayload,
-        promptType: 'fix-worker', prompt: fixPrompt, maxTokens: 4000, temperature: 0.1, stream: true
+        diagnosis,
+        files,
+        context: { patternRules: buildWorkerRules(activePatterns, 9) || undefined },
+        worker: workerAI,
+        workerModel,
+        supervisorProvider: supervisor,
+        escalated: !!escalated,
+        keys: keysPayload,
+        stream: true,
       })
     });
     if (!res.ok) { const err: any = await res.json().catch(() => ({})); throw new Error(err.error || 'Worker API failed'); }
@@ -142,10 +136,13 @@ ${buildWorkerRules(activePatterns, 9)}`;
       while (true) { const { done, value } = await reader.read(); if (done) break; const chunk = decoder.decode(value, { stream: true }); workerResponse += chunk; if (onChunk) onChunk(chunk); }
     }
   } catch (err: any) {
-    throw new Error(`Worker returned no response. Error: ${err.message || 'unknown'}.`);
+    throw new Error(`Worker failed: ${err.message || 'unknown'}`);
   }
 
-  if (!workerResponse.trim()) { throw new Error('Worker returned empty response.'); }
-  deps.usageTracker?.recordUsage(Math.ceil((fixPrompt.length + workerResponse.length) / 4), 0, workerAI, 0, Math.ceil(workerResponse.length / 4), 'worker', require('path').basename(root));
-  return { workerResponse: workerResponse.trim(), workerLabel };
+  if (!workerResponse.trim()) throw new Error('Worker returned empty response.');
+  deps.usageTracker?.recordUsage(
+    Math.ceil((diagnosis.length + workerResponse.length) / 4), 0, workerAI,
+    0, Math.ceil(workerResponse.length / 4), 'worker', path.basename(root)
+  );
+  return { workerResponse: workerResponse.trim(), workerLabel: modelLabel(workerAI) };
 }
