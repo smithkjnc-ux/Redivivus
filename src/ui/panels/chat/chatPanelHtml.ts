@@ -100,6 +100,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
           ${renderInputLeftInner(header)}
         </div>
         <div id="input-right">
+          <button id="tier-badge" style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid #555;background:transparent;cursor:pointer;white-space:nowrap;transition:all 0.15s;font-family:inherit;" title="Model tier — click to change"></button>
           <button id="send-btn" title="Send (Enter)">↑</button>
         </div>
       </div>

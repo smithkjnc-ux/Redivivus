@@ -75,34 +75,42 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     refresh(); return;
   }
 
-  // ── AI intent classification — single cloud call classifies everything ──
-  // [DONE] Replaced hardcoded regex fast-path with cloud classifier for all intents.
-  // Questions, commands, run intents, offtopic — all handled by the same AI call.
-  const _BUILD_FALLBACK = /^\s*(add|change|update|remove|delete|rename|replace|fix|edit|make|give|put|set|increase|decrease|toggle|enable|disable|switch|move|style|color)\b/i;
-  const intent = deps.classifyIntent
-    ? (await deps.classifyIntent(userText).catch(() => _BUILD_FALLBACK.test(lowerText) ? { type: 'build' as const } : { type: 'question' as const }))
-    : { type: 'question' as const };
+  // ── Supervisor chat — Claude classifies AND answers in one call ──
+  // [FIX] Replaces broken cloudClassify() (/classify never existed) + promptCheap() (wrong model for Q&A).
+  const { cloudChat } = await import('../../services/api/apiClientChat.js');
+  const _cfgBlueprint = deps.redivivus.isInitialized() ? (deps.redivivus.loadConfig?.() as any)?.blueprint : undefined;
+  const chatResult = await cloudChat(userText, {
+    blueprint: _cfgBlueprint,
+    recentMessages: conversation.slice(-6).map(m => ({ role: m.role, content: m.content })),
+  }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
-  // Immediate exits — no clarify step needed for these
-  if (intent.type === 'offtopic') {
+  if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh); return; }
+
+  // Terminal actions — answered by Claude directly, no pipeline needed
+  if (chatResult.action === 'answer' || chatResult.action === 'clarify') {
+    const providerLabel: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+    const byline = providerLabel[chatResult.provider] ?? 'Claude';
+    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${byline}*`, timestamp: Date.now() });
+    refresh();
+    await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
+    return;
+  }
+  if (chatResult.action === 'offtopic') {
     conversation.push({ role: 'assistant', content: "I'm a coding assistant -- I can help you build, fix, explain, or review code. What are you building today?", timestamp: Date.now() });
     refresh(); return;
   }
-  if (intent.type === 'command' && intent.command) {
-    const label = (intent.command as string).replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
-    await vscode.commands.executeCommand(intent.command as string);
+  if (chatResult.action === 'command' && chatResult.task) {
+    const label = chatResult.task.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim();
+    await vscode.commands.executeCommand(chatResult.task);
     conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
     refresh(); return;
   }
-  if (intent.type === 'question') {
-    await handleAIChat(msg, userText, deps, conversation, refresh); return;
-  }
-  if (intent.type === 'run') {
-    await handleRunIntent(intent, deps, conversation, refresh); return;
-  }
-  if (intent.type === 'convert') {
-    await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return;
-  }
+  if (chatResult.action === 'run') { await handleRunIntent({ type: 'run' }, deps, conversation, refresh); return; }
+  if (chatResult.action === 'convert') { await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return; }
+
+  // For build/fix/scaffold/service — use Claude's extracted task as the grounded instruction
+  const intent = { type: chatResult.action as 'build' | 'fix' | 'scaffold' | 'service' };
+  const _claudeTask = chatResult.task || userText;
 
   // ── Job sizing — classify tier before any clarify/build fires (Stage 2) ──
   // [JobSizer] Replaces shouldClarify() binary check with 4-tier intake control.
@@ -179,11 +187,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
 
-  // ── Final routing by intent ──
-  if (intent.type === 'fix') { await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType); return; }
-  if (intent.type === 'scaffold') { await handleScaffoldIntent(userText, deps, conversation, refresh); return; }
-  if (intent.type === 'service') { await handleServiceIntent(userText, deps, conversation, refresh); return; }
-  if (intent.type === 'build') { await handleBuildIntent(routedText, userText, msg, deps, conversation, refresh); return; }
+  // ── Final routing by intent — use Claude's extracted task when available ──
+  if (intent.type === 'fix') { await handleFixRequest(_claudeTask, deps, msg.imageBase64, msg.imageType); return; }
+  if (intent.type === 'scaffold') { await handleScaffoldIntent(_claudeTask, deps, conversation, refresh); return; }
+  if (intent.type === 'service') { await handleServiceIntent(_claudeTask, deps, conversation, refresh); return; }
+  if (intent.type === 'build') { await handleBuildIntent(routedText || _claudeTask, _claudeTask, msg, deps, conversation, refresh); return; }
 
   await handleAIChat(msg, userText, deps, conversation, refresh);
 }

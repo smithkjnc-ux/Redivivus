@@ -8,6 +8,7 @@ import { buildInterviewScript } from './chatPanelScriptInterview';
 import { buildActionsScript } from './chatPanelScriptActions';
 import { buildActionsScriptB } from './chatPanelScriptActionsB';
 import { buildGatesScript } from './chatPanelScriptGates';
+import { buildTierScript } from './chatPanelScriptTier';
 import { buildExpandedInterviewScript } from './chatPanelScriptExpandedInterview';
 import { buildImageScript } from './chatPanelScriptImage';
 import { buildListenerScript } from './chatPanelScriptListener';
@@ -43,7 +44,8 @@ export function buildChatScript(): string {
       setInputBusy(true);
       // [FIX] Hide preview overlay so user can see the chat conversation unfold
       if (window.__redivivusPreviewHide) { window.__redivivusPreviewHide(); }
-      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined });
+      var _tier = (window._getActiveTier && window._getActiveTier()) || undefined;
+      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier });
       input.value = ''; input.style.height = 'auto'; window._pendingImage = null; window._pendingImageType = null;
       const _ip = document.getElementById('img-prev'); if (_ip) _ip.remove();
     }
@@ -191,5 +193,6 @@ export function buildChatScript(): string {
     ${buildGatesScript()}
     ${buildExpandedInterviewScript()}
     ${buildImageScript()}
+    ${buildTierScript()}
   `;
 }
