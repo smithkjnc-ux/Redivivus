@@ -49,7 +49,7 @@ export async function runPhase1Supervisor(
 
   let diagRes: any;
   try {
-    const res = await fetchFn(`${base}/v1/fix-supervisor`, {
+    const res = await fetchFn(`${base}/fix-supervisor`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
@@ -115,7 +115,7 @@ export async function runPhase2Worker(
 
   let workerResponse = '';
   try {
-    const res = await fetch(`${base}/v1/fix-worker`, {
+    const res = await fetch(`${base}/fix-worker`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
