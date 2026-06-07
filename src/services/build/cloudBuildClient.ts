@@ -83,11 +83,27 @@ export async function callCloudBuild(
         makeTimeout(30_000, 'Plan'),
       ]);
       if (planRes.ok) {
-        const plan = await planRes.json() as { files: Array<{ path: string; description: string; isNew: boolean }> };
-        _planLog(`ok status=${planRes.status} files=${plan.files?.length ?? 0} paths=${(plan.files ?? []).map(f => f.path).join(', ')}`);
+        const plan = await planRes.json() as {
+          files: Array<{ path: string; description: string; isNew: boolean }>;
+          prescription?: any[];
+          supervisorModel?: string;
+          supervisorProvider?: string;
+          supervisorInputTokens?: number;
+          supervisorOutputTokens?: number;
+        };
+        _planLog(`ok status=${planRes.status} files=${plan.files?.length ?? 0} supervisor=${plan.supervisorModel ?? 'none'} paths=${(plan.files ?? []).map(f => f.path).join(', ')}`);
         if (plan.files && plan.files.length > 1) {
-          _planLog(`-> multi-file path (executeMultiFileBuild)`);
-          return await executeMultiFileBuild(task, root, context, keyHeaders, token, base, preferred ?? '', plan.files, deps, opts.onProgress);
+          _planLog(`-> multi-file path (executeMultiFileBuild) with prescription=${!!plan.prescription}`);
+          return await executeMultiFileBuild(
+            task, root, context, keyHeaders, token, base, preferred ?? '',
+            plan.files, deps,
+            plan.prescription ?? null,
+            plan.supervisorModel ?? null,
+            plan.supervisorProvider ?? null,
+            plan.supervisorInputTokens ?? 0,
+            plan.supervisorOutputTokens ?? 0,
+            opts.onProgress,
+          );
         }
         _planLog(`-> single-file path (plan returned <=1 file)`);
       } else {
