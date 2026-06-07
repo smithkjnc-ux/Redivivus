@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.3.84",
+  "version": "0.3.85",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -571,7 +571,20 @@
         "redivivus.personality": {
           "type": "string",
           "default": "plain",
-          "enum": ["plain","friendly","scifi","horror","hillbilly","pirate","snarky","butler","trashy","surfer","hacker","roast"],
+          "enum": [
+            "plain",
+            "friendly",
+            "scifi",
+            "horror",
+            "hillbilly",
+            "pirate",
+            "snarky",
+            "butler",
+            "trashy",
+            "surfer",
+            "hacker",
+            "roast"
+          ],
           "enumDescriptions": [
             "Plain — neutral, professional. No personality modifier.",
             "Friendly 😊 — warm, encouraging, upbeat. Makes coding feel supportive.",
