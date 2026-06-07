@@ -16,6 +16,12 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     msg = { type: 'map-context', nodeId: '', label: '', lines: 0, health: 'neutral', todos: 0, _explainPrompt: msg.text, _displayLabel: 'Analysis' };
   }
 
+  // Easter egg: Konami code in the webview triggers the personality picker
+  if (msg.type === 'easter-egg-personality') {
+    import('../../commands/personalityPicker.js').then(m => m.pickPersonality());
+    return;
+  }
+
   if (await handleEarlyExits(panel, msg)) { return; }
 
   // Pre-load buildMode from VS Code setting on first message if the user hasn't chosen yet this session.

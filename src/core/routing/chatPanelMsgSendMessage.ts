@@ -107,6 +107,14 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     conversation.push({ role: 'assistant', content: `Done -- **${label}**`, timestamp: Date.now() });
     refresh(); return;
   }
+  if (chatResult.action === 'personality-picker') {
+    const providerLabel: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+    const byline = providerLabel[chatResult.provider] ?? 'Claude';
+    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${byline}*`, timestamp: Date.now() });
+    refresh();
+    setTimeout(() => import('../../services/api/apiClientChat.js').then(() => import('../../commands/personalityPicker.js').then(m => m.pickPersonality())), 400);
+    return;
+  }
   if (chatResult.action === 'run') { await handleRunIntent({ type: 'run' }, deps, conversation, refresh); return; }
   if (chatResult.action === 'convert') { await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return; }
 

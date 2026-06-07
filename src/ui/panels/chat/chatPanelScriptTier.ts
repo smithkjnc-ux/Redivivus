@@ -124,6 +124,15 @@ export function buildTierScript(): string {
       window._getActiveTier = activeTier;
       window._renderTierBadge = renderBadge;
 
+      // Easter egg: Konami code unlocks personality picker
+      // ↑ ↑ ↓ ↓ ← → ← → B A
+      var _k = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
+      var _ki = 0;
+      document.addEventListener('keydown', function(e) {
+        if (e.key === _k[_ki]) { _ki++; } else { _ki = e.key === _k[0] ? 1 : 0; }
+        if (_ki === _k.length) { _ki = 0; vscode.postMessage({ type: 'easter-egg-personality' }); }
+      });
+
       // Initial render
       renderBadge();
     })();

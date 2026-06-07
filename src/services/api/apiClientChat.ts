@@ -5,7 +5,7 @@
 import { getApiBase, getAccountToken, collectKeyHeaders } from './apiClient.js';
 
 export interface ChatResult {
-  action: 'answer' | 'build' | 'fix' | 'clarify' | 'command' | 'offtopic' | 'run' | 'convert' | 'scaffold' | 'service';
+  action: 'answer' | 'build' | 'fix' | 'clarify' | 'command' | 'offtopic' | 'run' | 'convert' | 'scaffold' | 'service' | 'personality-picker';
   text: string;
   task?: string;       // extracted build/fix task (populated for build and fix actions)
   model: string;
