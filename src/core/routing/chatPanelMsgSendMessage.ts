@@ -104,8 +104,8 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
   if (chatResult.action === 'command' && chatResult.task) {
-    await vscode.commands.executeCommand(chatResult.task);
-    conversation.push({ role: 'assistant', content: `Done -- **${chatResult.task.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim()}**`, timestamp: Date.now() });
+    try { await vscode.commands.executeCommand(chatResult.task); } catch { /* needs args or unknown — still show text */ }
+    conversation.push({ role: 'assistant', content: chatResult.text || `Done -- **${chatResult.task.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim()}**`, timestamp: Date.now() });
     refresh(); releaseInput(); return;
   }
   if (chatResult.action === 'personality-picker') {

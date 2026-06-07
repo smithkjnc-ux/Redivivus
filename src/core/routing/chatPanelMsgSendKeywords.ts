@@ -74,11 +74,19 @@ export async function handleKeywordShortcuts(
     }
   }
 
-  if (/list.*project|show.*project|available.*project|my.*project/i.test(lowerText)) {
+  if (/list.*project|show.*project|available.*project|my.*project|open.*project|switch.*project|change.*project/i.test(lowerText)) {
     const projects = _scanRedivivusProjects();
-    const reply = projects.length ? `Found **${projects.length} Redivivus project${projects.length === 1 ? '' : 's'}** -- opening the picker now.` : 'No Redivivus projects found.';
-    conversation.push({ role: 'assistant', content: reply, timestamp: Date.now() }); refresh();
-    if (projects.length) { panel.webview.postMessage({ type: 'show-projects-modal', projects }); }
+    // Try to match a specific project name if mentioned
+    const nameMatch = lowerText.match(/open\s+(?:the\s+)?(.+?)\s+project/i);
+    const named = nameMatch ? projects.find(p => p.name.toLowerCase().includes(nameMatch[1].toLowerCase())) : null;
+    if (named) {
+      conversation.push({ role: 'assistant', content: `Opening **${named.name}**...`, timestamp: Date.now() }); refresh();
+      panel.webview.postMessage({ type: 'open-workspace-btn', path: named.fullPath });
+    } else {
+      const reply = projects.length ? `Found **${projects.length} project${projects.length === 1 ? '' : 's'}** -- opening the picker now.` : 'No Redivivus projects found in your projects directory.';
+      conversation.push({ role: 'assistant', content: reply, timestamp: Date.now() }); refresh();
+      if (projects.length) { panel.webview.postMessage({ type: 'show-projects-modal', projects }); }
+    }
     return true;
   }
 
