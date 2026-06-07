@@ -96,39 +96,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     fixLog('Phase 1: Supervisor diagnosis received', { diagnosisPreview: diagnosis.substring(0, 500) });
     supervisorLabel = p1.supervisorLabel;
 
-    if (p1.requiresAssetFetch && p1.fetchInstructions) {
-      fixLog('Phase 1.5: Executing Agentic Asset Fetch...');
-      conversation.push({
-          role: 'assistant',
-          content: `> 🔄 **Agentic Asset Fetch Initiated:** Task requires massive external assets. Handing off to Terminal Agent to download them safely...`,
-          timestamp: Date.now()
-      });
-      deps.refresh();
-      
-      try {
-          const { executeAgentTask } = await import('../../services/ai/agentService.js');
-          const agentCtx: any = {
-              root: root,
-              task: `[ASSET FETCH] ${p1.fetchInstructions}. Use cross-platform Node.js scripts (e.g. using 'https' or 'fs') instead of OS-specific tools like wget or curl if possible. DO NOT MODIFY EXISTING PROJECT CODE. ONLY download raw assets into the requested raw directory.\n\nANTI-BOT EVASION: If your fetch script fails with HTTP 403 or 429, you must dynamically adapt:\n1. First, modify your script to spoof a real browser User-Agent header.\n2. If the source still blocks you, immediately PIVOT and write a new script to download the assets from a developer-friendly mirror (like raw.githubusercontent.com or an open API) instead of fighting the firewall.`,
-              log: (msg: string) => { conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() }); deps.refresh(); },
-              modifiedFiles: new Set<string>(),
-              snapshotId: undefined,
-              routing: deps.routing,
-              blueprintContext: ''
-          };
-          await executeAgentTask(agentCtx.task, 'Project Context: Downloading massive assets', deps.routing, agentCtx, agentCtx.log);
-          
-          conversation.push({
-              role: 'assistant',
-              content: `> ✅ **Assets Fetched!** Returning to Surgical Worker to modularize them into the codebase...`,
-              timestamp: Date.now()
-          });
-          deps.refresh();
-      } catch (e) {
-          fixLog('Phase 1.5: Agentic Fetch Failed', { error: String(e) });
-          throw new Error("Agentic Asset Fetch Failed: " + String(e));
-      }
-    }
+    // [PHASE-1-HARDENING] Agentic Fetch removed — complex asset orchestration moves to backend in Phase 2.
 
   } catch (err) {
     const _errMsg = err instanceof Error ? err.message : String(err);
