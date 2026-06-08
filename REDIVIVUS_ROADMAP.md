@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-08 — File Size Gate Backend: Added FILE_SIZE_THRESHOLDS re-export to workerTokenLimits.ts. Verified existing gate infrastructure (fileSizeGate.ts + chatPanelMsgFix.ts integration) is functional. UI display not implemented (requires src/ui/ changes, forbidden this session).
+*Last updated:* 2026-06-08 — Surgical Fuzzy Matching: Implemented 4-pass matching (exact -> normalized -> trimmed-line -> fuzzy 85%) in surgicalEditService.ts. Handles whitespace drift after multiple fix attempts. Detailed logging added for monitoring match strategy effectiveness.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

@@ -5,6 +5,76 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+// [FIX] Fuzzy matching support for surgical edits -- handles whitespace drift and minor changes
+// that occur after multiple fix attempts on the same file.
+
+/** Normalize text for matching -- handles line endings, tabs, whitespace, blank lines. */
+function normalizeForMatch(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')          // normalize line endings
+    .replace(/\t/g, '  ')            // tabs to spaces
+    .replace(/[ \t]+$/gm, '')        // trim trailing whitespace per line
+    .replace(/\n{3,}/g, '\n\n')      // collapse 3+ blank lines to 2
+    .trim();                          // trim leading/trailing whitespace
+}
+
+/** Calculate similarity between two strings (0-1 scale). Uses line-based comparison. */
+function calculateSimilarity(a: string, b: string): number {
+  const linesA = a.split('\n').filter(l => l.trim().length > 0);
+  const linesB = b.split('\n').filter(l => l.trim().length > 0);
+  if (linesA.length === 0 || linesB.length === 0) return 0;
+  
+  // Find longest common subsequence of non-empty lines (normalized)
+  const normA = linesA.map(l => l.trim().replace(/\s+/g, ' '));
+  const normB = linesB.map(l => l.trim().replace(/\s+/g, ' '));
+  
+  let matches = 0;
+  let bi = 0;
+  for (const line of normA) {
+    const idx = normB.indexOf(line, bi);
+    if (idx !== -1) { matches++; bi = idx + 1; }
+  }
+  
+  return matches / Math.max(normA.length, normB.length);
+}
+
+/** Find best fuzzy match location in content using similarity. Returns {index, similarity}. */
+function findFuzzyMatch(searchBlock: string, content: string, threshold: number): { index: number; similarity: number } | null {
+  const searchLines = normalizeForMatch(searchBlock).split('\n').filter(l => l.length > 0);
+  const contentLines = content.split('\n');
+  
+  if (searchLines.length === 0) return null;
+  if (searchLines.length < 3) return null; // Don't fuzzy-match short blocks -- too risky
+  
+  let bestIndex = -1;
+  let bestSimilarity = 0;
+  
+  // Sliding window over content lines
+  for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
+    const windowContent = contentLines.slice(i, i + searchLines.length).join('\n');
+    const similarity = calculateSimilarity(searchBlock, windowContent);
+    if (similarity > bestSimilarity) {
+      bestSimilarity = similarity;
+      bestIndex = i;
+    }
+  }
+  
+  if (bestSimilarity >= threshold && bestIndex !== -1) {
+    // Convert line index to character index
+    const index = contentLines.slice(0, bestIndex).join('\n').length + (bestIndex > 0 ? 1 : 0);
+    return { index, similarity: bestSimilarity };
+  }
+  
+  return null;
+}
+
+/** Log helper for surgical matching -- uses console but can be swapped for proper logger. */
+function surgicalLog(msg: string, details?: any): void {
+  const prefix = '[SURGICAL]';
+  if (details) { console.log(prefix, msg, details); }
+  else { console.log(prefix, msg); }
+}
+
 export interface SurgicalEdit {
   filePath: string;       // relative path
   searchBlock: string;    // exact text to find
@@ -107,7 +177,8 @@ export function parseSurgicalEdits(response: string, defaultFilePath: string = '
 /**
  * Apply surgical edits to files on disk.
  * For each file, reads current content, finds the search block, and replaces it.
- * If any search block is not found, returns an error for that file.
+ * Uses 4-pass matching: exact -> normalized -> trimmed-line -> fuzzy (85% threshold).
+ * If any search block is not found after all 4 passes, returns an error for that file.
  */
 export function applySurgicalEdits(edits: SurgicalEdit[], root: string): EditResult[] {
   // Group edits by file
@@ -128,51 +199,106 @@ export function applySurgicalEdits(edits: SurgicalEdit[], root: string): EditRes
 
     let content = fs.readFileSync(absPath, 'utf-8');
     let appliedCount = 0;
-    let failedSearch: string | undefined;
+    let failedEdit: { searchBlock: string; strategy: string } | undefined;
 
     for (const edit of fileEdits) {
-      const idx = content.indexOf(edit.searchBlock);
+      const blockPreview = edit.searchBlock.slice(0, 40).replace(/\n/g, '\\n');
+      surgicalLog(`Trying exact match for "${blockPreview}..."`);
+      
+      // Strategy 1: Exact match (fastest, most precise)
+      let idx = content.indexOf(edit.searchBlock);
+      let strategy = 'exact';
+      
+      // Strategy 2: Normalized match (handles line endings, trailing whitespace)
       if (idx === -1) {
-        // Pass 2: normalize trailing whitespace per line
-        const normalizedContent = content.split('\n').map(l => l.trimEnd()).join('\n');
-        const normalizedSearch = edit.searchBlock.split('\n').map(l => l.trimEnd()).join('\n');
+        surgicalLog(`  Exact match failed -- trying normalized match...`);
+        const normalizedContent = normalizeForMatch(content);
+        const normalizedSearch = normalizeForMatch(edit.searchBlock);
         const nIdx = normalizedContent.indexOf(normalizedSearch);
         if (nIdx !== -1) {
-          const linesBefore = normalizedContent.slice(0, nIdx).split('\n').length - 1;
+          // Map normalized index back to original content
+          const beforeMatch = normalizedContent.slice(0, nIdx);
+          const linesBefore = beforeMatch.split('\n').length - 1;
           const searchLines = normalizedSearch.split('\n').length;
           const origLines = content.split('\n');
-          const beforeStr = origLines.slice(0, linesBefore).join('\n') + (linesBefore > 0 ? '\n' : '');
-          content = beforeStr + edit.replaceBlock + '\n' + origLines.slice(linesBefore + searchLines).join('\n');
-        } else {
-          // Pass 3: strip all leading+trailing whitespace per line (handles tab/space and indent drift)
-          const normalize = (s: string) => s.replace(/\t/g, '  ').split('\n').map(l => l.trim()).filter(l => l.length > 0);
-          const strippedContent = content.replace(/\t/g, '  ').split('\n').map(l => l.trim());
-          const strippedSearch = normalize(edit.searchBlock);
-          let foundAt = -1;
-          for (let si = 0; si <= strippedContent.length - strippedSearch.length; si++) {
-            if (strippedSearch.every((sl, j) => strippedContent[si + j] === sl)) { foundAt = si; break; }
-          }
-          if (foundAt !== -1) {
-            const origLines = content.split('\n');
-            content = [...origLines.slice(0, foundAt), edit.replaceBlock, ...origLines.slice(foundAt + strippedSearch.length)].join('\n');
-          } else {
-            failedSearch = edit.searchBlock.slice(0, 60) + (edit.searchBlock.length > 60 ? '...' : '');
-            break;
+          const charIndex = origLines.slice(0, linesBefore).join('\n').length + (linesBefore > 0 ? 1 : 0);
+          idx = charIndex;
+          strategy = 'normalized';
+          surgicalLog(`  Normalized match succeeded`);
+        }
+      }
+      
+      // Strategy 3: Trimmed-line match (handles indentation drift)
+      if (idx === -1) {
+        surgicalLog(`  Normalized match failed -- trying trimmed-line match...`);
+        const contentLines = content.split('\n');
+        const searchLines = edit.searchBlock.split('\n');
+        const trimmedSearch = searchLines.map(l => l.trim());
+        
+        // Don't try if search is just empty/whitespace
+        if (trimmedSearch.some(l => l.length > 0)) {
+          // Sliding window over content lines
+          for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
+            const windowTrimmed = contentLines.slice(i, i + searchLines.length).map(l => l.trim());
+            if (trimmedSearch.every((sl, j) => windowTrimmed[j] === sl)) {
+              // Found at line index i -- convert to char index
+              const charIndex = contentLines.slice(0, i).join('\n').length + (i > 0 ? 1 : 0);
+              idx = charIndex;
+              strategy = 'trimmed-line';
+              surgicalLog(`  Trimmed-line match succeeded (line ${i + 1})`);
+              break;
+            }
           }
         }
-      } else {
-        content = content.slice(0, idx) + edit.replaceBlock + content.slice(idx + edit.searchBlock.length);
       }
-      appliedCount++;
+      
+      // Strategy 4: Fuzzy match (85% similarity threshold, last resort)
+      if (idx === -1) {
+        const searchLines = edit.searchBlock.split('\n').filter(l => l.trim().length > 0);
+        if (searchLines.length >= 3) {
+          surgicalLog(`  Trimmed-line match failed -- trying fuzzy match (min 85% similarity)...`);
+          const fuzzy = findFuzzyMatch(edit.searchBlock, content, 0.85);
+          if (fuzzy) {
+            idx = fuzzy.index;
+            strategy = 'fuzzy';
+            surgicalLog(`  Fuzzy match succeeded (${(fuzzy.similarity * 100).toFixed(1)}% similarity)`);
+          }
+        } else {
+          surgicalLog(`  Skipping fuzzy match -- search block too short (${searchLines.length} lines, need 3+)`);
+        }
+      }
+      
+      // Apply the edit if any strategy found a match
+      if (idx !== -1) {
+        const before = content.slice(0, idx);
+        const after = content.slice(idx + edit.searchBlock.length);
+        content = before + edit.replaceBlock + after;
+        appliedCount++;
+        surgicalLog(`  Applied edit using ${strategy} strategy`);
+      } else {
+        // All strategies failed -- log detailed failure info
+        failedEdit = { searchBlock: edit.searchBlock, strategy: 'all-4-failed' };
+        const searchPreview = edit.searchBlock.slice(0, 100).replace(/\n/g, '\\n');
+        surgicalLog(`  ALL STRATEGIES FAILED for search block: "${searchPreview}..."`);
+        
+        // Find best fuzzy match anyway to show how close we got
+        const bestMatch = findFuzzyMatch(edit.searchBlock, content, 0.0); // threshold 0 = find best regardless
+        if (bestMatch && bestMatch.similarity > 0) {
+          surgicalLog(`  Best match found: ${(bestMatch.similarity * 100).toFixed(1)}% similarity (needed 85%)`);
+        }
+        break;
+      }
     }
 
-    if (failedSearch) {
-      results.push({ filePath: relPath, success: false, editCount: appliedCount, error: `Search block not found: "${failedSearch}"` });
+    if (failedEdit) {
+      const failedPreview = failedEdit.searchBlock.slice(0, 60).replace(/\n/g, '\\n') + (failedEdit.searchBlock.length > 60 ? '...' : '');
+      results.push({ filePath: relPath, success: false, editCount: appliedCount, error: `Search block not found (all 4 strategies failed): "${failedPreview}"` });
     } else {
       const dir = path.dirname(absPath);
       if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
       fs.writeFileSync(absPath, content, 'utf-8');
       results.push({ filePath: relPath, success: true, editCount: appliedCount });
+      surgicalLog(`Successfully applied ${appliedCount} edits to ${relPath}`);
     }
   }
   return results;

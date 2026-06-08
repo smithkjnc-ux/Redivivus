@@ -3,6 +3,37 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 08, 2026: Surgical Edit Fuzzy Matching
+
+**Goal:** Fix surgical edit failures caused by whitespace drift and minor code changes after multiple fix attempts.
+
+**Root cause:** Previous implementation had 3 matching strategies but no clear logging or similarity-based fuzzy matching. When exact, normalized, and trimmed-line matching all failed, the edit was rejected even if the code was 80%+ similar.
+
+**File changed:** `src/services/build/surgicalEditService.ts`
+
+**What changed:**
+1. Added `normalizeForMatch()` function (lines 11-19) -- standard normalization for line endings, tabs, trailing whitespace, blank lines.
+2. Added `calculateSimilarity()` function (lines 22-39) -- line-based similarity calculation using normalized line comparison.
+3. Added `findFuzzyMatch()` function (lines 41-69) -- sliding window search with configurable similarity threshold (85% default).
+4. Added `surgicalLog()` helper (lines 71-76) -- console logging with [SURGICAL] prefix.
+5. Rewrote `applySurgicalEdits()` (lines 183-305) -- explicit 4-pass matching strategy:
+   - Pass 1: Exact match (fastest, most precise)
+   - Pass 2: Normalized match (handles line endings, trailing whitespace)
+   - Pass 3: Trimmed-line match (handles indentation drift)
+   - Pass 4: Fuzzy match (85% similarity threshold, last resort, skips blocks under 3 lines)
+6. Added detailed logging at each pass -- success/failure logged with strategy name and similarity percentage.
+7. Added failure diagnostics -- when all strategies fail, logs best match found and similarity percentage.
+
+**Why:** Multiple fix attempts on the same file cause minor whitespace/indentation drift. Previous exact matching would fail repeatedly, causing Guardian rejections and infinite retry loops.
+
+**Risk:** Low. Fuzzy match is last resort (pass 4) with 85% threshold and 3+ line minimum. Preserves exact matching for clean files while adding resilience for drifted files.
+
+**Verification:**
+- `npm run compile`: Exit code 0 (zero errors)
+- `git diff --name-only | grep "src/ui"`: Exit code 1 (no UI files touched)
+
+---
+
 ## Session — Jun 08, 2026: File Size Gate Backend Infrastructure
 
 **Goal:** Implement file size gate before fix pipeline to prevent oversized files from triggering truncation.
