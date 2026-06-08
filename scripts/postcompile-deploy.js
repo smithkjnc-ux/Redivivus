@@ -43,6 +43,8 @@ if (fs.existsSync(mediaSrc)) console.log('✓ Brand media synced to build');
 const deployTargets = [
   // Baked extension (custom VSCode build)
   path.join(home, 'projects', 'redivivus-build', 'VSCode-linux-x64', 'resources', 'app', 'extensions', 'redivivus'),
+  // Legacy Downloads location -- kept in sync until confirmed dead
+  path.join(home, 'Downloads', 'redivivus-0.3.56', 'resources', 'app', 'extensions', 'redivivus'),
 ];
 
 // [WARN] Resolve the actual running IDE via the stable symlink — this is where the user's desktop icon points.
