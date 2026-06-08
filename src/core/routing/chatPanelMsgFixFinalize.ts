@@ -53,7 +53,8 @@ export async function runFixFinalize(params: {
           supervisorProvider: 'groq',
         }),
       });
-      fixLog('[GLOBAL_VAULT] Extract response', { status: extractRes.status });
+      const extractBody = await extractRes.json().catch(() => ({}));
+      fixLog('[GLOBAL_VAULT] Extract response', { status: extractRes.status, body: JSON.stringify(extractBody).slice(0,200) });
     } catch (e) { fixLog('[GLOBAL_VAULT] Extract failed', { error: String(e) }); }
   }
 
