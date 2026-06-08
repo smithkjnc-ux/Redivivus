@@ -62,7 +62,7 @@ export function renderBlueprintCardToken(html: string): string {
       + `<div class="bpc-legend"><span style="color:#22c55e;">&#9679;</span> stated &nbsp;<span style="color:#f59e0b;">&#9679;</span> assumed &nbsp;<span style="color:#ef4444;">&#9679;</span> need answer</div>`
       + `<div class="bpc-fields">${fieldRows}</div>`
       + `<div style="display:flex;gap:8px;margin-top:12px;">`
-      + `<button class="bpc-build-btn" data-session="${sid}" style="padding:7px 18px;background:#4a9eff;color:#0f0f1a;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;">Build it</button>`
+      + `<button class="bpc-build-btn" data-session="${sid}" style="padding:10px 28px;background:linear-gradient(135deg,#4a9eff,#2563eb);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;font-family:inherit;box-shadow:0 4px 15px rgba(74,158,255,0.4);letter-spacing:0.3px;">Build it</button>`
       + `<button class="bpc-edit-btn" data-session="${sid}" style="padding:7px 14px;background:none;border:1px solid var(--vscode-input-border);color:var(--vscode-descriptionForeground);border-radius:6px;cursor:pointer;font-size:12px;font-family:inherit;">Change something</button>`
       + `</div></div>`;
   });

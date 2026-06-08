@@ -95,8 +95,14 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const _byline = `${_pr}${_ms&&_ms!==_pr?' '+_ms:''} · ↑${chatResult.inputTokens??0} ↓${chatResult.outputTokens??0} tok`;
 
   if (chatResult.action === 'answer' || chatResult.action === 'clarify') {
-    conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
-    refresh(); releaseInput();
+    // [FIX] Don't show verbose build specs as chat text -- blueprint card handles build intent display
+    const isBuildSpec = /^\{.*"action"\s*:\s*"build"/s.test(chatResult.text?.trim() ?? '');
+    const displayText = isBuildSpec ? '' : chatResult.text;
+    if (displayText) {
+      conversation.push({ role: 'assistant', content: `${displayText}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
+      refresh();
+    }
+    releaseInput();
     await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
     return;
   }
