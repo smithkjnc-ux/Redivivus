@@ -200,7 +200,17 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
         ? `__SUGGEST__${plain} — please write the complete corrected file using FULL FILE format (not surgical edits).`
         : `__SUGGEST__${userText} — please write the complete corrected files, not surgical edits.`;
       const _b64sug = Buffer.from(suggestedPrompt, 'utf8').toString('base64');
-      appendProjectDeadEnd(root, `fix-no-output: ${userText.slice(0,80)}`, plain || 'Worker produced no parseable file edits', 'No FILE: blocks or SEARCH/REPLACE markers after two attempts', 'Add FILE: header with fenced code block for each changed file');
+      // [FIX] Record actual failure reason not a hardcoded generic message
+      const deadEndReason = failed.length > 0
+        ? failed.join('; ')
+        : plain || 'Worker produced no parseable file edits';
+      const deadEndWhat = written.length === 0 && skipped.length === 0
+        ? 'No files were written after retry'
+        : `Skipped files: ${skipped.join(', ')}`;
+      const deadEndNext = plain
+        ? `Try: ${plain} -- use FULL FILE format`
+        : 'Use FULL FILE format with complete file content';
+      appendProjectDeadEnd(root, `fix-failed: ${userText.slice(0,80)}`, deadEndReason, deadEndWhat, deadEndNext);
       fixLog('FINAL FAILURE: no parseable output after retry', { plain, skipNote, failedErrors: failed });
       finalizeFixLogger();
       let failMsg = plain ? `**What I found:** ${plain}\n\n` : '';

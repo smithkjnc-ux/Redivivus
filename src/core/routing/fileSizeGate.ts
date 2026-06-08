@@ -173,6 +173,14 @@ export function isTruncatedOutput(text: string): boolean {
     return true;
   }
 
+  // Check if file ends mid-statement (truncated mid-word or mid-expression)
+  const lastNonEmptyLine = text.split('\n').reverse().find(l => l.trim().length > 0) || '';
+  const validEndings = [';', '}', ')', ']', '"', "'", '`', '*/', '---', 'EOF'];
+  const endsCleanly = validEndings.some(e => lastNonEmptyLine.trimEnd().endsWith(e));
+  if (!endsCleanly && lastNonEmptyLine.trim().length > 0) {
+    return true;
+  }
+
   // Check if code block is missing closing backticks
   const codeBlockOpens = (text.match(/```[a-z]*\n/g) || []).length;
   const codeBlockCloses = (text.match(/\n```/g) || []).length;

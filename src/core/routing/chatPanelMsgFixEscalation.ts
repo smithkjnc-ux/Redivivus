@@ -4,6 +4,7 @@
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { modelLabel } from './chatPanelMsgFixUtils';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
+import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds';
 
 export interface EscalationResult {
   finalResponse: string;
@@ -15,6 +16,7 @@ export interface EscalationResult {
   retryCount: number;
   escalated: boolean;
   forceSurgical?: boolean; // [FIX] When true, retry with surgical format instead of FULL FILE
+  accumulatedCritiques?: string[]; // [FIX] Guardian rejection reasons for dead end logging
 }
 
 /** Runs Phase 2 (Worker) → Phase 3 (Guardian) with automatic retry and escalation. */
@@ -187,7 +189,19 @@ export async function runEscalationLoop(params: {
 
   // All retries + escalation exhausted
   guardianNote = `Guardian (${guardianLabel}): Failed after ${retryCount} retries${escalated ? ' + escalation' : ''}. Applying best available fix.`;
-  return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: maxRetries, escalated, forceSurgical };
+  // [FIX] Write actual Guardian rejection reasons to dead_ends.md
+  if (accumulatedCritiques.length > 0) {
+    const critiqueText = accumulatedCritiques.join('; ');
+    appendProjectDeadEnd(
+      root,
+      `guardian-rejected: ${critiqueText.slice(0, 80)}`,
+      critiqueText,
+      `Guardian rejected after ${maxRetries + 1} attempts${escalated ? ' including escalation' : ''}`,
+      'Try FULL FILE format instead of surgical edits, or rephrase the fix request more specifically'
+    );
+    fixLog('[DEAD END] Wrote Guardian rejection reasons to dead_ends.md', { critiques: accumulatedCritiques });
+  }
+  return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: maxRetries, escalated, forceSurgical, accumulatedCritiques };
 }
 
 /** Renders a 4-step progress list into the last conversation message. */
