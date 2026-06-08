@@ -44,7 +44,10 @@ export async function handleBuildIntent(
       // Skip card when re-entering from blueprint card confirm — go straight to build
       if (!msg.fromBlueprintCard) {
         // [FIX] Use userText (clean) not routedText — routedText has diagnostic suffixes that confuse inference
-        const inferred = await inferBlueprintFields(userText, deps.routing).catch(() => null);
+        // [FIX] Use the richest available task description for blueprint inference.
+        // userText may be short ("can you make this?") -- prefer the enriched task if it's longer.
+        const inferText = (routedText && routedText.length > userText.length) ? routedText : userText;
+        const inferred = await inferBlueprintFields(inferText.slice(0, 800), deps.routing).catch(() => null);
         if (inferred) {
           _pendingBlueprintCards.set(inferred.sessionId, userText);
           conversation.push({ role: 'assistant', content: buildBlueprintCardToken(inferred), timestamp: Date.now() });

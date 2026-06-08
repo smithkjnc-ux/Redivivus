@@ -73,7 +73,7 @@ export async function inferBlueprintFields(
 ): Promise<BlueprintInferenceResult> {
   const sessionId = Date.now().toString(36);
   try {
-    const prompt = INFERENCE_PROMPT.replace('{REQUEST}', request.slice(0, 400));
+    const prompt = INFERENCE_PROMPT.replace('{REQUEST}', request.slice(0, 800));
     const res = await (routing as any).prompt(prompt, 15_000);
     if (!res?.text) { return makeFallback(request, sessionId); }
     let clean = res.text.trim();
