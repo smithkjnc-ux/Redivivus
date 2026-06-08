@@ -116,6 +116,12 @@ export function validateCode(code: string, ext: string): ValidationResult {
         .replace(/\u2026/g, '...')
         .replace(/\u2018|\u2019/g, "'")
         .replace(/\u201C|\u201D/g, '"');
+      // Catch-all: convert any remaining non-ASCII to \uXXXX escape sequences
+      fixed = fixed.replace(/[^\x00-\x7F]/g, (c: string) => {
+        const code = c.charCodeAt(0);
+        if (code <= 0xFFFF) { return '\\u' + code.toString(16).padStart(4, '0'); }
+        return '\\u' + code.toString(16).padStart(8, '0');
+      });
       return { issues: [`Non-ASCII characters in JS file (${unique}) -- auto-fixed common ones`], autoFixed: true, code: fixed };
     }
   }
