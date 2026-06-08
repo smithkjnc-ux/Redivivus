@@ -31,21 +31,49 @@ export class SnapshotService {
     const id = Date.now().toString();
     const snapDir = path.join(this.snapshotsRoot, id);
     if (!fs.existsSync(snapDir)) { fs.mkdirSync(snapDir, { recursive: true }); }
+    // [FIX] Snapshot ALL source files, not just the ones being changed.
+    // Without this, reverting only restores changed files and leaves other files in a broken state.
+    const allSourceFiles = this._getAllSourceFiles();
+    const prescribedSet = new Set(filePaths);
     const preExisting: string[] = [];
     const newFiles: string[] = [];
     for (const rel of filePaths) {
+      const abs = path.join(this.root, rel);
+      if (!fs.existsSync(abs)) { newFiles.push(rel); }
+    }
+    for (const rel of allSourceFiles) {
       const abs = path.join(this.root, rel);
       if (fs.existsSync(abs)) {
         preExisting.push(rel);
         const dest = path.join(snapDir, rel);
         fs.mkdirSync(path.dirname(dest), { recursive: true });
         fs.copyFileSync(abs, dest);
-      } else { newFiles.push(rel); }
+      }
     }
     const meta: SnapshotMeta = { id, timestamp: Date.now(), task, files: filePaths, preExisting, newFiles };
     fs.writeFileSync(path.join(snapDir, '_meta.json'), JSON.stringify(meta, null, 2), 'utf8');
     this._pruneOld();
     return id;
+  }
+
+  private _getAllSourceFiles(): string[] {
+    const results: string[] = [];
+    const ignored = new Set(['.redivivus', 'node_modules', '.git', 'dist', 'out', 'build']);
+    const walk = (dir: string, base: string) => {
+      try {
+        for (const entry of fs.readdirSync(dir)) {
+          if (ignored.has(entry)) { continue; }
+          const full = path.join(dir, entry);
+          const rel = base ? base + '/' + entry : entry;
+          try {
+            if (fs.statSync(full).isDirectory()) { walk(full, rel); }
+            else { results.push(rel); }
+          } catch {}
+        }
+      } catch {}
+    };
+    walk(this.root, '');
+    return results;
   }
 
   /** Call AFTER writing a new file — saves the initial state as a permanent baseline that is never pruned. */

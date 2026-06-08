@@ -211,6 +211,19 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
       written = applyRes.written; failed = applyRes.failed; skipped = applyRes.skipped; fixSnapId = applyRes.fixSnapId;
       fixLog('Phase 3: Application complete', { written, failed, skipped });
+
+      // [FIX] Verify prescribed files were actually written -- catches false success where Worker fixes wrong file.
+      // Extract file mentions from PRESCRIPTION section of diagnosis.
+      const prescriptionSection = diagnosis.match(/PRESCRIPTION:([\s\S]*?)(?:\[TRIVIAL\]|$)/)?.[1] ?? '';
+      const prescribedFiles = [...prescriptionSection.matchAll(/`?([a-zA-Z0-9_\-./]+\.[a-zA-Z]+)`?/g)]
+        .map(m => m[1])
+        .filter(f => [...allowedRels].some(r => r.endsWith(f) || f.endsWith(r)));
+      const unwrittenPrescribed = prescribedFiles.filter(f => !written.some(w => w.endsWith(f) || f.endsWith(w)));
+      if (unwrittenPrescribed.length > 0 && written.length > 0) {
+        fixLog('[PRESCRIPTION_CHECK] Prescribed files not written', { unwritten: unwrittenPrescribed, written });
+        failed = [...failed, ...unwrittenPrescribed.map(f => `${f}: prescribed but not written`)];
+        written = []; // Force retry
+      }
     }
   } catch (err) {
     const _errMsg2 = err instanceof Error ? err.message : String(err);
