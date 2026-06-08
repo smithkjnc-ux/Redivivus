@@ -3,6 +3,48 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 08, 2026: File Size Gate Backend Infrastructure
+
+**Goal:** Implement file size gate before fix pipeline to prevent oversized files from triggering truncation.
+
+**Pre-flight finding:** Most infrastructure already existed:
+- `fileSizeGate.ts` has complete gate logic with 30KB advisory / 50KB hard gate
+- `chatPanelMsgFix.ts:65-78` already runs gate check before AI calls
+- `chatPanelMsgFixApply.ts:73-78` already has truncation safety net via `isTruncatedOutput()`
+
+**File changed:** `src/core/ai/workerTokenLimits.ts`
+**What changed:** Added re-export of `FILE_SIZE_THRESHOLDS` from `fileSizeGate.ts` (line 45-49). This centralizes all Worker-related constants in one file.
+**Why:** User requested FILE_SIZE_THRESHOLDS be available in workerTokenLimits.ts for documentation/consistency.
+**Risk:** None. Re-export only — primary definition remains in fileSizeGate.ts.
+
+**Backend-only verification:**
+- `npm run compile`: Exit code 0 (zero errors)
+- `git diff --name-only | grep "src/ui"`: Exit code 1 (no UI files touched)
+
+**Note on UI:** The gate sends `show-filesize-gate` message to webview, but UI handler is not implemented. Backend infrastructure is complete; UI display would require changes to src/ui/ files (forbidden by session rules).
+
+---
+
+## Session — Jun 08, 2026: Worker AI Token Limits — xAI Bump + Constants File
+
+**Goal:** Raise Worker AI max_tokens to documented provider maximums to prevent truncation on large file outputs.
+
+**File changed:** `src/core/ai/providers/xaiProvider.ts`
+**What changed:** Bumped `max_tokens` from 16000 to 32000 (line 21-22). Updated comment to reflect new value.
+**Why:** xAI Grok-3 models support 32K output tokens. Worker was only using half capacity, causing truncation on large file generations.
+**Risk:** None. Value is within documented API limits. Other providers already at max (Claude 64K, Gemini 64K, OpenAI 16K, Groq 8K, Kimi 16K).
+
+**File created:** `src/core/ai/workerTokenLimits.ts`
+**What changed:** New constants file documenting all Worker AI token limits per provider. Includes `WORKER_TOKEN_LIMITS`, `STREAMING_TOKEN_LIMITS`, and `CONTEXT_WINDOW_SIZES` exports.
+**Why:** Central reference for current maximums. Future refactor can import these instead of hardcoding in providers.
+**Risk:** None. File is additive only; not imported anywhere yet.
+
+**Verification:**
+- `npm run compile`: Exit code 0 (zero errors)
+- `git diff --name-only | grep "src/ui"`: Exit code 1 (no UI files touched)
+
+---
+
 ## Session — Jun 07, 2026: FULL FILE Write Not Applying to Disk + Truncation Detection
 
 **Root cause:** Failure Pattern A — FULL FILE format not parsed correctly.
