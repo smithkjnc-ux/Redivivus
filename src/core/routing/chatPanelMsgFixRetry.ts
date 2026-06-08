@@ -90,8 +90,8 @@ export async function retryNoOutput(params: {
       `${diagnosis}\n\n` +
       `CRITICAL: Your previous response produced NO parseable code changes.\n` +
       `You MUST output every changed file using this exact format:\n` +
-      `## Fix: filename\n\`\`\`html\n[complete file content]\n\`\`\`\n` +
-      `Write actual code — not instructions, not explanations, not partial snippets.`;
+      `<file path="relative/path/to/file">\n<content>\n[complete new file content]\n</content>\n</file>\n` +
+      `Output ONLY the file blocks above. No prose, no markdown headers, no explanation.`;
   }
 
   try {

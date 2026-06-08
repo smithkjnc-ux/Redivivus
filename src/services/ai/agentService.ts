@@ -102,7 +102,7 @@ Begin. Think step-by-step.`;
           maxTokens: 4000,
           temperature: 0.1
         })
-      }, 60_000);
+      }, 120_000);
       
       const data = await apiRes.json();
       if (!apiRes.ok) throw new Error(data.error || 'Agent execute failed');

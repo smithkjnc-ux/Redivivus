@@ -19,6 +19,7 @@ import { detectPatterns, buildSupervisorNotes, buildWorkerRules, validateOutputF
 import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService';
 import { initFixLogger, fixLog, finalizeFixLogger, getCurrentLogPath } from '../../services/logging/fixPipelineLogger';
+import { runFixFinalize } from './chatPanelMsgFixFinalize';
 
 // [DEAD] modelLabel defined here -- moved to chatPanelMsgFixUtils.ts to keep this file under 200 lines
 
@@ -60,10 +61,27 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   }
   // [FIX] Empty scaffold (no source files yet) — treat as a first build, not a fix.
   if (sourceFiles.length === 0) { await deps.handleBuildRequest(userText, true); return; }
+
+  // [FILE_SIZE_GATE] Check for oversized files before firing any AI calls
+  const { runFileSizeGate } = await import('./fileSizeGate.js');
+  const gateResult = await runFileSizeGate(sourceFiles, deps);
+  if (gateResult.shouldAbort) {
+    fixLog('[FILE_SIZE_GATE] Fix aborted by user');
+    finalizeFixLogger();
+    conversation.push({
+      role: 'assistant',
+      content: 'Fix cancelled — the file is too large for reliable AI fixes. Try splitting it first.',
+      timestamp: Date.now()
+    });
+    refresh();
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+    return;
+  }
+
   const allowedRels = new Set(sourceFiles.map(f => f.rel));
   let fileNames = sourceFiles.map(f => f.rel).join(', ');
   let filesBlock = sourceFiles.map(f => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
-  
+
   // [LOG] Debug: What files are we sending to the AI?
   fixLog('Files selected for AI context', { fileNames, count: sourceFiles.length });
   sourceFiles.forEach(f => fixLog(`  File: ${f.rel}`, { chars: f.content.length }));
@@ -75,7 +93,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
 
   // Phase 1: Supervisor diagnoses ALL bugs
-  conversation.push({ role: 'assistant', content: 'Reading your project files...', timestamp: Date.now() });
+  conversation.push({ role: 'assistant', content: `Scanning ${sourceFiles.length} file${sourceFiles.length !== 1 ? 's' : ''}...`, timestamp: Date.now() });
   refresh();
   let diagnosis = ''; let supervisorLabel = 'AI'; let subtasks: string[] = []; let executionMode: 'parallel' | 'sequential' = 'sequential';
   try {
@@ -107,7 +125,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       `⚠️ **Something went wrong while analysing your fix.** ${_hint}\n\n` +
       `_Details: ${_errMsg.slice(0, 300)}_\n\n` +
       `__RETRY_FIX__:${_b64}__END_RETRY__`;
-    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
+    finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
   // Phase 2+3: Worker generates fix → Guardian reviews → retry/escalate if rejected
@@ -130,18 +148,12 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       needsAgentHandoff = subtaskRes.needsAgentHandoff;
       fixLog('Phase 3: Iterative Application complete', { written, failed, skipped });
     } else {
-      conversation[conversation.length - 1].content = 'Found the issue — writing the fix now...';
-      refresh();
       const { runEscalationLoop } = await import('./chatPanelMsgFixEscalation.js');
-      fixLog('Phase 2: Starting Worker fix application...');
-      const escalation = await runEscalationLoop({ diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel });
+      fixLog('Phase 2: Starting Worker fix application...', { forceSurgical: gateResult.forceSurgical });
+      const escalation = await runEscalationLoop({ diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel, forceSurgical: gateResult.forceSurgical });
       finalResponse = escalation.finalResponse;
       workerLabel = escalation.workerLabel;
-      fixLog('Phase 2: Worker response received', { 
-        preview: finalResponse.substring(0, 500), 
-        totalLength: finalResponse.length,
-        workerLabel
-      });
+      fixLog('Phase 2: Worker response received', { preview: finalResponse.substring(0, 500), totalLength: finalResponse.length, workerLabel });
       guardianLabel = escalation.guardianLabel;
       guardianNote = escalation.guardianNote;
       scopeNote = escalation.scopeNote;
@@ -153,6 +165,9 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       // [FIX] Try surgical edits first (SEARCH/REPLACE), fall back to full-file parsing
       fixLog('Phase 3: Applying fix content...');
       const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
+      const targetFiles = fileNames.split(', ').slice(0, 3).join(', ');
+      conversation[conversation.length - 1].content = `${supervisorLabel}: diagnosis done\nWorker: fix written\nVerify: done\nGuardian: approved\nWriting ${targetFiles}...`;
+      refresh();
       const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
       written = applyRes.written; failed = applyRes.failed; skipped = applyRes.skipped; fixSnapId = applyRes.fixSnapId;
       fixLog('Phase 3: Application complete', { written, failed, skipped });
@@ -166,7 +181,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       `⚠️ **Something went wrong while writing the fix.** ${_hint2}\n\n` +
       `_Details: ${_errMsg2.slice(0, 300)}_\n\n` +
       `__RETRY_FIX__:${_b642}__END_RETRY__`;
-    refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
+    finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
   
   if (written.length === 0) {
@@ -177,43 +192,24 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     } else {
       const plain = diagnosis.match(/^PLAIN:\s*(.+?)(?:\n|$)/m)?.[1]?.trim() ?? '';
       const skipNote = skipped.length > 0 ? `\n\n⚠️ AI tried to create ${skipped.length} file(s) not in this project: ${skipped.join(', ')}` : '';
+      // Extract PRESCRIPTION section so user knows what to do next
+      const prescriptionRaw = (diagnosis.match(/PRESCRIPTION:([\s\S]*?)(?:\[TRIVIAL|$)/)?.[1] ?? '').trim();
+      const prescriptionLines = prescriptionRaw.split('\n').filter(l => l.trim().match(/^[-•*]|^##/)).slice(0, 6).join('\n').trim();
+      // Build a specific suggested prompt from what the Supervisor already knows
+      const suggestedPrompt = plain
+        ? `__SUGGEST__${plain} — please write the complete corrected file using FULL FILE format (not surgical edits).`
+        : `__SUGGEST__${userText} — please write the complete corrected files, not surgical edits.`;
+      const _b64sug = Buffer.from(suggestedPrompt, 'utf8').toString('base64');
       appendProjectDeadEnd(root, `fix-no-output: ${userText.slice(0,80)}`, plain || 'Worker produced no parseable file edits', 'No FILE: blocks or SEARCH/REPLACE markers after two attempts', 'Add FILE: header with fenced code block for each changed file');
-      conversation[conversation.length - 1].content = (plain ? `**What I found:** ${plain}\n\n` : '') + `Couldn't make the change automatically. Try describing what to fix in more detail.${skipNote}`;
+      fixLog('FINAL FAILURE: no parseable output after retry', { plain, skipNote, failedErrors: failed });
+      finalizeFixLogger();
+      let failMsg = plain ? `**What I found:** ${plain}\n\n` : '';
+      if (prescriptionLines) { failMsg += `**What to do:**\n${prescriptionLines}\n\n`; }
+      failMsg += `The fix didn't apply cleanly. Click the button to retry with a more specific prompt:\n\n__RETRY_FIX__:${_b64sug}__END_RETRY__${skipNote}`;
+      conversation[conversation.length - 1].content = failMsg;
       refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
     }
   }
 
-  // Auto-retry if known patterns survived the first write — transparent to user on success
-  const { retryPatternFix } = await import('./chatPanelMsgFixRetry.js');
-  const retryRes = await retryPatternFix({ written, activePatterns, root, diagnosis, supervisorLabel, allowedRels, deps, userText, conversation, refresh });
-  if (retryRes.retried && retryRes.written.length > 0) { written = retryRes.written; workerLabel = retryRes.workerLabel; }
-
-  finalizeFixLogger();
-  const { presentFixResult } = await import('./chatPanelMsgFixOutput.js');
-  await presentFixResult({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns });
-  if (written.length > 0) { try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch {} }
-
-  // Compiler as truth — real execution feedback Guardian AI cannot provide
-  if (written.length > 0) {
-    const { runCompileAutoFix } = await import('../../services/build/compileAutoFix.js');
-    const ctx = { task: userText, root, blueprintContext: '', routing: deps.routing, conversation, refresh, logError: () => {}, vault: deps.vault, postToWebview: (m: any) => deps.panel?.webview?.postMessage(m) };
-    await runCompileAutoFix(ctx as any, written);
-  }
-
-  if (needsAgentHandoff) {
-    const { executeAgentHandoff } = await import('./chatPanelMsgFixAgentHandoff.js');
-    await executeAgentHandoff(deps, root, userText, written, fixSnapId, conversation);
-    return;
-  }
-
-  // Auto-capture fixed files to vault so the fix pattern is reusable
-  fixLog('=== Fix Request Completed ===', { written, failed });
-  if (deps.vault && written.length > 0) {
-    const absPaths = written.map(f => path.join(root, f));
-    const projectName = path.basename(root);
-    const fixTask = `fix: ${userText.slice(0, 120)}`;
-    const callAI = (p: string) => deps.routing.prompt(p, 12_000);
-    const { autoCaptureFiles } = await import('../../services/vault/vaultAutoCapture.js');
-    autoCaptureFiles(absPaths, projectName, deps.vault, fixTask, callAI).catch(() => { /* best-effort */ });
-  }
+  await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels });
 }

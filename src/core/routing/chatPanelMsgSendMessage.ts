@@ -15,7 +15,8 @@ import { runAgentMode } from './chatPanelMsgSendAgent';
 
 import { runChatClarifyStep } from './chatPanelMsgSendClarify';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent';
-import { runConfirmedLocalBuild } from './chatPanelMsgSendConfirmedBuild';
+import { checkBuildConfirmation, getWorkspaceFileList } from './chatPanelMsgSendConfirmCheck';
+import { fixLog } from '../../services/logging/fixPipelineLogger';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { conversation, refresh } = deps;
@@ -52,39 +53,35 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (await handleRememberIntent(userText, conversation, refresh)) { return; }
   if (await handleReadResult(lowerText, conversation, refresh)) { return; }
 
-  // ── Build confirmations: "that sounds perfect, lets build it" after prior conversation ──
-  // [RULE 18] Kept as structural fast-path: short explicit agreement + prior conversation context lookup.
-  // The cloud classifier cannot reach back into conversation history — this must stay as code.
-  const _BUILD_CONFIRM = /\b(build\s+it|lets\s+(build|do)\s+it|go\s+ahead|make\s+it|start\s+building|lets\s+go)\b/i;
-  const _AGREEMENT = /^\s*(yes|yeah|yep|do it|proceed|go ahead|sure|ok|okay|sounds good)\s*[.!]?$|\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
-  if ((_BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText)) && lowerText.length < 80) {
-    let foundRequest = '';
-    for (let i = conversation.length - 2; i >= 0; i--) {
-      if (conversation[i].role === 'user') {
-        const prior = conversation[i].content.toLowerCase();
-        if (_BUILD_CONFIRM.test(prior) || _AGREEMENT.test(prior)) { continue; }
-        foundRequest = conversation[i].content;
-        break;
-      }
-    }
-    if (foundRequest) {
-      await runConfirmedLocalBuild(foundRequest, userText, deps, conversation, refresh);
-      return;
-    }
-    conversation.push({ role: 'assistant', content: 'I\'m ready to build — what would you like me to make?', timestamp: Date.now() });
-    refresh(); return;
+  // ── Build confirmations — extracted to chatPanelMsgSendConfirmCheck.ts (Rule 9 split) ──
+  if (await checkBuildConfirmation(lowerText, userText, deps, conversation, refresh)) { return; }
+
+  // [FIX] Pre-classification: if workspace is open and message looks like a bug report,
+  // skip the general chat classifier and go directly to fix pipeline.
+  const hasWorkspace = !!vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const looksLikeBugReport = hasWorkspace && (
+    /\b(blank|empty|not working|broken|error|crash|freeze|hang|slow|weird|strange|bug|issue|problem|fix|correct|repair)\b/i.test(lowerText) ||
+    /\b(preview|browser|screen|display|render|show|load|fetch)\b.*\b(broken|fail|error|blank|empty|not)/i.test(lowerText) ||
+    /\b(game|app|page|site|project)\b.*\b(broken|not working|blank|empty|weird)/i.test(lowerText)
+  );
+  if (looksLikeBugReport) {
+    fixLog(`[PRE-CLASSIFY] Bug report detected, routing to fix pipeline: "${userText.slice(0, 60)}..."`);
+    await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
+    return;
   }
 
   // ── Supervisor chat — Claude classifies AND answers in one call ──
   // [FIX] Replaces broken cloudClassify() (/classify never existed) + promptCheap() (wrong model for Q&A).
   const { cloudChat } = await import('../../services/api/apiClientChat.js');
   const _cfgBlueprint = deps.redivivus.isInitialized() ? (deps.redivivus.loadConfig?.() as any)?.blueprint : undefined;
+  const _wsRootFL = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const chatResult = await cloudChat(userText, {
     blueprint: _cfgBlueprint,
     recentMessages: conversation.slice(-6).map(m => ({ role: m.role, content: m.content })),
     currentTime: new Date().toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     personality: vscode.workspace.getConfiguration('redivivus').get<string>('personality', 'plain'),
+    fileList: _wsRootFL ? getWorkspaceFileList(_wsRootFL) : undefined,
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
   if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh); return; }
@@ -192,7 +189,8 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
 
   // ── Final routing by intent — use Claude's extracted task when available ──
-  if (intent.type === 'fix') { await handleFixRequest(_claudeTask, deps, msg.imageBase64, msg.imageType); return; }
+  // [FIX] Pass original userText — _claudeTask is AI-rewritten and shows up in history/vault/deadends instead of the user's actual words.
+  if (intent.type === 'fix') { await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType); return; }
   if (intent.type === 'scaffold') { await handleScaffoldIntent(_claudeTask, deps, conversation, refresh); return; }
   if (intent.type === 'service') { await handleServiceIntent(_claudeTask, deps, conversation, refresh); return; }
   if (intent.type === 'build') { await handleBuildIntent(routedText || _claudeTask, _claudeTask, msg, deps, conversation, refresh); return; }

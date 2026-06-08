@@ -14,6 +14,7 @@ import { BuildHistoryService } from '../../services/build/buildHistoryService';
 import { SnapshotService } from '../../services/snapshotService';
 import { listSourceFiles } from '../../services/workspace/codebaseSearch';
 import { buildGitContextBlock } from '../../services/workspace/gitContext';
+import { fixLog } from '../../services/logging/fixPipelineLogger.js';
 
 /** Maps raw model ID strings to friendly display names for chat messages. */
 export function modelLabel(model: string): string {
@@ -37,16 +38,37 @@ export function parseFixResponse(
 ): { fixes: { rel: string; abs: string; content: string }[]; skipped: string[] } {
   const all: { rel: string; abs: string; content: string }[] = [];
   
+  // [DEBUG] Log what we're trying to parse
+  fixLog(`[PARSE] Input text length: ${text.length}, first 200 chars: ${text.substring(0, 200).replace(/\n/g, '\\n')}`);
+  fixLog(`[PARSE] Last 200 chars: ${text.substring(text.length - 200).replace(/\n/g, '\\n')}`);
+  
   // 1. XML Structured Format
-  const xmlFileRe = /<file\s+path="([^"]+)">[\s\S]*?<content>\n?([\s\S]*?)\n?<\/content>[\s\S]*?<\/file>/g;
+  // [FIX] Made whitespace matching more permissive — Worker may output content on same line as tag
+  const xmlFileRe = /<file\s+path="([^"]+)">[\s\S]*?<content>\s*([\s\S]*?)\s*<\/content>[\s\S]*?<\/file>/g;
   let xmlMatch: RegExpExecArray | null;
+  let xmlMatches = 0;
   while ((xmlMatch = xmlFileRe.exec(text)) !== null) {
+    xmlMatches++;
     const rel = xmlMatch[1].trim().replace(/^\.?\//, '');
     const content = xmlMatch[2].trimEnd();
+    fixLog(`[PARSE] XML match #${xmlMatches}: path="${rel}", content length=${content.length}`);
     if (rel && content) { all.push({ rel, abs: path.join(root, rel), content }); }
   }
+  fixLog(`[PARSE] XML regex found ${xmlMatches} matches, ${all.length} valid fixes`);
+  
+  // [FIX] Handle TRUNCATED XML: if we see <file path="..."><content> but no closing tags,
+  // extract everything from after <content> to end of text
+  if (all.length === 0 && text.includes('<file') && text.includes('<content>') && !text.includes('</content>')) {
+    const truncatedMatch = text.match(/<file\s+path="([^"]+)"[^>]*>[\s\S]*?<content>\s*([\s\S]*)/);
+    if (truncatedMatch) {
+      const rel = truncatedMatch[1].trim().replace(/^\.?\//, '');
+      const content = truncatedMatch[2].trimEnd();
+      fixLog(`[PARSE] TRUNCATED XML detected: path="${rel}", content length=${content.length}`);
+      if (rel && content) { all.push({ rel, abs: path.join(root, rel), content }); }
+    }
+  }
 
-  // 2. Legacy fallback
+  // 2. Legacy fallback: ## Fix: header format
   if (all.length === 0) {
     const fixPattern = /^## Fix:\s*(.+?)\s*\n```[a-z]*\n([\s\S]*?)```/gm;
     let match: RegExpExecArray | null;
@@ -62,6 +84,34 @@ export function parseFixResponse(
         const content = match[2].replace(/^```[a-z]*\n?/m, '').replace(/\n?```$/m, '').trimEnd();
         if (rel && content && content.length > 10) { all.push({ rel, abs: path.join(root, rel), content }); }
       }
+    }
+  }
+
+  // 3. FULL FILE markdown format: ### filename.js or ## filename.js followed by code block
+  // This catches Worker output that uses standard markdown headers instead of '## Fix:'
+  if (all.length === 0) {
+    // Pattern: ### filename.js or ## filename.js (without 'Fix:' prefix) followed by code block
+    const mdHeaderPattern = /^#{2,4}\s+(?!Fix:)([^\n]+\.\w+)\s*\n```[a-z]*\n([\s\S]*?)```/gm;
+    let match: RegExpExecArray | null;
+    while ((match = mdHeaderPattern.exec(text)) !== null) {
+      const rel = match[1].trim().replace(/^\.?\//, '');
+      const content = match[2].trimEnd();
+      if (rel && content) { all.push({ rel, abs: path.join(root, rel), content }); }
+    }
+  }
+
+  // 4. File path mention followed by code block (most permissive fallback)
+  // Catches patterns like "game.js:
+  // ```js
+  // ...
+  // ```"
+  if (all.length === 0) {
+    const fileMentionPattern = /(?:^|\n)([\w\-./]+\.\w{1,6}):?\s*\n```[a-z]*\n([\s\S]*?)```/gm;
+    let match: RegExpExecArray | null;
+    while ((match = fileMentionPattern.exec(text)) !== null) {
+      const rel = match[1].trim().replace(/^\.?\//, '');
+      const content = match[2].trimEnd();
+      if (rel && content) { all.push({ rel, abs: path.join(root, rel), content }); }
     }
   }
 

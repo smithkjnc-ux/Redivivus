@@ -18,7 +18,8 @@ export async function executeOpenAI(
     const _msgs: any[] = systemMessage
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }]
         : [{ role: 'user', content: text }];
-      const body = JSON.stringify({ model, messages: _msgs });
+      // [FIX] max_tokens set to GPT-4o maximum (16384) — Worker needs full output for large files
+      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 16384 });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
     if (!res.ok) {return { text: '', model, success: false, error: `OpenAI API error ${res.status}: ${data.error?.message || res.statusText}` };}

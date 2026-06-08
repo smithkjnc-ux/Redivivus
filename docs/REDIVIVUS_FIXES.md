@@ -3,6 +3,347 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 07, 2026: FULL FILE Write Not Applying to Disk + Truncation Detection
+
+**Root cause:** Failure Pattern A — FULL FILE format not parsed correctly.
+The `parseFixResponse` function in `chatPanelMsgFixUtils.ts` only recognized two formats: (1) XML `<file path="..."><content>...</content></file>`, and (2) Legacy `## Fix: path\n\`\`\`\ncontent\n\`\```. When the Worker output FULL FILE format using standard markdown headers like `### game.js` or just file mentions followed by code blocks, neither pattern matched. The parser returned empty results → no files written → fix appeared to succeed but disk was unchanged.
+
+**File changed:** `src/core/routing/chatPanelMsgFixUtils.ts`
+**What changed:** 
+1. Fixed XML regex pattern: Changed `\n?` to `\s*` for whitespace matching after `<content>` and before `</content>`. The original regex required optional newlines but the Worker outputs content with arbitrary whitespace/indentation.
+2. Added Pattern #3 (markdown headers `##`/`###` with file extensions followed by code blocks) and Pattern #4 (file path mentions followed by code blocks) to `parseFixResponse()`. These are evaluated sequentially after XML and Legacy patterns fail.
+**Why:** The backend prompt tells Workers to use FULL FILE format for complex fixes. Workers output XML format (`<file path="..."><content>...</content></file>`) but the original regex was too strict about newlines. The extension-side parser needed to be more permissive to handle real-world Worker output.
+**Risk:** Low. Patterns are evaluated in order of specificity (most specific first). New patterns only trigger if previous ones return no results. File path validation via `allowedRels` still applies.
+
+**File changed:** `src/core/routing/chatPanelMsgFixPhases.ts`
+**What changed:** Added `size` field to file objects in `runPhase1Supervisor()` and `runPhase2Worker()`. Calculates `totalSize` and `largestFile` metrics and sends them to backend via `fileMetrics` in context.
+**Why:** Backend needs file size data to make intelligent format decisions (FULL FILE vs surgical) based on both region count AND file size.
+**Risk:** None — additive change, backend can ignore if not used.
+
+**File changed:** `src/core/routing/chatPanelMsgFixEscalation.ts`
+**What changed:**
+1. Added `forceSurgical` flag to `EscalationResult` interface.
+2. Added truncation detection regex (`/truncated|incomplete|cuts off mid-function|max_tokens|finish_reason.*length/i`) in both Supervisor verify rejection and Guardian rejection handlers.
+3. When truncation detected, sets `forceSurgical = true` and adds `[FORMAT CHANGE]` critique instructing Worker to use surgical edits instead of FULL FILE.
+4. Updated all return statements to include `forceSurgical` flag.
+**Why:** When FULL FILE output is truncated (file too large for token limit), retrying with same format fails repeatedly. System now automatically switches to surgical format on truncation detection.
+**Risk:** Low. Only triggers when truncation keywords detected in error messages. Surgical format is more reliable for large files.
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptActionsB.ts`
+**What changed:** Changed `type: 'send-message'` to `type: 'fix-request'` in the retry button click handler (line 166).
+**Why:** The "Try this fix" button was sending `send-message` which goes through general chat classification and often gets misclassified as Q&A. It should send `fix-request` to bypass classification and go directly to the Supervisor/Worker/Guardian fix pipeline.
+**Risk:** None. The button only appears in fix failure contexts, so it should always route to the fix pipeline.
+
+**File changed:** `src/core/routing/chatPanelMsgFixPhases.ts`, `src/core/routing/chatPanelMsgFixEscalation.ts`
+**What changed:** 
+1. Added `forceSurgical` parameter to `runPhase2Worker()` and `runEscalationLoop()` functions.
+2. Pass `forceSurgical` in API request body to backend `/fix-worker` endpoint via `context.forceSurgical`.
+3. When truncation detected in Supervisor verify, set `forceSurgical = true` and it persists across retries.
+**Why:** The truncation detection was setting the flag but it wasn't being passed to the Worker. The Worker kept outputting FULL FILE format even when instructed to use surgical. Now the flag flows through: escalation loop → runPhase2Worker → backend API → Worker prompt.
+**Risk:** Low. Backend needs to consume `context.forceSurgical` to actually change the Worker prompt, but passing it is harmless if not yet implemented server-side.
+
+**File changed:** `src/core/routing/chatPanelMsgFixUtils.ts`
+**What changed:** 
+1. Added debug logging to `parseFixResponse()` to diagnose parsing failures.
+2. Added TRUNCATED XML handler: when `<file path="..."><content>` exists but `</content>` is missing (truncated output), extract partial content anyway.
+**Why:** The XML regex requires closing tags (`</content></file>`). When Worker's 20KB output gets truncated mid-file, the regex returns 0 matches and the fix fails completely. Now we extract what we can and apply it.
+**Risk:** Low. Partial/truncated files may have syntax errors, but this at least surfaces the issue to the user instead of silently failing.
+
+## Session — Jun 07, 2026: Massive Unicode Cleanup — HTML Files
+
+**Files changed:** 
+- `src/ui/panels/chat/chatPanelHtml.ts`
+- `src/ui/panels/chat/chatPanelScriptActionsB.ts`
+- `src/ui/panels/chat/chatPanelHeaderRender.ts`
+
+**What changed:** Replaced 25+ Unicode HTML entities and emoji with ASCII:
+- `⚠️` → `[!]`
+- `🟢` → `[o]`
+- `&#x26A1;` → `[A]`
+- `&#x1F9E9;` → `[R]`
+- `&#x25cf;` → `[*]` / `[.]`
+- `&#x2190;` → `<-`
+- `&#x1F4F1;` / `&#x1F4BB;` / `&#x1F5A5;` → `[M]` / `[T]` / `[D]`
+- `&#x21BA;` → `[R]`
+- `&#x270F;&#xFE0F;` → `[I]` / `[E]`
+- `&#x1F441;` → `[H]`
+- `&#x21D5;` → `[M]`
+- `&#x1F310;` → `[B]`
+- `&#x229E;` → `[P]`
+- `&#x2192;` → `[->]`
+- `&#x2715;` → `[X]`
+- `&#x2191;` → `[^]`
+- `✏️` → `[E]`
+- `🗺️` → `[M]`
+- `&#x1F4CB;` → `[B]` / `[P]` / `[H]`
+- `&#x1F680;` → `[B]`
+- `&#x1F4CA;` → `[U]`
+- `&#x1F5D1;&#xFE0F;` → `[C]`
+- `&#x25CE;` → `[o]`
+- `&#x25B6;` → `[>]`
+- `⚠️` / `🧠` → `[!]` / `[AI]`
+- `&hellip;` → `...`
+- `✕` → `[X]`
+- `↑` → `[>]`
+
+**Why:** CLAUDE.md Rule 13 — any non-ASCII characters in WebView HTML cause silent parse failures. These were breaking the entire UI.
+**Risk:** None. Visual appearance changed from icons to [bracket] labels.
+
+## Session — Jun 07, 2026: Unicode Fixes — chatPanelScriptTier.ts (Tier Badge)
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptTier.ts`
+**What changed:** Replaced Unicode escape sequences:
+- `\\u26A1` (⚡) → `[F]`
+- `\\u25C6` (◆) → `[P]`
+- `\\u2736` (✶) → `[U]`
+- `\\u00b7` (·) → `-`
+- Comment arrows `↑↓←→` → words
+**Why:** These Unicode escapes in the tier badge JavaScript were breaking the entire chat panel UI, causing the tier badge to disappear and buttons to fail.
+**Risk:** None. Visual appearance changed from icons to [F]/[P]/[U] labels.
+
+## Session — Jun 07, 2026: More Unicode Fixes — chatPanelScriptListener.ts
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptListener.ts`
+**What changed:** Replaced Unicode characters:
+- `↩` → removed
+- `↕` → removed
+- `↑`/`↓` → removed (buttons now just say "Up"/"Down")
+- `✓` → `[OK]`
+- `⚠` → `[!]`
+- `📌` → removed (button now just says "Save")
+**Why:** CLAUDE.md Rule 13 — all Unicode in WebView scripts causes silent parse failures. These were breaking the entire chat panel.
+**Risk:** None. UI slightly less pretty but fully functional.
+
+## Session — Jun 07, 2026: Chat Panel Dead — Script Ordering Fix
+
+**File changed:** `src/ui/panels/chat/chatPanelScript.ts`
+**What changed:** Moved `${buildGatesScript()}` from line 193 to line 183 (before `${buildListenerScript()}`).
+**Why:** `buildListenerScript()` calls `showFileSizeGate()` on message events, but that function was defined in `buildGatesScript()` which was included AFTER the listener. JavaScript ReferenceError broke the entire chat panel.
+**Risk:** None. Corrected load order ensures functions defined before use.
+
+**File changed:** `src/ui/panels/chat/chatPanelScript.ts`
+**What changed:** Replaced `⚙️` with `[*]` on line 176.
+**Why:** CLAUDE.md Rule 13 — Unicode emoji in WebView scripts cause silent parse failures.
+**Risk:** None. Visual indicator preserved.
+
+## Session — Jun 07, 2026: Rule 13 Fix — Unicode Characters Broke Chat Panel
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptGates.ts`
+**What changed:** Replaced Unicode characters with ASCII:
+- `&#x26A0;` (⚠) → `[!]`
+- `&#x279C;` (➜) → `->`
+**Why:** CLAUDE.md Rule 13: "No non-ASCII characters in WebView injected scripts." Unicode arrows, emoji, and box-drawing characters cause silent parse failures in VS Code webviews.
+**Risk:** None. Visual appearance slightly different but functionally identical.
+
+## Session — Jun 07, 2026: Worker Token Limits Raised to Maximums
+
+**File changed:** `src/core/ai/providers/openaiProvider.ts`
+**What changed:** Added `max_tokens: 16384` to OpenAI API call (was unset, defaulting to ~4096).
+**Why:** GPT-4o supports up to 16,384 output tokens. Default was truncating files >~15KB.
+**Risk:** None. Using documented provider maximum.
+
+**File changed:** `src/core/ai/providers/groqProvider.ts`
+**What changed:** Added `max_tokens: 8000` to Groq API call (was unset, defaulting to ~4096).
+**Why:** Groq Llama supports up to 8,000 output tokens. Default was truncating large files.
+**Risk:** None. Using documented provider maximum.
+
+**File changed:** `src/core/ai/providers/xaiProvider.ts`
+**What changed:** Added `max_tokens: 16000` to xAI API call (was unset, defaulting to ~4096).
+**Why:** Grok supports up to 16,000 output tokens. Default was truncating large files.
+**Risk:** None. Using documented provider maximum.
+
+**File changed:** `src/core/ai/providers/kimiProvider.ts`
+**What changed:** Added `max_tokens: 16000` to Kimi API call (was unset, defaulting to ~4096).
+**Why:** Moonshot supports up to 16,000 output tokens. Default was truncating large files.
+**Risk:** None. Using documented provider maximum.
+
+**File changed:** `src/services/ai/streamingProviders.ts`
+**What changed:** Added `max_tokens` to OpenAI-compatible streaming providers (Groq: 8000, others: 16000).
+**Why:** Streaming Worker calls also need high output limits for large files.
+**Risk:** None. Matches non-streaming provider limits.
+
+**File changed:** `src/core/routing/fileSizeGate.ts`
+**What changed:** Raised thresholds: 10KB→30KB (advisory), 15KB→50KB (hard gate).
+**Why:** With higher token limits, Worker can now reliably handle files up to ~50KB. Chess game (~20KB) now passes without gate warning.
+**Risk:** Low. Gate still protects against truly massive files.
+
+## Session — Jun 07, 2026: File Size Gate Before Fix Pipeline
+
+**File changed:** `src/core/routing/fileSizeGate.ts` (NEW)
+**What changed:** 
+1. Created FILE_SIZE_THRESHOLDS constants (Advisory: 10KB, Gate: 15KB)
+2. `formatFileSize()` — human-readable formatting
+3. `checkFileSizes()` — scans collected files for oversized ones
+4. `runFileSizeGate()` — async gate with user choice (split/anyway/show/cancel)
+5. `isTruncatedOutput()` — detects truncated Worker output before write
+**Why:** Large files (>15KB) cause truncated Worker output, leaving code in broken state. Gate blocks AI calls before tokens are spent.
+**Risk:** Low. Gate only triggers on files >15KB; user can still proceed with "Try anyway".
+
+**File changed:** `src/core/routing/chatPanelMsgFix.ts`
+**What changed:** 
+1. Imported and called `runFileSizeGate()` after `collectSourceFiles()` but before Supervisor call
+2. Pass `forceSurgical` flag from gate result to `runEscalationLoop()`
+**Why:** Intercept oversized files BEFORE any AI calls fire. No tokens wasted on doomed fixes.
+**Risk:** Low. Early return pattern matches existing empty-scaffold handler.
+
+**File changed:** `src/core/routing/chatPanelMsgFixApply.ts`
+**What changed:** Added truncation check before writing fixes to disk. If `isTruncatedOutput()` detects incomplete content, blocks write and adds to failed list.
+**Why:** Safety net — even if gate is bypassed or backend ignores forceSurgical, we never write broken partial files.
+**Risk:** None. Only blocks writes; never allows truncated content through.
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptGates.ts`
+**What changed:** Added `showFileSizeGate()` function with three clickable options (split/anyway/show) + cancel button.
+**Why:** Guardian-voice UI that feels helpful, not like an error.
+**Risk:** None. New function, doesn't modify existing gates.
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptListener.ts`
+**What changed:** Added handler for `show-filesize-gate` message type.
+**Why:** Wire up extension-to-webview gate display.
+**Risk:** None. Single line addition.
+
+**File changed:** `src/core/routing/chatPanelMessages.ts`
+**What changed:** Added handler for `filesize-gate-choice` message type.
+**Why:** Route user choice back to the waiting `runFileSizeGate()` promise.
+**Risk:** None. Follows existing gate handler pattern.
+
+## Session — Jun 07, 2026: Smarter failure message with prescription + suggest button
+
+**File changed:** `src/core/routing/chatPanelMsgFix.ts`
+**What changed:** Failure message now shows: (1) What I found [PLAIN: line], (2) What to do [PRESCRIPTION bullet points], (3) "Try this fix" button that sends a specific prompt built from the diagnosis — not the vague original message.
+**Why:** "Couldn't make the change automatically. Try describing what to fix in more detail." was useless — Redivivus already knew the diagnosis and prescription but wasn't surfacing it. User had no idea what to say next.
+**Risk:** None. Fallback stays the same if plain/prescription are empty.
+
+**File changed:** `src/ui/panels/chat/chatPanelRenderer.ts`
+**What changed:** `__RETRY_FIX__` button renderer detects `__SUGGEST__` prefix in decoded text → renders green "Try this fix →" button instead of blue "↩ Retry". Same line count (1-for-1 replacement), no Rule 9 violation.
+**Why:** Users need to visually distinguish "try again blindly" from "try with specific instructions."
+**Risk:** None — falls back to normal Retry style if decode fails.
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptActionsB.ts`
+**What changed:** Retry button click handler strips `__SUGGEST__` prefix before sending the message.
+**Why:** The prefix is an internal marker for the renderer — the actual sent text should be the clean suggestion.
+**Risk:** None.
+
+## Session — Jun 07, 2026: Fix Pipeline Audit — [DEAD] deletion rule + FULL FILE prescription
+
+**Root cause (from fix pipeline log):**
+The Worker repeatedly failed to delete `loadSVG()` and `colorPieceSVG()` from game.js because the [DEAD] annotation rule was ambiguous. "Add a [DEAD] comment above it" was interpreted as: add comment + keep the function body. The function survived with a [DEAD] prefix on its signature but all its code intact. Guardian correctly rejected this 3 times.
+Secondary: fixes touching 5 scattered regions of a 572-line file should use FULL FILE format — multiple surgical edits compound errors.
+
+**File changed:** `src/lib/ai/redivivusWorkerRules.ts` (backend)
+**What changed:** Clarified Rule 3 ([DEAD]) with explicit surgical delete instructions: entire function in `<search>`, ONLY the // [DEAD] comment in `<replace>`. Added WRONG vs RIGHT examples.
+**Why:** Workers were annotating deleted functions instead of deleting them. The ambiguity caused every fix attempt on functions that needed removal to fail Guardian review.
+**Risk:** None — prompt clarification only.
+
+**File changed:** `src/app/api/v1/fix-worker/route.ts` (backend)
+**What changed:** Replaced "add a [DEAD] comment above it" with the explicit deletion rule: comment IS the deletion, do NOT copy body into `<replace>`.
+**Why:** Same ambiguity in the Worker system prompt.
+**Risk:** None.
+
+**File changed:** `src/app/api/v1/fix-supervisor/route.ts` (backend)
+**What changed:** Added PRESCRIPTION FORMAT RULE: when fix requires 3+ distinct regions in the same file, Supervisor must instruct Worker to use FULL FILE format and state it explicitly in the prescription.
+**Why:** Surgical edits across many scattered regions of a large file are fragile. The chess game fix needed changes in 5 different locations; surgical edits kept failing to apply cleanly.
+**Risk:** None — prompt change only. Guardian still validates the output.
+
+## Session — Jun 07, 2026: Documentation audit — architecture + CLAUDE.md
+
+**File changed:** `docs/REDIVIVUS_ARCHITECTURE.md`
+**What changed:** (1) Updated version (0.3.19→0.3.84), backend URL (Cloudflare Pages→fly.dev), website deploy method (Cloudflare Workers + wrangler). (2) Corrected deployment paths — postcompile-deploy.js handles this automatically now; manual cp commands removed. (3) Added full source file documentation for 10 previously undocumented files in `src/core/ai/` and `src/services/ai/`. (4) Expanded Known Issues with current Jun 7 bugs.
+**Why:** These files were added over multiple sessions with no architecture documentation. New AI editors opening this project had no map for this critical subsystem.
+**Risk:** None — documentation only.
+
+**File changed:** `CLAUDE.md`
+**What changed:** Added 4 new sections after Rule 21: (1) Workshop Model 7 Principles — how the Supervisor/Worker/Guardian pipeline works; (2) Current Known Bugs as of Jun 7; (3) VSCodium Settings Paths — corrected extension location, user settings path, deploy procedure; (4) Agent Voice Guidelines — narration format rules for the Autonomous Agent.
+**Why:** These were missing reference sections that any AI editor needs to understand how to work with Redivivus correctly.
+**Risk:** None — documentation only.
+
+## Session — Jun 07, 2026: Browser runtime error capture for fix pipeline
+
+**File changed:** `src/services/workspace/previewErrorService.ts` (new)
+**What changed:** Stores browser runtime errors captured from the live preview iframe. Max 30 errors, cleared on each preview start. Records type (error/unhandled/console/fetch), message, source, line, timestamp.
+**Why:** Execution-based feedback — the Supervisor now sees WHAT actually failed at runtime (e.g. "ReferenceError: loadSVG is not defined at game.js:125"), not just the static source code. This makes diagnoses exact vs. inferred.
+**Risk:** None — read-only by the fix pipeline; never blocks the build.
+
+**File changed:** `src/ui/panels/chat/chatPanelPreviewErrorCapture.ts` (new)
+**What changed:** Builds the JavaScript injected into every served HTML page. Captures window.onerror, unhandledrejection, console.error, and fetch() failures. Posts collected errors to window.parent after 2.5s (giving the app time to load and fail).
+**Why:** The capture must happen inside the served page's JS context — only that context has access to the app's runtime errors.
+**Risk:** None — best-effort; errors in the capture script are silently swallowed.
+
+**File changed:** `src/ui/panels/chat/chatPanelPreview.ts`
+**What changed:** `_injectInspector` now also injects the error capture script into served HTML. `stopPreviewServer` and `startPreviewServer` both call `clearPreviewErrors()` so stale errors never pollute a new session.
+**Why:** The static server is the only point where HTML passes through Node.js — the right injection point.
+**Risk:** None — script is injected after </body> (or appended), same as inspector.
+
+**File changed:** `src/ui/panels/chat/chatPanelScriptListener.ts`
+**What changed:** Added `window.addEventListener('message', ...)` that listens for `redivivus-preview-errors` from the iframe and forwards them to the extension via `vscode.postMessage`.
+**Why:** Cross-origin iframe→parent bridge — the iframe is at localhost:5500, the parent is the VS Code WebView. postMessage with * target origin is the standard bridge.
+**Risk:** None — only handles the specific message type.
+
+**File changed:** `src/core/routing/chatPanelMessageRouterPreview.ts`
+**What changed:** Handles `preview-errors-captured` message from the WebView, stores in previewErrorService.
+**Why:** Routes the captured errors from the WebView into the extension's error store.
+**Risk:** None.
+
+**File changed:** `src/core/routing/chatPanelMsgFixContext.ts`
+**What changed:** `collectFixContext` now includes `BROWSER RUNTIME ERRORS` section when preview errors exist.
+**Why:** This is the injection point into the Supervisor's context. The Supervisor sees actual runtime errors alongside the source code.
+**Risk:** None — errors are only shown if present; no change to behavior when preview hasn't been run.
+
+## Session — Jun 07, 2026: History title + TRIVIAL threshold fixes
+
+**File changed:** `src/core/routing/chatPanelMsgSendMessage.ts`
+**What changed:** `handleFixRequest` now receives original `userText` instead of `_claudeTask`.
+**Why:** `_claudeTask` is the AI-rewritten task description (e.g. "Examine all files in this chess game..."). It was flowing into build history, vault, and dead-ends display instead of the user's actual words. Fix requests need the user's original phrasing — the Supervisor reads all files anyway and doesn't need an AI-pre-processed version.
+**Risk:** None. Supervisor prompt is context-rich from file contents.
+
+**File changed:** `src/app/api/v1/fix-supervisor/route.ts` (backend)
+**What changed:** Tightened `[TRIVIAL: SKIP REVIEW]` definition — now only applies to single-value literal changes (one string/number/CSS property). Explicitly bars function rewrites, async/sync changes, rendering approach replacements, or any fix spanning >3 lines.
+**Why:** Supervisor was flagging "replace SVG with Unicode" as trivial because the CONCEPT is simple, even though the implementation requires deleting and rewriting functions. TRIVIAL causes both Verify and Guardian to be skipped — Worker errors go straight to disk. The chess game blank-board bug was caused by this: Guardian would have caught the duplicate function declarations GPT-4o left behind.
+**Risk:** Guardian will now run more often on fixes. Correct behavior.
+
+## Session — Jun 07, 2026: Fix pipeline step progress (Option 1)
+
+**File changed:** `src/core/routing/chatPanelMsgFixFinalize.ts` (new)
+**What changed:** Extracted lines 186-218 from chatPanelMsgFix.ts (rule 9 split): pattern-retry, output presentation, compile check, agent handoff, vault capture.
+**Why:** chatPanelMsgFix.ts was at 219 lines — required split before adding progress messages.
+**Risk:** None — pure extraction, same logic.
+
+**File changed:** `src/core/routing/chatPanelMsgFix.ts`
+**What changed:** (1) Entry message now shows file count: "Scanning 8 files...". (2) Before apply phase, shows 4-step summary with file names. (3) Replaced finalize block with runFixFinalize() call.
+**Why:** User can now see how many files are being analyzed and which files are being written.
+**Risk:** None.
+
+**File changed:** `src/core/routing/chatPanelMsgFixEscalation.ts`
+**What changed:** Rewrote updateStatus() — now shows clean 4-line step tracker ("Supervisor: done / Worker: writing fix (1.2 KB)... / Verify: pending / Guardian: pending") using pre-wrap newlines. Removed raw streaming code block. Fixed stale retryLabel reference.
+**Why:** Previous [1/4]/[2/4]/[4/4] format was clinical and skipped the Verify step. The code block dump confused users.
+**Risk:** None.
+
+**File changed:** `src/core/routing/chatPanelMsgFixSubtasks.ts`
+**What changed:** Per-subtask step message now shows step label + first 60 chars of the subtask description.
+**Why:** Multi-subtask fix runs now show which subtask is running.
+**Risk:** None.
+
+## Session — Jun 07, 2026: cloudChat file context + Rule 9 split
+
+**File changed:** `src/core/routing/chatPanelMsgSendConfirmCheck.ts` (new)
+**What changed:** Extracted build-confirmation fast-path from `chatPanelMsgSendMessage.ts` into this new file. Also exports `getWorkspaceFileList()` helper that walks the workspace root (depth 3, source extensions only, max 80 files).
+**Why:** `chatPanelMsgSendMessage.ts` hit 201 lines — Rule 9 split required before further edits.
+**Risk:** None — pure extraction, no logic change.
+
+**File changed:** `src/core/routing/chatPanelMsgSendMessage.ts`
+**What changed:** (1) Replaced inline build-confirmation block with `checkBuildConfirmation()` call. (2) Collect workspace file list via `getWorkspaceFileList()` and pass as `fileList` in cloudChat context.
+**Why:** Bug fix — `cloudChat()` was calling the backend with no project file context, so the classifier couldn't distinguish "fix it" (existing code) from "build it" (new project). Passing the file list gives the AI the signal it needs.
+**Risk:** File list capped at 80 entries; fails gracefully if workspace root unreadable.
+
+**File changed:** `src/services/api/apiClientChat.ts`
+**What changed:** Added `fileList?: string[]` to `ChatContext` interface.
+**Why:** Required for the new fileList field passed by chatPanelMsgSendMessage.
+**Risk:** None.
+
+**File changed:** `src/app/api/v1/chat/route.ts` (backend)
+**What changed:** Added `fileList` to body type and to the prompt context string: `Project files: <comma-separated list>`.
+**Why:** Backend classifier now sees the project file list and can correctly classify fix/build intent.
+**Risk:** None — fileList is optional; old clients without it work unchanged.
+
 ## Session — Jun 06, 2026: Agent Model Resolution Fix
 
 User-reported: Agent failed with `404 not_found_error: model: claude`

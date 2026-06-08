@@ -18,7 +18,8 @@ export async function executeKimi(
     const _msgs: any[] = systemMessage
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }]
         : [{ role: 'user', content: text }];
-      const body = JSON.stringify({ model, messages: _msgs });
+      // [FIX] max_tokens set to Kimi maximum (16000) — Worker needs full output for large files
+      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 16000 });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
     if (!res.ok) {return { text: '', model: 'kimi', success: false, error: `Kimi API error ${res.status}: ${data.error?.message || res.statusText}` };}

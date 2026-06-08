@@ -7,7 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-06
+*Last updated:* 2026-06-07 — MASSIVE UNICODE CLEANUP: Fixed 25+ Unicode entities in 4 files (chatPanelHtml.ts, chatPanelHeaderRender.ts, chatPanelScriptActionsB.ts, chatPanelScriptTier.ts). All icons now use [bracket] format per Rule 13.
+
+*Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
 *Prior:* Jun 06, 2026 — FIXED: Agent Authentication Error (JSON.stringify dropping function-based API keys during payload construction) in agentService.ts and agentSupervisor.ts by using collectKeys().
 

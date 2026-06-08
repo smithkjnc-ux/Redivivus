@@ -14,6 +14,7 @@ export interface EscalationResult {
   needsAgentHandoff: boolean;
   retryCount: number;
   escalated: boolean;
+  forceSurgical?: boolean; // [FIX] When true, retry with surgical format instead of FULL FILE
 }
 
 /** Runs Phase 2 (Worker) → Phase 3 (Guardian) with automatic retry and escalation. */
@@ -26,8 +27,9 @@ export async function runEscalationLoop(params: {
   root: string;
   supervisorLabel: string;
   maxRetries?: number;
+  forceSurgical?: boolean;
 }): Promise<EscalationResult> {
-  const { diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel } = params;
+  const { diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel, forceSurgical: initialForceSurgical } = params;
   const maxRetries = params.maxRetries ?? 2;
   const { routing, conversation, refresh } = deps;
 
@@ -37,35 +39,33 @@ export async function runEscalationLoop(params: {
   let guardianNote = '';
   let scopeNote = '';
   let needsAgentHandoff = false;
-  let retryCount = 0;
-  let escalated = false;
+  let retryCount = 0; let escalated = false;
+  let forceSurgical = !!initialForceSurgical; // [FIX] Tracks if truncation forced surgical format
 
   // [WARN] Accumulates Guardian critiques across retries so the Worker learns from ALL past failures
   let accumulatedCritiques: string[] = [];
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // ── Phase 2: Worker generates fix ──
-    const isEscalation = attempt > maxRetries;
-    const retryLabel = attempt === 0 ? '' : escalated ? ' (ESCALATED)' : ` (retry ${attempt}/${maxRetries})`;
-    updateStatus(conversation, supervisorLabel, `generating fix${retryLabel}...`, attempt, escalated);
+    updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated);
     refresh();
 
     try {
       const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
       // Inject accumulated critiques into the worker context for retries
       const enrichedDeps = attempt > 0 ? enrichDepsWithCritiques(deps, accumulatedCritiques) : deps;
-      let streamAccum = '';
+      let streamBytes = 0;
       const onChunk = (chunk: string) => {
-        streamAccum += chunk;
-        updateStatus(conversation, supervisorLabel, `generating fix${retryLabel}...`, attempt, escalated, streamAccum);
+        streamBytes += chunk.length;
+        updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated, streamBytes);
         refresh();
       };
-      const p2 = await runPhase2Worker(diagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk, escalated);
+      const p2 = await runPhase2Worker(diagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk, escalated, forceSurgical);
       if (!p2) { throw new Error('Worker returned null'); }
       workerResponse = p2.workerResponse;
       workerLabel = p2.workerLabel;
     } catch (err) {
-      throw new Error(`Worker phase failed${retryLabel}: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(`Worker phase failed: ${err instanceof Error ? err.message : String(err)}`);
     }
 
     // ── Check for Trivial Fast-Path ──
@@ -77,7 +77,7 @@ export async function runEscalationLoop(params: {
     }
 
     // ── Phase 2.5: Supervisor verifies Worker logic ──
-    updateStatus(conversation, supervisorLabel, `verifying logic${retryLabel}...`, attempt, escalated);
+    updateStatus(conversation, supervisorLabel, 'verify', attempt, escalated);
     refresh();
 
     try {
@@ -92,9 +92,17 @@ export async function runEscalationLoop(params: {
         accumulatedCritiques.push(`[SUPERVISOR LOGIC CHECK] ${logicIssue}`);
         fixLog(`Supervisor REJECTED Worker logic (attempt ${attempt + 1})`, { issue: logicIssue.substring(0, 300) });
 
+        // [FIX] Detect truncation errors and force surgical format on retry
+        const isTruncated = /truncated|incomplete|cuts off mid-function|max_tokens|finish_reason.*length/i.test(logicIssue);
+        if (isTruncated && attempt < maxRetries) {
+          forceSurgical = true;
+          fixLog(`[TRUNCATION DETECTED] Switching to surgical format for retry ${attempt + 2}`);
+          accumulatedCritiques.push(`[FORMAT CHANGE] Previous attempt used FULL FILE but output was truncated. Use SURGICAL EDITS (SEARCH/REPLACE) instead for reliability.`);
+        }
+
         if (attempt < maxRetries) {
           conversation[conversation.length - 1].content =
-            `[2/4] Worker (${workerLabel}): Supervisor rejected logic \u2014 "${logicIssue.slice(0, 100)}". Retrying (${attempt + 1}/${maxRetries})...`;
+            `Supervisor (${supervisorLabel}): done\nWorker: rejected \u2014 "${logicIssue.slice(0, 80)}" \u2014 retrying...\nVerify: pending\nGuardian: pending`;
           refresh();
           continue;
         } else {
@@ -107,7 +115,7 @@ export async function runEscalationLoop(params: {
     }
 
     // ── Phase 3: Guardian reviews the fix ──
-    updateStatus(conversation, supervisorLabel, `reviewing fix${retryLabel}...`, attempt, escalated);
+    updateStatus(conversation, supervisorLabel, 'guardian', attempt, escalated);
     refresh();
 
     try {
@@ -139,7 +147,7 @@ export async function runEscalationLoop(params: {
       if (guardianResult.passed) {
         guardianNote = `Guardian (${guardianLabel}): Approved`;
         fixLog(`Guardian APPROVED the fix`);
-        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated };
+        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical };
       }
 
       // Guardian rejected WITHOUT corrected text — accumulate critique and retry
@@ -147,11 +155,19 @@ export async function runEscalationLoop(params: {
       accumulatedCritiques.push(critique);
       fixLog(`Guardian REJECTED the fix (attempt ${attempt + 1})`, { critique: critique.substring(0, 300) });
 
+      // [FIX] Detect truncation errors and force surgical format on retry
+      const isTruncated = /truncated|incomplete|cuts off mid-function|max_tokens|finish_reason.*length/i.test(critique);
+      if (isTruncated && attempt < maxRetries) {
+        forceSurgical = true;
+        fixLog(`[TRUNCATION DETECTED] Switching to surgical format for retry ${attempt + 2}`);
+        accumulatedCritiques.push(`[FORMAT CHANGE] Previous attempt used FULL FILE but output was truncated. Use SURGICAL EDITS (SEARCH/REPLACE) instead for reliability.`);
+      }
+
       // If we've exhausted retries, escalate to supervisor model
       if (attempt === maxRetries && !escalated) {
         escalated = true;
         conversation[conversation.length - 1].content =
-          `[2/4] Worker: ${maxRetries} retries exhausted. **Escalating to ${supervisorLabel}**...`;
+          `Supervisor (${supervisorLabel}): done\nWorker: retries exhausted — escalating to best model...\nVerify: pending\nGuardian: pending`;
         refresh();
         // One more attempt with the best model — the enriched deps will force supervisor-level prompting
         continue;
@@ -160,26 +176,34 @@ export async function runEscalationLoop(params: {
       // Log the retry in chat
       if (attempt < maxRetries) {
         conversation[conversation.length - 1].content =
-          `[2/4] Worker (${workerLabel}): Guardian rejected — "${critique.slice(0, 100)}". Retrying (${attempt + 1}/${maxRetries})...`;
+          `Supervisor (${supervisorLabel}): done\nWorker: rejected — "${critique.slice(0, 80)}" — retrying...\nVerify: pending\nGuardian: pending`;
         refresh();
       }
     } catch {
       guardianNote = 'Guardian: skipped (error)';
-      return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated };
+      return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical };
     }
   }
 
   // All retries + escalation exhausted
   guardianNote = `Guardian (${guardianLabel}): Failed after ${retryCount} retries${escalated ? ' + escalation' : ''}. Applying best available fix.`;
-  return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: maxRetries, escalated };
+  return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: maxRetries, escalated, forceSurgical };
 }
 
-/** Updates the status line in the last conversation message */
-function updateStatus(conversation: any[], supervisorLabel: string, phase2Status: string, attempt: number, escalated: boolean, streamContent = ''): void {
+/** Renders a 4-step progress list into the last conversation message. */
+function updateStatus(conversation: any[], supervisorLabel: string, phase: 'worker' | 'verify' | 'guardian', attempt: number, escalated: boolean, streamBytes = 0): void {
   const lastMsg = conversation[conversation.length - 1];
-  if (lastMsg) {
-    lastMsg.content = `[1/4] Supervisor (${supervisorLabel}): done\n[2/4] Worker: ${phase2Status}\n[4/4] Guardian: pending...${streamContent ? '\n\n```\n' + streamContent + '\n```' : ''}`;
-  }
+  if (!lastMsg) { return; }
+  const retry = attempt > 0 ? (escalated ? ' — escalated' : ` — retry ${attempt}`) : '';
+  const kbNote = streamBytes > 512 ? ` (${(streamBytes / 1024).toFixed(1)} KB)` : '';
+  const workerStatus = phase === 'worker' ? `writing fix${kbNote}${retry}...` : `fix written${attempt > 0 ? retry : ''}`;
+  const verifyStatus = phase === 'verify' ? 'checking logic...' : phase === 'guardian' ? 'done' : 'pending';
+  const guardianStatus = phase === 'guardian' ? 'reviewing...' : 'pending';
+  lastMsg.content =
+    `Supervisor (${supervisorLabel}): done\n` +
+    `Worker: ${workerStatus}\n` +
+    `Verify: ${verifyStatus}\n` +
+    `Guardian: ${guardianStatus}`;
 }
 
 /** Creates a copy of deps with accumulated Guardian critiques injected into the routing context */

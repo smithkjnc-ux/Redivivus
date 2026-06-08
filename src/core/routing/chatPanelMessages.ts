@@ -125,6 +125,10 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   } else if (msg.type === 'placement-cancel') {
     if (msg.placementId) { resolvePlacement(msg.placementId, 'cancel'); }
 
+  } else if (msg.type === 'filesize-gate-choice') {
+    const { handleFileSizeGateResponse } = await import('./fileSizeGate.js');
+    handleFileSizeGateResponse({ gateId: msg.gateId, choice: msg.choice });
+
   } else if (msg.type === 'scope-submit') {
     const { resolveScopeQuestion } = await import('../../services/project/templateScopeService.js');
     resolveScopeQuestion(msg.answer || '');

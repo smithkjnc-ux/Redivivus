@@ -13,6 +13,11 @@ const SIMPLE_TASK_FAST_PATHS = /\b(make|create|build)\s+(me\s+)?(a\s+)?(?:[a-zA-
 // [FIX] Visual / layout bug reports are simple code edits — never route to agent
 const VISUAL_BUG_FAST_PATHS = /\b(cut off|cropped|overflow|overlap|misaligned|off screen|clipped|hidden|invisible|not showing|not displaying|not rendering|too small|too big|too large|doesn't fit|won't fit|out of|beyond|autosize|responsive|resize|scale|fit|center|align|position|margin|padding|width|height|layout)\b/i;
 
+// [FIX] Runtime symptom bug reports — user describes what they SEE and asks for a fix.
+// "blank in the browser", "acts weird", "not loading" are symptom descriptions, not requests
+// to run the environment. The fix is always code. Never route these to the agent pipeline.
+const SYMPTOM_BUG_FAST_PATHS = /\b(blank|black screen|white screen|acts? weird|looks? wrong|looks? broken|game is blank|board is blank|screen is blank|not (rendering|loading|working|running)|doesn'?t (render|load|work|run|show|appear)|won'?t (render|load|work|run|show)|only (in|in the) (browser|web browser|real browser)|works? in preview|blank in (the )?(browser|web)|browser.*blank|weird in|glitch|freezes?|crashes?)\b/i;
+
 /**
  * Evaluates a user prompt to determine whether it should route to the simple pipeline
  * or the complex (agent) pipeline. Uses fast-path regex for obvious cases, then falls 
@@ -37,20 +42,27 @@ export async function evaluateTaskComplexity(
     return 'simple';
   }
 
+  // [FIX] Runtime symptom bug reports are always simple — user describes what they see,
+  // fix is always in the code. "blank in browser" ≠ "needs to run a browser".
+  if (SYMPTOM_BUG_FAST_PATHS.test(userText)) {
+    return 'simple';
+  }
+
   // AI classifier — 50-token call, Groq-first (cheapest), Gemini fallback
   try {
-    const prompt = `You are a task router. Given this user request, decide if it can be handled with CODE EDITS ONLY (simple) or if it REQUIRES running terminal commands, installing packages, starting servers, compiling, testing, or interacting with the runtime environment (complex).
+    const prompt = `You are a task router. Decide: CODE EDITS ONLY (simple) or REQUIRES running terminal commands (complex).
 
 User request: "${userText.slice(0, 300)}"
 
 Rules:
-- Code changes, bug fixes, CSS edits, adding features, refactoring → simple
-- Creating entirely new websites, apps, games, portfolios, tools, or projects from scratch → simple (code-only output)
-- ANY request where the output is files (HTML, CSS, JS, Python, etc.) → simple
-- Installing dependencies, running builds, starting servers, testing, deployment, CI/CD → complex
-- ONLY route complex if the task REQUIRES a running terminal or environment — not just because the task is large
+- Bug fixes, code changes, CSS edits, adding features, refactoring → simple
+- New websites, apps, games from scratch → simple (output is files)
+- User DESCRIBING a visual/runtime symptom (blank, crash, glitch, weird, not loading) and asking to FIX it → simple. The symptom is in the browser; the fix is in the code.
+- "Works in X but not Y" → simple. Still a code fix.
+- Installing packages, running builds, starting servers, deployment, CI/CD → complex
+- ONLY complex if the task itself REQUIRES executing terminal commands — not because the bug happened at runtime
 
-Respond with ONLY the word: simple or complex`;
+Respond with ONLY: simple or complex`;
 
     const result = await routing.prompt(prompt, 12_000);
     if (result.success && result.text) {

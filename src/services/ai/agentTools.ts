@@ -6,6 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
+import { NETWORK_TOOLS } from './agentToolsNetwork';
 
 const execAsync = promisify(exec);
 
@@ -149,77 +150,21 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     }
   },
   {
-    name: 'search_web',
-    description: 'Searches the web and returns top search results. Use this to find documentation, APIs, or solutions.',
-    parameters: '{ "query": "string" }',
+    name: 'read_file_lines',
+    description: 'Reads a specific range of lines from a file. Use this instead of cat|tail when a file is large and you only need part of it.',
+    parameters: '{ "filePath": "string (relative path)", "startLine": "number (1-based)", "endLine": "number (1-based, inclusive)" }',
     execute: async (args: any, ctx: AgentContext) => {
-      ctx.log(`🌐 Searching the web for: \`${args.query}\``);
+      const absPath = path.join(ctx.root, args.filePath);
+      if (!fs.existsSync(absPath)) { return `Error: File ${args.filePath} does not exist.`; }
       try {
-        const res = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(args.query)}`, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        });
-        const html = await res.text();
-        const results = [];
-        const regex = /<a class="result__snippet[^>]*href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/g;
-        let match;
-        while ((match = regex.exec(html)) !== null && results.length < 5) {
-          let url = match[1];
-          const uddgMatch = url.match(/uddg=([^&]+)/);
-          if (uddgMatch) url = decodeURIComponent(uddgMatch[1]);
-          else if (url.startsWith('//')) url = 'https:' + url;
-          const snippet = match[2].replace(/<[^>]+>/g, '').trim();
-          results.push(`URL: ${url}\nSnippet: ${snippet}`);
-        }
-        return results.length > 0 ? results.join('\n\n') : 'No results found.';
-      } catch (e: any) {
-        return `Error searching web: ${e.message}`;
-      }
+        const lines = fs.readFileSync(absPath, 'utf8').split('\n');
+        const start = Math.max(0, (args.startLine || 1) - 1);
+        const end = Math.min(lines.length, args.endLine || lines.length);
+        return `Lines ${start + 1}-${end} of ${lines.length} total:\n${lines.slice(start, end).join('\n')}`;
+      } catch (e: any) { return `Error reading file: ${e.message}`; }
     }
   },
-  {
-    name: 'read_url',
-    description: 'Reads and extracts text content from a web page URL. Use this to read documentation after searching.',
-    parameters: '{ "url": "string" }',
-    execute: async (args: any, ctx: AgentContext) => {
-      ctx.log(`📄 Reading webpage: \`${args.url}\``);
-      try {
-        const res = await fetch(args.url, {
-          headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
-        });
-        const html = await res.text();
-        let text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-                       .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-                       .replace(/<[^>]+>/g, ' ')
-                       .replace(/&nbsp;/g, ' ')
-                       .replace(/&lt;/g, '<')
-                       .replace(/&gt;/g, '>')
-                       .replace(/&amp;/g, '&')
-                       .replace(/&quot;/g, '"')
-                       .replace(/&#39;/g, "'")
-                       .replace(/\s+/g, ' ')
-                       .trim();
-        return text.substring(0, 15000); // Truncate to save tokens
-      } catch (e: any) {
-        return `Error reading URL: ${e.message}`;
-      }
-    }
-  },
-  {
-    name: 'search_code',
-    description: 'Searches the entire workspace for a specific keyword or regex pattern.',
-    parameters: '{ "query": "string (keyword or regex)" }',
-    execute: async (args: any, ctx: AgentContext) => {
-      ctx.log(`🔍 Searching codebase for: \`${args.query}\``);
-      try {
-        const { stdout } = await execAsync(`grep -rnI "${args.query.replace(/"/g, '\\"')}" . | head -n 50`, { cwd: ctx.root });
-        if (!stdout) { return 'No results found.'; }
-        return stdout;
-      } catch (e: any) {
-        if (e.code === 1) {return 'No results found.';}
-        return `Error searching codebase: ${e.message}`;
-      }
-    }
-  }
+  ...NETWORK_TOOLS,
 ];
 
 export function getToolInstructions(): string {

@@ -12,6 +12,11 @@ import * as path from 'path';
 import { getActiveProjectRoot } from '../../services/project/activeProjectRoot';
 
 export async function handlePreviewMessages(panel: any, msg: any): Promise<boolean> {
+  if (msg.type === 'preview-errors-captured') {
+    const { recordPreviewErrors } = await import('../../services/workspace/previewErrorService.js');
+    recordPreviewErrors(msg.errors || []);
+    return true;
+  }
   const _panel = (panel as any)._panel;
 
   if (msg.type === 'start-preview') {

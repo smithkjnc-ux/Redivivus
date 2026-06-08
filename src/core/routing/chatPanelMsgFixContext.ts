@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { getRecentBuildContext } from './chatPanelMsgFixUtils';
 import { getLastTerminalError } from '../../services/workspace/terminalErrorService';
+import { getPreviewErrors } from '../../services/workspace/previewErrorService';
 import { listSourceFiles } from '../../services/workspace/codebaseSearch';
 
 // [FIX] Smart file selection: when userText is provided, send only files relevant to the bug
@@ -53,6 +54,21 @@ export function collectFixContext(root: string, sourceFiles: { rel: string; cont
   const buildCtx = getRecentBuildContext(root, sourceFiles);
   if (buildCtx) { parts.push(buildCtx); }
 
+  // Static HTML project detection — no package.json, no build system, served directly as a file.
+  // When the user opens it in a real browser it loads as file://, which silently breaks:
+  // - fetch() calls to local paths (CORS block)
+  // - ES module imports with bare specifiers
+  // - Any API that requires a real origin
+  // The Redivivus in-app preview serves it at localhost so it works there but not in the browser.
+  try {
+    const rootFiles = require('fs').readdirSync(root) as string[];
+    const isStaticHtml = rootFiles.some((f: string) => f.endsWith('.html')) &&
+      !rootFiles.includes('package.json') && !rootFiles.includes('requirements.txt');
+    if (isStaticHtml) {
+      parts.push('PROJECT TYPE: Pure static HTML (no build system). When opened in a browser as file://, fetch() calls to local files fail silently (CORS/network error). The in-app preview at localhost works fine — if the user reports a browser-only bug, check for fetch() or XMLHttpRequest calls loading local assets.');
+    }
+  } catch {}
+
   // Live VS Code diagnostics — real TypeScript/ESLint errors currently shown in the editor gutter.
   // The compiler ran these already; injecting them means the Supervisor knows what is broken NOW.
   try {
@@ -75,6 +91,19 @@ export function collectFixContext(root: string, sourceFiles: { rel: string; cont
     const t = getLastTerminalError();
     if (t?.errorBlock?.trim()) {
       parts.push(`LAST TERMINAL ERROR (${t.terminalName}):\n${t.fullContext.slice(0, 600)}`);
+    }
+  } catch {}
+
+  // Browser runtime errors captured from the live preview iframe.
+  // These are gold: they tell the Supervisor exactly what failed at runtime, not just what the code says.
+  try {
+    const previewErrs = getPreviewErrors();
+    if (previewErrs.length > 0) {
+      const lines = previewErrs.map(e => {
+        const loc = e.source ? ` (${e.source}${e.line ? ':' + e.line : ''})` : '';
+        return `  [${e.type.toUpperCase()}]${loc} ${e.message}`;
+      }).join('\n');
+      parts.push(`BROWSER RUNTIME ERRORS (captured from live preview -- these are what the user actually sees):\n${lines}`);
     }
   } catch {}
 

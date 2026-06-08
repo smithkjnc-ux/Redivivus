@@ -70,14 +70,22 @@ export async function applyFixContent(finalResponse: string, root: string, allow
     const { fixes: legacyFixes, skipped: legacySkipped } = parseFixResponse(finalResponse, root, allowedRels);
     fixLog(`Apply: Legacy parsing complete`, { filesFound: legacyFixes.length, skipped: legacySkipped.length });
     if (legacyFixes.length > 0) {
-      written = []; failed = []; skipped = legacySkipped;
-      fixSnapId = takeSnapshot(root, legacyFixes.map(f => f.rel), userText);
-      for (const fix of legacyFixes) {
-        try {
-          fs.mkdirSync(path.dirname(fix.abs), { recursive: true });
-          fs.writeFileSync(fix.abs, stripSeparatorArtifacts(fix.content), 'utf-8');
-          written.push(fix.rel);
-        } catch (e) { failed.push(`${fix.rel}: ${e instanceof Error ? e.message : String(e)}`); }
+      // [SAFETY] Check if any fix content is truncated before writing
+      const { isTruncatedOutput } = await import('./fileSizeGate.js');
+      const truncatedFixes = legacyFixes.filter(f => isTruncatedOutput(f.content));
+      if (truncatedFixes.length > 0) {
+        fixLog(`[SAFETY] BLOCKING WRITE: ${truncatedFixes.length} file(s) have truncated content`, { files: truncatedFixes.map(f => f.rel) });
+        failed.push(...truncatedFixes.map(f => `${f.rel}: Content appears truncated — write blocked to protect file`));
+      } else {
+        written = []; failed = []; skipped = legacySkipped;
+        fixSnapId = takeSnapshot(root, legacyFixes.map(f => f.rel), userText);
+        for (const fix of legacyFixes) {
+          try {
+            fs.mkdirSync(path.dirname(fix.abs), { recursive: true });
+            fs.writeFileSync(fix.abs, stripSeparatorArtifacts(fix.content), 'utf-8');
+            written.push(fix.rel);
+          } catch (e) { failed.push(`${fix.rel}: ${e instanceof Error ? e.message : String(e)}`); }
+        }
       }
     }
   }

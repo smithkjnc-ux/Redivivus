@@ -21,6 +21,7 @@ export interface ChatContext {
   currentTime?: string;
   timezone?: string;
   personality?: string;
+  fileList?: string[];
 }
 
 export async function cloudChat(

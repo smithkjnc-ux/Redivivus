@@ -197,3 +197,56 @@ Every change gets logged. It goes in the RIGHT file:
 - **REDIVIVUS_ROADMAP.md** -> INDEX ONLY. Last 3 sessions + doc pointers. Max 80 lines.
 
 If REDIVIVUS_ROADMAP.md grows past 80 lines, you are writing in the wrong file.
+
+---
+
+## The Workshop Model — 7 Principles
+
+Redivivus uses a three-role AI pipeline for every build and fix. These principles govern how it works:
+
+1. **Best available model = Supervisor.** The highest-ranked configured model automatically becomes Supervisor AND Guardian. No hardcoding — rank comes from `modelTierList.ts`, overridable via `redivivus.modelRankOverrides`.
+2. **Supervisor prescribes, Worker executes.** The Supervisor diagnoses and writes a PRESCRIPTION. The Worker implements it exactly — no re-analysis, no deviation, no "improvements" beyond the prescription.
+3. **Guardian = same model as Supervisor.** The reviewer is always the highest-capability model. After the Worker runs, the Guardian checks logic, blueprint alignment, and scope before any file is written.
+4. **Trivial fixes skip Guardian.** ONLY single-value changes (one literal string, number, or CSS property) qualify as trivial. Function rewrites, async/sync changes, or anything spanning more than 3 lines must go through Guardian review.
+5. **Multi-Worker parallelism.** Every other configured model becomes a Worker. More API keys = more Workers = faster parallel builds. The Supervisor coordinates them.
+6. **Failover is automatic.** 2+ failures on a model: marked degraded, next-ranked model promoted, user notified. 3+ failures: model removed from active pool. Recovery after 10 min. State resets on extension host restart.
+7. **Single-model mode always works.** When only 1 key is configured, all three roles use that model. User is notified. Quality drops but nothing breaks.
+
+---
+
+## Current Known Bugs (Jun 7, 2026)
+
+- **Several source files exceed 200 lines** — Rule 9 requires splitting before editing. See `docs/REDIVIVUS_ARCHITECTURE.md` Known Issues for the full list. Do NOT add lines to any of them without splitting first.
+- **Supervisor over-engineers fix prescriptions** — For chess/game piece rendering, Supervisor has been known to prescribe inline SVG geometry instead of Unicode symbols. Domain-specific guidance added to `fix-supervisor/route.ts`. Watch for similar over-engineering in other domains. Correct approach: always use the simplest built-in solution first.
+- **Agent mode context accumulation** — By iteration 6+, the history sent to the backend `/execute` endpoint can timeout (120s). Use `read_file_lines` tool instead of `cat | tail`. Prefer the standard fix pipeline for pure code changes — agent mode is for tasks that genuinely require running the environment.
+- **Fix pipeline log not written on failure** — Fixed Jun 7, 2026. All early-return failure paths now call `finalizeFixLogger()`. Logs appear at `<project>/.redivivus/logs/fix-pipeline-*.log` even when the fix fails.
+
+---
+
+## VSCodium Settings Paths
+
+```
+Extension in running IDE:   ~/.local/opt/redivivus/resources/app/extensions/redivivus/
+User settings:              ~/.local/opt/redivivus/data/User/settings.json
+Stable symlink:             ~/.local/opt/redivivus → ~/Downloads/redivivus-<version>/
+Desktop file:               ~/.local/share/applications/redivivus.desktop
+App icon:                   ~/.local/share/icons/redivivus.png
+```
+
+Deploy after compile: `npm run compile` — `postcompile-deploy.js` handles copying `out/` to all extension locations automatically. Manual copy is no longer needed.
+
+**Reload after deploy:** `Ctrl+Shift+P → Developer: Restart Extension Host`
+
+---
+
+## Agent Voice Guidelines
+
+When the Autonomous Agent narrates its steps in the chat panel:
+
+- **Format:** `Step N · model-name: [action description]` — always include the step number and model name so the user can see who is doing what.
+- **Action verbs first:** Start each step description with an active verb — "Reading...", "Running...", "Writing...", "Searching...". Never start with "I will" or "I am going to".
+- **File links not paths:** Reference files by name as a highlighted link (`index.html`), not full paths (`/home/papajoe/projects/chess/index.html`).
+- **Thinking as italic:** Internal reasoning is shown as italic thought bubbles — `_Step 3 · claude: Let me check the render function..._`. Decisions are plain text.
+- **Never pre-announce results:** Do not say "I will now fix the bug" — say "Reading game.js to find the render issue." The result speaks for itself in the outcome card.
+- **One action per step:** Each step card represents exactly one tool call or decision. Never bundle "reading X and also checking Y" in one step label.
+- **Abort gracefully:** If the agent hits a timeout or permission denial, the failure message shows "Agent failed: [reason]" — the reason must be a plain-English sentence a non-technical user can understand.

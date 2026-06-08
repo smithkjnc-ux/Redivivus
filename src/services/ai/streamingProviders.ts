@@ -98,7 +98,10 @@ export async function streamProvider(
     const p = providerMap[ai];
     if (!p) {throw new Error(`Unknown AI: ${ai}`);}
     const key = p.key(); if (!key) {throw new Error(`No key for ${ai}`);}
-    const _msgs: any[] = systemMessage ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }] : [{ role: 'user', content: text }]; const body = JSON.stringify({ model: p.model, stream: true, messages: _msgs });
+    const _msgs: any[] = systemMessage ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }] : [{ role: 'user', content: text }];
+    // [FIX] max_tokens set to provider maximum — Worker needs full output for large files
+    const maxTokens = ai === 'groq' ? 8000 : 16000;
+    const body = JSON.stringify({ model: p.model, stream: true, messages: _msgs, max_tokens: maxTokens });
     const res = await fetch(p.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body, signal });
     if (!res.ok || !res.body) {throw new Error(`${ai} ${res.status}`);}
     const { full, truncated } = await readSSE(res.body, onChunk,

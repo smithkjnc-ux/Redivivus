@@ -4,36 +4,34 @@
 
 ---
 
-*Last updated: May 27, 2026 (Session 11BI)*
+*Last updated: Jun 7, 2026 (Session Jun7)*
 
 ---
 
 ## Project Info
-- **Version:** 0.3.19
+- **Version:** 0.3.84
 - **Extension ID:** papajoe.redivivus
 - **Engine compat:** `vscode ^1.70.0` (for Windsurf compatibility)
 - **GitHub:** `https://github.com/smithkjnc-ux/Redivivus.git` (private)
-- **Backend:** `https://redivivus-backend.pages.dev` (Cloudflare Pages)
-- **Website:** `https://redivivus.dev` (Cloudflare Pages — `redivivus-web` repo)
+- **Backend:** `https://redivivus-backend.fly.dev` (fly.dev — `redivivus-backend` repo, `fly deploy --now`)
+- **Website:** `https://redivivus.dev` (Cloudflare Workers — `redivivus-web` repo, `npx wrangler deploy`)
 - **Database:** Supabase (`nadcrknbzsbhpnnvhtir` instance)
 - **Dogfood project:** `~/projects/doaidream/`
 
 ## Deployment (VSCodium ONLY)
 ```bash
-# Compile
+# Compile + auto-deploy (postcompile-deploy.js handles copying to all extension locations)
 cd ~/projects/redivivus && npm run compile
-
-# Deploy to VSCodium
-cp -r ~/projects/redivivus/out/* ~/.vscode-oss/extensions/papajoe.redivivus-0.3.4/out/
-
-# If package.json changed (new commands):
-cp ~/projects/redivivus/package.json ~/.vscode-oss/extensions/papajoe.redivivus-0.3.4/package.json
 
 # Reload: Ctrl+Shift+P → Developer: Restart Extension Host
 ```
 
+**Extension location in running IDE:** `~/.local/opt/redivivus/resources/app/extensions/redivivus/`
+**VSCodium user settings:** `~/.local/opt/redivivus/data/User/settings.json`
+**Stable symlink:** `~/.local/opt/redivivus` → `~/Downloads/redivivus-<version>/`
+
 **[WARN] NEVER sync to `~/.windsurf/extensions/` or `~/.vscode/extensions/`**
-The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave it alone.
+The Windsurf 0.2.0 folder was accidentally overwritten — leave it alone.
 
 ---
 
@@ -62,6 +60,26 @@ The Windsurf 0.2.0 folder was accidentally overwritten with 0.3.4 code — leave
 | `src/ui/mapScriptEngine.ts` | [WARN] Shared canvas IIFE for all Architecture Map views |
 | `src/ui/statusBar.ts` | Status bar items (project, session, tokens) |
 | `src/ui/vaultBrowserRenderer.ts` | Vault Browser WebView HTML renderer |
+
+### Build Pre-flight Pipeline (`src/core/ai/`)
+These files run in sequence BEFORE any build fires. They gate the build on intent clarity and visual alignment.
+
+| File | Purpose |
+|------|---------|
+| `src/core/ai/jobSizer.ts` | Classifies every build request into a job tier: **tell-them** (0 questions, just do it), **look-it-up** (1 factual gap), **offer-choices** (2-3 high-impact decisions), **explore-with-them** (vague/large — full 5 W's intake). Fast-path regex first, AI fallback. Controls how many clarify questions fire before the build starts. |
+| `src/core/ai/decisionTriage.ts` | Splits clarify questions into 3 buckets: **ai-owns** (AI resolves from code — never asks user), **user-owns-ask** (preference/structural — ask user, capped by job tier), **user-owns-guess** (cheap preference — AI picks default, surfaces post-build). Prevents unnecessary questions reaching the user. |
+| `src/core/ai/fiveWsDiagnostic.ts` | Pre-commit alignment check. After job-sizing and triage, before any build fires, makes a lightweight AI call to confirm the AI is solving the RIGHT problem. Returns `aligned/misaligned`, detected goal, requested action, and a **WHO experience score** (0.0–1.0: non-technical → technical) that calibrates response depth. |
+| `src/core/ai/visualSpecService.ts` | Establishes a visual contract before any Worker generates UI code. Priority: extracted (theme/token files) > inferred (existing components) > defaulted (new project). Embeds locked palette, typography, and spacing values into routedText — Worker output is visually consistent without guessing. Also feeds the Visual Contract Editor. |
+| `src/core/ai/modelTierList.ts` | Built-in capability ranking: `claude-opus-4-8=100` → `gemini-2.5-pro=83` → `gpt-4o=80` → `gemini-2.5-flash=70` → `claude-haiku-4-5=65` → … → fallback=30. Consumed by roleAssignmentService. User override via `redivivus.modelRankOverrides` VS Code setting. |
+| `src/core/ai/roleAssignmentService.ts` | Maps configured providers to Supervisor/Guardian/Worker roles by tier rank. Highest-ranked active model = Supervisor AND Guardian. All others = Workers. Single-model mode (only 1 key configured) uses that model for all three roles. Call `assignRoles(buildRegistrations(keyMap))` to get the full assignment. |
+| `src/core/ai/roleAssignmentFailover.ts` | Runtime failure tracking. 2+ failures on a model: marks it degraded, promotes next-ranked model to Supervisor, notifies user via Guardian voice. 3+ failures: model removed from active assignment. Recovery after 10 min: model restored and assignment re-evaluated. **[WARN] State is module-level — resets on extension host restart. Failures do not persist across sessions.** |
+
+### AI Routing Services (`src/services/ai/` — additions)
+| File | Purpose |
+|------|---------|
+| `src/services/ai/guardianAI.ts` | Guardian AI review layer. When 2+ providers configured AND `guardianEnabled=true`, the Guardian (highest-ranked model) reviews Worker output before it reaches the user. Catches: hallucinations, blueprint drift, off-track answers, bad code patterns. Returns pass/fail, corrected text (if any), issues list, and out-of-scope scope alerts. |
+| `src/services/ai/routingServiceSupervisor.ts` | Supervisor plan with automatic failover. Wraps `supervisorPlanImpl()` — on null return, records failure, promotes next-ranked model, retries once. Callers set `svc.supervisorFailoverCallback` for plain-English role-change notifications. Extracted from routingService.ts (Rule 9 split). |
+| `src/services/ai/secretKeyStore.ts` | OS keychain-backed AI provider key store (VS Code `SecretStorage`). Keys are encrypted at rest on the local device. Auto-migrates from legacy `chassis.*` / `redivivus.*` settings entries on first activation. Provides `getKeyCached()` for sync access and post-init callbacks for panels that load before init completes. **[WARN] `getKeyCached()` returns null before init — always call after activation event.** |
 
 ### Services
 | File | Purpose |
@@ -143,7 +161,11 @@ FAILOVER (src/core/ai/roleAssignmentFailover.ts)
 - Engine version must stay at `^1.70.0` for Windsurf compat (Windsurf 1.110.1)
 - `@types/vscode` must match engine version (currently 1.70.0)
 - AI review/restructure commands need API key — show clear stub when missing
-- Several pre-existing files exceed 200 lines (Rule 9) — split required before editing them
+- Several pre-existing files exceed 200 lines (Rule 9) — split required before editing them: `chatPanelBuildRunner.ts` (240), `chatPanelMessageRouterEarlyExits.ts` (229), `chatPanelMsgFix.ts` (220+), `extension.ts` (369), `extensionCommands.ts` (208), `agentTools.ts` (now fixed), `supervisorOrchestrator.ts` (248), `cloudBuildClient.ts` (280), `chatPanel.ts` (217), `chatPanelPublicAPI.ts` (227), `chatPanelRenderer.ts` (208), `chatPanelScriptActions.ts` (235)
+- Supervisor can over-engineer fix prescriptions (e.g., recommending inline SVG for chess pieces instead of Unicode) — domain-specific guidance added to fix-supervisor prompt for known patterns; watch for similar issues in other domains
+- Agent mode accumulates context across iterations — by iteration 6+ with large files in history, the backend `/execute` call can approach the 120s timeout. Mitigated by: `read_file_lines` tool (line-range reads instead of cat|tail), 120s timeout (up from 60s). For complex projects, prefer the standard fix pipeline over agent mode for pure code changes.
+- `PLAIN:` line occasionally missing from Supervisor response — results in generic "Couldn't make the change automatically" message with no diagnostic text. Fix pipeline log (`chess-ai-game/.redivivus/logs/fix-pipeline-*.log`) always has full details.
+- History title in build history was showing AI-rewritten task text instead of user's original message — fixed Jun 7, 2026 (handleFixRequest now receives original userText, not _claudeTask)
 
 ---
 

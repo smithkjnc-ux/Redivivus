@@ -25,15 +25,18 @@ export async function runPhase1Supervisor(
   const _bp = _cfg?.blueprint;
 
   // Parse structured files from filesBlock for the new endpoint
-  const files: { path: string, content: string }[] = [];
+  const files: { path: string, content: string, size: number }[] = [];
   const fileBlocks = filesBlock.split(/\n\/\/ === FILE: /).slice(1);
   for (const blk of fileBlocks) {
     const nl = blk.indexOf('\n');
     if (nl === -1) continue;
     const relPath = blk.slice(0, nl).replace(/\s*===\s*$/, '').trim();
     const content = blk.slice(nl + 1);
-    files.push({ path: relPath, content });
+    files.push({ path: relPath, content, size: content.length });
   }
+  // Calculate total size for format decision (FULL FILE vs surgical)
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  const largestFile = files.reduce((max, f) => f.size > max.size ? f : max, files[0] || { path: '', size: 0 });
 
   // Build roadmap snippet for context
   let roadmapSnippet = '';
@@ -54,13 +57,18 @@ export async function runPhase1Supervisor(
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         userText,
-        files,
+        files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
         context: {
           blueprint: _bp || undefined,
           projectRules: projectRules || undefined,
           deadEnds: projectDeadEnds || undefined,
           roadmapSnippet: roadmapSnippet || undefined,
           patternNotes: buildSupervisorNotes(activePatterns) || undefined,
+          fileMetrics: {
+            totalSize,
+            largestFile: { path: largestFile.path, size: largestFile.size },
+            fileCount: files.length
+          }
         },
         supervisor,
         supervisorModel,
@@ -93,17 +101,21 @@ export async function runPhase2Worker(
   deps: MessageHandlerDeps,
   root: string,
   onChunk?: (chunk: string) => void,
-  escalated?: boolean
+  escalated?: boolean,
+  forceSurgical?: boolean
 ): Promise<{ workerResponse: string, workerLabel: string } | null> {
   // Parse structured files from filesBlock
-  const files: { path: string, content: string }[] = [];
+  const files: { path: string, content: string, size: number }[] = [];
   const fileBlocks = filesBlock.split(/\n\/\/ === FILE: /).slice(1);
   for (const blk of fileBlocks) {
     const nl = blk.indexOf('\n');
     if (nl === -1) continue;
     const relPath = blk.slice(0, nl).replace(/\s*===\s*$/, '').trim();
-    files.push({ path: relPath, content: blk.slice(nl + 1) });
+    const content = blk.slice(nl + 1);
+    files.push({ path: relPath, content, size: content.length });
   }
+  const totalSize = files.reduce((sum, f) => sum + f.size, 0);
+  const largestFile = files.reduce((max, f) => f.size > max.size ? f : max, files[0] || { path: '', size: 0 });
 
   const base = require('../../services/api/apiClient.js').getApiBase();
   const token = await require('../../services/api/apiClient.js').getAccountToken();
@@ -120,8 +132,16 @@ export async function runPhase2Worker(
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({
         diagnosis,
-        files,
-        context: { patternRules: buildWorkerRules(activePatterns, 9) || undefined },
+        files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
+        context: {
+          patternRules: buildWorkerRules(activePatterns, 9) || undefined,
+          fileMetrics: {
+            totalSize,
+            largestFile: { path: largestFile.path, size: largestFile.size },
+            fileCount: files.length
+          },
+          forceSurgical: !!forceSurgical
+        },
         worker: workerAI,
         workerModel,
         supervisorProvider: supervisor,

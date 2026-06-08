@@ -37,7 +37,8 @@ export async function runSubtasksLoop(params: {
   for (let i = 0; i < subtasks.length; i++) {
     const stepLabel = `[${i + 1}/${subtasks.length}]`;
     fixLog(`--- Starting Subtask ${stepLabel} ---`, { subtask: subtasks[i] });
-    deps.conversation[deps.conversation.length - 1].content = `Found the issue — writing fix ${stepLabel}...`;
+    deps.conversation[deps.conversation.length - 1].content =
+      `Supervisor (${supervisorLabel}): done\nWorker: fix ${stepLabel} — ${subtasks[i].slice(0, 60)}...\nVerify: pending\nGuardian: pending`;
     deps.refresh();
 
     const chunkDiagnosis = `${diagnosis}\n\nSubtask ${stepLabel}: ${subtasks[i]}`;
