@@ -18,8 +18,8 @@ export async function executeXAI(
     const _msgs: any[] = systemMessage
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }]
         : [{ role: 'user', content: text }];
-      // [FIX] max_tokens set to xAI maximum (16000) — Worker needs full output for large files
-      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 16000 });
+      // [FIX] max_tokens set to xAI maximum (32000) — Worker needs full output for large files
+      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 32000 });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
     if (!res.ok) {return { text: '', model, success: false, error: `xAI API error ${res.status}: ${data.error?.message || res.statusText}` };}
