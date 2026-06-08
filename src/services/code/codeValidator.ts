@@ -104,5 +104,20 @@ export function validateCode(code: string, ext: string): ValidationResult {
   if (ext === '.html' || ext === '.htm') {
     return validateAndFixHtmlAnimation(code);
   }
+  // ── Check 10: non-ASCII in JS/TS files ──
+  if (ext === '.js' || ext === '.ts') {
+    const nonAsciiMatches = code.match(/[^\x00-\x7F]/g) || [];
+    if (nonAsciiMatches.length > 0) {
+      const unique = [...new Set(nonAsciiMatches)].slice(0, 3)
+        .map((c: string) => `U+${c.charCodeAt(0).toString(16).toUpperCase()}`).join(', ');
+      let fixed = code
+        .replace(/\u2014/g, '--')
+        .replace(/\u2013/g, '-')
+        .replace(/\u2026/g, '...')
+        .replace(/\u2018|\u2019/g, "'")
+        .replace(/\u201C|\u201D/g, '"');
+      return { issues: [`Non-ASCII characters in JS file (${unique}) -- auto-fixed common ones`], autoFixed: true, code: fixed };
+    }
+  }
   return { issues: [], autoFixed: false, code };
 }
