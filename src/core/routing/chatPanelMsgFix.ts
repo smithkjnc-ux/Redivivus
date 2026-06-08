@@ -70,16 +70,15 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // File size gate only catches 50KB+ files, but GPT-4o/Groq/Kimi cap at 16K/8K/16K tokens (~12-20KB).
   // Without this check, FULL FILE output is always truncated for mid-size files on low-limit providers.
   if (!gateResult.forceSurgical) {
-    const { WORKER_TOKEN_LIMITS } = await import('../ai/workerTokenLimits.js');
-    const { selectSupervisorAndWorker } = deps.routing;
-    const { worker } = selectSupervisorAndWorker();
-    const workerKey = Object.keys(WORKER_TOKEN_LIMITS).find(k => (worker || '').toLowerCase().includes(k));
-    const workerLimit = workerKey ? (WORKER_TOKEN_LIMITS as any)[workerKey] : 8000;
-    // ~3.5 chars per token is conservative estimate for code
-    const workerOutputBytes = workerLimit * 3.5;
+    const { bestModelForRole } = await import('../../services/ai/modelRegistry.js');
+    const { worker } = deps.routing.selectSupervisorAndWorker();
+    const workerModel = worker ? bestModelForRole(worker, 'flash') : undefined;
+    // outputK is in thousands of tokens; 3.5 chars/token is conservative for code
+    const workerOutputK = workerModel?.outputK ?? 8;
+    const workerOutputBytes = workerOutputK * 1000 * 3.5;
     const largestFile = sourceFiles.reduce((max, f) => f.content.length > max.content.length ? f : max, sourceFiles[0]);
     if (largestFile && largestFile.content.length > workerOutputBytes) {
-      fixLog(`[TOKEN_GATE] Forcing surgical: ${largestFile.rel} is ${largestFile.content.length} chars, worker limit ~${Math.round(workerOutputBytes)} chars (${workerLimit} tokens)`);
+      fixLog(`[TOKEN_GATE] Forcing surgical: ${largestFile.rel} is ${largestFile.content.length} chars, worker ${workerModel?.modelId ?? worker} limit ~${Math.round(workerOutputBytes)} chars (${workerOutputK}K tokens)`);
       gateResult.forceSurgical = true;
     }
   }
