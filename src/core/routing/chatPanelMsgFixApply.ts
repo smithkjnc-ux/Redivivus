@@ -1,6 +1,7 @@
 // [SCOPE] Application of code fixes (Surgical or Full-file fallback)
 
 import * as fs from 'fs';
+import { validateCode } from '../../services/code/codeValidator.js';
 import * as path from 'path';
 import { parseFixResponse, takeSnapshot } from './chatPanelMsgFixUtils';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
@@ -82,7 +83,10 @@ export async function applyFixContent(finalResponse: string, root: string, allow
         for (const fix of legacyFixes) {
           try {
             fs.mkdirSync(path.dirname(fix.abs), { recursive: true });
-            fs.writeFileSync(fix.abs, stripSeparatorArtifacts(fix.content), 'utf-8');
+            const ext1 = path.extname(fix.rel);
+            const validated1 = validateCode(stripSeparatorArtifacts(fix.content), ext1);
+            if (validated1.autoFixed) { fixLog(`[CHECK10] Auto-fixed non-ASCII in ${fix.rel}`); }
+            fs.writeFileSync(fix.abs, validated1.code, 'utf-8');
             written.push(fix.rel);
           } catch (e) { failed.push(`${fix.rel}: ${e instanceof Error ? e.message : String(e)}`); }
         }
@@ -122,7 +126,10 @@ export async function applyFixContent(finalResponse: string, root: string, allow
       fixSnapId = takeSnapshot(root, [targetRel], userText);
       try {
         fs.mkdirSync(path.dirname(absTarget), { recursive: true });
-        fs.writeFileSync(absTarget, stripSeparatorArtifacts(largest), 'utf-8');
+        const ext2 = path.extname(targetRel);
+        const validated2 = validateCode(stripSeparatorArtifacts(largest), ext2);
+        if (validated2.autoFixed) { fixLog(`[CHECK10] Auto-fixed non-ASCII in ${targetRel}`); }
+        fs.writeFileSync(absTarget, validated2.code, 'utf-8');
         written.push(targetRel);
       } catch (e) { failed.push(`${targetRel}: ${e instanceof Error ? e.message : String(e)}`); }
     }
