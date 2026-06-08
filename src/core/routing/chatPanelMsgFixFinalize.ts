@@ -33,6 +33,30 @@ export async function runFixFinalize(params: {
   const retryRes = await retryPatternFix({ written, activePatterns, root, diagnosis, supervisorLabel, allowedRels, deps, userText, conversation, refresh });
   if (retryRes.retried && retryRes.written.length > 0) { written = retryRes.written; workerLabel = retryRes.workerLabel; }
 
+  // [Stage 3] Extract success pattern to global dead end vault
+  if (written.length > 0) {
+    try {
+      const { getApiBase, getAccountToken } = require('../../services/api/apiClient.js');
+      const base = getApiBase();
+      const token = await getAccountToken();
+      fixLog('[GLOBAL_VAULT] Firing success extract from finalize...');
+      const extractRes = await fetch(`${base}/dead-end-extract/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          outcome: 'success',
+          symptom: userText,
+          diagnosis,
+          solution: diagnosis.match(/PRESCRIPTION:([\s\S]*?)(?:\[TRIVIAL|$)/)?.[1]?.trim() ?? '',
+          projectPath: root,
+          keys: {},
+          supervisorProvider: 'groq',
+        }),
+      });
+      fixLog('[GLOBAL_VAULT] Extract response', { status: extractRes.status });
+    } catch (e) { fixLog('[GLOBAL_VAULT] Extract failed', { error: String(e) }); }
+  }
+
   finalizeFixLogger();
   const { presentFixResult } = await import('./chatPanelMsgFixOutput.js');
   await presentFixResult({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns });

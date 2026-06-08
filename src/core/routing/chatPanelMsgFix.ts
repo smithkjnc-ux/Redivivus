@@ -112,7 +112,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     const base = require('../../services/api/apiClient.js').getApiBase();
     const token = await require('../../services/api/apiClient.js').getAccountToken();
     const keywords = userText.toLowerCase().split(/\s+/).filter(w => w.length > 3).slice(0, 10);
-    const dqRes = await fetch(`${base}/dead-end-query`, {
+    const dqRes = await fetch(`${base}/dead-end-query/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ keywords }),
@@ -258,7 +258,8 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
         const token3 = await require('../../services/api/apiClient.js').getAccountToken();
         const keysPayload3 = require('../../services/api/apiClient.js').collectKeys();
         const { supervisor: sup3 } = deps.routing.selectSupervisorAndWorker();
-        fetch(`${base3}/dead-end-extract`, {
+        fixLog('[GLOBAL_VAULT] Firing failure extract...');
+        const extractRes3 = await fetch(`${base3}/dead-end-extract/`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token3}` },
           body: JSON.stringify({
@@ -271,7 +272,8 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
             keys: keysPayload3,
             supervisorProvider: sup3,
           }),
-        }).catch(() => {}); // fire and forget
+        });
+        fixLog('[GLOBAL_VAULT] Failure extract response', { status: extractRes3.status });
       } catch (e) { fixLog('[GLOBAL_VAULT] Extract failed (non-blocking)', { error: String(e) }); }
       finalizeFixLogger();
       let failMsg = plain ? `**What I found:** ${plain}\n\n` : '';
@@ -280,30 +282,6 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       conversation[conversation.length - 1].content = failMsg;
       refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
     }
-  }
-
-  // [Stage 3] Extract success pattern to global dead end vault
-  if (written.length > 0) {
-    try {
-      const base4 = require('../../services/api/apiClient.js').getApiBase();
-      const token4 = await require('../../services/api/apiClient.js').getAccountToken();
-      const keysPayload4 = require('../../services/api/apiClient.js').collectKeys();
-      const { supervisor: sup4 } = deps.routing.selectSupervisorAndWorker();
-      fetch(`${base4}/dead-end-extract`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token4}` },
-        body: JSON.stringify({
-          outcome: 'success',
-          symptom: userText,
-          deadEnds: projectDeadEnds,
-          diagnosis,
-          solution: diagnosis.match(/PRESCRIPTION:([\s\S]*?)(?:\[TRIVIAL|$)/)?.[1]?.trim() ?? '',
-          projectPath: root,
-          keys: keysPayload4,
-          supervisorProvider: sup4,
-        }),
-      }).catch(() => {}); // fire and forget
-    } catch (e) { fixLog('[GLOBAL_VAULT] Extract failed (non-blocking)', { error: String(e) }); }
   }
 
   await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels });
