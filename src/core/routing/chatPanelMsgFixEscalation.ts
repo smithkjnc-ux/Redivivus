@@ -19,7 +19,10 @@ export interface EscalationResult {
   accumulatedCritiques?: string[]; // [FIX] Guardian rejection reasons for dead end logging
 }
 
-/** Runs Phase 2 (Worker) → Phase 3 (Guardian) with automatic retry and escalation. */
+/** Runs Phase 2 (Worker) → Phase 3 (Guardian) with automatic retry and escalation.
+ *  [STAGE 2] Now includes re-prescription: Supervisor is called again after each Guardian
+ *  rejection with full context of what failed and why, enabling new prescription strategies.
+ */
 export async function runEscalationLoop(params: {
   diagnosis: string;
   fileNames: string;
@@ -30,8 +33,14 @@ export async function runEscalationLoop(params: {
   supervisorLabel: string;
   maxRetries?: number;
   forceSurgical?: boolean;
+  // [STAGE 2] NEW parameters for re-prescription after Guardian rejection:
+  userText?: string;        // original user request
+  buildContext?: string;    // build context for Supervisor
+  projectDeadEnds?: string; // existing dead ends from dead_ends.md
+  projectRules?: string;    // project rules for Supervisor
 }): Promise<EscalationResult> {
-  const { diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel, forceSurgical: initialForceSurgical } = params;
+  const { diagnosis, fileNames, filesBlock: initialFilesBlock, activePatterns, deps, root, supervisorLabel, forceSurgical: initialForceSurgical } = params;
+  const { userText, buildContext, projectDeadEnds, projectRules } = params;
   const maxRetries = params.maxRetries ?? 2;
   const { routing, conversation, refresh } = deps;
 
@@ -46,6 +55,10 @@ export async function runEscalationLoop(params: {
 
   // [WARN] Accumulates Guardian critiques across retries so the Worker learns from ALL past failures
   let accumulatedCritiques: string[] = [];
+
+  // [STAGE 2] Track mutable state for re-prescription
+  let currentDiagnosis = diagnosis;
+  let filesBlock = initialFilesBlock;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // ── Phase 2: Worker generates fix ──
@@ -62,7 +75,8 @@ export async function runEscalationLoop(params: {
         updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated, streamBytes);
         refresh();
       };
-      const p2 = await runPhase2Worker(diagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk, escalated, forceSurgical);
+      // [STAGE 2] Use currentDiagnosis (may be updated by re-prescription)
+      const p2 = await runPhase2Worker(currentDiagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk, escalated, forceSurgical);
       if (!p2) { throw new Error('Worker returned null'); }
       workerResponse = p2.workerResponse;
       workerLabel = p2.workerLabel;
@@ -165,6 +179,56 @@ export async function runEscalationLoop(params: {
         accumulatedCritiques.push(`[FORMAT CHANGE] Previous attempt used FULL FILE but output was truncated. Use SURGICAL EDITS (SEARCH/REPLACE) instead for reliability.`);
       }
 
+      // [STAGE 2] RE-PRESCRIPTION: Call Supervisor again with enriched context after Guardian rejection
+      if (attempt < maxRetries && userText) {
+        fixLog(`[RE-PRESCRIBE] Guardian rejected attempt ${attempt + 1} — calling Supervisor for new prescription`);
+        try {
+          // Re-read file contents after failed attempt (file may have changed or not depending on truncation)
+          const { collectSourceFiles } = await import('./chatPanelMsgFixContext.js');
+          const refreshedFiles = collectSourceFiles(root, userText);
+          if (refreshedFiles && refreshedFiles.length > 0) {
+            filesBlock = refreshedFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
+            fixLog(`[RE-PRESCRIBE] Refreshed file contents for re-prescription (${refreshedFiles.length} files)`);
+          }
+
+          // Build enriched dead ends including this session's accumulated failures
+          const sessionDeadEnds = accumulatedCritiques
+            .map((c, i) => `## Attempt ${i + 1} failed\n- What was tried: ${currentDiagnosis.slice(0, 100).replace(/\n/g, ' ')}...\n- Why it failed: ${c}\n- Do NOT repeat this approach`)
+            .join('\n\n');
+          const enrichedDeadEnds = [projectDeadEnds, sessionDeadEnds].filter(Boolean).join('\n\n---\n\n');
+
+          const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
+          const rePrescription = await runPhase1Supervisor(
+            userText,
+            filesBlock,
+            buildContext || '',
+            activePatterns,
+            enrichedDeadEnds,
+            projectRules || '',
+            deps,
+            root,
+            undefined, undefined,
+            true  // isRetry = true
+          );
+
+          if (rePrescription && rePrescription.diagnosis) {
+            const oldDiagnosis = currentDiagnosis.slice(0, 80);
+            currentDiagnosis = rePrescription.diagnosis;
+            fixLog(`[RE-PRESCRIBE] New prescription received`, {
+              oldPreview: oldDiagnosis + '...',
+              newPreview: currentDiagnosis.substring(0, 200) + '...'
+            });
+          } else {
+            fixLog(`[RE-PRESCRIBE] Supervisor returned no new diagnosis, continuing with original prescription`);
+          }
+        } catch (err) {
+          fixLog(`[RE-PRESCRIBE] Re-prescription failed, continuing with original prescription`, {
+            err: err instanceof Error ? err.message : String(err)
+          });
+          // Non-fatal — fall through to retry with original/current prescription
+        }
+      }
+
       // If we've exhausted retries, escalate to supervisor model
       if (attempt === maxRetries && !escalated) {
         escalated = true;
@@ -190,16 +254,18 @@ export async function runEscalationLoop(params: {
   // All retries + escalation exhausted
   guardianNote = `Guardian (${guardianLabel}): Failed after ${retryCount} retries${escalated ? ' + escalation' : ''}. Applying best available fix.`;
   // [FIX] Write actual Guardian rejection reasons to dead_ends.md
+  // [STAGE 2] Include re-prescription attempts in dead end logging
   if (accumulatedCritiques.length > 0) {
     const critiqueText = accumulatedCritiques.join('; ');
+    const prescriptionAttempts = `Original + ${retryCount} re-prescription(s)`;
     appendProjectDeadEnd(
       root,
       `guardian-rejected: ${critiqueText.slice(0, 80)}`,
       critiqueText,
-      `Guardian rejected after ${maxRetries + 1} attempts${escalated ? ' including escalation' : ''}`,
+      `Guardian rejected after ${maxRetries + 1} attempts${escalated ? ' including escalation' : ''} with ${prescriptionAttempts}`,
       'Try FULL FILE format instead of surgical edits, or rephrase the fix request more specifically'
     );
-    fixLog('[DEAD END] Wrote Guardian rejection reasons to dead_ends.md', { critiques: accumulatedCritiques });
+    fixLog('[DEAD END] Wrote Guardian rejection reasons to dead_ends.md', { critiques: accumulatedCritiques, prescriptionAttempts });
   }
   return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: maxRetries, escalated, forceSurgical, accumulatedCritiques };
 }

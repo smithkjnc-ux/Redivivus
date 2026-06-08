@@ -3,6 +3,37 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 08, 2026: Stage 2 — Supervisor Re-Prescription After Guardian Rejection
+
+**Goal:** Fix the "same wrong prescription" problem where Supervisor prescribes once, Guardian rejects, Worker retries same approach 3 times, all fail.
+
+**Root cause:** The original `diagnosis` from Supervisor was never updated across retry attempts. Worker kept trying variations of the same failing strategy. No feedback loop to Supervisor about what failed and why.
+
+**File changed:** `src/core/routing/chatPanelMsgFixEscalation.ts`
+
+**What changed:**
+1. Extended `runEscalationLoop` parameters (lines 36-40) — added `userText`, `buildContext`, `projectDeadEnds`, `projectRules` for re-prescription support.
+2. Added mutable state tracking (lines 59-61) — `currentDiagnosis` and `filesBlock` can now be updated mid-loop.
+3. Worker calls now use `currentDiagnosis` (line 79) instead of static `diagnosis` — enables new prescription to take effect immediately.
+4. **Re-prescription block** (lines 182-229) — after Guardian rejection and before retry:
+   - Re-reads file contents from disk (fresh state after failed attempt)
+   - Builds `sessionDeadEnds` from accumulated Guardian critiques with context of what was tried
+   - Combines with `projectDeadEnds` from dead_ends.md for enriched context
+   - Calls `runPhase1Supervisor` with `isRetry: true` and full failure context
+   - Updates `currentDiagnosis` if new prescription received
+   - Logs old→new prescription preview for debugging
+5. Enhanced dead end logging (lines 260-268) — tracks how many re-prescriptions were attempted.
+
+**Why:** After Guardian rejects a fix, the Supervisor needs to know WHY it failed to prescribe a different strategy. Simply telling Worker "try again" with the same instructions is futile.
+
+**Risk:** Low. Re-prescription only fires when Guardian rejects AND retries remain. Falls back to original prescription if re-prescription fails. Non-fatal errors logged and continue.
+
+**Verification:**
+- `npm run compile`: Exit code 0 (zero errors)
+- `git diff --name-only | grep "src/ui"`: Exit code 1 (no UI files touched)
+
+---
+
 ## Session — Jun 08, 2026: Surgical Edit Fuzzy Matching
 
 **Goal:** Fix surgical edit failures caused by whitespace drift and minor code changes after multiple fix attempts.

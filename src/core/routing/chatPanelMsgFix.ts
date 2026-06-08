@@ -150,7 +150,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     } else {
       const { runEscalationLoop } = await import('./chatPanelMsgFixEscalation.js');
       fixLog('Phase 2: Starting Worker fix application...', { forceSurgical: gateResult.forceSurgical });
-      const escalation = await runEscalationLoop({ diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel, forceSurgical: gateResult.forceSurgical });
+      const escalation = await runEscalationLoop({ diagnosis, fileNames, filesBlock, activePatterns, deps, root, supervisorLabel, forceSurgical: gateResult.forceSurgical, userText, buildContext, projectDeadEnds, projectRules });
       finalResponse = escalation.finalResponse;
       workerLabel = escalation.workerLabel;
       fixLog('Phase 2: Worker response received', { preview: finalResponse.substring(0, 500), totalLength: finalResponse.length, workerLabel });
