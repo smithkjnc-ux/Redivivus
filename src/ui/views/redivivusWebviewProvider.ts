@@ -10,7 +10,8 @@ import { VaultService } from '../../services/vault/vaultService.js';
 import { RoutingService } from '../../services/ai/routingService.js';
 import { getStyles } from '../styles.js';
 import { getScripts } from './scripts.js';
-import { renderWelcomeView, renderRetrofitPendingView } from './welcomeView.js';
+import { renderWelcomeView, renderRetrofitPendingView, renderNoKeyView } from './welcomeView.js';
+import { hasAnyKey } from '../../services/ai/secretKeyStore.js';
 import { renderWorkTab } from './workTab.js';
 import { renderFilesTab, renderSwitchForm } from './filesTab.js';
 import { renderHistoryTab, getSessionHistory, getReviews } from './historyTab.js';
@@ -125,7 +126,7 @@ export class RedivivusWebviewProvider implements vscode.WebviewViewProvider {
     if (this.state.wizardStep !== 'welcome') {
       content = renderWizardStep(this.state.wizardStep, this.state.wizardData);
     } else if (!initialized && !this.state.welcomeDismissed) {
-      content = renderWelcomeView();
+      content = hasAnyKey() ? renderWelcomeView() : renderNoKeyView();
     } else if (backupExists) {
       content = renderRetrofitPendingView();
     } else {
