@@ -17,7 +17,7 @@ export function isWebPageTask(taskLow: string): boolean {
 // Fast paths handle obvious cases; AI handles "make them realistic", "improve the sounds", etc.
 export async function isModificationRequest(taskLow: string, routing: RoutingService, usageTracker?: UsageTracker): Promise<boolean> {
   // Fast path: unambiguous modification verbs
-  if (/\b(modify|update|change\s+(in|the)|fix\s+(in|the)|extend\s+(the|this)|this\s+(program|file|code|app)|existing|current\s+(file|code)|add\s+(to|another|more))\b/.test(taskLow)) {
+  if (/\b(modify|update|change\s+(in|the)|fix\s+(in|the|it|this)|extend\s+(the|this)|this\s+(program|file|code|app)|existing|current\s+(file|code)|add\s+(to|another|more)|white\s+screen|blank\s+screen|not\s+working|broken|bug)\b/.test(taskLow)) {
     return true;
   }
   // Fast path: explicit file extension reference (e.g. "update index.html")
