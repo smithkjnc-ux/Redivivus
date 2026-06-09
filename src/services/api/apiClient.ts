@@ -115,12 +115,19 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
   model?: string; provider?: string; input_tokens?: number; output_tokens?: number;
   success?: boolean; intent?: string; project_name?: string;
 }): void {
-  getAccountToken().then(token => {
+  getAccountToken().then(async token => {
     if (!token) return;
     fetch(`${getApiBase()}/telemetry`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ event, ...data }),
+      body: JSON.stringify({
+        event,
+        ...data,
+        ide_version: (await import('../../extension.js').catch(() => null) as any)?.default?.packageJSON?.version
+          || require('../../../package.json').version
+          || 'unknown',
+        configured_providers: (() => { try { return require('./secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
+      }),
     }).then(res => {
       if (res.status === 401) {
         clearAccountToken().then(() => vscode.commands.executeCommand('redivivus.refreshChat'));
