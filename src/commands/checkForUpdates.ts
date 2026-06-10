@@ -33,7 +33,7 @@ async function downloadFile(url: string, dest: string, onProgress: (pct: number)
       file.on('finish', () => { file.close(); resolve(); });
       res.on('error', reject);
     }).on('error', reject);
-    request(u);
+    request(url);
   });
 }
 
