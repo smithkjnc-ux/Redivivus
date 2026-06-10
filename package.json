@@ -1,8 +1,8 @@
 {
   "name": "redivivus",
   "displayName": "Redivivus",
-  "description": "AI-agnostic coding protocol for VS Code — the frame everything bolts to",
-  "version": "0.3.93",
+  "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
+  "version": "0.3.92",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -135,7 +135,7 @@
       },
       {
         "command": "redivivus.wizardRetrofit",
-        "title": "Redivivus: Wizard — Retrofit Existing Project"
+        "title": "Redivivus: Wizard \u2014 Retrofit Existing Project"
       },
       {
         "command": "redivivus.switchAI",
@@ -332,7 +332,7 @@
       },
       {
         "command": "redivivus.showMap",
-        "title": "Redivivus: Show Architecture Map 🗺"
+        "title": "Redivivus: Show Architecture Map \ud83d\uddfa"
       },
       {
         "command": "redivivus.selfDiagnostic",
@@ -545,9 +545,9 @@
             "quality"
           ],
           "enumDescriptions": [
-            "Economy — cheapest viable model for the job. Lowest cost; small risk of bugs on tricky tasks. Never uses top-tier.",
-            "Balanced (recommended) — pro-tier model for most builds; escalates to the top model only for genuinely hard/novel tasks. Best cost-to-quality.",
-            "Quality — favors the strongest models; escalates to top-tier readily. Highest quality, highest cost."
+            "Economy \u2014 cheapest viable model for the job. Lowest cost; small risk of bugs on tricky tasks. Never uses top-tier.",
+            "Balanced (recommended) \u2014 pro-tier model for most builds; escalates to the top model only for genuinely hard/novel tasks. Best cost-to-quality.",
+            "Quality \u2014 favors the strongest models; escalates to top-tier readily. Highest quality, highest cost."
           ],
           "markdownDescription": "How Redivivus picks the AI model for each build. The build's difficulty (weighted by novelty, not size) is combined with this preference to choose the supervisor tier. **Balanced** keeps most builds on a pro-tier model and only uses the top model (e.g. Opus) for genuinely hard work. The build result card shows why each model was chosen."
         },
@@ -565,7 +565,7 @@
               "copilot"
             ]
           },
-          "markdownDescription": "Which AI-editor rule files to generate in new projects (CLAUDE.md, .cursorrules, .windsurfrules, GEMINI.md, .clinerules, copilot-instructions). Default is **none** — the canonical rules always live in `.redivivus/rules.md`. Enable only the editors you actually use. Run **Redivivus: Configure Editor Rule Files** for a checklist."
+          "markdownDescription": "Which AI-editor rule files to generate in new projects (CLAUDE.md, .cursorrules, .windsurfrules, GEMINI.md, .clinerules, copilot-instructions). Default is **none** \u2014 the canonical rules always live in `.redivivus/rules.md`. Enable only the editors you actually use. Run **Redivivus: Configure Editor Rule Files** for a checklist."
         },
         "redivivus.defaultAI": {
           "type": "string",
@@ -582,7 +582,7 @@
             "Google Gemini (free tier available)",
             "Anthropic Claude (paid)",
             "OpenAI GPT-4o / GPT-4o Mini (paid)",
-            "Groq — Llama 3 (free tier)",
+            "Groq \u2014 Llama 3 (free tier)",
             "xAI Grok (paid)",
             "Moonshot Kimi (paid)"
           ],
@@ -596,37 +596,37 @@
         "redivivus.geminiApiKey": {
           "type": "string",
           "default": "",
-          "description": "Google Gemini API key — free at aistudio.google.com (or set GEMINI_API_KEY env var)"
+          "description": "Google Gemini API key \u2014 free at aistudio.google.com (or set GEMINI_API_KEY env var)"
         },
         "redivivus.claudeApiKey": {
           "type": "string",
           "default": "",
-          "description": "Anthropic Claude API key — console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
+          "description": "Anthropic Claude API key \u2014 console.anthropic.com (or set ANTHROPIC_API_KEY env var)"
         },
         "redivivus.openaiApiKey": {
           "type": "string",
           "default": "",
-          "description": "OpenAI API key for GPT-4o — platform.openai.com (or set OPENAI_API_KEY env var)"
+          "description": "OpenAI API key for GPT-4o \u2014 platform.openai.com (or set OPENAI_API_KEY env var)"
         },
         "redivivus.groqApiKey": {
           "type": "string",
           "default": "",
-          "description": "Groq API key — free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
+          "description": "Groq API key \u2014 free Llama 3 at console.groq.com (or set GROQ_API_KEY env var)"
         },
         "redivivus.xaiApiKey": {
           "type": "string",
           "default": "",
-          "description": "xAI Grok API key — console.x.ai (or set XAI_API_KEY env var)"
+          "description": "xAI Grok API key \u2014 console.x.ai (or set XAI_API_KEY env var)"
         },
         "redivivus.kimiApiKey": {
           "type": "string",
           "default": "",
-          "description": "Moonshot Kimi API key — platform.moonshot.cn (or set MOONSHOT_API_KEY env var)"
+          "description": "Moonshot Kimi API key \u2014 platform.moonshot.cn (or set MOONSHOT_API_KEY env var)"
         },
         "redivivus.guardianEnabled": {
           "type": "boolean",
           "default": true,
-          "description": "Guardian AI — when 2+ AI keys are configured, the higher-ranked AI silently reviews and corrects the worker AI's responses before they reach you. Disable to skip the review step."
+          "description": "Guardian AI \u2014 when 2+ AI keys are configured, the higher-ranked AI silently reviews and corrects the worker AI's responses before they reach you. Disable to skip the review step."
         },
         "redivivus.startupBehavior": {
           "type": "string",
@@ -658,7 +658,7 @@
             "guided"
           ],
           "enumDescriptions": [
-            "Ask every time — a mode picker appears on first build in each session",
+            "Ask every time \u2014 a mode picker appears on first build in each session",
             "Auto: AI builds immediately with no questions. Blueprint, snapshots, and history still recorded.",
             "Guided: full project interview (5 W's + style + constraints) before building. Answers saved to blueprint."
           ],
