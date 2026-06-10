@@ -19,7 +19,7 @@ function _settingsKey(): string {
     ['groq', getGroqKey], ['xai', getXAIKey], ['kimi', getKimiKey],
   ];
   return pairs.map(([p, fn]) => fn() ? p : '').join(',')
-    + '|' + (vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || 'gemini');
+    + '|' + (vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '');
 }
 
 /** Clear the cached roster — call after model failure or key change. */
@@ -85,7 +85,7 @@ export function getPreferredAI(): string {
 
 export function getAvailableAI(): { ai: string; source: 'redivivus-settings' | 'env' | 'none'; label: string } {
   const config = vscode.workspace.getConfiguration('redivivus');
-  const defaultAI = config.get<string>('defaultAI') || 'gemini';
+  const defaultAI = config.get<string>('defaultAI') || '';
   const checks = [
     { id: 'gemini', label: 'Gemini', key: getGeminiKey },
     { id: 'claude', label: 'Claude', key: getClaudeKey },

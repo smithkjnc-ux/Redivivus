@@ -56,7 +56,7 @@ export class SidebarProvider implements vscode.TreeDataProvider<SidebarNode> {
   getChildren(element?: SidebarNode): SidebarNode[] {
     if (element) { return element.children || []; }
 
-    const currentAI = vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || 'gemini';
+    const currentAI = vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '';
     const COMING_SOON = 'Coming Soon -- not yet implemented';
 
     return [

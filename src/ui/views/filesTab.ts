@@ -130,7 +130,7 @@ export function renderSwitchForm(currentAI: string): string {
   return `
     <div id="switch-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
       <h3 style="margin:0 0 8px 0; font-size:14px;">Pick your AI engine</h3>
-      <p style="margin:0 0 12px 0; font-size:12px; color:var(--vscode-descriptionForeground);">Currently using: <strong>${(currentAI || 'gemini').toUpperCase()}</strong></p>
+      <p style="margin:0 0 12px 0; font-size:12px; color:var(--vscode-descriptionForeground);">Currently using: <strong>${(currentAI || 'None').toUpperCase()}</strong></p>
       <div id="switch-picker" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
         <button class="switch-btn" data-ai="gemini" style="padding:8px 14px; border-radius:4px; border:1px solid var(--border,#334455); background:var(--input-bg,#0d1117); color:var(--fg,#e6edf3); cursor:pointer; font-size:12px;">Gemini 2.5 Flash <span style="opacity:0.5; font-size:10px;">Free</span></button>
         <button class="switch-btn" data-ai="groq" style="padding:8px 14px; border-radius:4px; border:1px solid var(--border,#334455); background:var(--input-bg,#0d1117); color:var(--fg,#e6edf3); cursor:pointer; font-size:12px;">Groq Llama 3 <span style="opacity:0.5; font-size:10px;">Free</span></button>

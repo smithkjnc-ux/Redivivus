@@ -87,7 +87,7 @@ export class RedivivusWebviewProvider implements vscode.WebviewViewProvider {
     const session = this.sessions.session;
     const backupExists = initialized && fs.existsSync(path.join(this.redivivus.redivivusDir, 'backup'));
     const projectName = config?.projectName || path.basename(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'Project');
-    const currentAI = vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || 'gemini';
+    const currentAI = vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '';
 
     const sessions = getSessionHistory(this.redivivus);
     const reviews = getReviews(this.redivivus);

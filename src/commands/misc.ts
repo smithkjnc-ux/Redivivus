@@ -68,7 +68,7 @@ function registerCoreCommands(
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.switchAI', async () => {
       const config = vscode.workspace.getConfiguration('redivivus');
-      const current = config.get<string>('defaultAI') || 'gemini';
+      const current = config.get<string>('defaultAI') || '';
       const ais = [
         { id: 'gemini', label: 'Gemini', desc: 'Free tier — fast, good for most tasks', icon: '✨' },
         { id: 'claude', label: 'Claude', desc: 'Paid — deep reasoning, best for complex files', icon: '🤖' },
