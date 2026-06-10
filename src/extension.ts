@@ -166,7 +166,7 @@ export function activate(context: vscode.ExtensionContext) {
   setTimeout(async () => {
     try {
       const last = context.globalState.get<number>(UPDATE_CHECK_KEY, 0);
-      // if (Date.now() - last < 24 * 60 * 60 * 1000) { return; }
+      // beta: no update throttle
       context.globalState.update(UPDATE_CHECK_KEY, Date.now());
 
       const pkg = require('../package.json');
