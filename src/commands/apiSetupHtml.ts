@@ -120,6 +120,7 @@ export function getApiSetupHtml(): string {
   ${providerCards}
   <div class="actions">
     <button id="apply-btn">&#x2705; Apply Changes</button>
+    <button id="export-all-btn" class="secondary">&#x1F4BE; Export Keys (.env)</button>
     <button id="vscode-settings-btn" class="secondary">&#x2699;&#xFE0F; Open VS Code Settings</button>
   </div>
   <div id="apply-feedback" class="apply-feedback">
@@ -155,7 +156,18 @@ export function getApiSetupHtml(): string {
     });
 
     document.getElementById('vscode-settings-btn').addEventListener('click', () => { vscode.postMessage({ type: 'open-vscode-settings' }); });
-    
+
+    document.getElementById('export-all-btn').addEventListener('click', () => {
+      const btn = document.getElementById('export-all-btn');
+      btn.innerHTML = '&#x8987; Saving...';
+      btn.style.opacity = '0.7';
+      vscode.postMessage({ type: 'export-all-keys' });
+      setTimeout(() => {
+        btn.innerHTML = '&#x1F4BE; Export Keys (.env)';
+        btn.style.opacity = '1';
+      }, 1500);
+    });
+
     window.addEventListener('message', e => {
       if (e.data.type === 'highlight-provider') {
         const el = document.getElementById(e.data.provider + '-key');

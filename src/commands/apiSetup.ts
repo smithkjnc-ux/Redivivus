@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 import { getApiSetupHtml } from './apiSetupHtml.js';
 import { checkProviderReachable } from '../core/diagnostics/selfDiagnosticChecks';
+import { getKeyCached, getConfiguredProviders } from '../services/ai/secretKeyStore.js';
 
 export function registerApiSetupCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -132,6 +133,33 @@ class ApiSetupPanel {
         vscode.window.showInformationMessage(`Redivivus: ${msg.providerId.toUpperCase()} has been ${index > -1 ? 'enabled' : 'disabled'}!`);
       } else if (msg.type === 'open-vscode-settings') {
         await vscode.commands.executeCommand('workbench.action.openSettings', 'redivivus');
+      } else if (msg.type === 'export-all-keys') {
+        const providers = getConfiguredProviders();
+        if (providers.length === 0) {
+          vscode.window.showWarningMessage('Redivivus: No API keys configured to export');
+          return;
+        }
+        const envMap: Record<string, string> = {
+          gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY',
+          groq: 'GROQ_API_KEY', xai: 'XAI_API_KEY', kimi: 'MOONSHOT_API_KEY',
+        };
+        const lines: string[] = ['# Redivivus API Keys — ' + new Date().toISOString().split('T')[0]];
+        for (const provider of providers) {
+          const key = getKeyCached(provider);
+          if (key && envMap[provider]) {
+            lines.push(`${envMap[provider]}=${key}`);
+          }
+        }
+        const envContent = lines.join('\n');
+
+        const uri = await vscode.window.showSaveDialog({
+          defaultUri: vscode.Uri.file('redivivus-keys.env'),
+          filters: { 'Environment Files': ['env'], 'All Files': ['*'] }
+        });
+        if (!uri) { return; }
+
+        await vscode.workspace.fs.writeFile(uri, Buffer.from(envContent, 'utf8'));
+        vscode.window.showInformationMessage(`Redivivus: API keys exported to ${uri.fsPath}`);
       }
     }, null, this._disposables);
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);
