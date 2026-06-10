@@ -48,6 +48,7 @@ export async function initSecretKeyStore(ctx: vscode.ExtensionContext): Promise<
       if (legacy?.trim()) {
         try {
           await Promise.resolve(ctx.secrets.store(SECRET_PREFIX + p, legacy.trim()));
+          try { await cfg.update(SETTINGS_MAP[p], undefined, vscode.ConfigurationTarget.Global); } catch { }
           key = legacy.trim();
         } catch { key = legacy.trim(); }
       }
