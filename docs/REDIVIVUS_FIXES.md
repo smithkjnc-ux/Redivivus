@@ -3,6 +3,24 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 10, 2026: Documented Auth & Installation Flow
+
+**Goal:** Provide an exact reference for how new users sign up, get approved, download, and install Redivivus.
+
+**File created:** `docs/REDIVIVUS_AUTH_FLOW.md`
+
+**What changed:**
+1. Documented the `redivivus-web` Supabase magic-link flow (`/login` and `/auth/callback`).
+2. Documented the waitlist approval checks before allowing access to `/download`.
+3. Documented the behavior of the `install-redivivus.sh` and `.ps1` scripts, including VSCodium base retrieval, `.vsix` injection, and current branding logic.
+4. Documented the IDE authentication handoff to the local app via `redivivus-backend` `auth/ide` endpoints.
+
+**Why:** To ensure we have a clear, source-of-truth reference for the authentication loop before making branding modifications to the installers.
+
+**Risk:** None. Documentation only.
+
+---
+
 ## Session — Jun 08, 2026: Stage 2 — Supervisor Re-Prescription After Guardian Rejection
 
 **Goal:** Fix the "same wrong prescription" problem where Supervisor prescribes once, Guardian rejects, Worker retries same approach 3 times, all fail.

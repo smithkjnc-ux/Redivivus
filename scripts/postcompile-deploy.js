@@ -108,9 +108,18 @@ if (fs.existsSync(buildCodium) && !fs.existsSync(buildRedivivus)) {
   try { fs.symlinkSync('codium', buildRedivivus); } catch {}
 }
 
+// CLI alias: bin/redivivus -> bin/codium. The wrapper uses readlink -f so the symlink resolves
+// to the real wrapper and works identically. bin/codium is KEPT for legacy VSIX auto-updaters.
+const buildBinCodium = path.join(buildRoot, 'bin', 'codium');
+const buildBinRedivivus = path.join(buildRoot, 'bin', 'redivivus');
+if (fs.existsSync(buildBinCodium) && !fs.existsSync(buildBinRedivivus)) {
+  try { fs.symlinkSync('codium', buildBinRedivivus); } catch {}
+}
+
 // Write install.sh into the build root so users get a desktop shortcut.
 // Uses a stable symlink at ~/.local/opt/redivivus so future re-installs don't break the .desktop file.
-// [WARN] StartupWMClass must be 'codium' — the app's actual WM_CLASS is set by the VSCodium binary, not the launch filename.
+// WM_CLASS is overridden via the --class=Redivivus Electron flag in Exec=, so StartupWMClass=Redivivus
+// matches and dock grouping works. Verify with `xprop WM_CLASS` after install if icons misbehave.
 const installSh = `#!/bin/bash
 # Redivivus install -- creates a stable symlink + desktop shortcut
 set -e
@@ -129,6 +138,16 @@ if [ -f "$INSTALL_DIR/codium" ] && [ ! -e "$INSTALL_DIR/redivivus" ]; then
   ln -sf codium "$INSTALL_DIR/redivivus"
 fi
 
+# CLI alias: bin/redivivus -> bin/codium (kept for legacy updaters)
+if [ -f "$INSTALL_DIR/bin/codium" ] && [ ! -e "$INSTALL_DIR/bin/redivivus" ]; then
+  ln -sf codium "$INSTALL_DIR/bin/redivivus"
+fi
+
+# Put redivivus on PATH
+mkdir -p "$HOME/.local/bin"
+ln -sf "$STABLE_LINK/bin/redivivus" "$HOME/.local/bin/redivivus"
+ln -sf "$STABLE_LINK/bin/codium" "$HOME/.local/bin/codium"
+
 ICON_SRC="$INSTALL_DIR/resources/app/resources/linux/redivivus.png"
 if [ -f "$ICON_SRC" ]; then cp "$ICON_SRC" "$ICON_DEST"; fi
 
@@ -136,12 +155,12 @@ cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Name=Redivivus IDE
 Comment=AI-powered code editor
-Exec=$STABLE_LINK/redivivus --no-sandbox --reuse-window %U
+Exec=$STABLE_LINK/redivivus --class=Redivivus --no-sandbox --reuse-window %U
 Icon=$ICON_DEST
 Terminal=false
 Type=Application
 Categories=Development;IDE;
-StartupWMClass=codium
+StartupWMClass=Redivivus
 MimeType=text/plain;inode/directory;
 EOF
 chmod +x "$DESKTOP_FILE"
@@ -152,7 +171,7 @@ gio set "$DESKTOP_FILE" metadata::trusted true 2>/dev/null || true
 update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
 gtk-update-icon-cache -f -t "$HOME/.local/share/icons" 2>/dev/null || true
 
-echo "Redivivus installed! Launch from your application menu."
+echo "Redivivus installed! Launch from your application menu or run: redivivus"
 echo "  If the icon does not appear immediately, log out and back in once."
 echo "  To update: extract the new tarball and run ./install.sh again."
 `;

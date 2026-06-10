@@ -8,6 +8,24 @@ import * as cp from 'child_process';
 
 const STABLE_LINK = path.join(os.homedir(), '.local', 'opt', 'redivivus');
 
+// [SCOPE] Resolve the IDE CLI binary, platform-aware. Prefers the running IDE's own bin dir
+// (via appRoot) so this works on any OS/install location, then falls back to the Linux
+// stable symlink. Tries 'redivivus' first (rebranded installs), then 'codium' (legacy).
+function resolveCliPath(): string | null {
+  const names = process.platform === 'win32'
+    ? ['redivivus.cmd', 'codium.cmd']
+    : ['redivivus', 'codium'];
+  const candidates: string[] = [];
+  // appRoot = <install>/resources/app → bin dir is <install>/bin
+  const appRootBin = path.resolve(vscode.env.appRoot, '..', '..', 'bin');
+  for (const n of names) { candidates.push(path.join(appRootBin, n)); }
+  for (const n of names) { candidates.push(path.join(STABLE_LINK, 'bin', n)); }
+  for (const c of candidates) {
+    try { if (fs.existsSync(c)) { return c; } } catch { /* keep trying */ }
+  }
+  return null;
+}
+
 function isDevBuild(): boolean {
   try {
     const dir = fs.realpathSync(STABLE_LINK);
@@ -49,9 +67,10 @@ export async function runUpdate(newVersion: string, _downloadUrl?: string): Prom
         progress.report({ message: `Downloading… ${pct}%`, increment: pct });
       });
       progress.report({ message: 'Installing…', increment: 100 });
-      const codium = path.join(STABLE_LINK, 'bin', 'codium');
+      const cli = resolveCliPath();
+      if (!cli) { throw new Error('Could not locate the IDE CLI binary (redivivus/codium) to install the update.'); }
       await new Promise<void>((resolve, reject) => {
-        const proc = cp.spawn(codium, ['--install-extension', dest, '--force'], { stdio: 'ignore' });
+        const proc = cp.spawn(cli, ['--install-extension', dest, '--force'], { stdio: 'ignore' });
         proc.on('close', (code) => code === 0 ? resolve() : reject(new Error(`install exited ${code}`)));
         proc.on('error', reject);
       });

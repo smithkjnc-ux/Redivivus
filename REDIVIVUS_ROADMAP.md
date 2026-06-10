@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-08 — Stage 2 Re-Prescription: After Guardian rejection, Supervisor is called again with enriched dead ends (session failures + project dead ends). New prescription updates `currentDiagnosis`, enabling fresh strategies on retry instead of repeating same failed approach.
+*Last updated:* 2026-06-10 — Documented user authentication and installation flow across web and backend projects in `docs/REDIVIVUS_AUTH_FLOW.md`.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
