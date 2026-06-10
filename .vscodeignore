@@ -31,3 +31,12 @@ Redivivus_UX_VISION.md
 REORGANIZATION_REPORT.md
 test_map.js
 docs/**
+node_modules/**
+releases/**
+*.vsix
+.wrangler/**
+tmp-binaries/**
+tmp-ide/**
+test-*.js
+test_*.js
+*.test.js
