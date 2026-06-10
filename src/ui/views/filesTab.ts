@@ -120,8 +120,94 @@ export function renderFilesTab(
       </div>`;
   }
 
+  // Add key export section at the bottom
+  html += renderKeyExportSection(aiKeys);
   html += '</div>';
   return html;
+}
+
+export function renderKeyExportSection(aiKeys?: { gemini?: boolean; claude?: boolean; openai?: boolean; groq?: boolean; xai?: boolean; kimi?: boolean }): string {
+  const configured: string[] = [];
+  if (aiKeys?.gemini) configured.push('gemini');
+  if (aiKeys?.claude) configured.push('claude');
+  if (aiKeys?.openai) configured.push('openai');
+  if (aiKeys?.groq) configured.push('groq');
+  if (aiKeys?.xai) configured.push('xai');
+  if (aiKeys?.kimi) configured.push('kimi');
+
+  if (configured.length === 0) {
+    return '';
+  }
+
+  const providerLabels: Record<string, string> = {
+    gemini: 'Gemini',
+    claude: 'Claude',
+    openai: 'OpenAI',
+    groq: 'Groq',
+    xai: 'xAI',
+    kimi: 'Kimi',
+  };
+
+  const envNames: Record<string, string> = {
+    gemini: 'GEMINI_API_KEY',
+    claude: 'ANTHROPIC_API_KEY',
+    openai: 'OPENAI_API_KEY',
+    groq: 'GROQ_API_KEY',
+    xai: 'XAI_API_KEY',
+    kimi: 'MOONSHOT_API_KEY',
+  };
+
+  let keyRows = '';
+  for (const provider of configured) {
+    keyRows += `
+      <div class="key-export-row" data-provider="${provider}" style="display:flex; align-items:center; gap:8px; padding:8px 0; border-bottom:1px solid var(--border, #334455);">
+        <span style="font-size:12px; font-weight:600; min-width:80px;">${providerLabels[provider]}</span>
+        <code class="key-preview" style="flex:1; font-family:monospace; font-size:11px; background:var(--input-bg,#0d1117); padding:4px 8px; border-radius:4px;">Loading...</code>
+        <button class="key-copy-btn" data-provider="${provider}" style="padding:4px 10px; background:#1f6feb; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:11px;">📋 Copy</button>
+      </div>`;
+  }
+
+  return `
+    <div style="margin-top:20px; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
+      <div style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+        <span style="font-size:16px;">🔒</span>
+        <span style="font-size:14px; font-weight:700; color:#e2e2f0;">Export / Import Keys</span>
+      </div>
+      <p style="margin:0 0 12px 0; font-size:11px; color:var(--vscode-descriptionForeground);">
+        Keys are stored in your OS keychain — never sent to any server.
+      </p>
+
+      <details style="margin-bottom:12px;">
+        <summary style="cursor:pointer; font-size:12px; color:var(--teal); font-weight:600; padding:8px 0;">
+          🔑 Configured Keys (${configured.length})
+        </summary>
+        <div style="margin-top:8px;">
+          ${keyRows}
+          <div style="margin-top:12px; display:flex; gap:8px;">
+            <button id="export-all-keys-btn" style="flex:1; padding:8px 16px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">
+              📋 Copy All (.env format)
+            </button>
+          </div>
+        </div>
+      </details>
+
+      <details>
+        <summary style="cursor:pointer; font-size:12px; color:var(--teal); font-weight:600; padding:8px 0;">
+          ⬇️ Import Keys
+        </summary>
+        <div style="margin-top:8px;">
+          <p style="margin:0 0 8px 0; font-size:11px; color:var(--vscode-descriptionForeground);">
+            Paste .env format (ANTHROPIC_API_KEY=sk-...):
+          </p>
+          <textarea id="import-keys-textarea" rows="4" placeholder="# Paste your API keys here\nANTHROPIC_API_KEY=sk-ant-...\nGEMINI_API_KEY=AIza..." style="width:100%; padding:8px; background:var(--input-bg, #0d1117); color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; font-size:12px; font-family:monospace; resize:vertical;"></textarea>
+          <button id="import-keys-btn" style="margin-top:8px; width:100%; padding:8px 16px; background:#1f6feb; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:12px; font-weight:600;">
+            🔐 Import Keys
+          </button>
+        </div>
+      </details>
+
+      <div id="key-export-status" style="margin-top:12px; font-size:12px; min-height:20px;"></div>
+    </div>`;
 }
 
 export function renderSwitchForm(currentAI: string): string {
