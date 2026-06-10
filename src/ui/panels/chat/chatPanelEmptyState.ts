@@ -66,7 +66,7 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
 
   const signInBanner = header.isSignedIn ? '' :
     `<div style="margin-bottom:16px;padding:12px 16px;background:rgba(20,184,166,0.07);border:1px solid rgba(20,184,166,0.25);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
-      <span style="font-size:13px;color:#c0c0d8;">Connect your Redivivus account to route AI through the cloud.</span>
+      <span style="font-size:13px;color:#c0c0d8;">Connect your Redivivus account to activate your license.</span>
       <button data-cmd="redivivus.signIn" style="flex-shrink:0;padding:6px 14px;background:#14B8A6;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;">Sign In</button>
     </div>`;
 
