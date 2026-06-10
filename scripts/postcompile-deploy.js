@@ -58,12 +58,13 @@ try {
   }
 } catch {}
 
-// Also sync to any installed redivivus extension in ~/.vscode/extensions/
-const vscodeExts = path.join(home, '.vscode', 'extensions');
-if (fs.existsSync(vscodeExts)) {
-  for (const entry of fs.readdirSync(vscodeExts)) {
+// Also sync to any installed redivivus extension in ~/.vscode/extensions/ and
+// ~/.redivivus/extensions/ (post-rebrand dataFolderName location)
+for (const extRoot of [path.join(home, '.vscode', 'extensions'), path.join(home, '.redivivus', 'extensions')]) {
+  if (!fs.existsSync(extRoot)) continue;
+  for (const entry of fs.readdirSync(extRoot)) {
     if (/^papajoe\.redivivus-/.test(entry)) {
-      deployTargets.push(path.join(vscodeExts, entry));
+      deployTargets.push(path.join(extRoot, entry));
     }
   }
 }

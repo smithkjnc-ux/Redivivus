@@ -44,7 +44,7 @@
           "name": "Redivivus Menu",
           "type": "webview",
           "icon": "resources/redivivus-icon-v2.svg",
-          "visibility": "hidden"
+          "visibility": "collapsed"
         }
       ]
     },
