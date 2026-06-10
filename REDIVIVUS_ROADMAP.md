@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-10 — Documented user authentication and installation flow across web and backend projects in `docs/REDIVIVUS_AUTH_FLOW.md`.
+*Last updated:* 2026-06-10 (PM) — Linux branding overhaul: debranded installer, CLI aliases, desktop WM_CLASS, nls patching, sidebar visibility fix, deploy gap fix, platform-aware updater (v0.4.4–v0.4.5).
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
@@ -28,6 +28,15 @@
 ---
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
+
+### Jun 10, 2026 (PM) — Linux Branding Overhaul (v0.4.4–v0.4.5)
+- Installer fixes: pkill/`set -e` crash, stale `extensions.json`, macOS VSIX path bug, session restore, `.vscode-oss` migration
+- Full VSCodium debrand: `nls.messages.json` sed patch, `product.json` all keys, Welcome page suppression
+- `bin/redivivus` symlinks at root ELF + `bin/` level; `bin/codium` compat shim kept for legacy updaters
+- Desktop `.desktop` file: `--class=Redivivus` + `StartupWMClass=Redivivus` (root ELF, not bin wrapper)
+- `resolveCliPath()` in `checkForUpdates.ts` — platform-aware, `appRoot`-relative, tries `redivivus` then `codium`
+- `redivivusSidebar` visibility: `hidden` → `collapsed`; postcompile deploy now syncs `~/.redivivus/extensions`
+- Export Keys (.env) button moved to Setup Hub panel; save-dialog flow
 
 ### Session 16 — Jun 3, 2026: Adaptive Blueprint Completion
 - AI infers all 5 W's from any build request (confident/assumed/unknown per field)

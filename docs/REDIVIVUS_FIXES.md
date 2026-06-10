@@ -3,6 +3,106 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 10, 2026 (PM): Linux Branding Overhaul + Installer Fixes (v0.4.4–0.4.5)
+
+**Goal:** Fully debrand the running IDE from VSCodium, fix all installer crashes and stale-state bugs, verify extension deployment, and update docs.
+
+---
+
+### Installer (`redivivus-web/public/install-redivivus.sh`)
+
+**Fix 1 — pkill + `set -e` crash**
+- **Root cause:** `pkill` returns exit code 1 when no matching process found. `set -e` aborted the installer silently if Redivivus/codium wasn't running.
+- **Fix:** Replaced two separate `pkill -f "codium"` / `pkill -f "redivivus"` calls with a single `pkill -f "$HOME/.local/opt/redivivus" || true`. Path-based pattern can't accidentally match the installer script itself; `|| true` guards `set -e`.
+
+**Fix 2 — stale `extensions.json` blocking reinstall**
+- **Root cause:** Old extension version registered in `extensions.json` pointing to deleted folder; VSCodium CLI threw "please restart VSCodium" during `--install-extension`.
+- **Fix:** `extensions.json` unconditionally reset to `[]` before every install.
+
+**Fix 3 — macOS VSIX install path bug**
+- **Root cause:** VSIX installation used Linux-only path `~/.local/opt/redivivus/bin/codium`; doesn't exist on macOS → macOS users got no extension installed.
+- **Fix:** Platform-aware install — `$OS = Darwin` uses `/Applications/VSCodium.app/.../bin/codium`; Linux prefers `$INSTALL_DIR/bin/redivivus` then falls back to `bin/codium`.
+
+**Fix 4 — fresh install restoring previous session**
+- **Root cause:** VSCodium defaults `window.restoreWindows` to `"one"`. Installer wrote no `settings.json`.
+- **Fix:** Installer writes `settings.json` on fresh install with `"window.restoreWindows": "none"` and `"workbench.startupEditor": "none"`.
+
+**Fix 5 — `~/.vscode-oss` stale extension data**
+- New step 1c: migrates `~/.vscode-oss/extensions` → `~/.redivivus/extensions` only when the target dir doesn't exist (safe for upgrades, no-op on clean installs).
+
+**Fix 6 — idempotent PATH append**
+- Replaced `echo '...' >> ~/.bashrc` with `grep -q '.local/bin' ~/.bashrc || echo ...` to avoid duplicate PATH entries on repeated installs.
+
+**Added — `redivivus` CLI aliases**
+- Creates `redivivus → codium` symlinks at root ELF and `bin/` level. `bin/codium` kept as compat shim so older VSIX auto-updaters can still self-update.
+- `~/.local/bin/redivivus` and `~/.local/bin/codium` created.
+- Step 1b runs for pre-existing installs that skip the download branch.
+
+**Added — Linux desktop file branding**
+- `Exec=$HOME/.local/opt/redivivus/redivivus --class=Redivivus --no-sandbox --reuse-window %U`
+- `StartupWMClass=Redivivus` (was `codium`)
+- `Exec` uses root ELF (NOT `bin/` wrapper) — wrapper runs through `cli.js` which may strip unknown Chromium flags; root ELF passes `--class` directly to Electron. **Do not change to bin wrapper.**
+
+**Added — VSCodium UI string patching**
+- Step 1b now runs `sed -i 's/VSCodium/Redivivus/g'` on `nls.messages.json` (not checksummed in `product.json` → safe to edit without "corrupt install" warning).
+- Replaces: "Get started with VSCodium" walkthrough title and all other NLS strings.
+
+**Added — Welcome page / Release Notes suppression**
+- New default settings for fresh installs: `"workbench.welcomePage.extraAnnouncements": false`, `"update.showReleaseNotes": false`.
+  - `workbench.welcome.enabled` does NOT exist — enumerated actual setting names from workbench bundle.
+  - Announcements are fetched live from VSCodium's GitHub; built-in fallback in this build is empty (`o5e=[]`); setting to false removes the section entirely.
+- For existing installs: Python `setdefault` merge injects the keys without overwriting user settings.
+
+**product.json status:**
+- All branding keys patched: `nameShort`, `nameLong`, `applicationName`, `dataFolderName`, `win32*`, `darwinBundleIdentifier`, `linuxIconName`, `urlProtocol`, all URL keys.
+- One remaining VSCodium ref: `serverDownloadUrlTemplate` — kept intentionally (functional URL for remote-server downloads).
+
+---
+
+### Extension (`redivivus/`)
+
+**Fix — `redivivusSidebar` visibility (`package.json`)**
+- Changed `"visibility": "hidden"` → `"visibility": "collapsed"` for `redivivusSidebar` view.
+- `hidden` removes the view from the sidebar entirely; `collapsed` shows it as a collapsed section under Project Files, which is the intended default.
+
+**Fix — postcompile deploy gap (`scripts/postcompile-deploy.js`)**
+- Deploy script previously only scanned `~/.vscode/extensions`. After the `dataFolderName` rebrand to `.redivivus`, the installed extension at `~/.redivivus/extensions` never received compiled output.
+- Now scans both `~/.vscode/extensions` and `~/.redivivus/extensions`.
+- Verified: 3 extension locations deployed post-fix.
+
+**Added — `bin/redivivus` symlink in build root (`scripts/postcompile-deploy.js`)**
+- Creates `bin/redivivus → codium` at build time. Survives tarball extraction (tar preserves symlinks). `bin/codium` kept for legacy updater compat.
+- Generated `install.sh` also creates both aliases and adds both to `~/.local/bin`.
+
+**Added — platform-aware CLI resolution (`src/commands/checkForUpdates.ts`)**
+- New `resolveCliPath()`: resolves the IDE CLI from `vscode.env.appRoot/../bin` (works on any platform/install location) rather than the hardcoded Linux-only `STABLE_LINK`.
+- Priority: `appRoot/../bin/redivivus` → `appRoot/../bin/codium` → `STABLE_LINK/bin/redivivus` → `STABLE_LINK/bin/codium`.
+- `.cmd` variants used on Windows.
+- Throws descriptive error if no binary found (previously would crash with `ENOENT` on non-Linux).
+
+**Added — Export Keys (.env) button (`src/commands/apiSetup.ts`, `apiSetupHtml.ts`)**
+- Moved from "Files & AI" tab to the Setup Hub API Keys panel.
+- Button label: "💾 Export Keys (.env)"; temp state: "Saving...".
+- Handler uses `vscode.window.showSaveDialog()` with default filename `redivivus-keys.env`, then `vscode.workspace.fs.writeFile()`. Success notification shows saved path.
+
+**Fixed — SecretStorage migration cleanup (`src/services/ai/secretKeyStore.ts`)**
+- After migrating key to SecretStorage, plaintext key deleted from `settings.json` via `cfg.update(key, undefined, ConfigurationTarget.Global)`.
+
+---
+
+**Risk:** Low overall. `bin/codium` compat shims prevent stranding legacy VSIX versions. `nls.messages.json` not checksummed. Settings changes use `setdefault` (non-destructive). `extensions.json` reset is intentional — VSIX reinstall immediately follows.
+
+**Verification:**
+- `bash -n install-redivivus.sh` → SYNTAX OK
+- `node --check postcompile-deploy.js` → JS SYNTAX OK
+- `npm run compile` → exit 0
+- `bin/redivivus --version` → `1.121.03429` ✅
+- `redivivus --list-extensions` → `papajoe.redivivus` ✅
+- `grep "VSCodium" nls.messages.json` → 0 matches ✅
+- Welcome page shows "Redivivus IDE" / "Get started with Redivivus" / "Redivivus Announcements: There are no current announcements" ✅
+
+---
+
 ## Session — Jun 10, 2026: Documented Auth & Installation Flow
 
 **Goal:** Provide an exact reference for how new users sign up, get approved, download, and install Redivivus.

@@ -4,13 +4,26 @@
 
 ---
 
-*Last updated: June 2, 2026 (Session 11EG) — added Admin Reports two-way follow-up backlog*
+*Last updated: June 10, 2026 — added macOS/Windows rebrand backlog, WM_CLASS verification, Gemini chip fix, unified /install endpoint, key rotation (deferred)*
 
 ---
 
 ## Active Backlog — Work Top-to-Bottom
 
-### 🟠 Admin — Reports: reporter identity + two-way follow-up (requested Jun 2, 2026)
+### � Branding — macOS + Windows full rebrand (follow-on to Jun 10 Linux overhaul)
+- [ ] **macOS**: rename `VSCodium.app` → `Redivivus.app`, `Contents/MacOS/VSCodium` → `Redivivus`; patch `Info.plist` via `plutil`; generate `.icns` via `iconutil`; ad-hoc re-sign (`codesign --force --deep --sign -`) + quarantine strip — **required for Apple Silicon launch**. Fix macOS VSIX CLI path (currently points at `VSCodium.app` pending full rebrand).
+- [ ] **Windows**: switch from `VSCodiumSetup-x64.exe` (registry-polluting) to `.zip` extract; rename `VSCodium.exe` → `redivivus.exe`; patch `bin\codium.cmd` to `redivivus.cmd`; `product.json` patch (currently Linux-only); Start Menu shortcut; PATH entry; detect legacy `.exe` installs before proceeding.
+- [ ] **Unified `/install` endpoint** (`redivivus-web/src/app/install/route.ts`): route by `User-Agent` — `PowerShell` → `.ps1`, `curl`/`Wget` → `.sh`. Update download page to show one command per detected OS.
+
+### 🟡 Branding — Verification pending
+- [ ] **WM_CLASS check**: after next install, run `xprop WM_CLASS`, click Redivivus window — must report `"Redivivus"`. If dock icons duplicate, `--class=Redivivus` flag isn't propagating.
+- [ ] **Auto-updater end-to-end test**: confirm `resolveCliPath()` finds `bin/redivivus` in a real update cycle and installs VSIX successfully.
+- [ ] **Gemini default provider chip**: bottom status bar shows "Gemini" as default provider even when no key is configured — should show nothing or "No AI".
+
+### 🔒 Security — deferred
+- [ ] **Rotate exposed API keys** (deferred by user — keys were briefly visible in logs).
+
+### �� Admin — Reports: reporter identity + two-way follow-up (requested Jun 2, 2026)
 Make /admin/reports a real triage tool, not just a read-only feed.
 
 - [ ] **Show who sent it + timestamp** — display the reporter's email/identity and date-time prominently on each report card. **Prereq:** the IDE submission must include the signed-in user's email/id (now that the IDE is authed). Store reporter email on the `feedback` row (currently only nullable `user_id`).
