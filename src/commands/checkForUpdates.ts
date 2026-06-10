@@ -1,4 +1,4 @@
-// [SCOPE] Redivivus auto-updater — downloads new tarball, extracts, updates stable symlink, restarts
+// [SCOPE] Redivivus auto-updater — downloads VSIX from GitHub Releases, installs, reloads
 import * as vscode from 'vscode';
 import * as https from 'https';
 import * as fs from 'fs';
@@ -8,14 +8,11 @@ import * as cp from 'child_process';
 
 const STABLE_LINK = path.join(os.homedir(), '.local', 'opt', 'redivivus');
 
-function getInstallDir(): string {
-  // Resolve the stable symlink to find where the current binary lives
-  try { return fs.realpathSync(STABLE_LINK); } catch { return ''; }
-}
-
 function isDevBuild(): boolean {
-  const dir = getInstallDir();
-  return dir.includes('/projects/redivivus-build') || dir.includes('/projects/redivivus/');
+  try {
+    const dir = fs.realpathSync(STABLE_LINK);
+    return dir.includes('/projects/redivivus-build') || dir.includes('/projects/redivivus/');
+  } catch { return false; }
 }
 
 async function downloadFile(url: string, dest: string, onProgress: (pct: number) => void): Promise<void> {
@@ -36,63 +33,38 @@ async function downloadFile(url: string, dest: string, onProgress: (pct: number)
       file.on('finish', () => { file.close(); resolve(); });
       res.on('error', reject);
     }).on('error', reject);
-    request(url);
+    request(u);
   });
 }
 
-function extractTarball(tarPath: string, destDir: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    fs.mkdirSync(destDir, { recursive: true });
-    const proc = cp.spawn('tar', ['-xzf', tarPath, '-C', destDir, '--strip-components=1'], { stdio: 'ignore' });
-    proc.on('close', (code) => code === 0 ? resolve() : reject(new Error(`tar exited ${code}`)));
-    proc.on('error', reject);
-  });
-}
-
-export async function runUpdate(newVersion: string, downloadUrl: string): Promise<void> {
-  const installTarget = path.join(os.homedir(), '.local', 'opt', `redivivus-${newVersion}`);
-  const tarPath = path.join(os.tmpdir(), `redivivus-${newVersion}.tar.gz`);
+export async function runUpdate(newVersion: string, _downloadUrl?: string): Promise<void> {
+  const vsixUrl = `https://github.com/smithkjnc-ux/Redivivus/releases/download/v${newVersion}/redivivus-${newVersion}.vsix`;
+  const dest = path.join(os.tmpdir(), `redivivus-${newVersion}.vsix`);
 
   await vscode.window.withProgress(
     { location: vscode.ProgressLocation.Notification, title: `Updating Redivivus to v${newVersion}`, cancellable: false },
     async (progress) => {
       progress.report({ message: 'Downloading…', increment: 0 });
-
-      await downloadFile(downloadUrl, tarPath, (pct) => {
-        progress.report({ message: `Downloading… ${pct}%`, increment: pct / 2 });
+      await downloadFile(vsixUrl, dest, (pct) => {
+        progress.report({ message: `Downloading… ${pct}%`, increment: pct });
       });
-
-      progress.report({ message: 'Extracting…', increment: 50 });
-      await extractTarball(tarPath, installTarget);
-
-      // Update stable symlink atomically
-      try { fs.unlinkSync(STABLE_LINK); } catch { /* didn't exist */ }
-      fs.symlinkSync(installTarget, STABLE_LINK);
-
-      // Copy icon to stable path
-      const iconSrc = path.join(installTarget, 'resources', 'app', 'resources', 'linux', 'redivivus.png');
-      const iconDest = path.join(os.homedir(), '.local', 'share', 'icons', 'redivivus.png');
-      if (fs.existsSync(iconSrc)) { fs.copyFileSync(iconSrc, iconDest); }
-
-      // Clean up tarball
-      try { fs.unlinkSync(tarPath); } catch { /* best-effort */ }
-
-      progress.report({ message: 'Done!', increment: 100 });
+      progress.report({ message: 'Installing…', increment: 100 });
+      const codium = path.join(STABLE_LINK, 'bin', 'codium');
+      await new Promise<void>((resolve, reject) => {
+        const proc = cp.spawn(codium, ['--install-extension', dest, '--force'], { stdio: 'ignore' });
+        proc.on('close', (code) => code === 0 ? resolve() : reject(new Error(`install exited ${code}`)));
+        proc.on('error', reject);
+      });
+      try { fs.unlinkSync(dest); } catch { /* best-effort */ }
     }
   );
 
   const choice = await vscode.window.showInformationMessage(
-    `Redivivus v${newVersion} is ready. Restart to apply the update.`,
-    'Restart Now', 'Later'
+    `Redivivus v${newVersion} installed! Reload to apply.`,
+    'Reload Now', 'Later'
   );
-
-  if (choice === 'Restart Now') {
-    // Spawn the new binary detached, then quit the current process
-    try {
-      const newBin = path.join(STABLE_LINK, 'redivivus');
-      cp.spawn(newBin, ['--reuse-window'], { detached: true, stdio: 'ignore' }).unref();
-    } catch { /* best-effort spawn */ }
-    setTimeout(() => vscode.commands.executeCommand('workbench.action.quit'), 500);
+  if (choice === 'Reload Now') {
+    vscode.commands.executeCommand('workbench.action.reloadWindow');
   }
 }
 
@@ -104,25 +76,21 @@ export function registerCheckForUpdatesCommand(context: vscode.ExtensionContext)
       const cfg = vscode.workspace.getConfiguration('redivivus');
       const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev';
       const webBase = apiBase.replace('/api/v1', '');
-
       try {
         const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(8000) });
         if (!res.ok) { vscode.window.showErrorMessage('Could not check for updates — try again later.'); return; }
-        const { version: latestVersion, downloadUrl } = await res.json() as { version: string; downloadUrl: string };
-
+        const { version: latestVersion } = await res.json() as { version: string };
         if (!latestVersion || latestVersion === currentVersion) {
           vscode.window.showInformationMessage(`Redivivus v${currentVersion} is up to date.`); return;
         }
-
         if (isDevBuild()) {
-          vscode.window.showInformationMessage(`v${latestVersion} is available (dev build — run release.sh to update).`); return;
+          vscode.window.showInformationMessage(`v${latestVersion} available (dev build — use rigops to release).`); return;
         }
-
         const choice = await vscode.window.showInformationMessage(
           `Redivivus v${latestVersion} is available (you have v${currentVersion}).`,
           'Update Now', 'Dismiss'
         );
-        if (choice === 'Update Now') { await runUpdate(latestVersion, downloadUrl); }
+        if (choice === 'Update Now') { await runUpdate(latestVersion); }
       } catch (err) {
         vscode.window.showErrorMessage(`Update check failed: ${err instanceof Error ? err.message : String(err)}`);
       }
