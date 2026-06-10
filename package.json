@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -692,7 +692,7 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "tsc -p ./",
+    "vscode:prepublish": "tsc -p ./ && node scripts/postcompile-deploy.js",
     "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
     "package": "npm run compile && vsce package --no-dependencies",
     "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
