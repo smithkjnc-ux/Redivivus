@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
-  "version": "0.3.96",
+  "version": "0.3.97",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -365,6 +365,11 @@
       {
         "command": "redivivus.changePersonality",
         "title": "Redivivus: Change Personality"
+      },
+      {
+        "command": "redivivus.checkForUpdates",
+        "title": "Redivivus: Check for Updates",
+        "category": "Redivivus"
       }
     ],
     "viewsWelcome": [
