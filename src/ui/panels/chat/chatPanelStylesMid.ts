@@ -70,7 +70,7 @@ export function buildChatCssMid(): string {
     .bpc-legend { font-size: 10px; color: var(--vscode-descriptionForeground); margin-bottom: 10px; }
     .bpc-fields { display: flex; flex-direction: column; gap: 6px; }
     .bpc-row { display: flex; align-items: center; gap: 10px; }
-    .bpc-label { font-size: 11px; font-weight: 700; color: var(--vscode-descriptionForeground); width: 50px; flex-shrink: 0; }
+    .bpc-label { font-size: 11px; font-weight: 700; color: var(--vscode-descriptionForeground); width: 58px; flex-shrink: 0; white-space: nowrap; }
     .bpc-input:focus { outline: none; border-color: #4a9eff !important; }
     .terminal-error-card {
       background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.35);

@@ -5,7 +5,11 @@ import * as vscode from 'vscode';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from '../ai/routingKeys.js';
 
 const SECRET_KEY = 'redivivus.account.token';
-const API_BASE_DEFAULT = 'http://localhost:3000/api/v1';
+// [FIX] Default to PRODUCTION (Fly), like any shipped client — so dev builds test the real deployed
+// backend, not a local server. Pointing at localhost gave inaccurate tests (different code, latency,
+// cold-start behavior). To develop against a local backend, explicitly set `redivivus.apiBase` to
+// http://localhost:3000/api/v1 — it's now opt-IN, never the default.
+const API_BASE_DEFAULT = 'https://redivivus-backend.fly.dev/api/v1';
 export function getApiBase(): string {
   // [WARN] Never hardcode or rewrite to stale Cloudflare/legacy domains.
   // The extension hits the Fly.io backend directly — redivivus.dev is no longer the API origin.

@@ -46,6 +46,11 @@ export async function runBuildAfterGates(
 
   // No project open — auto-create a folder
   if (!root) {
+    // [FIX] autoCreateProject makes AI calls (blueprint extract + name derivation) BEFORE the build's
+    // working bubble appears. Show feedback so the gap never looks like a freeze. (The AI calls now have
+    // hard timeouts + failover, so a slow/stalled provider can't hang here either.)
+    deps.conversation.push({ role: 'assistant', content: '📁 Setting up your project...', timestamp: Date.now() });
+    deps.refresh();
     try {
       const created = await autoCreateProject(task, deps);
       root = created.dir;

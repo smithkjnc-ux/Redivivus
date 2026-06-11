@@ -3,6 +3,28 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 11, 2026 (PM5): Default API base = Fly (production), not localhost + Health false-negative
+
+- **The extension was hitting `localhost:3000`, never Fly.** `API_BASE_DEFAULT` in `apiClient.ts` was `http://localhost:3000/api/v1`, and `redivivus.apiBase` was unset — so every build went through the user's *local* dev backend, and the Fly deploys were never actually exercised by the app. Tests were inaccurate (different code/latency/cold-start than production). **Fix:** default is now `https://redivivus-backend.fly.dev/api/v1` — dev builds test the real deployed backend, like any shipped client. Local dev is now **opt-in only** (explicitly set `redivivus.apiBase` to localhost). The function comment already *claimed* "hits the Fly.io backend directly" — the default just contradicted it.
+  - **Consequence:** the next test finally exercises the deployed Fly pipeline — i.e. all the backend fixes (#1 truncation, #2 Sonnet loop, #3 accounting, prescription reuse, Phase-2 live streaming) become active in the user's flow for the first time.
+- **Health pill false negative** — `chatPanelPublicAPI.ts`: the earlier re-post fix re-*posted* the first probe's result, so a cold/slow first request that came back red stayed red (clicking re-checked → green). Now it **re-probes** (fresh checks at 2.5s + 6s), self-correcting a transient red and still beating the webview-ready race.
+- **Also (cosmetic):** header font bumped (9-10px → 11-13px); blueprint `.bpc-label` got `white-space:nowrap` + width 58px (was wrapping "WHERE" → "WHER/E"); "📁 Setting up your project..." feedback before the no-project auto-create AI calls.
+- **Risk:** low. `tsc` clean; deployed. Backend confirmed reachable (System Health: 204ms, build endpoint 204).
+
+---
+
+## Session — Jun 11, 2026 (PM4): The freeze — CSP blocked inline styles + AI hangs never failed over
+
+Two root causes behind "the program froze" (no-project build stalled at `conv=1`, before any reply rendered):
+
+- **CSP blocked ALL inline styles.** `chatPanelHtml.ts` CSP was `style-src 'nonce-X'` — a nonce does NOT cover inline `style=""` attributes or JS `.style.x=` (only `<style>` elements). Dev console showed hundreds of blocked-inline-style violations, incl. `setInputBusy` / `showContentPanel` — so the webview couldn't repaint its busy/progress state (looked frozen) and the header's flex-column never applied (the BETA/version/timestamp one-line bug). Fix: `style-src 'unsafe-inline'` (styles only; scripts stay nonce-locked). Also switched the header to explicit `<br>` stacking. `'unsafe-inline'` was never in the CSP (git -S confirms) — this blocking was always present, just newly exposed by splitting the build stamp.
+- **AI hangs never failed over.** Per the user: "when an AI stops for ANY reason, drop to the next lower AI and continue." Two bugs in `routingService.ts prompt()` + `routingServiceCheap.ts promptCheapImpl()` (used by `evaluateTaskComplexity` and `runFiveWsDiagnostic` — the exact stages the build stalled in):
+  1. **Timeout couldn't catch a real hang.** `fetchWithTimeout` uses `AbortController`, which aborts the connection but NOT the body read in Electron's fetch — so a provider that connects then hangs mid-response froze forever and never failed over. Fix: a hard full-call deadline via `Promise.race` (timeoutMs + 3s) that always resolves to a timeout error → failover.
+  2. **Only failed over on network/capacity errors.** Hard errors (bad response, 4xx/5xx, auth, content filter) returned immediately with no failover. Fix: fail over on ANY error — try the next-ranked AI; only "no keys configured" short-circuits.
+- **Risk:** low. `'unsafe-inline'` for styles is standard webview practice (style injection can't run JS; scripts still nonce-locked). Failover-on-any-error can try all providers on a universally-bad prompt (bounded by provider count) before returning the aggregate error — acceptable per the explicit requirement. `tsc` clean; deployed.
+
+---
+
 ## Session — Jun 11, 2026 (PM3): Build Activity Phase 2 — live code streaming + expand-by-default setting
 
 - **Phase 2: watch the Worker's code type itself in.** Backend now forwards the Worker's stream to the panel chunk-by-chunk.

@@ -137,24 +137,23 @@ export async function panelRefresh(panel: any): Promise<void> {
       try {
         const { collectHealthData, getHealthStatus } = await import('./chatPanelHealthCheck.js');
         const colorMap: Record<string, string> = { green: '#4caf50', yellow: '#ff9800', red: '#f44336' };
-        // [FIX] The Health pill stayed grey until clicked: the startup probe posted its color before the
-        // webview's message listener was ready, so the message was dropped (a race). We now keep the last
-        // result and RE-POST it shortly after — by then the listener exists — so the button colors itself
-        // proactively. The header HTML also reads globalState on every render (so reopens are colored too).
-        let lastMsg: { type: string; status: string; color: string } | null = null;
+        // [FIX] The Health pill must reflect REAL health proactively. Two failure modes handled here:
+        //  1) Race: the first probe posts its color before the webview listener is ready -> message lost.
+        //  2) False negative: the first probe catches a cold/slow request and comes back red, even though
+        //     the backend is fine (clicking the pill re-checks and shows green).
+        // The fix for BOTH is to RE-PROBE (a fresh check), not re-post a stale result. A few quick re-probes
+        // self-correct a transient red AND land once the listener exists.
         const probe = async () => {
           try {
             const data = await collectHealthData();
             const status = getHealthStatus(data);
-            lastMsg = { type: 'update-health-btn', status, color: colorMap[status] };
-            _panel.webview.postMessage(lastMsg);
+            _panel.webview.postMessage({ type: 'update-health-btn', status, color: colorMap[status] });
             ChatPanel.extensionContext?.globalState.update('redivivus.healthStatus', status);
           } catch {}
         };
         await probe();
-        // Re-post a couple times to defeat the webview-not-ready race on first paint (cheap, no re-render).
-        setTimeout(() => { if (lastMsg) { try { _panel.webview.postMessage(lastMsg); } catch {} } }, 1500);
-        setTimeout(() => { if (lastMsg) { try { _panel.webview.postMessage(lastMsg); } catch {} } }, 4000);
+        setTimeout(probe, 2500);
+        setTimeout(probe, 6000);
         setInterval(probe, 5 * 60 * 1000);
       } catch {}
     })();

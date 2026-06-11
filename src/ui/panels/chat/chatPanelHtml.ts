@@ -77,14 +77,14 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
   const emptyState = buildEmptyStateHtml(header, progress);
 
   return `<!DOCTYPE html><html><head><meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-src http://localhost:* http://127.0.0.1:*; img-src http://localhost:* http://127.0.0.1:* data:;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}'; frame-src http://localhost:* http://127.0.0.1:*; img-src http://localhost:* http://127.0.0.1:* data:;" />
   <style nonce="${nonce}">${buildChatCss()}</style></head><body>
   <div class="header">
     <div class="header-left">
       <span id="redivivus-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);">${header && header.sessionActive ? '&#x25cf; working' : '&#x25cf; ready'}</span>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:1px;line-height:1.15;">
-        <span style="font-size:9px;font-weight:700;letter-spacing:0.08em;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 5px;user-select:none;">BETA</span>
-        ${header?.buildStamp ? `<span style="font-size:10px;color:var(--vscode-descriptionForeground);opacity:0.6;font-family:monospace;user-select:none;">${header.buildStamp.split(' · ')[0]}</span><span title="Compiled: ${header.buildStamp}" style="font-size:9px;color:var(--vscode-descriptionForeground);opacity:0.5;font-family:monospace;user-select:none;">${header.buildStamp.split(' · ').slice(1).join(' · ')}</span>` : ''}
+      <div style="text-align:right;line-height:1.35;">
+        <span style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 6px;user-select:none;">BETA</span>
+        ${header?.buildStamp ? `<br><span style="font-size:13px;color:var(--vscode-descriptionForeground);opacity:0.75;font-family:monospace;user-select:none;">${header.buildStamp.split(' · ')[0]}</span><br><span title="Compiled: ${header.buildStamp}" style="font-size:11px;color:var(--vscode-descriptionForeground);opacity:0.6;font-family:monospace;user-select:none;">${header.buildStamp.split(' · ').slice(1).join(' · ')}</span>` : ''}
       </div>
     </div>
     <div class="header-right">

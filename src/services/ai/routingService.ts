@@ -95,7 +95,15 @@ export class RoutingService {
     for (let i = 0; i < ranked.length; i++) {
       const ai = ranked[i];
       const fetchFn = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
-      const result = await callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage);
+      // [FIX] Hard full-call deadline. fetchWithTimeout's AbortController aborts the CONNECTION but NOT
+      // the body read in Electron's fetch — so a provider that connects then hangs mid-response would
+      // freeze the whole UI forever and never fail over. Promise.race guarantees we always move on to the
+      // next AI. The +3s buffer over the fetch timeout avoids cutting off a slow-but-working provider.
+      const deadlineMs = timeoutMs + 3000;
+      const result = await Promise.race([
+        callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage),
+        new Promise<AIResponse>(resolve => setTimeout(() => resolve({ text: '', model: ai, success: false, error: `${ai} timed out after ${deadlineMs}ms (no response)` }), deadlineMs)),
+      ]);
 
       if (result.success) {
         // Fire-and-forget telemetry so admin analytics reflect direct calls too
@@ -114,30 +122,22 @@ export class RoutingService {
         return { ...result, usingFallback: i > 0 ? ai : undefined };
       }
 
-      // Check if this error should trigger failover to next AI
+      // [FIX] Fail over on ANY error, not just network/capacity. User's rule: when an AI stops for ANY
+      // reason (timeout, hang, quota, auth, bad/empty response, 4xx/5xx, content filter), drop to the
+      // next-ranked AI and continue. Trying the next provider can only help; if every provider fails we
+      // return the aggregate error below. The only non-failover case is "no keys", handled before the loop.
       const err = (result.error || '').toLowerCase();
-      // Network/timeout errors: always failover
-      const isNetworkError = err.includes('timed out') || err.includes('timeout') || err.includes('abort')
-        || err.includes('network') || err.includes('enotfound') || err.includes('econnrefused')
-        || err.includes('fetch');
-      // Capacity errors: credit exhausted, rate limits, quota — failover to next AI
+      lastError = result.error || 'Unknown error';
+
+      // Feed the tier detector: repeated quota/capacity errors mark a free-capable provider as constrained
+      // so future build plans match its real ceiling. Silent, soft, self-recovering.
       const isCapacityError = err.includes('credit') || err.includes('balance') || err.includes('quota')
         || err.includes('rate limit') || err.includes('rate_limit') || err.includes('429')
         || err.includes('402') || err.includes('insufficient') || err.includes('overloaded')
         || err.includes('capacity') || err.includes('billing');
-      const isRetryable = isNetworkError || isCapacityError;
-      lastError = result.error || 'Unknown error';
-
-      // Feed the tier detector: repeated quota errors mark a free-capable provider as constrained
-      // so future build plans match its real ceiling. Silent, soft, self-recovering.
       if (isCapacityError) { recordQuotaError(ai); }
 
-      if (!isRetryable) {
-        // Hard error (bad API key, invalid request, etc.) — don't failover
-        return result;
-      }
-
-      // Notify caller about failover
+      // Notify caller about the failover so the chat can show "Claude stalled -> trying Gemini".
       if (i < ranked.length - 1 && this.promptFailoverCallback) {
         this.promptFailoverCallback(ai, ranked[i + 1]);
       }

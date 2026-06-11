@@ -36,7 +36,14 @@ export async function promptCheapImpl(
     const ai = ranked[i];
     const startTime = Date.now();
     const fetchFn = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, timeoutMs);
-    const result = await callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage);
+    // [FIX] Hard full-call deadline — the AbortController in fetchWithTimeout aborts the connection but
+    // not the body read (Electron fetch), so a provider that connects then hangs would freeze forever and
+    // never fail over. Promise.race guarantees we move on to the next (cheap) AI.
+    const deadlineMs = timeoutMs + 3000;
+    const result = await Promise.race([
+      callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage),
+      new Promise<AIResponse>(resolve => setTimeout(() => resolve({ text: '', model: ai, success: false, error: `${ai} timed out after ${deadlineMs}ms (no response)` }), deadlineMs)),
+    ]);
     if (result.success) {
       logTelemetry('ai_prompt', { model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens, success: true });
       logAICall({
@@ -50,15 +57,9 @@ export async function promptCheapImpl(
       });
       return { ...result, usingFallback: i > 0 ? ai : undefined };
     }
-    const err = (result.error || '').toLowerCase();
-    const isRetryable = err.includes('timed out') || err.includes('timeout') || err.includes('abort')
-      || err.includes('network') || err.includes('enotfound') || err.includes('econnrefused')
-      || err.includes('fetch') || err.includes('credit') || err.includes('balance')
-      || err.includes('quota') || err.includes('rate limit') || err.includes('rate_limit')
-      || err.includes('429') || err.includes('402') || err.includes('insufficient')
-      || err.includes('overloaded') || err.includes('capacity') || err.includes('billing');
+    // [FIX] Fail over on ANY error (timeout, hang, quota, auth, bad/empty response, 4xx/5xx). User's rule:
+    // when an AI stops for any reason, drop to the next-ranked AI and continue — never give up on attempt 1.
     lastError = result.error || 'Unknown error';
-    if (!isRetryable) { return result; }
     if (i < ranked.length - 1 && (svc as any).promptFailoverCallback) {
       (svc as any).promptFailoverCallback(ai, ranked[i + 1]);
     }
