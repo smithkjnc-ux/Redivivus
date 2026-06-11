@@ -4,7 +4,7 @@
 
 ---
 
-*Last updated: Jun 7, 2026 (Session Jun7)*
+*Last updated: Jun 11, 2026 — strengthened Design Rule 1 (Plain English / talk-to-the-human) into a full standing guideline.*
 
 ---
 
@@ -115,7 +115,12 @@ These files run in sequence BEFORE any build fires. They gate the build on inten
 ---
 
 ## Design Rules
-1. **Plain English everywhere** — no jargon in user-facing text
+1. **Plain English everywhere — talk to the human, not the compiler.** Redivivus serves non-technical builders with great ideas and zero coding background; the chat must *teach and reassure*, never intimidate. This applies to EVERY user-facing surface: chat replies, build/result cards, security & safety reports, agent narration, error messages, tooltips, button labels, notifications.
+   - **Jargon lives in the code, not the chat.** No `innerHTML` / `textContent` / `DOMPurify` / `stop_reason` / stack traces in user text. Say what it *means* and *why it matters* in everyday words, then what to do about it.
+   - **Don't cry wolf.** Never alarm the user about a non-problem. Calm, accurate framing ("Worth fixing before you share this" / "Minor — good to tidy up, not urgent") over scary labels ("3 CRITICAL — fix before shipping"). Verify it's a real issue before flagging it.
+   - **Offer to explain.** End guidance with an opening like "...not sure what one means? Just ask and I'll explain it in plain terms."
+   - **Experienced coders don't need this — but it never hurts them.** Plain English is the default; precision is not sacrificed, jargon is just translated.
+   - **Canonical example:** `src/services/build/securityScanner.ts` (rewritten Jun 11 2026) — plain-English findings + context-aware checks that don't false-alarm on hardcoded strings. Use it as the model for any new user-facing message.
 2. **Files under 200 lines** — split at natural boundaries, add `[NEXT]` tags
 3. **[SCOPE] at top of every file** — read before touching
 4. **[WARN] before fragile code** — understand why before changing
