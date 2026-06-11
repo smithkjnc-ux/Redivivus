@@ -3,6 +3,15 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 11, 2026: Remove redundant header "No AI key" badge
+
+- **File changed:** `src/ui/panels/chat/chatPanelHtml.ts`
+- **What changed:** Removed the header badge that pushed `⚠️ No AI key` when `!hasKey` (left a [DEAD] note).
+- **Why:** It duplicated the input-bar AI pill (`renderInputLeftInner`), which already shows the real roster ("Claude +5") or "No AI key". Worse, the header badge went STALE — showed "No AI key" while the input pill correctly showed the configured roster, because key-change refresh updates the input pill but not the header badge. The input pill is now the single source of truth; the launcher "set up an AI" banner still covers first-run guidance.
+- **Risk:** none — removed a duplicate/stale indicator only. Compiles + deploys.
+
+---
+
 ## Session — Jun 10, 2026 (Evening): Auto-Detect Free-Tier Quota (hybrid, silent)
 
 **Goal:** Fix the capability-ceiling overestimate (free Gemini reads as Pro/cap-9 but is really Flash/cap-7) automatically, with no toggles — so it "just works" — while keeping every failure mode soft (a wrong guess only plans more carefully, never blocks a build).

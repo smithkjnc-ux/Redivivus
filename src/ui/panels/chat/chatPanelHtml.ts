@@ -56,9 +56,9 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
 
   const badges: string[] = [];
   if (header) {
-    if (!header.hasKey) {
-      badges.push(`<span class="badge ai red clickable" data-cmd="redivivus.openSettings" title="Click to configure AI">⚠️ No AI key</span>`);
-    }
+    // [DEAD] Removed the header "No AI key" badge — it duplicated the input-bar AI pill
+    // (renderInputLeftInner in chatPanelHeaderRender.ts, which shows the real roster or "No AI key")
+    // and could go stale (show "No AI key" while the input pill correctly showed the configured roster).
     if (header.sessionActive) {
       badges.push(`<span class="badge session">🟢 Session</span>`);
     }
