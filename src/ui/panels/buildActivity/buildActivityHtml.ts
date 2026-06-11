@@ -3,7 +3,7 @@
 // The controller (buildActivityPanel.ts) posts {type:'reset'|'step'|'finish'} messages; the script
 // below appends timeline rows. Status markers are plain ASCII so the WebView never silently fails.
 
-export function buildActivityHtml(task: string): string {
+export function buildActivityHtml(task: string, expandByDefault = true): string {
   const safeTask = String(task || 'your build').replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] || c));
   return `<!DOCTYPE html>
 <html lang="en">
@@ -15,10 +15,14 @@ export function buildActivityHtml(task: string): string {
     background: var(--vscode-editor-background); margin: 0; padding: 16px; font-size: 13px; }
   h2 { font-size: 14px; margin: 0 0 4px 0; }
   .task { color: var(--vscode-descriptionForeground); font-size: 12px; margin-bottom: 16px;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden;
+    line-height: 1.4; }
   #timeline { display: flex; flex-direction: column; gap: 2px; }
-  .row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; border-radius: 6px;
+  .row { display: flex; flex-direction: column; border-radius: 6px; overflow: hidden;
     border-left: 3px solid transparent; background: var(--vscode-editorWidget-background); }
+  .row-head { display: flex; align-items: flex-start; gap: 10px; padding: 8px 10px; }
+  .row-head.clickable { cursor: pointer; }
+  .row-head.clickable:hover { background: rgba(255,255,255,0.04); }
   .row.running { border-left-color: var(--vscode-progressBar-background); }
   .row.done, .row.pass { border-left-color: #3fb950; }
   .row.fix, .row.failover { border-left-color: #d29922; }
@@ -32,6 +36,14 @@ export function buildActivityHtml(task: string): string {
   .body { flex: 1; min-width: 0; }
   .label { font-weight: 500; }
   .meta { color: var(--vscode-descriptionForeground); font-size: 11px; margin-top: 2px; }
+  .hint { font-size: 9px; color: var(--vscode-textLink-foreground); font-weight: 400; opacity: 0.85; margin-left: 4px; }
+  .detail { display: none; padding: 2px 12px 12px 48px; }
+  .row.open .detail { display: block; }
+  .detail .text { white-space: pre-wrap; font-size: 11px; color: var(--vscode-foreground);
+    line-height: 1.5; max-height: 320px; overflow: auto; }
+  .detail pre.code { margin: 0; font-family: var(--vscode-editor-font-family, monospace); font-size: 10px;
+    line-height: 1.4; background: rgba(0,0,0,0.28); padding: 8px; border-radius: 4px;
+    max-height: 380px; overflow: auto; white-space: pre; }
   .spin { display: inline-block; animation: blink 1s steps(2) infinite; }
   @keyframes blink { 50% { opacity: 0.25; } }
   .empty { color: var(--vscode-descriptionForeground); font-style: italic; padding: 12px 4px; }
@@ -45,6 +57,8 @@ export function buildActivityHtml(task: string): string {
   (function () {
     var vscode = acquireVsCodeApi();
     var timeline = document.getElementById('timeline');
+    var EXPAND_DEFAULT = ${expandByDefault ? 'true' : 'false'};  // user setting: expand step details by default
+    var liveCodeEl = null;  // the <pre> the worker's code streams into live (Phase 2)
 
     // ASCII status markers — phase/status -> short text badge (no emoji, Rule 13).
     function markFor(phase, status) {
@@ -80,30 +94,67 @@ export function buildActivityHtml(task: string): string {
     function settlePrior() {
       var live = timeline.querySelectorAll('.row.running, .row.continue');
       for (var i = 0; i < live.length; i++) {
-        live[i].className = 'row done';
+        var wasOpen = live[i].classList.contains('open');
+        live[i].className = 'row done' + (wasOpen ? ' open' : '');  // keep an expanded detail expanded
         var mk = live[i].querySelector('.mark');
         if (mk) { mk.className = 'mark done'; mk.innerHTML = '[OK]'; }
       }
     }
 
+    // Render one step. If the step carries detail (the Supervisor prescription, or the Worker code),
+    // the row becomes expandable so the user can SEE the actual work behind each line.
     function addRow(step) {
       var empty = document.getElementById('empty');
       if (empty) empty.remove();
       settlePrior();
       var status = step.status || 'running';
+      // step.live = the Worker's code will STREAM into this row (Phase 2). Give it an empty code block
+      // and remember it so incoming code chunks append here.
+      var hasDetail = (step.detail != null && String(step.detail).length > 0) || step.live === true;
       var row = document.createElement('div');
-      row.className = 'row ' + cls(status);
+      row.className = 'row ' + cls(status) + (hasDetail && EXPAND_DEFAULT ? ' open' : '');
       var meta = metaLine(step);
-      row.innerHTML =
-        '<div class="mark ' + cls(status) + '">' + markFor(step.phase, status) + '</div>' +
-        '<div class="body"><div class="label">' + esc(step.label || step.phase || 'Working') + '</div>' +
-        (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>';
+      var hintTxt = (hasDetail && EXPAND_DEFAULT) ? '[-] hide' : '[+] view';
+      var head =
+        '<div class="row-head' + (hasDetail ? ' clickable' : '') + '">' +
+          '<div class="mark ' + cls(status) + '">' + markFor(step.phase, status) + '</div>' +
+          '<div class="body"><div class="label">' + esc(step.label || step.phase || 'Working') +
+            (hasDetail ? '<span class="hint">' + hintTxt + '</span>' : '') + '</div>' +
+            (meta ? '<div class="meta">' + meta + '</div>' : '') + '</div>' +
+        '</div>';
+      var detailHtml = '';
+      if (step.live === true) {
+        detailHtml = '<div class="detail"><pre class="code"></pre></div>';
+      } else if (hasDetail) {
+        detailHtml = step.kind === 'code'
+          ? '<div class="detail"><pre class="code">' + esc(step.detail) + '</pre></div>'
+          : '<div class="detail"><div class="text">' + esc(step.detail) + '</div></div>';
+      }
+      row.innerHTML = head + detailHtml;
+      if (step.live === true) { liveCodeEl = row.querySelector('pre.code'); }
+      if (hasDetail) {
+        var headEl = row.querySelector('.row-head');
+        headEl.addEventListener('click', function () {
+          var open = row.classList.toggle('open');
+          var hint = row.querySelector('.hint');
+          if (hint) hint.textContent = open ? '[-] hide' : '[+] view';
+        });
+      }
       timeline.appendChild(row);
       row.scrollIntoView({ block: 'end' });
     }
 
+    // Append a streamed chunk of the Worker's code to the live code block (Phase 2 — watch it type).
+    function appendCode(text) {
+      if (!liveCodeEl || !text) return;
+      liveCodeEl.appendChild(document.createTextNode(text));  // textNode = safe, no escaping needed
+      var row = liveCodeEl.closest('.row');
+      if (row && row.classList.contains('open')) { liveCodeEl.scrollTop = liveCodeEl.scrollHeight; }
+    }
+
     function reset(task) {
       timeline.innerHTML = '<div class="empty" id="empty">Waiting for the pipeline to start...</div>';
+      liveCodeEl = null;
       var t = document.getElementById('task');
       if (t && task) t.textContent = task;
     }
@@ -111,6 +162,7 @@ export function buildActivityHtml(task: string): string {
     window.addEventListener('message', function (e) {
       var m = e.data || {};
       if (m.type === 'reset') reset(m.task);
+      else if (m.type === 'code') appendCode(m.text);
       else if (m.type === 'step') addRow(m.step || {});
       else if (m.type === 'finish') {
         var status = m.ok === false ? 'fix' : 'done';

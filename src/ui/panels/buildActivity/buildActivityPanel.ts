@@ -15,6 +15,11 @@ export class BuildActivityPanel {
 
   public static get current(): BuildActivityPanel | undefined { return BuildActivityPanel._instance; }
 
+  // User setting (Setup / Settings): show each step's work expanded by default, or collapsed.
+  private static _expandDefault(): boolean {
+    return vscode.workspace.getConfiguration('redivivus').get<boolean>('buildActivity.expandSteps', true);
+  }
+
   // Open (or reveal) the panel and reset its timeline for a new build. Beside the editor so the chat
   // bubble stays visible in the sidebar — the panel complements the bubble, it does not replace it.
   public static start(task: string): BuildActivityPanel {
@@ -42,13 +47,20 @@ export class BuildActivityPanel {
         this._queue = [];
       }
     });
-    this._panel.webview.html = buildActivityHtml(task);
+    this._panel.webview.html = buildActivityHtml(task, BuildActivityPanel._expandDefault());
   }
 
   // Append one pipeline step. Safe to call before the webview is ready (queued, then flushed).
   public step(step: any): void {
     if (!this._ready) { this._queue.push(step); return; }
     this._post({ type: 'step', step });
+  }
+
+  // Stream a chunk of the Worker's code into the live code block (Phase 2). Best-effort — only matters
+  // once the worker:running row exists, which is well after the panel is ready, so no queueing needed.
+  public code(text: string): void {
+    if (!this._ready || !text) { return; }
+    this._post({ type: 'code', text });
   }
 
   // Mark the build finished (adds a final row). ok=false renders a failed marker.
@@ -59,7 +71,7 @@ export class BuildActivityPanel {
   private _reset(task: string): void {
     this._ready = false;
     this._queue = [];
-    this._panel.webview.html = buildActivityHtml(task);
+    this._panel.webview.html = buildActivityHtml(task, BuildActivityPanel._expandDefault());
   }
 
   private _post(msg: any): void {

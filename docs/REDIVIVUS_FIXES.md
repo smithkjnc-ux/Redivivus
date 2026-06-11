@@ -3,6 +3,33 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 11, 2026 (PM3): Build Activity Phase 2 — live code streaming + expand-by-default setting
+
+- **Phase 2: watch the Worker's code type itself in.** Backend now forwards the Worker's stream to the panel chunk-by-chunk.
+  - **Backend** `build/route.ts`: `streamOnce` + `generateWorkerComplete` gained an `onChunk` param; the primary worker generation passes `emitCode`, which writes `@@RDV_CODE@@{json}` frames (one line each, newlines escaped). The `worker:running` frame now carries `live: true`. Dropped the Phase-1 end-of-worker code frame (the live stream replaces it). [NEXT] failover/retry that replaces finalCode leaves the live view showing the first attempt — emit a correction frame if that edge case matters.
+  - **Client** `cloudBuildClient.ts`: drain now routes `@@RDV_CODE@@` frames to a new `onCode` callback and strips them from the disk-written code (the real file still arrives as finalCode). `chatPanelBuildRunner.ts` wires `onCode -> activity.code()`.
+  - **Panel** `buildActivityHtml.ts` + `buildActivityPanel.ts`: a `live` step opens an empty `<pre>` that incoming chunks append to (via `document.createTextNode` — safe, no escaping); autoscrolls when open.
+- **Expand-by-default + setting (per user).** New `redivivus.buildActivity.expandSteps` (boolean, default true) registered in `package.json`. Panel reads it (`BuildActivityPanel._expandDefault()`) and opens detail rows by default; users can turn it off to keep steps collapsed and expand on click. Default true means the feature works even before the IDE picks up the new package.json (the `.get(..., true)` default).
+- **Deploy:** both repos `tsc` clean; extension + package.json deployed to `~/.redivivus/extensions/`. **Backend (live streaming + prescription detail) needs a Fly redeploy** to light up.
+
+---
+
+## Session — Jun 11, 2026 (PM2): /plan timeout = the real 2x cost; Build Activity "show the work"
+
+- **The 2x cost was a `/plan` TIMEOUT, not a missing reuse.** Debug log showed `[plan] THREW: Plan timed out` on EVERY build. `/plan` runs the full ~9k-token Sonnet prescription (20–40s) but the client timeout was **30s** — it timed out, the Claude call still billed on the backend, the client forwarded no prescription, and `/build` re-ran Sonnet. Two Claude calls (~$0.27). Fix: `cloudBuildClient.ts` — `/plan` timeout **30s → 90s** so it finishes and `/build` reuses it (one Sonnet call, ~$0.12) — cheaper AND faster (no double Supervisor). **Client-only — just needs an IDE reload, no Fly redeploy.**
+- **Health pill stayed grey until clicked** — `chatPanelPublicAPI.ts`: the startup probe posted its color before the webview listener was ready (race), so it was dropped. Now keeps the last result and re-posts at 1.5s + 4s to beat the race (cheap, no re-render). Render already reads `globalState`, so reopens were already colored.
+- **Build Activity task header truncated** — `buildActivityHtml.ts`: one-line ellipsis → 4-line clamp.
+- **Build Activity panel rows settling** — confirmed working in production (all `[OK]`).
+
+### Build Activity — "show the work" (Phase 1: expandable artifacts)
+Per the user: each step should reveal its work. Implemented expandable detail rows:
+- **Backend** `build/route.ts`: `prescriptionToText()` renders the contract as readable text; the Supervisor `done` frame now carries it as `detail`. After the worker finishes, a new `worker/built` frame carries the actual code (`detail`, `kind: 'code'`, outer fence stripped).
+- **Panel** `buildActivityHtml.ts`: rows with `detail` become clickable ([+] view / [-] hide) and expand to show the prescription (text) or code (`<pre>`, scrollable). `settlePrior` preserves an open detail. **ASCII-only gotcha:** a backtick in a JS comment inside the HTML template literal closed the literal early (TS1005) — removed.
+- **[NEXT] Phase 2 = Panel A:** true token-by-token live streaming of the worker code (requires the backend to forward worker chunks live instead of buffering). Phase 1 shows the finished artifacts; Phase 2 shows them typing in real time.
+- **Risk:** low. Backend detail frames add ~code-size bytes to the stream (sent once as a frame, client strips from disk-written code). **Build Activity detail + cost reuse need: IDE reload (panel/client) AND Fly redeploy (backend detail frames).** Both repos `tsc` clean.
+
+---
+
 ## Session — Jun 11, 2026 (PM): Post-deploy build polish — double-Supervisor cost, panel, auto-open
 
 Fixes #1-3 + Build Activity panel deployed to Fly; first clean build (Tetris renders, Gemini worker, Sonnet supervisor, completeness check passed, costs shown). Four follow-ups from watching a live build:

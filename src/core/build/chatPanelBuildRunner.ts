@@ -143,10 +143,11 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
   let activity: BuildActivityPanel | undefined;
   try { activity = BuildActivityPanel.start(task); } catch { /* panel optional — never block a build */ }
   const onStep = (step: any) => { try { activity?.step(step); } catch {} };
+  const onCode = (text: string) => { try { activity?.code(text); } catch {} };
   let buildOk: boolean | undefined;
 
   try {
-    const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk, onStep });
+    const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk, onStep, onCode });
     buildOk = !!result.success;
 
     if (!result.success) {

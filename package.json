@@ -541,6 +541,11 @@
           "default": "",
           "description": "Override the Redivivus cloud API base URL (leave blank for production). Example: http://localhost:3001/api/v1"
         },
+        "redivivus.buildActivity.expandSteps": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "In the **Build Activity** panel, show each step's work (the Supervisor's prescription and the Worker's code, streaming live) **expanded by default** so you can watch the build happen. Turn this off to keep steps collapsed and expand them on click."
+        },
         "redivivus.modelStrategy": {
           "type": "string",
           "default": "balanced",

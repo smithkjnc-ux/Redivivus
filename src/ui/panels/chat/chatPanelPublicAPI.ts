@@ -137,15 +137,24 @@ export async function panelRefresh(panel: any): Promise<void> {
       try {
         const { collectHealthData, getHealthStatus } = await import('./chatPanelHealthCheck.js');
         const colorMap: Record<string, string> = { green: '#4caf50', yellow: '#ff9800', red: '#f44336' };
+        // [FIX] The Health pill stayed grey until clicked: the startup probe posted its color before the
+        // webview's message listener was ready, so the message was dropped (a race). We now keep the last
+        // result and RE-POST it shortly after — by then the listener exists — so the button colors itself
+        // proactively. The header HTML also reads globalState on every render (so reopens are colored too).
+        let lastMsg: { type: string; status: string; color: string } | null = null;
         const probe = async () => {
           try {
             const data = await collectHealthData();
             const status = getHealthStatus(data);
-            _panel.webview.postMessage({ type: 'update-health-btn', status, color: colorMap[status] });
+            lastMsg = { type: 'update-health-btn', status, color: colorMap[status] };
+            _panel.webview.postMessage(lastMsg);
             ChatPanel.extensionContext?.globalState.update('redivivus.healthStatus', status);
           } catch {}
         };
         await probe();
+        // Re-post a couple times to defeat the webview-not-ready race on first paint (cheap, no re-render).
+        setTimeout(() => { if (lastMsg) { try { _panel.webview.postMessage(lastMsg); } catch {} } }, 1500);
+        setTimeout(() => { if (lastMsg) { try { _panel.webview.postMessage(lastMsg); } catch {} } }, 4000);
         setInterval(probe, 5 * 60 * 1000);
       } catch {}
     })();

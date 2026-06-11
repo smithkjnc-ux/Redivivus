@@ -48,7 +48,7 @@ export async function callCloudBuild(
   task: string,
   root: string,
   deps: BuildRequestDeps,
-  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void; onChunk?: (chunk: string) => void; onStep?: (step: any) => void } = {},
+  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void; onChunk?: (chunk: string) => void; onStep?: (step: any) => void; onCode?: (text: string) => void } = {},
 ): Promise<CloudBuildResult> {
   const token = await getAccountToken();
   if (!token) {
@@ -84,10 +84,15 @@ export async function callCloudBuild(
     try {
       opts.onProgress?.('Planning your build...');
       const planBody = JSON.stringify({ task, preferred, context: { blueprint: context.blueprint, existingFiles: context.existingFiles } });
-      // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
+      // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron.
+      // [WARN] 30s was too tight: /plan runs the FULL Supervisor prescription (~9k tokens on Sonnet,
+      // 20-40s). Timing out here didn't cancel the backend Claude call (it still billed) — it just made
+      // the client drop the prescription, so /build re-ran the Supervisor and we paid Sonnet TWICE
+      // (~$0.27 vs ~$0.12). 90s lets /plan finish so /build reuses it — cheaper AND faster (one
+      // Supervisor call, not two).
       const planRes = await Promise.race([
         fetch(`${base}/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...keyHeaders }, body: planBody }),
-        makeTimeout(30_000, 'Plan'),
+        makeTimeout(90_000, 'Plan'),
       ]);
       if (planRes.ok) {
         const plan = await planRes.json() as {
@@ -188,6 +193,7 @@ export async function callCloudBuild(
     // the code stream. Split them line-by-line: frames go to onStep (the panel), code goes to fullText.
     // trimStart() absorbs any keep-alive spaces that prefix a frame line; real code keeps its indentation.
     const STEP_PREFIX = '@@RDV_STEP@@';
+    const CODE_PREFIX = '@@RDV_CODE@@';  // live worker-code chunk (Phase 2) — panel-only, stripped from disk code
     let lineBuf = '';
     // [FIX #3] The backend's final `done` frame carries the worker's real token spend (initial + any
     // failover + retry). Capture it here so we report actual usage/cost instead of inputTokens:0.
@@ -200,6 +206,13 @@ export async function callCloudBuild(
       }
       opts.onStep?.(step);
     };
+    // Route a single line: a @@RDV_STEP@@ frame to the panel, a @@RDV_CODE@@ chunk to live code, else it
+    // is real file code. Returns true if the line was a frame (so it is stripped from the disk code).
+    const routeFrame = (t: string): boolean => {
+      if (t.startsWith(STEP_PREFIX)) { try { handleStep(JSON.parse(t.slice(STEP_PREFIX.length))); } catch {} return true; }
+      if (t.startsWith(CODE_PREFIX)) { try { opts.onCode?.(JSON.parse(t.slice(CODE_PREFIX.length)).text || ''); } catch {} return true; }
+      return false;
+    };
     const drain = (incoming: string, isFinal: boolean) => {
       lineBuf += incoming;
       let code = '';
@@ -207,17 +220,10 @@ export async function callCloudBuild(
       while ((nl = lineBuf.indexOf('\n')) >= 0) {
         const line = lineBuf.slice(0, nl);
         lineBuf = lineBuf.slice(nl + 1);
-        const t = line.trimStart();
-        if (t.startsWith(STEP_PREFIX)) {
-          try { handleStep(JSON.parse(t.slice(STEP_PREFIX.length))); } catch {}
-        } else {
-          code += line + '\n';
-        }
+        if (!routeFrame(line.trimStart())) { code += line + '\n'; }
       }
       if (isFinal && lineBuf) {
-        const t = lineBuf.trimStart();
-        if (t.startsWith(STEP_PREFIX)) { try { handleStep(JSON.parse(t.slice(STEP_PREFIX.length))); } catch {} }
-        else { code += lineBuf; }
+        if (!routeFrame(lineBuf.trimStart())) { code += lineBuf; }
         lineBuf = '';
       }
       if (code) { fullText += code; opts.onChunk?.(code); }
