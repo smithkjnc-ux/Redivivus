@@ -3,6 +3,78 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 11, 2026: Worker truncation regression — restore continuation loop (Fix #1 of 3)
+
+**Symptom:** Tetris build cost ~$0.53 (5× the historical ~10¢) AND shipped a non-working game (blank board). Root-caused from the actual build artifacts (`tetris-arcade-game/.redivivus/build_history.json`, `~/redivivus_debug.log`).
+
+**Root cause:** The worker's `index.html` was **truncated mid-statement** (ended on `// Require`, no `</html>`). Chain: worker hit its 16K output cap → unterminated `<script>` → SyntaxError → no JS runs → blank canvas (static HOLD/NEXT/SCORE panels still render). The fence parser then saw no closing ` ``` ` (`blocks=0`) and dumped the raw fragment to `index.html` via the NO-FENCE fallback, leaving a 0-byte `tetris.html` orphan.
+
+Why it regressed: `selectMaxTokens` caps worker output at 16K with a comment that it *"relies on the client's built-in continuation loop to finish cut-off code."* Commit `c55d78e` (migrate orchestration to backend) moved the worker to the backend streaming path (`build/route.ts`), **which has no continuation loop** — the safety net was left behind on the abandoned client path (`cloudBuildClientAI.ts`). The Supervisor's prescription and the Worker's code were both *good*; the pipeline just let the file get cut off and shipped the fragment.
+
+**Fix (backend):**
+- **File changed:** `redivivus-backend/src/lib/ai/executor.ts`
+  - **What:** `executeAIStream` now accepts an optional `onMeta?: ({ truncated }) => void` and reports the provider's native cutoff signal (OpenAI/groq/kimi/xai/deepseek `finish_reason === 'length'`; Claude `stop_reason === 'max_tokens'`; Gemini `finishReason === 'MAX_TOKENS'`). Additive — existing callers unaffected.
+  - **Why:** The backend had no way to know a worker response was cut off vs cleanly finished.
+- **File changed:** `redivivus-backend/src/app/api/v1/build/route.ts`
+  - **What:** Added `generateWorkerComplete()` + `makeContinuationPrompt()` — a continuation loop (max 4 passes) that resumes from the last 600 chars when the provider reports a max-tokens cutoff. Wired into the initial Worker generation AND the failover path (both previously drained the stream once with no cutoff handling).
+  - **Why:** Restores the truncation safety net the migration dropped, so large single-file builds finish instead of shipping broken fragments. Continuation prompts send only the instruction + tail (not the full original prompt) to stay cheap, mirroring the old client loop.
+- **Risk:** low. Continuation only fires when the provider actually signals a cutoff; clean finishes return on pass 0 unchanged. Backend `tsc --noEmit` clean (0 errors). Not yet deployed to Fly.
+
+### Fix #2 (done): Kill the Sonnet Guardian re-review + escalation — the ~40¢ leak
+
+- **File changed:** `redivivus-backend/src/app/api/v1/build/route.ts`
+- **What:** Removed `runGuardian()` (re-read the full file on the **Sonnet supervisor** 1–3×) and the **Supervisor escalation** (Sonnet rewriting the whole file). Replaced with `checkWorkerOutput()` — a **free, deterministic** completeness gate (unterminated code fence, missing `</html>`, unbalanced `<script>`) + **one cheap Worker retry** (same worker, with the fix #1 continuation loop) kept only if it reduces issues. No LLM, no Sonnet in the worker phase.
+- **Why:** That loop cost ~5× the build (~40¢ over a ~10¢ baseline), fired on nearly every complex build (an unconstrained Sonnet critic always finds *something*), and STILL shipped broken code — it never noticed the Tetris file was missing `</html>`. Guardian is a quality check, not a co-author: verify, and if it fails make the Worker redo it once. The defect that actually mattered (truncation) is a free string check. Matches the user's stated model: "evaluate, approve, or make the worker do it again."
+- **Net:** Supervisor (Sonnet) now runs exactly **once** (the prescription). Restores ~10¢ economics. The deterministic gate catches the exact failure that the $0.30 critic missed.
+- **Risk:** low-moderate. We trade a subjective "fully implements the contract?" judgement for a mechanical "is it complete/parseable?" check — intentional (that judgement WAS the cost leak and wasn't reliable). Backend `tsc` clean. **Subjective contract-conformance is no longer enforced** — acceptable given the prescription is detailed and the worker follows it; revisit only if quality regresses.
+
+### Also: purged stale Vercel references (project deploys to Fly, not Vercel)
+
+The repo was scaffolded from a Next.js/Vercel template but deploys to **Fly** (`fly.toml` + `Dockerfile`). Stale Vercel mentions were misleading — they even caused a wrong diagnosis earlier (claimed health-checks re-run every build "because Vercel serverless memory doesn't persist"; **false on Fly's long-lived container** — retracted).
+- **Deleted:** `VERCEL_DEPLOY.md`, `vercel.json` (dead config; its `maxDuration: 30` was the original reason for the keep-alive/buffering hack — irrelevant on Fly).
+- **Reworded:** two `route.ts` comments (Vercel → generic/proxy), and `DEPLOYMENT_GUIDE.md` now flags Vercel as legacy and names Fly as the current target.
+
+### Fix #3 (done): Honest token + cost accounting — card no longer under-reports
+
+The card showed only a Supervisor + Worker token line; worker `inputTokens` was hardcoded `0`, worker output was a `length/4` guess, `build_history.costUSD` was `0`, and the byline cost field was hardcoded `0.00000000` (so no price ever rendered).
+
+- **Backend** (`build/route.ts`): `generateWorkerComplete` now estimates worker tokens (~4 chars/token) across **every** pass — initial + continuations. The worker phase accumulates tokens across initial + failover + the fix-#2 retry, and the final `@@RDV_STEP@@ done` frame carries `inputTokens`/`outputTokens` to the client. (Worker is a cheap streamed model with no exact usage; the **Supervisor keeps REAL counts** from its non-streaming call, so total cost stays dollar-accurate since the expensive side is exact.)
+- **Client** (`cloudBuildClient.ts`): captures the worker tokens from the `done` frame (fallback to the old length/4 estimate for an un-redeployed backend). `data.inputTokens/outputTokens` = real worker tokens (fixes the worker usage row that recorded input 0); `data.costUSD` = worker + **real** supervisor cost via the shared pricing table.
+- **Shared pricing** (`usageTracker.ts`): exported `calcCost` (was module-private). Reused by the build client and the card byline — single source of truth.
+- **Card byline** (`chatPanelBuildBreakdown.ts`): per-row cost field now computed from real tokens via `calcCost` instead of `0.00000000`, so the renderer (`chatPanelRendererCards.ts:62,69`) shows `· $X.XXXX` per role.
+- **Risk:** low. Worker tokens are estimates (clearly the cheap side); supervisor + total cost are accurate. No new API calls. Both repos `tsc` clean; extension deploys.
+
+**All three fixes coded.** Combined effect once the backend ships: builds finish instead of truncating (#1), Sonnet runs once not 3–4× (#2, ~$0.53 → ~$0.15), and the card reports that real ~$0.15 instead of a fake ~$0.10 (#3). Plus the live Build Activity panel to watch it happen.
+
+**Still open:** (a) backend not yet deployed to Fly — nothing above is live in production until then; (b) multi-file `targetFile` path still has its own per-file Sonnet escalation (smaller leak, gated behind deterministic check + retry failing); (c) Rule 9 split debt on `chatPanelBuildRunner.ts` (251), `cloudBuildClient.ts` (now ~320); (d) Health-pill stays grey until clicked (original UI bug, untouched); (e) Panel A (live per-token code streaming) if B isn't enough.
+
+### Also this session: Build Activity panel (live pipeline visibility — "watch the work, not a bubble")
+
+User insight: the truncation would've been caught live if the build showed actual work instead of a waiting bubble. Root reason there was nothing to watch: the backend buffers the worker output and sends only keep-alive whitespace until the end. Built **Panel B** (step timeline; live per-token code streaming = future Panel A).
+
+- **Backend** (`redivivus-backend/.../build/route.ts`): the worker streaming loop already buffers internally, so milestone **step-frames** are now interleaved into the stream as `@@RDV_STEP@@{json}\n` — emitted for: supervisor done, worker running, **continuation passes** (the line that would've explained the Tetris failure), failover, guardian running/pass/fix, done. Plus `generateWorkerComplete` gained an `onContinue` callback.
+- **Client** (`src/services/build/cloudBuildClient.ts`): the stream reader now splits step-frames out line-by-line (`trimStart()` absorbs keep-alive spaces) → routes them to a new `onStep` callback; code still flows to `fullText` unchanged.
+- **New panel** (`src/ui/panels/buildActivity/buildActivityPanel.ts` + `buildActivityHtml.ts`, both <200 lines, ASCII-only per Rule 13): a webview opened **Beside** the chat (preserveFocus — the chat bubble stays). Renders a vertical timeline with ASCII status markers. Queues steps until the webview signals `ready`.
+- **Wiring** (`src/core/build/chatPanelBuildRunner.ts`): opens the panel at build start, passes `onStep`, calls `finish(ok)` once in `finally`. Panel is best-effort — any failure is swallowed so it never blocks a build.
+- **Risk:** low for the client/panel (additive, swallowed failures). **Rule 9 debt:** this added lines to `chatPanelBuildRunner.ts` (now 251) and `cloudBuildClient.ts` (now 307), both already over 200 — split owed. Extension compiles + deploys; backend `tsc` clean.
+- **[NEXT] Not yet active in production:** both Fix #1 and the panel's live steps need the **backend redeployed to Fly** — the deployed backend still streams the old format (no `@@RDV_STEP@@` frames, no continuation). Until then the panel opens but shows no steps, and large builds still truncate. Multi-file builds (`cloudBuildMultiFile.ts`) don't emit steps yet either.
+
+---
+
+## Session — Jun 11, 2026: AI audit — DeepSeek backend gap + worker error leak (fix pipeline broken)
+
+**Symptom:** Fix pipeline failed with "Supervisor rejected Worker output after 3 attempts — the Worker's response is not a code fix, it's an API error message." Root-caused two converging bugs:
+
+- **DeepSeek wiring was client-only.** This session added DeepSeek to the client (provider/registry/AI_RANK/routing) but NOT to: `collectKeys()` / `getPreferred` keyMap in `apiClient.ts` (so the deepseek key was never SENT to the backend), nor the **backend executor** (`redivivus-backend/src/lib/ai/executor.ts` — no `deepseek` case → `executeAIStream` threw "Unsupported provider"). All 7 backend routes (fix-worker/supervisor/build/guardian/execute/plan/chat) use that executor.
+  - **Fix (client):** `collectKeys()` + `getPreferred` keyMap now include `deepseek` (`apiClient.ts`).
+  - **Fix (backend):** added `executeDeepseek` (OpenAI-compatible, api.deepseek.com) to `executeAI` + `executeAIStream`, RUNTIME_FALLBACKS, and the fix-worker token-limit map. **Deployed to Fly.**
+- **Client never detected the backend's streamed `[ERROR: ...]` prefix.** `runPhase2Worker` (`chatPanelMsgFixPhases.ts`) concatenated every stream chunk and only checked for *empty* — so a backend AI error (which `executor.ts` writes inline as `[ERROR: msg]`) became the "fix," which the Supervisor then correctly rejected as "not code." → Added end-anchored `[ERROR:]` detection that throws `Worker AI error: <msg>` so the REAL error surfaces instead of the confusing retry loop.
+- **Risk:** none — completes the DeepSeek wiring (client+backend now consistent) and makes ALL backend stream errors surface properly. Client compiles+deploys; backend tsc clean + deployed.
+
+**Still open (separate subsystem, not yet fixed):** build flow didn't show the Blueprint confirmation (treated "make a tetris game" as chat, needed "build it again"); no summary after build + the chat panel switched to a new screen on workspace-open. Likely build-completion panel lifecycle + intent routing — to investigate next (possibly related to the VSIX/VSCodium split).
+
+---
+
 ## Session — Jun 11, 2026: Remove redundant header "No AI key" badge
 
 - **File changed:** `src/ui/panels/chat/chatPanelHtml.ts`

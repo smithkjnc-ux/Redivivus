@@ -5,6 +5,7 @@
 // the Supervisor (e.g. Claude) was never shown even though it ran. Extracted from chatPanelBuildRunner.
 
 import type { CloudBuildResult } from '../../services/build/cloudBuildClient';
+import { calcCost } from '../../services/usageTracker.js';
 
 // Field delimiter is '~' and row delimiter is '|||' — strip both from free text so a stray
 // character in a model name or error message can't corrupt the byline parsing.
@@ -17,19 +18,25 @@ export function buildBreakdownToken(result: CloudBuildResult, workerLabel: strin
   const rows: string[] = [];
 
   // Supervisor row — only when a Supervisor actually wrote the prescription.
+  // [FIX #3] Cost field (5th) was hardcoded 0.00000000 so the card never showed a price. Compute it from
+  // real tokens via the shared pricing table — the Supervisor uses real (non-streamed) token counts.
   if (result.supervisorRan && result.supervisorModel) {
-    const supTokens = (result.supervisorInputTokens ?? 0) + (result.supervisorOutputTokens ?? 0);
-    rows.push(`${safeField(result.supervisorModel)}~supervisor~planned~${supTokens}~0.00000000~0~prescribed the build`);
+    const supIn = result.supervisorInputTokens ?? 0;
+    const supOut = result.supervisorOutputTokens ?? 0;
+    const supCost = calcCost(result.supervisorModel, supIn, supOut).toFixed(8);
+    rows.push(`${safeField(result.supervisorModel)}~supervisor~planned~${supIn + supOut}~${supCost}~0~prescribed the build`);
   }
 
-  // Worker row — always present (or a solo row when there was no Supervisor).
+  // Worker row — always present (or a solo row when there was no Supervisor). Worker tokens are
+  // estimated (cheap streamed model); cost is small and computed the same way.
   if (workerTokens > 0 || rows.length === 0) {
     const ranSupervisor = !!result.supervisorRan;
     const role = ranSupervisor ? 'worker' : 'solo';
     const reason = ranSupervisor
       ? 'built from the prescription'
       : (result.supervisorError ? `built solo — Supervisor unavailable: ${safeField(result.supervisorError)}` : 'primary builder');
-    rows.push(`${safeField(workerLabel)}~${role}~built~${workerTokens}~0.00000000~0~${reason}`);
+    const wCost = calcCost(result.model || workerLabel, result.inputTokens ?? 0, result.outputTokens ?? 0).toFixed(8);
+    rows.push(`${safeField(workerLabel)}~${role}~built~${workerTokens}~${wCost}~0~${reason}`);
   }
 
   if (rows.length === 0) { return ''; }

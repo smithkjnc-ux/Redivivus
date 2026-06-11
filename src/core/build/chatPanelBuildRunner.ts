@@ -14,6 +14,7 @@ import { getAccountToken } from '../../services/api/apiClient.js';
 import { getCommunityGotchas, fetchCommunityGotchas } from '../../services/api/apiClientKnowledge.js';
 import { appendBuildLog } from '../../services/build/buildLogger.js';
 import { buildBreakdownToken, cleanBuildNarration } from './chatPanelBuildBreakdown.js';
+import { BuildActivityPanel } from '../../ui/panels/buildActivity/buildActivityPanel.js';
 
 function isProjectsContainer(root: string): boolean {
   const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
@@ -137,8 +138,16 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
     if (idx >= 0) { deps.conversation[idx] = { ...deps.conversation[idx], content: `⚙️ Building... __BUILD_WORKING__\n\`\`\`\n${streamAccum}\n\`\`\`` }; deps.refresh(); }
   };
 
+  // Live Build Activity panel — opens beside the chat so the user can WATCH the pipeline (supervisor ->
+  // worker -> continuations -> failover -> guardian) instead of just the bubble. Failures are non-fatal.
+  let activity: BuildActivityPanel | undefined;
+  try { activity = BuildActivityPanel.start(task); } catch { /* panel optional — never block a build */ }
+  const onStep = (step: any) => { try { activity?.step(step); } catch {} };
+  let buildOk: boolean | undefined;
+
   try {
-    const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk });
+    const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk, onStep });
+    buildOk = !!result.success;
 
     if (!result.success) {
       if (result.error === 'NOT_AUTHENTICATED') {
@@ -228,6 +237,8 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
       vscode.commands.executeCommand('redivivus.resolveFix', task, files.map(f => path.join(root!, f.path)));
     }
   } finally {
+    // Mark the activity panel finished exactly once, with the real outcome (false if the build threw).
+    try { activity?.finish(buildOk ?? false); } catch {}
     deps.setActiveBuildCtx(undefined);
     deps.postToWebview({ type: 'set-status', status: 'ready' });
     // Stop the live poll and do a final render so the Project Files tree shows the completed file set.

@@ -175,7 +175,7 @@ function normalizeAI(ai: string): string {
 
 // Per-model pricing table. Rates: [$/1M input, $/1M output].
 // [WARN] Update when Anthropic/Google/OpenAI change pricing.
-function calcCost(model: string, inTok: number, outTok: number): number {
+export function calcCost(model: string, inTok: number, outTok: number): number {
   const m = (model || '').toLowerCase();
   let inRate = 0.30, outRate = 0.30; // fallback flat rate
   if (m.includes('claude-haiku-4'))    { inRate = 0.80; outRate = 4.00; }  // Haiku 4.x (4-5 label or 4 label)

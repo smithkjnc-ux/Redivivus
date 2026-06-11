@@ -9,6 +9,7 @@ import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { VaultService } from '../vault/vaultService';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
 import { executeMultiFileBuild } from './cloudBuildMultiFile.js';
+import { calcCost } from '../usageTracker.js';
 
 export interface CloudBuildResult {
   success: boolean
@@ -47,7 +48,7 @@ export async function callCloudBuild(
   task: string,
   root: string,
   deps: BuildRequestDeps,
-  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void; onChunk?: (chunk: string) => void } = {},
+  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void; onChunk?: (chunk: string) => void; onStep?: (step: any) => void } = {},
 ): Promise<CloudBuildResult> {
   const token = await getAccountToken();
   if (!token) {
@@ -162,14 +163,52 @@ export async function callCloudBuild(
     const reader = instructionRes.body.getReader();
     const decoder = new TextDecoder('utf-8');
     let fullText = '';
-    
+
+    // [FIX] Build Activity panel — the backend interleaves milestone frames (`@@RDV_STEP@@{json}`) with
+    // the code stream. Split them line-by-line: frames go to onStep (the panel), code goes to fullText.
+    // trimStart() absorbs any keep-alive spaces that prefix a frame line; real code keeps its indentation.
+    const STEP_PREFIX = '@@RDV_STEP@@';
+    let lineBuf = '';
+    // [FIX #3] The backend's final `done` frame carries the worker's real token spend (initial + any
+    // failover + retry). Capture it here so we report actual usage/cost instead of inputTokens:0.
+    let workerInTok: number | undefined;
+    let workerOutTok: number | undefined;
+    const handleStep = (step: any) => {
+      if (step && step.phase === 'done') {
+        if (typeof step.inputTokens === 'number') workerInTok = step.inputTokens;
+        if (typeof step.outputTokens === 'number') workerOutTok = step.outputTokens;
+      }
+      opts.onStep?.(step);
+    };
+    const drain = (incoming: string, isFinal: boolean) => {
+      lineBuf += incoming;
+      let code = '';
+      let nl: number;
+      while ((nl = lineBuf.indexOf('\n')) >= 0) {
+        const line = lineBuf.slice(0, nl);
+        lineBuf = lineBuf.slice(nl + 1);
+        const t = line.trimStart();
+        if (t.startsWith(STEP_PREFIX)) {
+          try { handleStep(JSON.parse(t.slice(STEP_PREFIX.length))); } catch {}
+        } else {
+          code += line + '\n';
+        }
+      }
+      if (isFinal && lineBuf) {
+        const t = lineBuf.trimStart();
+        if (t.startsWith(STEP_PREFIX)) { try { handleStep(JSON.parse(t.slice(STEP_PREFIX.length))); } catch {} }
+        else { code += lineBuf; }
+        lineBuf = '';
+      }
+      if (code) { fullText += code; opts.onChunk?.(code); }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
-      const chunk = decoder.decode(value, { stream: true });
-      fullText += chunk;
-      opts.onChunk?.(chunk);
+      drain(decoder.decode(value, { stream: true }), false);
     }
+    drain('', true);
 
     const supervisorMetaRaw = instructionRes.headers.get('X-Supervisor-Meta');
     const workerProvider = instructionRes.headers.get('X-Worker-Provider') || preferred || 'claude';
@@ -239,12 +278,22 @@ export async function callCloudBuild(
 
     // Step 3: Parse the streamed code blocks into files locally
     const aiResponse = { text: fullText, model: workerProvider, success: true };
+    // [FIX #3] Real worker tokens come from the backend's `done` frame (covers initial + failover +
+    // retry). Fall back to a length/4 estimate only if the frame is missing (old backend). costUSD is
+    // worker (estimated) + supervisor (REAL, expensive model) -> dollar-accurate total per build.
+    const wIn = workerInTok ?? 0;
+    const wOut = workerOutTok ?? Math.ceil(fullText.length / 4);
+    const supCost = supervisor?.ran && supervisor?.model
+      ? calcCost(supervisor.model, supervisor.inputTokens ?? 0, supervisor.outputTokens ?? 0)
+      : 0;
+    const costUSD = calcCost(workerProvider, wIn, wOut) + supCost;
     const data = {
       files: [], // Extracted by processBuildResults
       narration: '',
       model: workerProvider,
-      inputTokens: 0,
-      outputTokens: Math.ceil(fullText.length / 4)
+      inputTokens: wIn,   // worker-only — processBuildResults records the supervisor as its own usage row
+      outputTokens: wOut,
+      costUSD,
     };
 
     const built = await processBuildResults(data, task, root, deps, {

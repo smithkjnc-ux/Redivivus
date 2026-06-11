@@ -77,6 +77,25 @@ export async function processBuildResults(
       data.files.push({ path: filePath, content: b.content, isNew: true });
       fileIndex++;
     }
+    // [FIX] blocks=0 means the worker produced output with NO code fences — DON'T leave the skeleton
+    // files empty (blank preview, "Built 0 files"). Surface a streamed error, or recover raw code.
+    if (data.files.length === 0 && rawText.trim()) {
+      const errM = rawText.match(/\[ERROR:\s*([^\]]+)\]/);
+      // Log what the worker actually sent so a no-fence failure can be diagnosed next time.
+      try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[buildtrace] NO-FENCE worker output (first 500): ${rawText.trim().slice(0,500).replace(/\n/g,' ')}\n`); } catch {}
+      if (errM) { throw new Error(`Build worker error: ${errM[1].trim()}`); }
+      // The worker often OPENS a ```lang(:path) fence but never closes it (truncation), so the fence
+      // regex matched nothing. Strip a leading fence line + any trailing ``` so the markers don't end
+      // up rendered in the page (the "```html:tetris.html" text on screen + quirks mode).
+      const t = rawText.trim()
+        .replace(/^```[\w-]*(?::[^\n]*)?[ \t]*\n?/, '')
+        .replace(/\n?```[ \t]*$/, '')
+        .trim();
+      // If it looks like a web doc / code, save it as index.html so something runs instead of nothing.
+      if (/<!doctype html|<html[\s>]/i.test(t) || (/[<{]/.test(t) && t.length > 80)) {
+        data.files.push({ path: 'index.html', content: t, isNew: true });
+      }
+    }
     // [trace] Final parsed filenames from the single-file fallback — shows whether the safety net
     // recovered real names (board.js…) or still fell back to file{N}. htmlRefs lists what the HTML expects.
     try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[buildtrace] single-file parse: blocks=${blocks.length} htmlRefs=[${htmlRefs.join(', ')}] -> files=[${data.files.map((f: any) => f.path).join(', ')}]\n`); } catch {}

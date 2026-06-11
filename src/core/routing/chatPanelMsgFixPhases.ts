@@ -160,6 +160,13 @@ export async function runPhase2Worker(
   }
 
   if (!workerResponse.trim()) throw new Error('Worker returned empty response.');
+  // [FIX] The backend streams provider errors inline as "[ERROR: ...]" (executor.ts executeAIStream).
+  // Detect it here — otherwise the error text is treated as the fix and the Supervisor rejects it as
+  // "not a code fix, it's an API error message" (the confusing retry loop users saw).
+  // Anchored at end: the backend APPENDS "[ERROR: ...]" on failure, so this won't false-positive on
+  // generated code that contains "[ERROR:" in a string literal mid-file.
+  const errMatch = workerResponse.match(/\[ERROR:\s*([^\]]+)\]\s*$/);
+  if (errMatch) { throw new Error(`Worker AI error: ${errMatch[1].trim()}`); }
   deps.usageTracker?.recordUsage(
     Math.ceil((diagnosis.length + workerResponse.length) / 4), 0, workerAI,
     0, Math.ceil(workerResponse.length / 4), 'worker', path.basename(root)
