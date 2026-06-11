@@ -16,7 +16,7 @@ import { runChunkedConvert } from './chatPanelMsgSendAIConvert';
 // This is the only remaining regex — it matches explicit preference declarations, not intent.
 // Replace with AI call if false-positive rate becomes a problem.
 const PREFERENCE_RE = /\b(i prefer|i want|always use|never use|use only|don'?t use|we decided|we always|entry point is|main file is|i like|i hate|i don'?t like|our stack|our framework|we use|keep it|make sure|remember that|from now on)\b/i;
-const AI_LABEL: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+const AI_LABEL: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
 /** Main AI chat handler — routes to chunked gen, single-call, or question path.
  *  isConvert: true = transform existing code (inject source files). false = Q&A. */
 export async function handleAIChat(

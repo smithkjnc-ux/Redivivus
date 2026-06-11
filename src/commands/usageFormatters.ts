@@ -5,7 +5,7 @@ import type { UsageReport} from '../services/usageTracker.js';
 import { AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
 
 export function formatUsageForChat(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>): string {
-  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
 
   const formatAIBreakdownChat = (byAI: { aiProvider: string; tokens: number; cost: number; messages: number; byRole?: { role: string; tokens: number; cost: number; messages: number }[] }[], periodRoster?: typeof roster) => {
     const displayRoster = periodRoster || roster;

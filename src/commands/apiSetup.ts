@@ -6,7 +6,16 @@ import * as vscode from 'vscode';
 import { ChatPanel } from '../ui/panels/chat/chatPanel';
 import { getApiSetupHtml } from './apiSetupHtml.js';
 import { checkProviderReachable } from '../core/diagnostics/selfDiagnosticChecks';
-import { getKeyCached, getConfiguredProviders } from '../services/ai/secretKeyStore.js';
+
+// [FIX] After keys change, refresh the chat panel so its pill + "No AI" banner update without a reload. No-op if closed.
+async function refreshChatPanelForKeyChange(): Promise<void> {
+  try {
+    const { invalidateRosterCache } = await import('../services/ai/routingServiceRoster.js');
+    invalidateRosterCache();
+    const p = ChatPanel.currentPanel as { refresh?: () => void } | undefined;
+    if (p && typeof p.refresh === 'function') { p.refresh(); }
+  } catch { /* chat panel may not be open — nothing to refresh */ }
+}
 
 export function registerApiSetupCommand(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
@@ -37,6 +46,7 @@ function showApiStatusInChat(): void {
     { id: 'groq',   name: 'Groq',    key: getKeyCached('groq'),   icon: '&#x1F525;' },
     { id: 'xai',    name: 'xAI',     key: getKeyCached('xai'),    icon: '&#x1F680;' },
     { id: 'kimi',   name: 'Kimi',    key: getKeyCached('kimi'),   icon: '&#x1F52E;' },
+    { id: 'deepseek', name: 'DeepSeek', key: getKeyCached('deepseek'), icon: '&#x1F40B;' },
   ];
   const providerHtml = providers.map(p => {
     const isSet = p.key && p.key.length > 0;
@@ -82,6 +92,7 @@ class ApiSetupPanel {
           ['gemini', 'geminiKey', 'Gemini'], ['claude', 'claudeKey', 'Claude'],
           ['openai', 'openaiKey', 'OpenAI'], ['groq', 'groqKey', 'Groq'],
           ['xai', 'xaiKey', 'xAI'], ['kimi', 'kimiKey', 'Kimi'],
+          ['deepseek', 'deepseekKey', 'DeepSeek'],
         ];
         for (const [id, msgKey, name] of pairs) {
           if (msg[msgKey] !== undefined) {
@@ -108,7 +119,8 @@ class ApiSetupPanel {
 
         // Refresh HTML after saving so thatConfigured/Not Set labels update in real-time
         this._panel.webview.html = getApiSetupHtml();
-        
+        await refreshChatPanelForKeyChange(); // [FIX] update chat pill + "No AI" banner without a reload
+
         this._panel.webview.postMessage({ type: 'saved', timestamp: new Date().toLocaleTimeString(), errors });
         
         if (errors.length > 0) {
@@ -130,36 +142,22 @@ class ApiSetupPanel {
         
         // Refresh HTML to update disabled labels and team roles dynamically
         this._panel.webview.html = getApiSetupHtml();
+        await refreshChatPanelForKeyChange(); // [FIX] enabling/disabling a provider changes the active AI set
         vscode.window.showInformationMessage(`Redivivus: ${msg.providerId.toUpperCase()} has been ${index > -1 ? 'enabled' : 'disabled'}!`);
       } else if (msg.type === 'open-vscode-settings') {
         await vscode.commands.executeCommand('workbench.action.openSettings', 'redivivus');
       } else if (msg.type === 'export-all-keys') {
-        const providers = getConfiguredProviders();
-        if (providers.length === 0) {
-          vscode.window.showWarningMessage('Redivivus: No API keys configured to export');
-          return;
+        // [FIX] Export is now an encrypted, passphrase-protected .rdvkeys file (was plaintext .env).
+        const { exportKeysEncrypted } = await import('../services/security/keyBackup.js');
+        await exportKeysEncrypted();
+      } else if (msg.type === 'import-keys') {
+        // Restore keys from an encrypted backup (after reload or on a new device).
+        const { importKeysEncrypted } = await import('../services/security/keyBackup.js');
+        const imported = await importKeysEncrypted();
+        if (imported > 0) {
+          this._panel.webview.html = getApiSetupHtml();
+          await refreshChatPanelForKeyChange();
         }
-        const envMap: Record<string, string> = {
-          gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY',
-          groq: 'GROQ_API_KEY', xai: 'XAI_API_KEY', kimi: 'MOONSHOT_API_KEY',
-        };
-        const lines: string[] = ['# Redivivus API Keys — ' + new Date().toISOString().split('T')[0]];
-        for (const provider of providers) {
-          const key = getKeyCached(provider);
-          if (key && envMap[provider]) {
-            lines.push(`${envMap[provider]}=${key}`);
-          }
-        }
-        const envContent = lines.join('\n');
-
-        const uri = await vscode.window.showSaveDialog({
-          defaultUri: vscode.Uri.file('redivivus-keys.env'),
-          filters: { 'Environment Files': ['env'], 'All Files': ['*'] }
-        });
-        if (!uri) { return; }
-
-        await vscode.workspace.fs.writeFile(uri, Buffer.from(envContent, 'utf8'));
-        vscode.window.showInformationMessage(`Redivivus: API keys exported to ${uri.fsPath}`);
       }
     }, null, this._disposables);
     this._panel.onDidDispose(() => this.dispose(), null, this._disposables);

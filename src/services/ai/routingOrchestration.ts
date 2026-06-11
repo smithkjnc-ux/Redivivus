@@ -6,6 +6,7 @@ import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
 import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
 import type { RoutingService } from './routingService.js';
+import { recordQuotaError, looksLikeQuotaError } from './providerTierState.js';
 
 /** Full orchestrated build pipeline — called by RoutingService.orchestratedBuild() */
 export async function orchestratedBuildImpl(
@@ -23,7 +24,11 @@ export async function orchestratedBuildImpl(
   // [WARN] Build a callAI function that uses the routing service's timeout mechanism
   const callAI = async (ai: string, prompt: string) => {
     const fetchFn = (url: string, opts: RequestInit) => fetchWithTimeout(url, opts, 60_000);
-    return callProvider(ai, prompt, fetchFn);
+    const res = await callProvider(ai, prompt, fetchFn);
+    // Feed the tier detector from worker-level quota failures too (orchestrated builds don't go
+    // through RoutingService.prompt, so this is the only hook on this path).
+    if (!res.success && looksLikeQuotaError(res.error || '')) { recordQuotaError(ai); }
+    return res;
   };
 
   onProgress?.('planning', '🎯 Creating build plan...');

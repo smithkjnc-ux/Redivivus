@@ -89,7 +89,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
 
-  const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
   const _m = chatResult.model || '', _pr = PROVIDER_LABEL[chatResult.provider] ?? 'Claude';
   const _ms = _m.includes('haiku')?'Haiku':_m.includes('sonnet')?'Sonnet':_m.includes('opus')?'Opus':_m.includes('flash')?'Flash':_m.includes('4o-mini')?'GPT-4o mini':_m.includes('4o')?'GPT-4o':'';
   const _byline = `${_pr}${_ms&&_ms!==_pr?' '+_ms:''} · ↑${chatResult.inputTokens??0} ↓${chatResult.outputTokens??0} tok`;

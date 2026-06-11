@@ -7,6 +7,7 @@ import { executeOpenAI } from './openaiProvider.js';
 import { executeGroq } from './groqProvider.js';
 import { executeXAI } from './xaiProvider.js';
 import { executeKimi } from './kimiProvider.js';
+import { executeDeepseek } from './deepseekProvider.js';
 
 // [WARN] tier selects model from modelRegistry: 'ultra'=most capable, 'pro'=guardian/supervisor,
 //        'flash'=worker (cheapest that qualifies). Always pass tier explicitly for Guardian calls.
@@ -32,6 +33,8 @@ export async function callProvider(
       return executeXAI(text, fetchWithTimeout, systemMessage, tier);
     case 'kimi':
       return executeKimi(text, fetchWithTimeout, systemMessage, tier);
+    case 'deepseek':
+      return executeDeepseek(text, fetchWithTimeout, systemMessage, tier);
     default:
       return { text: '', model: 'none', success: false, error: 'Unknown AI provider: ' + ai };
   }

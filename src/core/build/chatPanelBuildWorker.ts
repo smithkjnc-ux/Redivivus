@@ -14,7 +14,8 @@ const AI_LABELS: Record<string, string> = {
   openai: 'GPT-4o',
   groq: 'Groq',
   xai: 'Grok',
-  kimi: 'Kimi'
+  kimi: 'Kimi',
+  deepseek: 'DeepSeek'
 };
 
 export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onChunk?: (chunk: string) => void, tier: 'flash' | 'pro' | 'ultra' = 'flash'): Promise<{ success: boolean; text: string; error?: string; routedTo?: string; inputTokens?: number; outputTokens?: number; streamed?: boolean }> {

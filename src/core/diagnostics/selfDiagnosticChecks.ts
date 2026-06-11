@@ -84,6 +84,7 @@ const PROVIDER_PING: Record<string, { configKey: string; url: (k: string) => str
   Groq:    { configKey: 'redivivus.groqApiKey',    url: () => 'https://api.groq.com/openai/v1/models', headers: k => ({ Authorization: `Bearer ${k}` }) },
   xAI:     { configKey: 'redivivus.xaiApiKey',     url: () => 'https://api.x.ai/v1/models',          headers: k => ({ Authorization: `Bearer ${k}` }) },
   Kimi:    { configKey: 'redivivus.kimiApiKey',    url: () => 'https://api.moonshot.cn/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
+  DeepSeek:{ configKey: 'redivivus.deepseekApiKey',url: () => 'https://api.deepseek.com/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
 };
 
 export async function checkProviderReachable(providerName: string): Promise<DiagResult> {

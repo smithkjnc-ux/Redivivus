@@ -6,6 +6,7 @@ import { AI_CAPABILITIES } from './guardianAI.js';
 import type { AIResponse } from './routingTypes.js';
 import { getWorkerRules } from '../api/apiClientKnowledge.js';
 import { log } from '../logging/redivivusLogger.js';
+import { buildCapabilityProfiles, buildPlanPrompt, parsePlan } from './supervisorPlanner.js';
 
 export interface PlanStep {
   stepNumber: number;
@@ -30,59 +31,6 @@ export interface OrchestratedResult {
 /** Progress callback for UI updates */
 export type ProgressCallback = (phase: string, detail: string) => void;
 
-// [WARN] The plan prompt must return strict JSON. Any deviation and parsing fails.
-function buildPlanPrompt(task: string, availableAIs: string[], context: string): string {
-  const aiDescriptions = availableAIs
-    .filter(ai => AI_CAPABILITIES[ai])
-    .map(ai => {
-      const cap = AI_CAPABILITIES[ai];
-      return `  "${ai}": "${cap.bestFor}"`;
-    })
-    .join('\n');
-
-  return `You are the shop foreman. You size the job before anyone picks up a wrench. Direct, warm, efficient -- you've seen every kind of job.
-- No jargon with the user. You have opinions and share them. If the request doesn't match the goal, say so first.
-- Assign work to the right AI for each step. Fewer steps is better.
-
-You are a senior software architect planning a build task. Create a step-by-step plan and assign each step to the best-fit AI.
-
-TASK: "${task}"
-
-${context ? `PROJECT CONTEXT:\n${context}\n` : ''}
-AVAILABLE AIs AND THEIR STRENGTHS:
-${aiDescriptions}
-
-PROJECT RULES (MUST COMPLY):
-${getWorkerRules()}
-
-Create a build plan with 1-4 steps (fewer is better). Each step produces code.
-
-ARCHITECTURAL REASONING (Follow these steps before generating the plan):
-1. Environment Assessment: Evaluate the runtime environment. If there is no build tool (e.g. Vite, Webpack) prescribed in the blueprint, you MUST use natively executable languages (e.g. standard HTML, CSS, Vanilla JS) for browsers. Do NOT use TypeScript or JSX unless you also prescribe the build configuration to compile it.
-2. Infrastructure First: If the request requires a modern framework, your first step must establish the infrastructure (e.g. package.json, config files).
-3. Logical Decomposition: Break the project down into logical layers (e.g. State, Engine, UI, Styling) rather than arbitrary files.
-4. Interface Contracts: Ensure your step specifications clearly name the functions and interfaces so the workers can piece them together perfectly.
-
-Ensure you follow all PROJECT RULES, especially architecture constraints for games.
-
-For each step, you must output a STRICT CONTRACT for the Worker:
-- filesToCreate: Array of exact filenames to create/modify.
-- dependencies: Array of filenames this step imports or relies on.
-- exactInstructions: Precise prescription. Name every function, class, or variable to implement. Quote exact old → new code for changes.
-
-Respond with ONLY valid JSON, no markdown, no explanation:
-[
-  { 
-    "step": 1, 
-    "description": "Short label describing the logical layer", 
-    "filesToCreate": ["exact_filename.ext"],
-    "dependencies": ["files_this_step_imports.ext"],
-    "exactInstructions": "Precise implementation details...", 
-    "ai": "which_ai_id" 
-  }
-]`;
-}
-
 /** Ask the Supervisor AI to create a build plan */
 export async function createPlan(
   task: string,
@@ -106,7 +54,9 @@ export async function createPlan(
   }
 
   const supervisor = availableAIs[0]; // highest-ranked = supervisor
-  const prompt = buildPlanPrompt(task, availableAIs, context);
+  // Constraint-aware profiles (capability, output budget, context, cost) drive assignment + strategy.
+  const profiles = buildCapabilityProfiles(availableAIs);
+  const prompt = buildPlanPrompt(task, profiles, context);
   const res = await callAI(supervisor, prompt);
 
   if (!res.success || !res.text) {
@@ -116,43 +66,7 @@ export async function createPlan(
     return [{ stepNumber: 1, description: task, assignedAI: worker, assignedLabel: cap?.label || worker, type: 'code' }];
   }
 
-  return parsePlan(res.text, availableAIs);
-}
-
-/** Parse JSON plan from AI response */
-function parsePlan(text: string, availableAIs: string[]): PlanStep[] {
-  try {
-    // Strip markdown fences if present
-    let clean = text.trim();
-    const match = clean.match(/\[[\s\S]*\]/);
-    if (match) { clean = match[0]; }
-    const parsed = JSON.parse(clean);
-    if (!Array.isArray(parsed)) { throw new Error('Not an array'); }
-
-    const plan = parsed.slice(0, 4).map((item: any, i: number) => {
-      const ai = availableAIs.includes(item.ai) ? item.ai : availableAIs[1] || availableAIs[0];
-      const cap = AI_CAPABILITIES[ai];
-      return {
-        stepNumber: i + 1,
-        description: String(item.description || 'Build step'),
-        filesToCreate: Array.isArray(item.filesToCreate) ? item.filesToCreate : undefined,
-        dependencies: Array.isArray(item.dependencies) ? item.dependencies : undefined,
-        exactInstructions: item.exactInstructions ? String(item.exactInstructions) : undefined,
-        spec: item.spec ? String(item.spec) : undefined,
-        assignedAI: ai,
-        assignedLabel: cap?.label || ai,
-        type: 'code' as const,
-      };
-    });
-    log('debug', 'services', 'supervisorOrchestrator', 'parsePlan', 'Supervisor Plan Parsed Successfully', { plan });
-    return plan;
-  } catch (err) {
-    log('error', 'services', 'supervisorOrchestrator', 'parsePlan', 'Supervisor Plan Parse Failed', { rawText: text, error: String(err) });
-    // Parse failed — single step to best worker
-    const worker = availableAIs[1] || availableAIs[0];
-    const cap = AI_CAPABILITIES[worker];
-    return [{ stepNumber: 1, description: 'Build the requested feature', assignedAI: worker, assignedLabel: cap?.label || worker, type: 'code' }];
-  }
+  return parsePlan(res.text, profiles);
 }
 
 /** Execute a single plan step — sends the step prompt to the assigned AI */

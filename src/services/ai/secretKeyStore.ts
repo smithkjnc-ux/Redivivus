@@ -5,17 +5,17 @@
 
 import * as vscode from 'vscode';
 
-const PROVIDERS = ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi'] as const;
+const PROVIDERS = ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi', 'deepseek'] as const;
 type Provider = typeof PROVIDERS[number];
 
 const SECRET_PREFIX = 'redivivus.apikey.';
 const SETTINGS_MAP: Record<Provider, string> = {
   gemini: 'geminiApiKey', claude: 'claudeApiKey', openai: 'openaiApiKey',
-  groq: 'groqApiKey', xai: 'xaiApiKey', kimi: 'kimiApiKey',
+  groq: 'groqApiKey', xai: 'xaiApiKey', kimi: 'kimiApiKey', deepseek: 'deepseekApiKey',
 };
 export const ENV_MAP: Record<Provider, string> = {
   gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY',
-  groq: 'GROQ_API_KEY', xai: 'XAI_API_KEY', kimi: 'MOONSHOT_API_KEY',
+  groq: 'GROQ_API_KEY', xai: 'XAI_API_KEY', kimi: 'MOONSHOT_API_KEY', deepseek: 'DEEPSEEK_API_KEY',
 };
 
 let _ctx: vscode.ExtensionContext | null = null;

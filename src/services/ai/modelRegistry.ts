@@ -45,6 +45,10 @@ export const MODEL_REGISTRY: ModelDef[] = [
   // ── Kimi (Moonshot) ─────────────────────────────────────────────────────
   { provider: 'kimi',   modelId: 'moonshot-v1-128k',        label: 'Kimi 128k',          capability: 6,  costTier: 5, contextK: 128,  outputK: 16,  roles: ['pro', 'flash'],    strengths: ['large context', 'document analysis', 'bulk annotation'] },
   { provider: 'kimi',   modelId: 'moonshot-v1-32k',         label: 'Kimi 32k',           capability: 5,  costTier: 3, contextK: 32,   outputK: 8,   roles: ['flash'],           strengths: ['standard tasks', 'cost-effective'] },
+
+  // ── DeepSeek ────────────────────────────────────────────────────────────
+  { provider: 'deepseek', modelId: 'deepseek-reasoner',     label: 'DeepSeek R1',        capability: 8,  costTier: 2, contextK: 64,   outputK: 8,   thinking: true, roles: ['ultra', 'pro'], strengths: ['deep reasoning', 'math', 'algorithms', 'step-by-step logic'] },
+  { provider: 'deepseek', modelId: 'deepseek-chat',         label: 'DeepSeek V3',        capability: 7,  costTier: 1, contextK: 64,   outputK: 8,   roles: ['pro', 'flash'],    strengths: ['fast code gen', 'cost-effective', 'general coding'] },
 ];
 
 /** All models for a given provider, sorted best-first. */

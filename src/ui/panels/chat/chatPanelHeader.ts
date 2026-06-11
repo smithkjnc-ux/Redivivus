@@ -78,7 +78,7 @@ export function buildHeaderInfo(
   const blueprintStatus = determineBlueprintStatus(config);
 
   const selectedAI = vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '';
-  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
 
   const hasKey = available.ai !== 'none';
   const aiName = hasKey ? available.ai : selectedAI;

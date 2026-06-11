@@ -6,7 +6,7 @@ import type { BuildPlan } from '../../services/build/buildOrchestrator';
 import type { OrchestratorDeps } from './chatPanelOrchestrator';
 
 export const AI_LABELS: Record<string, string> = {
-  gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi',
+  gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek',
 };
 
 /** Returns true when 2+ AI providers are configured (enables full orchestration) */

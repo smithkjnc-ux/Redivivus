@@ -3,7 +3,7 @@
 // Falls back to a single onChunk call with the full response when streaming is unsupported.
 
 import type { AIResponse } from './routingTypes.js';
-import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from './routingKeys.js';
+import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
 
 type KeyGetter = () => string | null;
 type ChunkFn = (text: string) => void;
@@ -86,7 +86,7 @@ export async function streamProvider(
       return { text: full, model, success: !!full, error: full ? undefined : 'Empty Claude stream', truncated };
     }
 
-    // OpenAI-compatible: openai, groq, xai, kimi
+    // OpenAI-compatible: openai, groq, xai, kimi, deepseek
     const { bestModelForRole, tierToRole } = await import('./modelRegistry.js');
     const role = tierToRole(tier);
     const providerMap: Record<string, { url: string; model: string; key: KeyGetter }> = {
@@ -94,13 +94,14 @@ export async function streamProvider(
       groq:   { url: 'https://api.groq.com/openai/v1/chat/completions', model: bestModelForRole('groq',   role)?.modelId ?? 'llama-3.3-70b-versatile',  key: getGroqKey   },
       xai:    { url: 'https://api.x.ai/v1/chat/completions',            model: bestModelForRole('xai',    role)?.modelId ?? 'grok-3-mini',               key: getXAIKey    },
       kimi:   { url: 'https://api.moonshot.ai/v1/chat/completions',     model: bestModelForRole('kimi',   role)?.modelId ?? 'moonshot-v1-32k',           key: getKimiKey   },
+      deepseek: { url: 'https://api.deepseek.com/v1/chat/completions',  model: bestModelForRole('deepseek', role)?.modelId ?? 'deepseek-chat',            key: getDeepseekKey },
     };
     const p = providerMap[ai];
     if (!p) {throw new Error(`Unknown AI: ${ai}`);}
     const key = p.key(); if (!key) {throw new Error(`No key for ${ai}`);}
     const _msgs: any[] = systemMessage ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }] : [{ role: 'user', content: text }];
     // [FIX] max_tokens set to provider maximum — Worker needs full output for large files
-    const maxTokens = ai === 'groq' ? 8000 : 16000;
+    const maxTokens = (ai === 'groq' || ai === 'deepseek') ? 8000 : 16000;
     const body = JSON.stringify({ model: p.model, stream: true, messages: _msgs, max_tokens: maxTokens });
     const res = await fetch(p.url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body, signal });
     if (!res.ok || !res.body) {throw new Error(`${ai} ${res.status}`);}

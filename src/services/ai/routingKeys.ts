@@ -40,3 +40,8 @@ export function getKimiKey(): string | null {
   if (isDisabled('kimi')) { return null; }
   return getKeyCached('kimi');
 }
+
+export function getDeepseekKey(): string | null {
+  if (isDisabled('deepseek')) { return null; }
+  return getKeyCached('deepseek');
+}

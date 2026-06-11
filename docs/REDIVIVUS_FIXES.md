@@ -3,6 +3,181 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 10, 2026 (Evening): Auto-Detect Free-Tier Quota (hybrid, silent)
+
+**Goal:** Fix the capability-ceiling overestimate (free Gemini reads as Pro/cap-9 but is really Flash/cap-7) automatically, with no toggles — so it "just works" — while keeping every failure mode soft (a wrong guess only plans more carefully, never blocks a build).
+
+### New — `src/services/ai/providerTierState.ts` (48 lines, pure / no vscode)
+- **What it does:** in-memory tier detector. Sliding 15-min window of quota errors per provider; 3+ → "constrained" for a 6-hour sticky cooldown (prevents oscillation). Resets on host restart (same semantics as model failover).
+- **`looksLikeQuotaError(err)`** — shared classifier (quota/429/402/rate limit/insufficient/"resource exhausted"/billing/credit/balance). Verified it does NOT match 401 bad-key errors.
+- **`recordQuotaError(provider)`** — returns true only on the transition into constrained. Scoped via `FREE_TIER_MODEL` (currently `{ gemini: 'gemini-2.5-flash' }`): paid-only providers (claude/openai/xai/deepseek/kimi) are excluded — a quota error there = "out of credits" (failover's job), not a capability downshift. Verified claude never constrains.
+- **`isProviderConstrained(provider)`** — consulted by the planner.
+
+### Wiring
+- `supervisorPlanner.ts` — `representativeModel(ai)`: a constrained provider's profile uses its free-tier model's specs (Gemini → Flash cap 7) instead of its top model (Pro cap 9). That drops the ceiling to <8 → the CAREFUL build strategy engages automatically.
+- `routingService.ts` — capacity-error branch now calls `recordQuotaError(ai)`.
+- `routingOrchestration.ts` — orchestrated builds don't go through `RoutingService.prompt`, so the worker `callAI` records quota failures via `looksLikeQuotaError` (the only hook on that path).
+
+### Why hybrid-but-silent
+- Auto-detect (option A) is the "just works" part; the free-tier *model map* (option B's data) supplies what to downshift to. No user toggle, no popup, no globalState.
+- **Safe because soft:** worst case (false positive on a paid user's burst) = a few more-conservative-but-working builds that auto-recover after the 6h cooldown / window ages out. There is no hard-fail path. The frequency threshold is itself the 429-burst-vs-real-quota discriminator.
+- Verified: threshold trips on the 3rd error, paid providers never constrain, classifier ignores auth errors. Compile clean (EXIT 0).
+- **Known limitation:** in-memory, so a host restart re-learns (costs one optimistic build). globalState persistence is a trivial future upgrade if it ever matters.
+
+---
+
+## Session — Jun 10, 2026 (Evening): Constraint + Cost + Ceiling-Aware Supervisor Routing
+
+**Goal:** Make the Supervisor assign Workers using real model specs (capability, output budget, cost) instead of fuzzy strengths — AND guarantee free/low-tier-only rosters still build successfully by adapting the plan to the roster's ceiling rather than gating on it.
+
+### New — `src/services/ai/supervisorPlanner.ts` (split from supervisorOrchestrator.ts)
+- **File added:** `supervisorPlanner.ts` (158 lines) — holds `buildCapabilityProfiles()`, the capability/cost/constraint-aware `buildPlanPrompt()`, and constraint-clamping `parsePlan()`.
+- **Why split:** `supervisorOrchestrator.ts` was 248 lines (pre-existing Rule 9 violation). Extracting the planner brought it to 161 — under the limit — and gave a clean home for the new logic.
+
+### What changed (behavior)
+- **Real specs in the plan prompt:** each available worker is now described as `capability X/10, ~Nk output, cost N/10 — bestFor`, not just a strengths blurb. The Supervisor assigns `"ai"` per step informed by actual numbers.
+- **Assignment rules added:** match step difficulty to capability; give simple steps to the cheapest capable worker (cost ROI); never assign a file that exceeds a worker's output budget; keep interdependent steps on the same worker (fewer seam bugs).
+- **Ceiling-aware BUILD STRATEGY (the free/low-tier answer):** the plan adapts to the strongest available worker. `>=8` (Claude/Gemini/OpenAI/xAI/DeepSeek) → STRONG (ambitious OK). `<8` (Groq-only/Kimi-only at cap 6) → CAREFUL: decompose aggressively, prefer vanilla HTML/CSS/JS, keep files within the worker's output budget (~30 lines/1k tokens), over-specify every name, independently-verifiable steps. `<=4` adds a "keep whole project tiny, offer to extend" floor. **Never gates — always degrades.**
+- **Capacity clamp (`clampAssignment`):** a file-creating step assigned to the smallest-output worker is bumped to the roomiest available worker (ties → cheapest) when the gap is >=8k tokens. Cheap insurance against truncation; never fails a build.
+- **Verified:** bands confirmed against the real registry — Groq/Kimi-only → CAREFUL, all stronger rosters → STRONG. Compile clean (EXIT 0). Public API (createPlan/executeStep/reviewOutput) unchanged.
+
+### Design note (why not route on "strengths")
+When the Supervisor writes a strict contract, a Worker's stylistic strengths are deliberately neutralized — so routing Workers on fuzzy strengths is noise. What strict contracts do NOT neutralize: hard capacity limits, raw competence (capability tier), and cost. Routing on those three is the real win; the rich `strengths`/`bestFor` data is most valuable for picking the Supervisor (where reasoning sets the build ceiling).
+
+---
+
+## Session — Jun 10, 2026 (Evening): Add DeepSeek Provider
+
+**Goal:** Wire DeepSeek (R1 + V3) as a first-class BYOK provider, end to end. "Fable 5" (reported as a brand-new Anthropic model) put ON HOLD — unverifiable model ID; Claude provider already exists so it's a 2-line registry+tier add once the exact API model ID is known (will be tagged HIGH COST).
+
+### New provider — `src/core/ai/providers/deepseekProvider.ts`
+- **File added:** `deepseekProvider.ts` — OpenAI-compatible call to `https://api.deepseek.com/v1/chat/completions`, Bearer auth, max_tokens 8000. Default model `deepseek-chat`.
+
+### Functional wiring (required for DeepSeek to work)
+- `providerFactory.ts` — import + `case 'deepseek'`.
+- `routingKeys.ts` — `getDeepseekKey()` (respects `disabledProviders`).
+- `routingService.ts` — `getKeyMap()` adds `deepseek: getDeepseekKey`.
+- `secretKeyStore.ts` — `PROVIDERS`, `SETTINGS_MAP` (deepseekApiKey), `ENV_MAP` (DEEPSEEK_API_KEY).
+- `streamingProviders.ts` — added to OpenAI-compatible `providerMap`; capped max_tokens to 8000 (DeepSeek output limit).
+- `guardianAI.ts` — `AI_RANK` + `AI_CAPABILITIES`: DeepSeek inserted at rank 7 (above Groq); existing providers renumbered keeping relative order (no behavior change for users without DeepSeek).
+- `modelRegistry.ts` — two `ModelDef`s: `deepseek-reasoner` (R1, capability 8, costTier 2, thinking, ultra/pro) and `deepseek-chat` (V3, capability 7, costTier 1, pro/flash).
+- `modelTierList.ts` — replaced stale `deepseek-v3`/`deepseek-r1` keys (wrong IDs) with real `deepseek-reasoner` (72) / `deepseek-chat` (60); added `deepseek` to `getBestModelForProvider` isMatch.
+- `routingServiceRoster.ts` — `_settingsKey` pairs (cache invalidation), `getAvailableAI` checks array (so DeepSeek-only users aren't shown "No AI"), display `labelMap`, `getModelName` map.
+- `selfDiagnosticChecks.ts` — `PROVIDER_PING` DeepSeek entry.
+
+### UI / settings
+- `apiSetupHtml.ts` — DeepSeek provider card (badge **LOW COST**, green; whale icon; active model deepseek-reasoner). Verified: DeepSeek is cheap, not high cost.
+- `apiSetup.ts` — save-keys `pairs` + chat-status providers list.
+- `apiSetupScript.ts` — `ids` array (apply/reset loop).
+- `keyBackup.ts` — `PROVIDERS` array (so DeepSeek key is included in encrypted export/import).
+- `package.json` — `defaultAI` enum + enumDescriptions; new `redivivus.deepseekApiKey` setting.
+- Label maps updated (display only): statusBar, usageFormatters, usageHtmlTemplate (x2), chatPanelHeader, chatPanelChunked, chatPanelBuildWorker, chatPanelBuildOrchestratedUtils, roleAssignmentFailover, chatPanelMsgSendAI, chatPanelMsgSendMessage, chatPanelHealthCheck.
+
+### Verification
+- `npm run compile` clean (EXIT 0, no TS errors). Registry resolves ultra/pro → `deepseek-reasoner`, flash → `deepseek-chat`.
+- **Rule 9 note:** `chatPanelHeader.ts` (209) and `chatPanelMsgSendMessage.ts` (205) are pre-existing >200 files; edits were single-key in-place additions to existing label-map lines — line counts did NOT increase. All other touched files are well under 200.
+
+---
+
+## Session — Jun 10, 2026 (Evening): Encrypted Key Backup + Import
+
+**Goal:** Replace the plaintext `.env` API-key export with a passphrase-encrypted backup, and add an import path so users can restore keys after a reload or on a new device.
+
+### New — `src/services/security/keyBackup.ts`
+- **File added:** `src/services/security/keyBackup.ts` (107 lines)
+- **What it does:** AES-256-GCM encryption of the provider→key map, with a passphrase-derived key via `scrypt` (random 16-byte salt + 12-byte IV per export; GCM auth tag detects wrong passphrase/tampering). Exposes `encryptKeyBackup`/`decryptKeyBackup` plus orchestration `exportKeysEncrypted()` (prompts passphrase twice, writes `.rdvkeys`) and `importKeysEncrypted()` (opens file, prompts passphrase, decrypts, `storeKey` each). Verified round-trip + wrong-passphrase rejection.
+- **Why:** The old export wrote keys in cleartext `.env` — anyone with the file had the keys. Encryption makes a stolen backup useless without the passphrase; passphrase-based (not OS-keychain) so the backup is portable across devices.
+- **Risk:** Passphrase is never stored — losing it makes the backup unrecoverable by design (documented in file [WARN]).
+
+### Split — `src/commands/apiSetupHtml.ts` → `src/commands/apiSetupScript.ts`
+- **Files changed:** `apiSetupHtml.ts` (210 → 137 lines), new `apiSetupScript.ts` (91 lines)
+- **What changed:** Extracted the webview `<script>` into `apiSetupScript.ts` (`API_SETUP_SCRIPT`) to bring the over-limit HTML file under Rule 9 before editing it. Added an "Import Keys" button, relabeled "Export Keys (.env)" → "Export Keys (encrypted)", and added the import-button click handler in the script.
+- **Why:** Rule 9 — `apiSetupHtml.ts` was a pre-existing 210-line violation; had to split before adding the import UI. Pre-existing bullet/emoji literals in the script preserved verbatim (Rule 13 note added).
+- **Risk:** none — webview panel uses `webview.html=` (not document.write), so no 45KB limit concern.
+
+### Wired — `src/commands/apiSetup.ts`
+- **File changed:** `src/commands/apiSetup.ts` (199 → 183 lines)
+- **What changed:** `export-all-keys` handler now delegates to `exportKeysEncrypted()` (was ~27 lines of inline plaintext `.env` building). Added `import-keys` handler → `importKeysEncrypted()`, then refreshes the panel HTML + chat panel on success. Removed now-unused `getKeyCached`/`getConfiguredProviders` top-level import.
+- **Risk:** none.
+
+**Goal:** Stop the chat input pill from falsely claiming "Gemini (Supervisor)" when no AI keys are configured, add a clear call-to-action on the launcher, and make the chat panel reflect key changes immediately (no reload).
+
+### API Setup — chat panel refresh on key change (`src/commands/apiSetup.ts`)
+- **File changed:** `src/commands/apiSetup.ts`
+- **What changed:** Added `refreshChatPanelForKeyChange()` helper — calls `invalidateRosterCache()` then `ChatPanel.currentPanel.refresh()`. Wired into both the `save-keys` and `toggle-provider` message handlers.
+- **Why:** After applying keys in the API Setup panel ("keys applied and verified successfully"), the chat panel still showed "No AI key" pill + the amber "No AI is set up yet" banner until a manual window reload. The chat panel's HTML was rendered once with `hasKey:false` and nothing re-rendered it. (Same pattern already exists at startup in `extension.ts` `onSecretKeyStoreReady`.)
+- **Risk:** File reached 201 lines after the edit; condensed the helper comment back to 199 (under Rule 9 limit). `apiSetupHtml.ts` remains a pre-existing 210-line violation (unchanged this session).
+
+### Roster — `src/services/ai/routingServiceRoster.ts`
+- **File changed:** `src/services/ai/routingServiceRoster.ts`
+- **What changed:** `getRosterDisplay()` now returns `[]` when no API key is configured (`!Object.values(keyMap).some(fn => fn())`).
+- **Why:** `buildRoster()` defaults `supervisor` to `'gemini'` even with zero keys, so `getRosterDisplay()` always returned a non-empty array. The input pill (`chatPanelHeaderRender.ts`) shows the roster whenever it's non-empty, ignoring `hasKey` — so it displayed "Gemini (Supervisor)" with no key set. Empty roster makes the render fall through to the "⚠️ No AI key" pill.
+- **Risk:** none — `buildRoster()` itself is unchanged, so routing logic that relies on a non-null supervisor default still works. Only the display roster is gated.
+
+### Launcher — `src/ui/panels/chat/chatPanelEmptyState.ts`
+- **File changed:** `src/ui/panels/chat/chatPanelEmptyState.ts`
+- **What changed:** Added `noAiBanner` (amber, shown when `!header.hasKey`) at the top of the launcher screen: "⚠️ No AI is set up yet. Redivivus needs at least one AI provider… Add a free key to get started." with a "Set up an AI" button → `redivivus.openSettings`. Mirrors the existing `signInBanner` pattern.
+- **Why:** A new user with no keys had no on-screen guidance that the first required step is configuring an AI.
+- **Risk:** none — banner is conditional on `!hasKey`; disappears once any key is added. Used HTML entities (`&#x26A0;`) per Rule 13, not literal emoji.
+
+---
+
+## Session — Jun 10, 2026 (Evening): Auto-Update Notification System (v0.4.6)
+
+**Goal:** Add `/api/version` backend endpoint, improve update UX (beta warning + snooze), version badge in status bar, and consolidate startup update check into a single reusable function.
+
+---
+
+### Backend — `/api/version` route (`redivivus-backend/src/app/api/version/route.ts`)
+- **File changed:** `src/app/api/version/route.ts` (new file)
+- **What changed:** Created GET endpoint; reads `REDIVIVUS_VERSION` env var first, falls back to proxying `api.github.com/repos/smithkjnc-ux/Redivivus/releases/latest` with 5-min Next.js cache. Returns `{"version":"X.X.X"}`.
+- **Why:** Endpoint was missing — `curl https://redivivus-backend.fly.dev/api/version` returned 404. Extension update check depends on this.
+- **Risk:** GitHub API unauthenticated rate limit (60/hr). Mitigated by 5-min cache and env-var fast path. Set `REDIVIVUS_VERSION=0.4.6` in Fly.io secrets; deployed.
+
+### Backend — Fly.io secret
+- **What changed:** `flyctl secrets set REDIVIVUS_VERSION=0.4.6` applied; `fly deploy` completed.
+- **Why:** Env-var fast path returns version without GitHub API call.
+- **Risk:** none
+
+### Backend — version/release mismatch causing HTTP 404 on update (follow-up)
+- **What changed:** `REDIVIVUS_VERSION` Fly secret had drifted to `0.4.7`, but no v0.4.7 GitHub release exists (latest published is v0.4.6 with a real `redivivus-0.4.6.vsix`). Reset secret to `0.4.6` via `flyctl secrets set`.
+- **Symptom:** IDE (v0.4.6) saw "Update v0.4.7 available", clicked update → `runUpdate` tried to download `.../releases/download/v0.4.7/redivivus-0.4.7.vsix` → HTTP 404 (asset doesn't exist) → "Update check failed: HTTP 404".
+- **Why it broke:** The version endpoint must NEVER advertise a version that has no published release + downloadable VSIX. The env-var fast path trusts the operator; if `REDIVIVUS_VERSION` is bumped ahead of an actual release, every client hits a 404.
+- **Operational rule (NON-NEGOTIABLE):** Only bump `REDIVIVUS_VERSION` as part of publishing that exact release (build VSIX → create GitHub release → set secret). The `deploy-ide.yml` flyctl step does this atomically. Never set it ahead manually.
+- **Risk:** none — backend now reports 0.4.6 = latest published release = running IDE. Update prompt clears on next check.
+
+### GitHub Workflow — flyctl step (`deploy-ide.yml.disabled`)
+- **File changed:** `.github/workflows/deploy-ide.yml.disabled`
+- **What changed:** Added `Update Fly.io REDIVIVUS_VERSION secret` step after GitHub Release creation. Uses `FLY_API_TOKEN` secret; requires adding that secret to GitHub repo before re-enabling workflow.
+- **Why:** Future releases will auto-update the backend version without manual `flyctl secrets set`.
+- **Risk:** `FLY_API_TOKEN` GitHub secret must be set before workflow is re-enabled.
+
+### Extension — `src/commands/checkForUpdates.ts`
+- **File changed:** `src/commands/checkForUpdates.ts`
+- **What changed:** (1) `registerCheckForUpdatesCommand`: upgraded to `showWarningMessage` with "⚠️ Beta" message, replaced Dismiss with "What's New" (opens GitHub release URL) and "Remind Me Later" (4-hour snooze stored to `redivivus.updateRemindAfter`). (2) New export `runStartupUpdateCheck(context, statusBar)`: 1-hour cooldown + snooze check, swallows all errors silently, calls `statusBar.showUpdateAvailable()` on update found.
+- **Why:** Old prompt had no snooze; users who clicked dismiss were never reminded again. No beta warning despite this being beta software.
+- **Risk:** none
+
+### Extension — `src/ui/views/statusBar.ts`
+- **File changed:** `src/ui/views/statusBar.ts`
+- **What changed:** Added `versionItem` (Right, priority 998) — shows current version as `v0.4.6`, tooltip says "click to check for updates", command `redivivus.checkForUpdates`. Always visible.
+- **Why:** No persistent version indicator in the IDE; users had no quick reference for current version.
+- **Risk:** File is now ~200 lines — at hard limit, split required before next edit.
+
+### Extension — `src/ui/views/statusBar.ts` — CRITICAL activation-crash fix (follow-up)
+- **File changed:** `src/ui/views/statusBar.ts`
+- **What changed:** Fixed broken `require('../../package.json')` → `require('../../../package.json')` for the version badge, and wrapped the whole version-badge block in try/catch.
+- **Why:** `statusBar.js` lives at `out/ui/views/` (3 levels deep). The `../../package.json` path (copied from `checkForUpdates.ts`, which is only 2 levels deep at `out/commands/`) resolved to non-existent `out/package.json`, threw during `statusBar.activate()`, and aborted the entire extension activation. Result: empty REDIVIVUS MENU sidebar, no chat auto-open, no version badge — the IDE looked broken after the v0.4.6 deploy + host restart.
+- **Risk:** none — try/catch now guarantees the non-critical version badge can never abort activation again.
+
+### Extension — `src/extension.ts`
+- **File changed:** `src/extension.ts`
+- **What changed:** Replaced 28-line inline startup update check with a 4-line call to `runStartupUpdateCheck(context, statusBar)`. File reduced from 373 → 349 lines.
+- **Why:** Inline check had no snooze logic; consolidation makes startup check testable in isolation.
+- **Risk:** File remains at 349 lines (pre-existing violation). [NEXT] split required before next edit.
+
+---
+
 ## Session — Jun 10, 2026 (PM): Linux Branding Overhaul + Installer Fixes (v0.4.4–0.4.5)
 
 **Goal:** Fully debrand the running IDE from VSCodium, fix all installer crashes and stale-state bugs, verify extension deployment, and update docs.

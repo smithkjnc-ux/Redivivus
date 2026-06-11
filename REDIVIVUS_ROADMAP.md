@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-10 (PM) — Linux branding overhaul: debranded installer, CLI aliases, desktop WM_CLASS, nls patching, sidebar visibility fix, deploy gap fix, platform-aware updater (v0.4.4–v0.4.5).
+*Last updated:* 2026-06-10 (Evening) — Auto-detect free-tier quota (new providerTierState.ts): repeated quota errors silently downshift a provider's planning capability (Gemini free => Flash) so builds match the real ceiling — no toggles, soft/self-recovering. Builds on the constraint/cost/ceiling-aware Supervisor routing (supervisorPlanner.ts). Earlier today: DeepSeek provider, encrypted key backup (.rdvkeys), no-AI UX fixes, auto-update + /api/version (v0.4.6).
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
@@ -28,6 +28,13 @@
 ---
 
 ## Recent Sessions (last 3 — full entries in `docs/REDIVIVUS_FIXES.md`)
+
+### Jun 10, 2026 (Evening) — Auto-Update Notification System (v0.4.6)
+- `/api/version` backend endpoint: env var `REDIVIVUS_VERSION` fast path + GitHub Releases fallback; deployed to Fly.io
+- `checkForUpdates.ts`: beta ⚠️ warning message, "What's New" + "Remind Me Later" (4-hour snooze) buttons, `runStartupUpdateCheck()` export
+- `statusBar.ts`: `versionItem` badge (Right, 998) — always shows current version, clicks to check for updates
+- `extension.ts`: inline 28-line startup check replaced with `runStartupUpdateCheck(context, statusBar)` call (file shrunk to 349 lines)
+- Workflow `deploy-ide.yml.disabled`: added `flyctl secrets set REDIVIVUS_VERSION` step for future automated releases
 
 ### Jun 10, 2026 (PM) — Linux Branding Overhaul (v0.4.4–v0.4.5)
 - Installer fixes: pkill/`set -e` crash, stale `extensions.json`, macOS VSIX path bug, session restore, `.vscode-oss` migration

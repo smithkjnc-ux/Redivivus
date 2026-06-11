@@ -12,6 +12,7 @@ export class StatusBar {
   private saveItem: vscode.StatusBarItem;
   private connectionItem: vscode.StatusBarItem;
   private updateItem: vscode.StatusBarItem;
+  private versionItem: vscode.StatusBarItem;
   private _isConnected = false;
 
   constructor(
@@ -25,6 +26,7 @@ export class StatusBar {
     this.saveItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 97);
     this.connectionItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 1000);
     this.updateItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 999);
+    this.versionItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 998);
   }
 
   activate(context: vscode.ExtensionContext): void {
@@ -35,7 +37,12 @@ export class StatusBar {
     this.saveItem.show();
     this.connectionItem.show();
     this.updateConnectionItem();
-    context.subscriptions.push(this.blueprintItem, this.sessionItem, this.tokenItem, this.saveItem, this.connectionItem, this.updateItem);
+    try {
+      const v = (require('../../../package.json') as { version: string }).version; // [WARN] 3-level path; a throw here aborts ALL activation
+      Object.assign(this.versionItem, { text: 'v' + v, tooltip: `Redivivus v${v} — click to check for updates`, command: 'redivivus.checkForUpdates' });
+      this.versionItem.show();
+    } catch { /* version badge non-critical — never abort activation */ }
+    context.subscriptions.push(this.blueprintItem, this.sessionItem, this.tokenItem, this.saveItem, this.connectionItem, this.updateItem, this.versionItem);
 
     // [WARN] This interval continuously updates the status bar. Ensure 'update' is performant to avoid UI lag.
     // [WARN] Proper disposal of this interval is crucial to prevent resource leaks upon deactivation.
@@ -167,7 +174,7 @@ export class StatusBar {
         else { aiTotals.set(entry.aiProvider, { tokens: entry.tokens, cost: entry.cost }); }
       }
     }
-    const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+    const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
     const aiLines = [...aiTotals.entries()]
       .map(([ai, d]) => `  ${aiLabels[ai] || ai}: ${d.tokens.toLocaleString()} tokens ($${d.cost.toFixed(4)})`)
       .join('\n');

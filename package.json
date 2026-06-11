@@ -581,7 +581,8 @@
             "openai",
             "groq",
             "xai",
-            "kimi"
+            "kimi",
+            "deepseek"
           ],
           "enumDescriptions": [
             "Google Gemini (free tier available)",
@@ -589,7 +590,8 @@
             "OpenAI GPT-4o / GPT-4o Mini (paid)",
             "Groq \u2014 Llama 3 (free tier)",
             "xAI Grok (paid)",
-            "Moonshot Kimi (paid)"
+            "Moonshot Kimi (paid)",
+            "DeepSeek R1 / V3 (low cost)"
           ],
           "description": "Which AI provider to use for Redivivus operations"
         },
@@ -627,6 +629,11 @@
           "type": "string",
           "default": "",
           "description": "Moonshot Kimi API key \u2014 platform.moonshot.cn (or set MOONSHOT_API_KEY env var)"
+        },
+        "redivivus.deepseekApiKey": {
+          "type": "string",
+          "default": "",
+          "description": "DeepSeek API key \u2014 platform.deepseek.com (or set DEEPSEEK_API_KEY env var)"
         },
         "redivivus.guardianEnabled": {
           "type": "boolean",

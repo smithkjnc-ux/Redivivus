@@ -21,7 +21,8 @@ export const MODEL_TIER_LIST: Record<string, number> = {
   'o4-mini':                    68,
   'claude-haiku-4-5':           65,
   'claude-haiku-4-5-20251001':  65,
-  'deepseek-v3':                62,
+  'deepseek-reasoner':          72,
+  'deepseek-chat':              60,
   'grok-3':                     62,
   'llama-4-maverick':           60,
   'moonshot-v1-128k':           58,
@@ -31,7 +32,6 @@ export const MODEL_TIER_LIST: Record<string, number> = {
   'gpt-4o-mini':                50,
   'grok-3-mini':                48,
   'gemini-2.0-flash':           45,
-  'deepseek-r1':                43,
   'llama-4-scout':              40,
   'moonshot-v1-32k':            40,
   'llama-3.1-8b-instant':       35,
@@ -55,6 +55,7 @@ export function getBestModelForProvider(provider: string): { modelId: string; ra
     if (provider === 'groq')   { return id.startsWith('llama-'); }
     if (provider === 'xai')    { return id.startsWith('grok-'); }
     if (provider === 'kimi')   { return id.startsWith('moonshot-'); }
+    if (provider === 'deepseek') { return id.startsWith('deepseek-'); }
     return false;
   };
   // Use getModelRank() so user overrides (redivivus.modelRankOverrides) are respected

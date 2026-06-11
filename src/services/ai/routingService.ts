@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import type { VaultContextService } from '../vault/vaultContextService.js';
 import type { AIResponse } from './routingTypes.js';
-import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from './routingKeys.js';
+import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import { AI_RANK } from './guardianAI.js';
 import { routeByComplexityImpl } from './routingComplexity.js';
@@ -17,6 +17,7 @@ import { analyzeFileImpl } from './routingServiceAnalyze.js';
 import { logTelemetry } from '../api/apiClient.js';
 import { logAICall } from './aiCallLogger.js';
 import { promptCheapImpl } from './routingServiceCheap.js';
+import { recordQuotaError } from './providerTierState.js';
 
 import {
   selectSupervisorAndWorker,
@@ -127,6 +128,10 @@ export class RoutingService {
       const isRetryable = isNetworkError || isCapacityError;
       lastError = result.error || 'Unknown error';
 
+      // Feed the tier detector: repeated quota errors mark a free-capable provider as constrained
+      // so future build plans match its real ceiling. Silent, soft, self-recovering.
+      if (isCapacityError) { recordQuotaError(ai); }
+
       if (!isRetryable) {
         // Hard error (bad API key, invalid request, etc.) — don't failover
         return result;
@@ -155,7 +160,7 @@ export class RoutingService {
   }
 
   getKeyMap(): Record<string, () => string | null> {
-    return { gemini: getGeminiKey, claude: getClaudeKey, openai: getOpenAIKey, groq: getGroqKey, xai: getXAIKey, kimi: getKimiKey };
+    return { gemini: getGeminiKey, claude: getClaudeKey, openai: getOpenAIKey, groq: getGroqKey, xai: getXAIKey, kimi: getKimiKey, deepseek: getDeepseekKey };
   }
 
   async routeByComplexity(task: string, promptText: string, timeoutMs = 30_000): Promise<AIResponse & { estimate?: string; tier?: 'free' | 'paid'; routedTo?: string; routingReason?: string }> {

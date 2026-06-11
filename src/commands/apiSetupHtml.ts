@@ -5,12 +5,13 @@ import * as vscode from 'vscode';
 import { RoutingService } from '../services/ai/routingService.js';
 import { API_SETUP_CSS } from './apiSetupStyles.js';
 import { buildProviderCards } from './apiSetupHtmlCards.js';
+import { API_SETUP_SCRIPT } from './apiSetupScript.js';
 
 export function getApiSetupHtml(): string {
   const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../services/ai/secretKeyStore.js');
   const config = vscode.workspace.getConfiguration('redivivus');
-  const [geminiKey, claudeKey, openaiKey, groqKey, xaiKey, kimiKey] =
-    ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi'].map(p => getKeyCached(p) || '');
+  const [geminiKey, claudeKey, openaiKey, groqKey, xaiKey, kimiKey, deepseekKey] =
+    ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi', 'deepseek'].map(p => getKeyCached(p) || '');
 
   const disabledProviders = config.get<string[]>('disabledProviders') || [];
   const routing = new RoutingService();
@@ -42,11 +43,16 @@ export function getApiSetupHtml(): string {
       abilities: 'Strong analytical capabilities. Will challenge assumptions and provide alternative architectural viewpoints.', 
       costDetails: 'No free tier. Paid: $2.00 per 1M input tokens.',
       link: 'https://console.x.ai/',                           linkLabel: 'Get API key', val: xaiKey, model: 'grok-2-1212', tier: '💬 Smart & Dynamic (Paid)' },
-    { id: 'kimi',   icon: '🔮', name: 'Kimi (Moonshot AI)',       badge: 'Paid',                badgeColor: '#b85c00', 
-      desc: 'Specialized in processing massive amounts of context.', 
-      abilities: 'Can ingest up to 200k tokens reliably. Ideal for reading entire framework documentation or huge monolithic files.', 
+    { id: 'kimi',   icon: '🔮', name: 'Kimi (Moonshot AI)',       badge: 'Paid',                badgeColor: '#b85c00',
+      desc: 'Specialized in processing massive amounts of context.',
+      abilities: 'Can ingest up to 200k tokens reliably. Ideal for reading entire framework documentation or huge monolithic files.',
       costDetails: 'No free tier. Paid: ~$0.02 per 1M input tokens.',
       link: 'https://platform.moonshot.cn/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)' },
+    { id: 'deepseek', icon: '🐋', name: 'DeepSeek',              badge: 'LOW COST',            badgeColor: '#1a7a3a',
+      desc: 'Strong reasoning at a fraction of the cost of premium models.',
+      abilities: 'DeepSeek R1 is a powerful chain-of-thought reasoner for math, algorithms, and step-by-step logic. DeepSeek V3 handles fast general coding.',
+      costDetails: 'No free tier, but very cheap. Paid: ~$0.14-$0.55 per 1M input tokens. As Supervisor, uses deepseek-reasoner (R1).',
+      link: 'https://platform.deepseek.com/api_keys',          linkLabel: 'Get API key', val: deepseekKey, model: 'deepseek-reasoner', tier: '🐋 Deep Reasoning (Low Cost)' },
   ];
 
   const getRank = (pId: string, val: string) => {
@@ -120,7 +126,8 @@ export function getApiSetupHtml(): string {
   ${providerCards}
   <div class="actions">
     <button id="apply-btn">&#x2705; Apply Changes</button>
-    <button id="export-all-btn" class="secondary">&#x1F4BE; Export Keys (.env)</button>
+    <button id="export-all-btn" class="secondary">&#x1F510; Export Keys (encrypted)</button>
+    <button id="import-keys-btn" class="secondary">&#x1F4E5; Import Keys</button>
     <button id="vscode-settings-btn" class="secondary">&#x2699;&#xFE0F; Open VS Code Settings</button>
   </div>
   <div id="apply-feedback" class="apply-feedback">
@@ -130,80 +137,6 @@ export function getApiSetupHtml(): string {
   <div class="tip">
     &#x1F4A1; You can also set keys via environment variables: <code>GEMINI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GROQ_API_KEY</code>, <code>XAI_API_KEY</code>, <code>MOONSHOT_API_KEY</code>
   </div>
-  <script>
-    const vscode = acquireVsCodeApi();
-    
-    function toggleProvider(id) {
-      vscode.postMessage({ type: 'toggle-provider', providerId: id });
-    }
-
-    document.getElementById('apply-btn').addEventListener('click', () => {
-      const btn = document.getElementById('apply-btn');
-      btn.innerHTML = '&#8987; Verifying Keys...';
-      btn.style.opacity = '0.7';
-      btn.style.pointerEvents = 'none';
-      
-      const ids = ['gemini','claude','openai','groq','xai','kimi'];
-      const payload = { type: 'save-keys' };
-      ids.forEach(id => {
-        document.getElementById(id + '-err').style.display = 'none'; // reset errors
-        const el = document.getElementById(id + '-key');
-        if (!el) return;
-        const v = el.value;
-        payload[id + 'Key'] = (v.includes('•') && el.dataset.original === 'set') ? undefined : v;
-      });
-      vscode.postMessage(payload);
-    });
-
-    document.getElementById('vscode-settings-btn').addEventListener('click', () => { vscode.postMessage({ type: 'open-vscode-settings' }); });
-
-    document.getElementById('export-all-btn').addEventListener('click', () => {
-      const btn = document.getElementById('export-all-btn');
-      btn.innerHTML = '&#x8987; Saving...';
-      btn.style.opacity = '0.7';
-      vscode.postMessage({ type: 'export-all-keys' });
-      setTimeout(() => {
-        btn.innerHTML = '&#x1F4BE; Export Keys (.env)';
-        btn.style.opacity = '1';
-      }, 1500);
-    });
-
-    window.addEventListener('message', e => {
-      if (e.data.type === 'highlight-provider') {
-        const el = document.getElementById(e.data.provider + '-key');
-        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.focus(); el.style.outline = '2px solid #4a9eff'; setTimeout(() => { el.style.outline = ''; }, 3000); }
-      } else if (e.data.type === 'saved') {
-        const btn = document.getElementById('apply-btn');
-        btn.innerHTML = '&#x2705; Apply Changes';
-        btn.style.opacity = '1';
-        btn.style.pointerEvents = 'auto';
-
-        if (e.data.errors && e.data.errors.length > 0) {
-            e.data.errors.forEach(err => {
-                const errDiv = document.getElementById(err.id + '-err');
-                if (errDiv) {
-                    errDiv.textContent = '❌ ' + err.msg;
-                    errDiv.style.display = 'block';
-                }
-                const statusDiv = document.getElementById(err.id + '-status');
-                if (statusDiv) {
-                    statusDiv.className = 'provider-status status-missing';
-                    statusDiv.innerHTML = '❌ Invalid Key';
-                }
-            });
-            const fb = document.getElementById('apply-feedback');
-            fb.innerHTML = '&#x26A0;&#xFE0F; <strong>Saved with errors.</strong> Some keys failed validation.<br><span id="apply-time" style="font-size:11px;opacity:0.7;">' + 'Applied at ' + e.data.timestamp + '</span>';
-            fb.style.borderLeft = '4px solid #b85c00';
-            fb.classList.add('show');
-            setTimeout(() => { fb.classList.remove('show'); fb.style.borderLeft = '4px solid #4ec959'; }, 8000);
-        } else {
-            const fb = document.getElementById('apply-feedback');
-            fb.innerHTML = '&#x2705; <strong>Keys verified and applied!</strong> Redivivus is ready to build.<br><span id="apply-time" style="font-size:11px;opacity:0.7;">' + 'Applied at ' + e.data.timestamp + '</span>';
-            fb.classList.add('show');
-            setTimeout(() => fb.classList.remove('show'), 5000);
-        }
-      }
-    });
-  </script>
+  <script>${API_SETUP_SCRIPT}</script>
 </body></html>`;
 }

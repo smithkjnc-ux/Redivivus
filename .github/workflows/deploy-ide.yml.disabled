@@ -139,3 +139,12 @@ jobs:
           cd $HOME/projects/redivivus
           git commit -am "chore: release $NEW_VERSION"
           git push origin master
+
+      - name: Update Fly.io REDIVIVUS_VERSION secret
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          curl -L https://fly.io/install.sh | sh
+          export PATH="$HOME/.fly/bin:$PATH"
+          flyctl secrets set REDIVIVUS_VERSION=$NEW_VERSION \
+            --app redivivus-backend

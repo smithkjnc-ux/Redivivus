@@ -5,7 +5,7 @@ import type { UsageReport, UsageEntry } from '../services/usageTracker.js';
 import { getUsageCss } from './usageHtmlStyles.js';
 
 export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>, history?: UsageEntry[]): string {
-  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
 
   const formatPeriod = (p: { tokens: number; cost: number; messages: number }) => ({
     tokens: p.tokens.toLocaleString(),
@@ -134,7 +134,7 @@ export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; l
       <th style="padding:6px 10px;text-align:right;">Cost</th>
     </tr></thead>
     <tbody>${[...history].reverse().slice(0, 200).map(e => {
-      const aiLabels2: Record<string,string> = { gemini:'Gemini', claude:'Claude', openai:'GPT-4o', groq:'Groq', xai:'Grok', kimi:'Kimi' };
+      const aiLabels2: Record<string,string> = { gemini:'Gemini', claude:'Claude', openai:'GPT-4o', groq:'Groq', xai:'Grok', kimi:'Kimi', deepseek:'DeepSeek' };
       const roleEmoji: Record<string,string> = { supervisor:'&#x1F50D; Supervisor', worker:'&#x2699;&#xFE0F; Worker', guardian:'&#x1F6E1;&#xFE0F; Guardian', qa:'&#x1F4AC; Q&amp;A', solo:'&#x1F3AF; Solo' };
       const d = new Date(e.timestamp);
       const t = d.toLocaleDateString() + ' ' + d.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});

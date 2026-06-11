@@ -8,7 +8,7 @@ import { buildRegistrations, assignRoles } from './roleAssignmentService.js';
 
 const RECOVERY_MS = 10 * 60 * 1000; // 10 minutes
 const PROVIDER_LABELS: Record<string, string> = {
-  claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi',
+  claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek',
 };
 
 export type FailoverNotify = (msg: string) => void;

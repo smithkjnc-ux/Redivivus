@@ -96,7 +96,7 @@ export function registerCheckForUpdatesCommand(context: vscode.ExtensionContext)
       const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev';
       const webBase = apiBase.replace('/api/v1', '');
       try {
-        const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(8000) });
+        const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(20_000) });
         if (!res.ok) { vscode.window.showErrorMessage('Could not check for updates — try again later.'); return; }
         const { version: latestVersion } = await res.json() as { version: string };
         if (!latestVersion || latestVersion === currentVersion) {
@@ -105,14 +105,45 @@ export function registerCheckForUpdatesCommand(context: vscode.ExtensionContext)
         if (isDevBuild()) {
           vscode.window.showInformationMessage(`v${latestVersion} available (dev build — use rigops to release).`); return;
         }
-        const choice = await vscode.window.showInformationMessage(
-          `Redivivus v${latestVersion} is available (you have v${currentVersion}).`,
-          'Update Now', 'Dismiss'
+        const choice = await vscode.window.showWarningMessage(
+          `⚠️ Redivivus Beta v${latestVersion} available (you have v${currentVersion}).\nBeta updates may include critical fixes — strongly recommended.`,
+          'Update Now', "What's New", 'Remind Me Later'
         );
-        if (choice === 'Update Now') { await runUpdate(latestVersion); }
+        if (choice === 'Update Now') {
+          await runUpdate(latestVersion);
+        } else if (choice === "What's New") {
+          vscode.env.openExternal(vscode.Uri.parse('https://github.com/smithkjnc-ux/Redivivus/releases/tag/v' + latestVersion));
+        } else if (choice === 'Remind Me Later') {
+          context.globalState.update('redivivus.updateRemindAfter', Date.now() + 4 * 60 * 60 * 1000);
+          vscode.window.showWarningMessage('⚠️ Reminder set for 4 hours. Beta updates are strongly recommended — please update soon.');
+        }
       } catch (err) {
         vscode.window.showErrorMessage(`Update check failed: ${err instanceof Error ? err.message : String(err)}`);
       }
     })
   );
+}
+
+// Startup update check: 1-hour cooldown + snooze support. Swallows all errors — never blocks startup.
+export async function runStartupUpdateCheck(
+  context: vscode.ExtensionContext,
+  statusBar: { showUpdateAvailable(version: string): void }
+): Promise<void> {
+  try {
+    const lastCheck = context.globalState.get<number>('redivivus.lastUpdateCheck', 0);
+    if (Date.now() - lastCheck < 60 * 60 * 1000) { return; }
+    const remindAfter = context.globalState.get<number>('redivivus.updateRemindAfter', 0);
+    if (Date.now() < remindAfter) { return; }
+    const pkg = require('../../package.json') as { version: string };
+    const currentVersion = pkg.version;
+    const cfg = vscode.workspace.getConfiguration('redivivus');
+    const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev';
+    const webBase = apiBase.replace('/api/v1', '');
+    const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(20_000) });
+    if (!res.ok) { return; }
+    await context.globalState.update('redivivus.lastUpdateCheck', Date.now());
+    const { version: latestVersion } = await res.json() as { version: string };
+    if (!latestVersion || latestVersion === currentVersion) { return; }
+    statusBar.showUpdateAvailable(latestVersion);
+  } catch { /* swallow all errors on startup */ }
 }

@@ -3,7 +3,7 @@
 // [WARN] invalidateRosterCache() must be called after any model failure or key change.
 
 import * as vscode from 'vscode';
-import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey } from './routingKeys.js';
+import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
 import { AI_RANK } from './guardianAI.js';
 
 export interface SwPair { supervisor: string; worker: string | null; }
@@ -16,7 +16,7 @@ let _swCache: { pair: SwPair; settingsKey: string } | null = null;
 function _settingsKey(): string {
   const pairs: Array<[string, () => string | null]> = [
     ['gemini', getGeminiKey], ['claude', getClaudeKey], ['openai', getOpenAIKey],
-    ['groq', getGroqKey], ['xai', getXAIKey], ['kimi', getKimiKey],
+    ['groq', getGroqKey], ['xai', getXAIKey], ['kimi', getKimiKey], ['deepseek', getDeepseekKey],
   ];
   return pairs.map(([p, fn]) => fn() ? p : '').join(',')
     + '|' + (vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '');
@@ -68,8 +68,12 @@ export function buildRoster(keyMap: Record<string, () => string | null>): {
 }
 
 export function getRosterDisplay(keyMap: Record<string, () => string | null>): Array<{ ai: string; label: string; role: 'Supervisor' | 'Worker' | 'Guardian'; emoji: string }> {
+  // [FIX] No keys configured -> empty roster. buildRoster() defaults supervisor to 'gemini' even
+  // with zero keys, which made the input pill falsely claim "Gemini (Supervisor)". Returning []
+  // lets the header render fall through to the "No AI key" pill. See chatPanelHeaderRender.ts.
+  if (!Object.values(keyMap).some(fn => fn())) { return []; }
   const roster = buildRoster(keyMap);
-  const labelMap: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const labelMap: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
   const result: Array<{ ai: string; label: string; role: 'Supervisor' | 'Worker' | 'Guardian'; emoji: string }> = [];
   result.push({ ai: roster.supervisor, label: labelMap[roster.supervisor] || roster.supervisor, role: 'Supervisor', emoji: '🎯' });
   for (const w of roster.workers) { result.push({ ai: w, label: labelMap[w] || w, role: 'Worker', emoji: '⚙️' }); }
@@ -93,6 +97,7 @@ export function getAvailableAI(): { ai: string; source: 'redivivus-settings' | '
     { id: 'groq', label: 'Groq', key: getGroqKey },
     { id: 'xai', label: 'Grok', key: getXAIKey },
     { id: 'kimi', label: 'Kimi', key: getKimiKey },
+    { id: 'deepseek', label: 'DeepSeek', key: getDeepseekKey },
   ];
   const preferred = checks.find(c => c.id === defaultAI);
   if (preferred && preferred.key()) { return { ai: preferred.id, source: 'redivivus-settings', label: preferred.label }; }
@@ -105,7 +110,7 @@ export function getModelName(): string {
   const modelMap: Record<string, string> = {
     gemini: 'gemini-2.5-flash', claude: 'claude-sonnet-4-20250514',
     openai: 'gpt-4o-mini', groq: 'llama-3.3-70b-versatile',
-    xai: 'grok-2-1212', kimi: 'moonshot-v1-8k',
+    xai: 'grok-2-1212', kimi: 'moonshot-v1-8k', deepseek: 'deepseek-chat',
   };
   return modelMap[ai] || ai;
 }

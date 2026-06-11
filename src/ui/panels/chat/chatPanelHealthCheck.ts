@@ -110,7 +110,7 @@ export function buildHealthHtml(d: HealthData): string {
 
   // — Keys —
   const KEY_ORDER = ['claude','gemini','openai','groq','xai','kimi'];
-  const KEY_LABEL: Record<string,string> = { claude:'Claude', gemini:'Gemini', openai:'OpenAI', groq:'Groq', xai:'xAI / Grok', kimi:'Kimi' };
+  const KEY_LABEL: Record<string,string> = { claude:'Claude', gemini:'Gemini', openai:'OpenAI', groq:'Groq', xai:'xAI / Grok', kimi:'Kimi', deepseek:'DeepSeek' };
   const configuredCount = KEY_ORDER.filter(k => d.keys[k]).length;
   const keysCls = configuredCount === 0 ? 'red' : configuredCount < 2 ? 'yellow' : 'green';
 

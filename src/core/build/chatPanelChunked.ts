@@ -36,7 +36,7 @@ export async function runChunkedBuild(task: string, ctx: BuildContext): Promise<
   const buildStart = Date.now();
 
   const { supervisor, worker } = routing.selectSupervisorAndWorker();
-  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi' };
+  const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
   const supervisorLabel = aiLabels[supervisor] || supervisor;
   const workerLabel = worker ? (aiLabels[worker] || worker) : null;
 
