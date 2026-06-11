@@ -74,9 +74,22 @@ export function buildActivityHtml(task: string): string {
       return parts.join('  --  ');
     }
 
+    // The pipeline is sequential, so any row still showing a spinner ([~] running/continue) is finished
+    // the moment a later step arrives. Flip those lingering rows to done so nothing stays "running"
+    // after the build completes.
+    function settlePrior() {
+      var live = timeline.querySelectorAll('.row.running, .row.continue');
+      for (var i = 0; i < live.length; i++) {
+        live[i].className = 'row done';
+        var mk = live[i].querySelector('.mark');
+        if (mk) { mk.className = 'mark done'; mk.innerHTML = '[OK]'; }
+      }
+    }
+
     function addRow(step) {
       var empty = document.getElementById('empty');
       if (empty) empty.remove();
+      settlePrior();
       var status = step.status || 'running';
       var row = document.createElement('div');
       row.className = 'row ' + cls(status);

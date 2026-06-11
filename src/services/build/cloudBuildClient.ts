@@ -69,6 +69,12 @@ export async function callCloudBuild(
     opts.onProgress?.(`Context trimmed to fit ${preferred || 'model'} window -- dropped: ${dropped.join(', ') || 'none'}, trimmed: ${trimmed.join(', ') || 'none'}`);
   }
 
+  // [FIX] /plan runs the full Supervisor (Sonnet) and returns its prescription + token cost. For
+  // single-file builds we forward these to /build so it REUSES the prescription instead of running the
+  // Supervisor a second time — halving the top-tier cost (~$0.25 -> ~$0.12) and making the card honest.
+  let planPrescription: any[] | null = null;
+  let planSupervisor: { provider?: string; model?: string; inputTokens?: number; outputTokens?: number } = {};
+
   // ── Step 0: Get build plan (skip for fix requests — always single-file) ──
   // [WARN] If /plan returns <=1 file (or fails), a multi-file project like a game falls through to the
   // single-file path, whose parser splits the blob into generic file1.js/file2.js names. The plan
@@ -93,6 +99,9 @@ export async function callCloudBuild(
           supervisorOutputTokens?: number;
         };
         _planLog(`ok status=${planRes.status} files=${plan.files?.length ?? 0} supervisor=${plan.supervisorModel ?? 'none'} paths=${(plan.files ?? []).map(f => f.path).join(', ')}`);
+        // Capture the prescription + Supervisor cost so the single-file path can reuse them in /build.
+        planPrescription = plan.prescription ?? null;
+        planSupervisor = { provider: plan.supervisorProvider, model: plan.supervisorModel, inputTokens: plan.supervisorInputTokens, outputTokens: plan.supervisorOutputTokens };
         if (plan.files && plan.files.length > 1) {
           _planLog(`-> multi-file path (executeMultiFileBuild) with prescription=${!!plan.prescription}`);
           return await executeMultiFileBuild(
@@ -124,7 +133,18 @@ export async function callCloudBuild(
     // was selected, producing incomplete output while Supervisor/Guardian ran on Claude.
     // User's cost/quality preference — backend combines it with task difficulty to pick the model tier.
     const strategy = vscode.workspace.getConfiguration('redivivus').get<string>('modelStrategy') || 'balanced';
-    const requestBody = JSON.stringify({ task, context, preferred, workerModel: preferred, strategy });
+    // Forward /plan's prescription + Supervisor token cost so /build reuses it instead of re-running
+    // the Supervisor (Sonnet) a second time. Only set for single-file builds that ran /plan above.
+    const requestBody = JSON.stringify({
+      task, context, preferred, workerModel: preferred, strategy,
+      ...(planPrescription ? {
+        prescription: planPrescription,
+        supervisorProvider: planSupervisor.provider,
+        supervisorModel: planSupervisor.model,
+        supervisorInputTokens: planSupervisor.inputTokens,
+        supervisorOutputTokens: planSupervisor.outputTokens,
+      } : {}),
+    });
     console.log(`[Redivivus] Build request: taskLen=${task.length}, bodyLen=${requestBody.length}, vaultItems=${context.vaultItems?.length ?? 0}, hasRules=${!!context.projectRules}`);
     // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron
     const instructionRes = await Promise.race([

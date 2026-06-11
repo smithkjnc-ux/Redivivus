@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { writeBuiltFile, createSnapshot, openBuiltFile } from '../../core/build/chatPanelBuildWriter.js';
+import { writeBuiltFile, createSnapshot } from '../../core/build/chatPanelBuildWriter.js';
 import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { CloudBuildResult } from './cloudBuildClient.js';
 import { appendBuildLog } from './buildLogger.js';
@@ -191,9 +191,12 @@ export async function processBuildResults(
     await deps.usageTracker.recordUsage(0, 0, data.model, data.inputTokens, data.outputTokens, workerRole, project);
   }
 
-  // Open the primary built file (html > code > first). Fallback: first written path.
-  const fileToOpen = primaryPath ?? writtenPaths[0];
-  if (fileToOpen) { openBuiltFile(fileToOpen).catch(() => {}); }
+  // [DEAD] Removed auto-opening the built file in the editor. Dropping raw HTML/source into a tab
+  // confuses non-technical users — the Preview tab already renders the result visually, and the file is
+  // one click away in the Project Files tree. Was: `if (fileToOpen) openBuiltFile(fileToOpen)`.
+  // [NEXT] If a "real need" emerges (e.g. a code-only project with no preview), gate re-opening behind
+  // a setting or open only when no previewable HTML exists.
+  void primaryPath; // keep primaryPath computed (used above for history/log selection)
 
   // [FIX] Fire build:finished via the event emitter instead of ChatPanel.onBuildFinished.
   // buildEvents.on() lets every listener (save-points, session recording) register independently.

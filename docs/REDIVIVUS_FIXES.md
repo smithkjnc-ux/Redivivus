@@ -3,6 +3,21 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 11, 2026 (PM): Post-deploy build polish — double-Supervisor cost, panel, auto-open
+
+Fixes #1-3 + Build Activity panel deployed to Fly; first clean build (Tetris renders, Gemini worker, Sonnet supervisor, completeness check passed, costs shown). Four follow-ups from watching a live build:
+
+- **Double Supervisor (the real ~2x cost).** Card showed Claude $0.1233 but the real Anthropic spend was ~$0.25. Root cause: `/plan/route.ts` runs the **full** Supervisor prescription on Sonnet (comment: *"Now uses the proper Supervisor model"*), then for single-file builds `/build` **threw it away and ran Sonnet again** — paying the top-tier model TWICE for identical work. Fix: `/build` now reuses `/plan`'s prescription when the client forwards it.
+  - **Backend** `build/route.ts`: short-circuit before the Supervisor block — if `body.prescription` present, set `parsedContract` from it, inject into the worker prompt, set `supervisorMeta` from the forwarded `/plan` tokens, do Worker delegation, and SKIP the second `executeAI` Supervisor call.
+  - **Client** `cloudBuildClient.ts`: hoist `plan.prescription` + `plan.supervisor*` and forward them in the `/build` body for single-file builds. Net: one Sonnet call (~$0.12), card matches the bill.
+- **Build Activity rows stuck "running"** — `buildActivityHtml.ts`: webview appended rows but never settled earlier spinners, so "Worker building" / "Checking" kept `[~]` after completion. Added `settlePrior()` — any `.row.running/.continue` flips to `[OK]` when a later step arrives (pipeline is sequential).
+- **Auto-opening the built file** — `cloudBuildResultProcessor.ts`: removed `openBuiltFile(fileToOpen)` ([DEAD] logged). Dropping raw HTML into a tab confuses users; Preview renders it and it's one click in the Project Files tree.
+- **Risk:** cost fix is moderate (changes which call produces the prescription) — single-file now depends on `/plan` succeeding; if `/plan` fails, `/build` still runs its own Supervisor (the `if (!supervisorMeta.ran ...)` fallback). Both repos `tsc` clean; extension deployed. **Backend not yet redeployed to Fly** — cost fix only active after deploy.
+
+**Still open:** Security scan false positives (client `securityScanner.ts` flags ALL `innerHTML` via regex — flagged the Tetris GAME OVER/PAUSED static strings as "3 critical"; same false-positive class the backend Guardian already fixed in 220af8f by only flagging external-data flows). Discussed, not yet fixed.
+
+---
+
 ## Session — Jun 11, 2026: Worker truncation regression — restore continuation loop (Fix #1 of 3)
 
 **Symptom:** Tetris build cost ~$0.53 (5× the historical ~10¢) AND shipped a non-working game (blank board). Root-caused from the actual build artifacts (`tetris-arcade-game/.redivivus/build_history.json`, `~/redivivus_debug.log`).
