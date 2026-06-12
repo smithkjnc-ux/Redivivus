@@ -31,6 +31,10 @@ export function onSecretKeyStoreReady(cb: () => void): void {
   _readyCallbacks.push(cb);
 }
 
+/** Synchronous "have keys finished loading from SecretStorage yet?" — used to suppress the alarming
+ *  "No AI is set up" banner during the brief pre-load window (the panel renders before keys load). */
+export function isSecretKeyStoreReady(): boolean { return _initialized; }
+
 /** Call once at extension activation. Loads keys from SecretStorage, migrates from settings.json. */
 export async function initSecretKeyStore(ctx: vscode.ExtensionContext): Promise<void> {
   _ctx = ctx;

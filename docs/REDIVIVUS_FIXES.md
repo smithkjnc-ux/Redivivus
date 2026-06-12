@@ -17,6 +17,18 @@
 
 ---
 
+## Session — Jun 12, 2026: "No AI is set up" banner flash — cry-wolf race fixed
+
+**Symptom:** a "⚠️ No AI is set up yet" banner (+ "No AI key" input badge) flashes for a split second on panel open, then vanishes. The user's keys are valid — false alarm.
+
+**Cause:** the chat panel auto-opens at ~500ms, BEFORE `initSecretKeyStore` finishes reading keys from SecretStorage. During that window `routing.getAvailableAI()` returns `none` → `hasKey=false` → the alarm renders. `onSecretKeyStoreReady` then refreshes and it disappears. Classic cry-wolf (Design Rule 1: never alarm on a transient/unknown state).
+
+- **Files:** `secretKeyStore.ts` (new sync `isSecretKeyStoreReady()` = `_initialized`); `chatPanelHtml.ts` (`keyStoreReady?` on `ChatHeaderInfo`); `chatPanelHeader.ts` (sets it); `chatPanelEmptyState.ts` (suppress "No AI" banner when `keyStoreReady === false`); `chatPanelHeaderRender.ts` (input badge shows neutral "🧠 …" while loading instead of "No AI key").
+- **What changed:** the "no AI" alarm only shows once keys have actually finished loading AND none are configured. During the brief pre-load window the UI stays neutral.
+- **Risk:** low. `tsc` clean; deployed. Keeps the genuine "no key" case (it still alarms once `keyStoreReady` is true).
+
+---
+
 ## Session — Jun 12, 2026: Active-project detection + paradox guard (protected folders)
 
 **Feature (PapaJoe request):** opening a file inside a projects-home subfolder makes that subfolder the ACTIVE project — the chat header/dashboard follows it — WITHOUT changing the workspace (stays `~/projects`, no reload). Completes Model A: workspace = home, navigating folders = switching projects.

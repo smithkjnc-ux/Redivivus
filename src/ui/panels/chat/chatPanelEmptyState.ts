@@ -72,7 +72,10 @@ export function buildEmptyStateHtml(header?: ChatHeaderInfo, progress?: SetupPro
 
   // [FIX] No AI key configured -> Redivivus cannot build or fix anything. Show a prominent
   // call-to-action so the user knows the very first step is to set up at least one AI provider.
-  const noAiBanner = header.hasKey ? '' :
+  // [FIX][CRY-WOLF] Suppress the "No AI is set up" alarm during the brief pre-load window (keyStoreReady
+  // === false). The panel renders before keys load from SecretStorage, so hasKey is momentarily false even
+  // when keys exist. Only alarm once we actually KNOW there's no key.
+  const noAiBanner = (header.hasKey || header.keyStoreReady === false) ? '' :
     `<div style="margin-bottom:16px;padding:14px 16px;background:rgba(245,166,35,0.10);border:1px solid rgba(245,166,35,0.40);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <span style="font-size:13px;color:#f5d9a8;"><strong>&#x26A0;&#xFE0F; No AI is set up yet.</strong> Redivivus needs at least one AI provider to build or fix code. Add a free key to get started.</span>
       <button data-cmd="redivivus.openSettings" style="flex-shrink:0;padding:7px 16px;background:#f5a623;color:#1a1a1a;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;">Set up an AI</button>

@@ -29,7 +29,7 @@ export function renderInputLeftInner(header?: ChatHeaderInfo): string {
   return `<button class="input-pill" data-cmd="redivivus.openVault" title="Browse Vault">&#x229E; Vault</button>
           ${header ? (header.rosterDisplay && header.rosterDisplay.length > 0
             ? `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="AI Team: ${header.rosterDisplay.map(r => r.emoji + ' ' + r.label + ' (' + r.role + ')').join(', ')}">${header.rosterDisplay[0].emoji} ${header.rosterDisplay[0].label}${header.rosterDisplay.length > 1 ? ' +' + (header.rosterDisplay.length - 1) : ''}</span>`
-            : `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="Click to configure AI model">${!header.hasKey ? '⚠️ No AI key' : '🧠 ' + header.aiLabel}</span>`
+            : `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="Click to configure AI model">${header.keyStoreReady === false ? '🧠 …' : (!header.hasKey ? '⚠️ No AI key' : '🧠 ' + header.aiLabel)}</span>`
           ) : ''}
           `;
 }

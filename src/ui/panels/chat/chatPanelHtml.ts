@@ -24,6 +24,7 @@ export interface ChatHeaderInfo {
   aiLabel: string;
   isFallback: boolean;
   hasKey: boolean;
+  keyStoreReady?: boolean; // false during the brief pre-load window -> suppress the "No AI" alarm
   blueprintLocked: boolean;
   hasBlueprint: boolean;
   sessionActive: boolean;

@@ -11,6 +11,7 @@ import { getAccountToken } from '../../../services/api/apiClient.js';
 import * as fs from 'fs';
 import { determineBlueprintStatus } from './chatPanelHeaderUtils.js';
 import { isProjectsContainer } from '../../../services/project/redivivusPaths.js';
+import { isSecretKeyStoreReady } from '../../../services/ai/secretKeyStore.js';
 
 export function buildHeaderInfo(
   redivivus: RedivivusService,
@@ -181,7 +182,7 @@ export function buildHeaderInfo(
   return {
     projectName, aiName, aiLabel: displayModel,
     isFallback: hasKey && available.ai !== selectedAI,
-    hasKey, blueprintLocked, hasBlueprint,
+    hasKey, keyStoreReady: isSecretKeyStoreReady(), blueprintLocked, hasBlueprint,
     sessionActive: false, currentTime: timeStr, isInitialized,
     usageReport: usageTracker?.getReport(),
     lastModel,
