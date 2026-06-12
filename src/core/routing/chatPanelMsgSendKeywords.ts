@@ -32,8 +32,9 @@ export async function handleKeywordShortcuts(
       const { detectPostBuildInfo } = await import('../build/chatPanelPostBuild.js');
       const _info = detectPostBuildInfo(_runRoot, []);
       if (_info.entryFile) {
-        const _p = require('path') as typeof import('path');
-        await vscode.env.openExternal(vscode.Uri.file(_p.join(_runRoot, _info.entryFile)));
+        // [FIX][RUN-WEB-HTTP] Serve over http (NOT file:// — modular apps break there).
+        const { openWebInBrowser } = await import('../project/openWebInBrowser.js');
+        await openWebInBrowser(_runRoot, _info.entryFile);
         conversation.push({ role: 'assistant', content: `Opening \`${_info.entryFile}\` in your browser.`, timestamp: Date.now() });
         refresh(); return true;
       }

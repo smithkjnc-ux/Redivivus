@@ -123,7 +123,13 @@ export async function handleOpenHtmlByName(msg: any): Promise<void> {
   }
   const filePath = require('path').join(root, filename);
   if (fs.existsSync(filePath)) {
-    await vscode.env.openExternal(vscode.Uri.file(filePath));
+    // [FIX][RUN-WEB-HTTP] HTML over http (NOT file:// — modular apps break there); other files open as-is.
+    if (/\.html?$/i.test(filename)) {
+      const { openWebInBrowser } = await import('./openWebInBrowser.js');
+      await openWebInBrowser(root, filename);
+    } else {
+      await vscode.env.openExternal(vscode.Uri.file(filePath));
+    }
   } else {
     vscode.window.showErrorMessage(`File not found: ${filePath}`);
   }

@@ -96,9 +96,10 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
           deps.conversation.push({ role: 'assistant', content: `This is browser code — it needs an HTML page to run. I created \`index.html\` for you automatically.`, timestamp: Date.now() });
           deps.refresh();
         }
-        // Open in the user's default browser outside of VS Code
-        vscode.env.openExternal(vscode.Uri.file(path.join(runRoot, htmlFile)));
-        debugLog(runRoot, 'run-command', `runProject: opened externally: ${htmlFile}`);
+        // [FIX][RUN-WEB-HTTP] Serve over http + open the real browser (NOT file:// — modular apps break there).
+        const { openWebInBrowser } = await import('./openWebInBrowser.js');
+        const servedHttp = await openWebInBrowser(runRoot, htmlFile);
+        debugLog(runRoot, 'run-command', `runProject: opened ${servedHttp ? 'via http' : 'via file://'}: ${htmlFile}`);
         return;
       }
       const term = vscode.window.createTerminal({ name: 'Redivivus: Run', cwd: runRoot });
