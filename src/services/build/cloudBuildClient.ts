@@ -84,18 +84,35 @@ export async function callCloudBuild(
     try {
       opts.onProgress?.('Planning your build...');
       const planBody = JSON.stringify({ task, preferred, context: { blueprint: context.blueprint, existingFiles: context.existingFiles } });
-      // [FIX] Promise.race instead of AbortSignal.timeout — AbortSignal.timeout unreliable in Electron.
-      // [WARN] 30s was too tight: /plan runs the FULL Supervisor prescription (~9k tokens on Sonnet,
-      // 20-40s). Timing out here didn't cancel the backend Claude call (it still billed) — it just made
-      // the client drop the prescription, so /build re-ran the Supervisor and we paid Sonnet TWICE
-      // (~$0.27 vs ~$0.12). 90s lets /plan finish so /build reuses it — cheaper AND faster (one
-      // Supervisor call, not two).
+      // [FIX] /plan now STREAMS (Phase 0). Keep-alive means the long Supervisor call can't falsely time
+      // out at ANY build size, and the prescription streams to the Build Activity panel LIVE (so the user
+      // watches the plan being written, never a frozen screen). Read the stream: @@RDV_STEP@@/@@RDV_CODE@@
+      // frames -> panel; the final @@RDV_RESULT@@ frame -> the file list + prescription /build reuses. The
+      // 300s ceiling only guards a genuinely dead stream — keep-alive keeps a live one from tripping it.
       const planRes = await Promise.race([
         fetch(`${base}/plan`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...keyHeaders }, body: planBody }),
-        makeTimeout(90_000, 'Plan'),
+        makeTimeout(300_000, 'Plan'),
       ]);
-      if (planRes.ok) {
-        const plan = await planRes.json() as {
+      if (planRes.ok && planRes.body) {
+        const pReader = planRes.body.getReader();
+        const pDec = new TextDecoder('utf-8');
+        let pBuf = '';
+        let planResult: any = null;
+        const onPlanLine = (t: string) => {
+          if (t.startsWith('@@RDV_STEP@@')) { try { opts.onStep?.(JSON.parse(t.slice(12))); } catch {} }
+          else if (t.startsWith('@@RDV_CODE@@')) { try { opts.onCode?.(JSON.parse(t.slice(12)).text || ''); } catch {} }
+          else if (t.startsWith('@@RDV_RESULT@@')) { try { planResult = JSON.parse(t.slice(14)); } catch {} }
+        };
+        while (true) {
+          const { done, value } = await pReader.read();
+          if (done) break;
+          pBuf += pDec.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = pBuf.indexOf('\n')) >= 0) { onPlanLine(pBuf.slice(0, nl).trimStart()); pBuf = pBuf.slice(nl + 1); }
+        }
+        if (pBuf.trim()) { onPlanLine(pBuf.trimStart()); }
+
+        const plan = (planResult ?? { files: [] }) as {
           files: Array<{ path: string; description: string; isNew: boolean }>;
           prescription?: any[];
           supervisorModel?: string;
@@ -103,8 +120,8 @@ export async function callCloudBuild(
           supervisorInputTokens?: number;
           supervisorOutputTokens?: number;
         };
-        _planLog(`ok status=${planRes.status} files=${plan.files?.length ?? 0} supervisor=${plan.supervisorModel ?? 'none'} paths=${(plan.files ?? []).map(f => f.path).join(', ')}`);
-        // Capture the prescription + Supervisor cost so the single-file path can reuse them in /build.
+        _planLog(`ok (stream) files=${plan.files?.length ?? 0} supervisor=${plan.supervisorModel ?? 'none'} paths=${(plan.files ?? []).map(f => f.path).join(', ')}`);
+        // Capture the prescription + Supervisor cost so /build reuses them (no second Supervisor call).
         planPrescription = plan.prescription ?? null;
         planSupervisor = { provider: plan.supervisorProvider, model: plan.supervisorModel, inputTokens: plan.supervisorInputTokens, outputTokens: plan.supervisorOutputTokens };
         if (plan.files && plan.files.length > 1) {
@@ -122,7 +139,7 @@ export async function callCloudBuild(
         }
         _planLog(`-> single-file path (plan returned <=1 file)`);
       } else {
-        _planLog(`NOT ok status=${planRes.status} -> single-file path`);
+        _planLog(`NOT ok status=${planRes?.status} -> single-file path`);
       }
     } catch (e) {
       _planLog(`THREW: ${e instanceof Error ? e.message : String(e)} -> single-file path`);
