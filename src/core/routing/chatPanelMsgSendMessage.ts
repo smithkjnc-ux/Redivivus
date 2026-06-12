@@ -95,16 +95,28 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const _byline = `${_pr}${_ms&&_ms!==_pr?' '+_ms:''} · ↑${chatResult.inputTokens??0} ↓${chatResult.outputTokens??0} tok`;
 
   if (chatResult.action === 'answer' || chatResult.action === 'clarify') {
-    // [FIX] Don't show verbose build specs as chat text -- blueprint card handles build intent display
+    // [FIX][SILENT-DROP] The classifier sometimes returns a BUILD request mislabeled as answer/clarify,
+    // with the build JSON embedded in `text`. The old code blanked that text and RETURNED — silently
+    // dropping the build (spinner cleared via releaseInput, nothing rendered, no project created). Now we
+    // detect the embedded build-spec and route it as a real build instead of dropping it, pulling the task
+    // out of the spec when present. (See REDIVIVUS_FIXES.md — this was the "nothing happens" bug.)
     const isBuildSpec = /[`\s]*\{[\s\S]*"action"\s*:\s*"build"/i.test(chatResult.text?.trim() ?? '');
-    const displayText = isBuildSpec ? '' : chatResult.text;
-    if (displayText) {
-      conversation.push({ role: 'assistant', content: `${displayText}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
-      refresh();
+    if (isBuildSpec) {
+      try {
+        const _m2 = chatResult.text.match(/\{[\s\S]*\}/);
+        if (_m2) { const _spec = JSON.parse(_m2[0]); if (_spec && typeof _spec.task === 'string' && _spec.task.trim()) { chatResult.task = _spec.task.trim(); } }
+      } catch { /* keep userText as the task */ }
+      chatResult.action = 'build';
+      // fall through to the build routing below — do NOT return
+    } else {
+      if (chatResult.text) {
+        conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
+        refresh();
+      }
+      releaseInput();
+      await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
+      return;
     }
-    releaseInput();
-    await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
-    return;
   }
   if (chatResult.action === 'command' && chatResult.task) {
     try { await vscode.commands.executeCommand(chatResult.task); } catch { /* needs args or unknown — still show text */ }
@@ -122,7 +134,15 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
 
   const intent = { type: chatResult.action as 'build' | 'fix' | 'scaffold' | 'service' };
   const _claudeTask = chatResult.task || userText;
-  if (msg.fromBlueprintCard && intent.type === 'build') { conversation.push({ role: 'assistant', content: 'Analyzing your build... __BUILD_WORKING__', timestamp: Date.now() }); refresh(); }
+  // [FIX] Guaranteed feedback: ALWAYS show an indicator the moment a build intent is detected, so a build
+  // never looks frozen while the AI infers/plans. Use the animated __BUILD_WORKING__ marker only on the
+  // card re-entry path (runBuildAfterGates clears it); on the first message use a plain line so we never
+  // leave a spinner stuck above the blueprint card.
+  if (intent.type === 'build') {
+    const _wm = msg.fromBlueprintCard ? ' __BUILD_WORKING__' : '';
+    conversation.push({ role: 'assistant', content: `Analyzing your build...${_wm}`, timestamp: Date.now() });
+    refresh();
+  }
   let clarify = { cancelled: false, routedText: userText };
   let _jobTier = 'offer-choices'; // hoisted for Stage 4 diagnostic
 

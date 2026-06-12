@@ -3,6 +3,19 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: THE "nothing happens" bug — builds silently dropped at classify
+
+**Symptom:** "build a tetris arcade game" → message appears, send-button spinner briefly spins, then clears — no working bubble, no blueprint card, no project, no error. Debug log stopped at `conv=1`.
+
+**Root cause (definitive):** In `chatPanelMsgSendMessage.ts`, the input spinner is released ONLY in the answer/clarify/command branches — never the build branch. So the spinner clearing proved execution went through the `answer/clarify` branch. The backend `/chat` (`cloudChat`) returned the build **mislabeled as `action:"answer"`** with the build JSON embedded in `text`. The client detected the build-spec, **blanked the text to avoid showing raw JSON, then `return`ed — silently dropping the build.** Spinner cleared (`releaseInput`), nothing rendered.
+
+- **File changed:** `src/core/routing/chatPanelMsgSendMessage.ts`
+- **What changed:** (1) **Silent-drop fix** — when an answer/clarify response's text IS a build-spec, route it as a real build (`chatResult.action='build'`, extract `task` from the spec) instead of returning. (2) **Guaranteed feedback** — always show an "Analyzing your build..." indicator the instant a build intent is detected (animated `__BUILD_WORKING__` only on the card re-entry path so no spinner gets stuck above the blueprint card; plain line on first message).
+- **Why:** A detected build must NEVER be silently dropped, and a build must NEVER look frozen (cry-wolf / always-feedback principle).
+- **Risk:** low. `tsc` clean; deployed. **Note:** the deeper cause is the backend classifier returning build as `action:"answer"` — the client now self-heals, but the backend `/chat` prompt should also be fixed to return `action:"build"` directly (backend follow-up). **Test:** "build a tetris arcade game" → "Analyzing your build..." → blueprint card or build, project lands in `~/projects/tetris-arcade-game/`.
+
+---
+
 ## Session — Jun 12, 2026: Model A — container is HOME (launcher), never a project + stray cleanup
 
 **Symptom (after W1):** with `~/projects` now the workspace, the chat showed a stale single-project **dashboard** ("hi-browser-website", a flappy-bird blueprint, "Setup 60%") instead of the launcher. **Cause:** a stray `~/projects/.redivivus/config.json` from **May 15** (pre-Model-A, when the old model scaffolded `~/projects` itself as a project) made `isInitialized()` return true for the container. Under Model A the container is HOME — never a project; projects are its subfolders.
