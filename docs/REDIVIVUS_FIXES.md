@@ -3,6 +3,19 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: Model A — container is HOME (launcher), never a project + stray cleanup
+
+**Symptom (after W1):** with `~/projects` now the workspace, the chat showed a stale single-project **dashboard** ("hi-browser-website", a flappy-bird blueprint, "Setup 60%") instead of the launcher. **Cause:** a stray `~/projects/.redivivus/config.json` from **May 15** (pre-Model-A, when the old model scaffolded `~/projects` itself as a project) made `isInitialized()` return true for the container. Under Model A the container is HOME — never a project; projects are its subfolders.
+
+- **Files changed:** `src/services/project/redivivusPaths.ts` (new exported `isProjectsContainer()`; `isInitialized()` returns false for the container); `src/core/routing/chatPanelMsgSendBuildIntent.ts` (the direct-fs `isInitFallback` now also excludes the container).
+- **What changed:** `isInitialized()` and the build-intent fs-fallback now treat the projects container as not-a-project regardless of a stray `.redivivus` → the container always shows the launcher, and container builds route as new-project (auto-create subfolder), never as fixes.
+- **Why:** durable fix so the container can NEVER be mistaken for a project, even if something writes a stray config there again.
+- **Risk:** low. `tsc` clean; deployed. **Follow-up (W2):** other direct-fs `.redivivus/config.json` checks (`chatPanelMsgIntentActions.ts:57`, `cloudBuildResultProcessor.ts:105`, `gitAutoCommitService.ts:81`) should also use `isProjectsContainer()` for full hardening — not urgent now that the stray config is gone.
+
+**Stray cleanup (user-approved, reversible).** Moved 7 pre-Model-A scaffolding items out of `~/projects` into `~/redivivus-stray-backup-2026-06-12/`: `.redivivus`, `.chassis`, `.clinerules`, `.cursorrules`, `.windsurfrules`, `.gitignore`, `.github`. **No folders/repos touched** — `~/projects` holds the user's real source repos (redivivus, redivivus-backend, redivivus-web, redivivus-build, redivivus-templates, rigops, ryppel, torqgrid-v2, etc.) plus AI-built games. Container now shows only project folders. Backup is outside `~/projects` so it doesn't clutter the workspace; restore by moving items back if ever needed.
+
+---
+
 ## Session — Jun 12, 2026: Model A workspace — W1 (establish ~/projects as the persistent workspace root)
 
 **Decision (PapaJoe):** workspace = the **parent** (`~/projects`); each project is a **subfolder**. Open once, never switch, never reload. The codebase was a confused mix of two models (stores projects under `~/projects` like Model A, but treated each project as its own workspace like Model B → the 0→1 folder transition reloads the host and wipes in-flight builds). `getLiveRoot()` already treats "workspace root == projects container" as "auto-create a subfolder," so Model A is mostly wired — it just was never made the actual workspace. Also decided: establish the home as a **deliberate first-run step** (after AI keys), default `~/projects`, show a one-line note (PapaJoe's idea — better than a silent auto-open).

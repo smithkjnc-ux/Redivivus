@@ -26,7 +26,8 @@ export async function handleBuildIntent(
 ): Promise<void> {
   const { panel } = deps;
   const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  const isInitFallback = wsRoot && require('fs').existsSync(path.join(wsRoot, '.redivivus', 'config.json'));
+  // [Model A] The projects container is never a project, even with a stray .redivivus config (pre-Model-A era).
+  const isInitFallback = wsRoot && !isProjectsContainer(wsRoot) && require('fs').existsSync(path.join(wsRoot, '.redivivus', 'config.json'));
   const isInit = deps.redivivus?.isInitialized?.() || isInitFallback;
 
   // [FIX] Force modification requests to bypass build and go straight to fix pipeline

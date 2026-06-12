@@ -47,7 +47,20 @@ export class RedivivusPaths {
   }
 }
 
+// [Model A] The projects container (~/projects) is HOME, never a project — even if a stray .redivivus
+// config sits there from the pre-Model-A era (when ~/projects itself got scaffolded as a project).
+// Treating it as initialized would show a single-project dashboard instead of the launcher and route
+// container builds as fixes. Home is never "initialized"; projects are its SUBFOLDERS.
+export function isProjectsContainer(root: string | undefined): boolean {
+  if (!root) { return false; }
+  const os = require('os');
+  const cfg = vscode.workspace.getConfiguration('redivivus')
+    .get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
+  return path.resolve(root) === path.resolve(cfg);
+}
+
 export function isInitialized(paths: RedivivusPaths): boolean {
+  if (isProjectsContainer(paths.getWorkspaceRoot())) { return false; }
   return require('fs').existsSync(paths.redivivusDir) && require('fs').existsSync(paths.configPath);
 }
 
