@@ -17,6 +17,19 @@
 
 ---
 
+## Session — Jun 12, 2026: card-confirmed build stalled at the Vault-Hit gate — skip all gates
+
+**Symptom:** "Build it" on the Tetris card → "Blueprint confirmed… Building now…" → then nothing (no folder, no result, status "ready"). Debug log's last event: `type=vault-hit-vault-…`.
+
+**Cause:** the previous fix routed the card-confirmed build to `handleBuildRequest(routedText)` WITHOUT `skipComplex`. With `buildMode` unset (Auto), `handleBuildRequest` still runs its gate gauntlet (placement / scope / semantic-vault / vault-hit / cost) because those gates only skip on `buildMode === 'direct'` or `skipComplex`. "tetris arcade game" matched the user's existing arcade games + vault, so the **Vault-Hit gate** popped a reuse modal and the build stalled on it — no folder ever created.
+
+- **File changed:** `src/core/routing/chatPanelMsgSendBuildIntent.ts` (one arg: `handleBuildRequest(routedText, true)`).
+- **What changed:** a confirmed blueprint card now passes `skipComplex=true`, skipping ALL gates and going straight to `runBuildAfterGates` (auto-creates `~/projects/<slug>/` + builds). The card IS the confirmation — no gate should interrupt it.
+- **Why:** the blueprint card already confirmed scope/placement/cost; re-gating it is the "blinders" anti-pattern and it deadlocked the build.
+- **Risk:** low. `tsc` clean; deployed (client-only). The build worker already generates correct output (debug log showed tetris.html + src/*.js from the worker) — the gate was the only blocker. **Note:** the handleBuildRequest gates still fire for non-card Auto builds (buildMode unset ≠ 'direct'); folding those into the strip-down (Step 3) remains.
+
+---
+
 ## Session — Jun 12, 2026: build→fix misroute — confirmed blueprint card now routes straight to build
 
 **Symptom:** "build a tetris arcade game" → blueprint card → "Build it" → ran the **FIX** pipeline (Supervisor/Worker/Verify/Guardian, "writing fix 1.2 KB", "The fix didn't apply cleanly"), created **no project folder**. (Failover worked here — the retry survived the dead OpenAI key — but the wrong engine ran.)

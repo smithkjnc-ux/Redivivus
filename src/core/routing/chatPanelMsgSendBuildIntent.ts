@@ -55,7 +55,11 @@ export async function handleBuildIntent(
           refresh(); return;
         }
       }
-      await deps.handleBuildRequest(routedText); return;
+      // [FIX] A confirmed blueprint card IS the confirmation — skip ALL gates (placement, scope, vault-hit,
+      // cost). Passing skipComplex=true routes straight to runBuildAfterGates (auto-creates the project
+      // folder + builds). Without it the Vault-Hit gate fired ("tetris" matched the user's arcade games),
+      // popped a reuse modal, and the build stalled at "Building now..." with no folder ever created.
+      await deps.handleBuildRequest(routedText, true); return;
     }
     if (isInit) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
     // [P0] Don't force a "How do you want to work?" choice — that meta-question is pure friction. Default
