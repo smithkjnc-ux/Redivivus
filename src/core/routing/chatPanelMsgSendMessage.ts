@@ -149,6 +149,12 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
   let routedText = clarify.routedText;
 
+  // [STRIP-0] Adaptive-planning strip-down Step 0 (naked body test). Commented out — NOT deleted — the
+  // three extra pre-build AI stages (Five W's diagnostic, Visual Spec, Adaptive complexity routing) so the
+  // build path is the bare body: classify -> infer -> confirm card -> build. Each was an extra AI call that
+  // ran on every build and is a misfire surface. Re-evaluate each as an opt-in garment in Step 3.
+  // See docs/REDIVIVUS_ADAPTIVE_PLANNING.md (STATUS LOG). To restore: uncomment the [DEAD] block below.
+  /* [DEAD][STRIP-0] Stages 4, 5, Adaptive — preserved for restore
   // Stage 4 — Five W's pre-commit diagnostic (goal-alignment + WHO calibration before build fires)
   {
     const { runFiveWsDiagnostic, handleMismatch } = await import('../ai/fiveWsDiagnostic.js');
@@ -183,7 +189,8 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
           conversation.push({ role: 'assistant', content: statusMsg, timestamp: Date.now() });
           refresh();
         }
-      } catch { /* visual spec optional -- never block a build */ }
+      } catch { // visual spec optional -- never block a build
+      }
     }
   }
 
@@ -192,11 +199,12 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const { evaluateTaskComplexity } = await import('../../services/ai/adaptiveClassifier.js');
   const route = blueprintConfirmed ? 'simple' : await evaluateTaskComplexity(routedText, deps.routing);
   if (route === 'complex') {
-    conversation.push({ role: 'assistant', content: '🔀 **Adaptive:** Routing to Agent Pipeline (environment task detected)...', timestamp: Date.now() });
+    conversation.push({ role: 'assistant', content: 'Adaptive: Routing to Agent Pipeline (environment task detected)...', timestamp: Date.now() });
     refresh();
     await runAgentMode(routedText, deps, conversation, refresh);
     return;
   }
+  [DEAD][STRIP-0] end preserved block */
 
   // ── Final routing by intent — use Claude's extracted task when available ──
   // [FIX] Pass original userText — _claudeTask is AI-rewritten and shows up in history/vault/deadends instead of the user's actual words.

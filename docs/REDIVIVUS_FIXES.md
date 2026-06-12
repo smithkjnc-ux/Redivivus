@@ -3,6 +3,18 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: Adaptive strip-down Step 0 — naked build body
+
+Strip-down of the AI pipeline, one phase at a time, to the "naked body" (classify -> infer -> confirm card -> build), then dress back only layers that pass the BOUNDARIES-not-BLINDERS test. Foundation chosen: the new streaming `/plan` pipeline (legacy `supervisorOrchestrator` retires in Step 1). Old code is **commented out, not deleted**, per user instruction + Rule 8.
+
+- **File changed:** `src/core/routing/chatPanelMsgSendMessage.ts`
+- **What changed:** Commented out (preserved as a `[DEAD][STRIP-0]` block) the three extra pre-build AI stages between intent-classify and build: Stage 4 (Five W's diagnostic), Stage 5 (Visual Spec), and the Adaptive complexity routing. The build path is now the bare body — only the two load-bearing AI calls remain: `cloudChat` (classify) and `inferBlueprintFields` (the confirm card).
+- **Why:** A "build a tetris game" message fired up to 6 AI calls before building; only 2 are load-bearing. The other 4 (incl. these 3) add latency, cost, and misfire surface — the "clothes that don't fit." Step 0 proves the body builds correctly naked before any layer goes back on.
+- **Risk:** low. `tsc` clean; deployed. Stages are commented, not removed — restore by uncommenting. `routedText` falls through unmodified (the commented stages only appended diagnostic suffixes). Auto mode already skipped these as user-facing gates; this also removes their silent cost. **Test next:** reload host, no folder open, "build a tetris game" → expect classify → blueprint card → build, no extra stage messages.
+- **Also changed:** `docs/REDIVIVUS_ADAPTIVE_PLANNING.md` — added **Section 8 (The Strip-Down & Limbs)**: the body-first rebuild sequence (Step 0 naked body → Step 1 one body → **Step 1.5 reattach limbs** → Step 2 one question-system → Step 3 dress up), the body decision (keep streaming `/plan`, retire legacy `supervisorOrchestrator`), and the **limbs gap analysis** vs Cursor/Windsurf/Cline/Roo (agent lacks `read_diagnostics`, real terminal, local search, surgical diffs; tools quarantined in agent mode). STATUS LOG updated. **Why:** persist the plan + limb gap so it survives context loss. **Risk:** none (doc only).
+
+---
+
 ## Session — Jun 11, 2026 (PM5): Default API base = Fly (production), not localhost + Health false-negative
 
 - **The extension was hitting `localhost:3000`, never Fly.** `API_BASE_DEFAULT` in `apiClient.ts` was `http://localhost:3000/api/v1`, and `redivivus.apiBase` was unset — so every build went through the user's *local* dev backend, and the Fly deploys were never actually exercised by the app. Tests were inaccurate (different code/latency/cold-start than production). **Fix:** default is now `https://redivivus-backend.fly.dev/api/v1` — dev builds test the real deployed backend, like any shipped client. Local dev is now **opt-in only** (explicitly set `redivivus.apiBase` to localhost). The function comment already *claimed* "hits the Fly.io backend directly" — the default just contradicted it.

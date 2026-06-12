@@ -228,3 +228,47 @@ safer — the precondition for safely loosening the plan at all.
   (`chatPanelMsgSendMessage.ts`) and the blueprint gap prompt (`chatPanelMsgSendBuildIntent.ts`). Auto =
   sentence → build, no gauntlet. **Still open:** no-project host-reload kills the build (build with a
   folder open for now); make project-open Auto optionally show the confirm card; **Phase 2 (run-it loop).**
+- **Jun 12, 2026** — **Strip-down + Limbs plan adopted** (see Section 8). **Step 0 DONE** (`chatPanelMsgSendMessage.ts`:
+  commented out Stages 4/5/Adaptive — naked build body = classify -> infer -> confirm -> build). Awaiting user test.
+
+---
+
+## 8. The Strip-Down & Limbs (body-first rebuild) — adopted Jun 12, 2026
+
+> The pipeline grew too many overlapping "clothes" (gates, wizards, mode choices, 3 question-systems, a
+> parallel fix pipeline, and TWO build bodies). User mental model: **strip to the naked conversational body,
+> then dress back only layers that pass the test — "would Claude, in a chat, make you fill out a form for
+> this?" If no, it does not go back on.** Old code is **commented out, not deleted** (`[DEAD][STRIP-0]`).
+
+**Body decision:** the **new streaming `/plan` pipeline** is the one body. Legacy `supervisorOrchestrator.ts`
+(createPlan/executeStep/reviewOutput text-prompt path) retires in Step 1.
+
+**The body = skin + skeleton.** Skin = the conversation (understand -> infer -> confirm in one glance ->
+build). Skeleton = the build engine (classify -> infer -> confirm -> plan -> build -> review). The skeleton
+is invisible but part of the body, like tool-use under a chat. The gates were bad *clothing* over the skin.
+
+### Sequence (test between every phase; nothing deleted)
+- [x] **Step 0 — Naked body.** Commented out the 3 extra pre-build AI stages (Five W's diagnostic, Visual
+      Spec, Adaptive complexity routing) in `chatPanelMsgSendMessage.ts`. Build path now fires only the 2
+      load-bearing AI calls: `cloudChat` (classify) + `inferBlueprintFields` (confirm card). *Awaiting test.*
+- [ ] **Step 1 — One body.** Retire legacy `supervisorOrchestrator` text-prompt path; route `orchestratedBuild`
+      to the streaming `/plan` pipeline. Comment out, keep as fallback until proven.
+- [ ] **Step 1.5 — REATTACH LIMBS** (the agent's tools, cheapest-power-first). Today's agent has only
+      read_file/write_file(full-overwrite)/run_command(15s exec!)/ask_user/list_dir/read_file_lines + web
+      search + MCP, and these are **quarantined** in a rarely-triggered "agent mode" — normal builds get NO
+      tools. Peer VS-based editors (Cursor/Windsurf/Cline/Roo) give their agent all of the below on every
+      task. Reattach to the ONE body, in order:
+      1. **`read_diagnostics`** — read VS Code Problems panel (TS/lint/compile). Native, FREE, zero AI
+         tokens. Unlocks write -> check -> fix loop. `getDiagnostics` already used by the fix pipeline
+         (`chatPanelMsgFixContext.ts`) but the agent has no tool for it. HIGHEST power-to-cost — do first.
+      2. **Real integrated terminal** — `createTerminal` + shell integration (already used in 5 files);
+         long-running/background commands, live output. Replaces the crippling 15s `child_process.exec`.
+      3. **`search_files`** (local ripgrep — VS Code bundles it) + **`list_definitions`** (symbols).
+      4. **`replace_in_file`** — wire existing `surgicalEditService.ts` as a tool (diffs, not full rewrites).
+      5. **`run_vscode_command`** — allowlisted command execution (format, tasks, git, debug).
+      6. **Browser/preview console** — runtime + console errors = this doc's Phase 2 run-it loop; lands here.
+- [ ] **Step 2 — One question-system.** Collapse `decisionTriage` + `expandedInterview` + `templateScopeService`
+      into a single infer-then-confirm step. Delete the Rule-18 regex fast-paths + the bug-report regex.
+- [ ] **Step 3 — Dress up.** Put back ONLY: auth, one cost-confirm (expensive builds), one merged vault-reuse
+      check, fix folded into the one body, Guided opt-in. Placement gate / 5W interrogation / mode popover /
+      blueprint-gap prompt stay OFF (failed the form test).
