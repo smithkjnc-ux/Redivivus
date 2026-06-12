@@ -3,6 +3,19 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: build→fix misroute — confirmed blueprint card now routes straight to build
+
+**Symptom:** "build a tetris arcade game" → blueprint card → "Build it" → ran the **FIX** pipeline (Supervisor/Worker/Verify/Guardian, "writing fix 1.2 KB", "The fix didn't apply cleanly"), created **no project folder**. (Failover worked here — the retry survived the dead OpenAI key — but the wrong engine ran.)
+
+**Cause:** the card confirm (`chatPanelMsgBlueprintCard.ts`) re-sends the enriched task through `handleSendMessage`, which **re-classifies via `cloudChat`**. Even though the enriched text starts with "build a tetris arcade game", the classifier flipped it to `fix` — the WHY field said "arcade game collection **addition**" and the workspace lists 12 sibling project folders, so the model read it as "modify my existing collection". Logs confirmed `hasProject=false` (container-is-home held) — so this was the classifier, not project detection. Critically (PapaJoe): **a fix never creates a folder/structure — it assumes everything exists and edits in place** — so a misrouted build can NEVER succeed in the fix pipeline.
+
+- **File changed:** `src/core/routing/chatPanelMsgSendMessage.ts`
+- **What changed:** A confirmed blueprint card (`msg.fromBlueprintCard`) now **skips re-classification entirely** and routes straight to `handleBuildIntent` (the build path). A build card is unambiguously a build; never let the classifier second-guess it. The build path auto-creates the project subfolder (`~/projects/<slug>/`), fixing the no-folder symptom too.
+- **Why:** eliminate the build→fix misroute; guarantee a confirmed build builds (and scaffolds a folder).
+- **Risk:** low. `tsc` clean; deployed (client-only). **Related backlog:** REDIVIVUS_FEATURES.md "In-project operation taxonomy" — the deeper fix is replacing the binary build/fix split with build/add/edit/remove/fix so in-project *additions* can scaffold new files.
+
+---
+
 ## Session — Jun 12, 2026: Fix-pipeline Worker failover — a dead AI no longer kills the build
 
 **Symptom:** "build a tetris arcade game" → Supervisor planned → Worker phase died with `401 Incorrect API key provided: sk-proj-…` and stopped. System Health confirmed **3 of 6 providers dead** (OpenAI invalid, xAI HTTP 403, Kimi invalid; valid = Claude, Gemini, Groq). The fix-pipeline Worker picked OpenAI (a dead provider — selected by key *presence*, not validity) and threw instead of falling over.

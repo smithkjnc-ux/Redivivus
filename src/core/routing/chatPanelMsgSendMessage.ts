@@ -43,6 +43,16 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     if (!/\bdone.*session\b|\bstart.*session\b/i.test(userText)) { try { const _CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; const ss = (_CP as any).startSessionSilent; if (ss) { ss(userText); } } catch {} }
   }
 
+  // [FIX][BUILD-NOT-FIX] A confirmed blueprint card is unambiguously a BUILD. Skip re-classification here —
+  // cloudChat flips the enriched task to 'fix' when the workspace holds existing project folders (it read
+  // "arcade game collection addition" + the 12 sibling folders as "modify my collection"). That misroute
+  // ran the FIX pipeline ("Scanning N files", "fix didn't apply"), wrote a surgical edit, and created NO
+  // project folder. Route straight to the build path, which auto-creates the project subfolder and builds.
+  if (msg.fromBlueprintCard) {
+    await handleBuildIntent(userText, userText, msg, deps, conversation, refresh);
+    return;
+  }
+
   const lowerText = userText.toLowerCase();
 
   // [FIX] Skip keyword shortcuts for blueprint card confirmations — the enriched task text contains

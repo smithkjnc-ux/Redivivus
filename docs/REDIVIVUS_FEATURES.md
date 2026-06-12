@@ -10,6 +10,15 @@
 
 ## Active Backlog — Work Top-to-Bottom
 
+### [DESIGN] In-project operation taxonomy — "fix" is too coarse (PapaJoe, Jun 12 2026)
+Today the router is effectively binary: **new-project build** vs **fix** (surgical repair of existing files). But operations *inside* an existing project are not all fixes. PapaJoe's framing: **an edit inside a project may be an edit, an addition, or a subtraction — it all depends.** Real categories:
+- **Add** — new file/feature/screen into an existing project (e.g. "add a high-score screen to my tetris"). Needs scaffolding NEW files — the fix pipeline can't, because **a fix never creates a folder or structure; it assumes everything already exists and just edits in place.**
+- **Edit/Modify** — change existing behavior/content.
+- **Subtract/Remove** — delete a feature/file.
+- **Fix/Repair** — correct a bug in existing code (the only thing today's "fix" pipeline truly fits).
+
+**Why it matters:** routing an *add* through the fix pipeline produces no new files/folders (it edits in place) → silent wrong output. Routing a *build* through fix is fatal for the same reason (observed Jun 12: misrouted Tetris build → "fix didn't apply", no folder). **Future work:** replace the binary build/fix split with an intent taxonomy (build / add / edit / remove / fix); give *add* the ability to scaffold new files inside an existing project (a hybrid of build + in-project placement). Relates to the build→fix classifier misroute (fixed tactically Jun 12 by routing confirmed blueprint cards straight to build).
+
 ### � Branding — macOS + Windows full rebrand (follow-on to Jun 10 Linux overhaul)
 - [ ] **macOS**: rename `VSCodium.app` → `Redivivus.app`, `Contents/MacOS/VSCodium` → `Redivivus`; patch `Info.plist` via `plutil`; generate `.icns` via `iconutil`; ad-hoc re-sign (`codesign --force --deep --sign -`) + quarantine strip — **required for Apple Silicon launch**. Fix macOS VSIX CLI path (currently points at `VSCodium.app` pending full rebrand).
 - [ ] **Windows**: switch from `VSCodiumSetup-x64.exe` (registry-polluting) to `.zip` extract; rename `VSCodium.exe` → `redivivus.exe`; patch `bin\codium.cmd` to `redivivus.cmd`; `product.json` patch (currently Linux-only); Start Menu shortcut; PATH entry; detect legacy `.exe` installs before proceeding.
