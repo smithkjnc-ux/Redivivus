@@ -24,6 +24,22 @@ via shippable, measurable stages — not to guess a perfect plan depth upfront.
 
 ## 2. Core Principles
 
+### The governing line: BOUNDARIES, not BLINDERS
+> Rules, structure, blueprint, contracts, verification = **boundaries** (a fence around the field); the AI
+> roams freely inside them. Exhaustive prescriptions, interrogating the user for what the AI knows, forced
+> mode choices, over-gating, regex-as-understanding = **blinders** (narrow rails that waste the AI's
+> superior knowledge). **Keep boundaries. Remove blinders.**
+
+**Test for anything we add** (a rule, gate, prompt, plan field): *does it constrain the SHAPE of the
+output, or the AI's THINKING?* Shape (structure/contracts/verification) → keep. Thinking (dictating every
+line, asking what's inferable, forcing a path) → remove.
+
+**Why this protects quality (answers the weak-model worry):** boundaries — contracts pin the seams,
+verification catches misses, selective escalation fixes the hard piece — protect quality *without* the
+blinders. Trust the AI more, not by hoping but because the fence + safety net catch a miss cheaply.
+Quality comes from the guardrails, not from blinding the AI. Every principle below is one expression of
+this single line.
+
 ### P1 — Guidance ∝ expected failure cost, not complexity alone
 > **Guidance(piece) ∝ P(this worker gets it wrong) × Impact(if it's wrong)**
 
@@ -48,6 +64,32 @@ failure class that killed early multi-file builds.
 
 This is "design the interfaces, let the teams build the modules." It scales to big programs because the
 strictness targets the part that doesn't scale (the interactions), not the part that does (the surfaces).
+
+### P0 — Absorb uncertainty; don't offload it (the governing principle)
+> The AI should HOLD uncertainty and resolve it itself, escalating to the user ONLY when the user is the
+> unique source of a build-critical answer. Helping ≠ asking — helping = absorbing the complexity. When
+> the AI asks a question it could answer itself, it is offloading its own uncertainty onto the user; that
+> is backwards for a tool meant to serve non-technical builders.
+
+**Ask the user a question only when BOTH are true:**
+1. The AI cannot reasonably infer the answer from the request + general knowledge, AND
+2. The user is the *unique* source of that answer AND a wrong guess would materially change the build.
+
+This is the SAME P(wrong)×Impact test as guidance depth (P1) — applied to *questions* instead of *plan
+detail*. Style/framework/layout/defaults → the AI picks a good one and lets the user change it after
+(P3, recovery-not-certainty). The user's business purpose, their specific must-haves → only they know
+those → ask, but ask that ONE targeted thing, never a blanket interview.
+
+**Consequences for the entry flow:**
+- **No Auto-vs-Guided mode choice.** Forcing the user to pick *how* they want to be asked questions is the
+  worst friction — a meta-question with zero payoff. ONE adaptive path.
+- **Default = infer everything → confirm in one glance → build.** The AI fills the 5W by inference, shows
+  a confirmable blueprint card ("here's what I understood — Build it / Change something"), and builds. No
+  separate 5W interrogation, no "missing WHO/WHAT/WHERE" gate.
+- **A question surfaces only for a genuinely unknowable + build-critical dimension** — one targeted ask.
+- **"Guided / let me specify" stays as opt-IN** for the rare user who wants to drive — invoked by them,
+  never forced on anyone, never the default.
+- **Never deadlock the input.** If a gate needs the user's answer, the input bar MUST be enabled.
 
 ### P3 — Plan for cheap RECOVERY, not for certainty
 Don't guarantee correctness by planning harder (expensive, and it still failed — the truncated Tetris).
@@ -179,4 +221,10 @@ safer — the precondition for safely loosening the plan at all.
 - **Jun 11, 2026** — **Phase 0 DONE** (streaming `/plan` + reuse + live plan in panel; `supervisorReused`
   guard in `/build`). **Phase 1 DONE** (contract-first: `contracts` block + "CONTRACTS FIRST" rule +
   Worker honors contracts first). Both backend changes need a **Fly redeploy** to activate; extension
-  (client `/plan` stream reader) deployed. **Next: Phase 2 (run-it loop).**
+  (client `/plan` stream reader) deployed.
+- **Jun 12, 2026** — Added the governing line **"BOUNDARIES, not BLINDERS"** + **P0** (absorb uncertainty).
+  **Gating collapse (deployed):** removed the forced "How do you want to work?" popover (defaults to Auto;
+  Guided opt-in via header badge); Auto mode now skips BOTH 5W interrogations — the Stage-4 mismatch
+  (`chatPanelMsgSendMessage.ts`) and the blueprint gap prompt (`chatPanelMsgSendBuildIntent.ts`). Auto =
+  sentence → build, no gauntlet. **Still open:** no-project host-reload kills the build (build with a
+  folder open for now); make project-open Auto optionally show the confirm card; **Phase 2 (run-it loop).**

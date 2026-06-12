@@ -148,11 +148,14 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
   let routedText = clarify.routedText;
 
-  // Stage 4 — Five W's pre-commit diagnostic (goal-alignment check before build fires)
+  // Stage 4 — Five W's pre-commit diagnostic (goal-alignment + WHO calibration before build fires)
   {
     const { runFiveWsDiagnostic, handleMismatch } = await import('../ai/fiveWsDiagnostic.js');
     const diagnostic = await runFiveWsDiagnostic(routedText, _jobTier, intent.type, deps.routing);
-    if (!diagnostic.aligned) {
+    // [P0] In Auto ('direct') mode the AI NEVER interrogates the user — it infers and the blueprint card
+    // confirms; correction is cheap (P3). Only Guided ('plan') mode pauses to resolve a 5W mismatch.
+    // (The runFiveWsDiagnostic call above is silent — no user prompt — so we still get WHO calibration.)
+    if (!diagnostic.aligned && deps.buildMode !== 'direct') {
       const resolved = await handleMismatch(diagnostic, routedText, deps.routing, conversation, refresh);
       if (!resolved) { return; } // user cancelled or chose "let me explain"
       routedText = resolved;

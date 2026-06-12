@@ -57,15 +57,19 @@ export async function handleBuildIntent(
       await deps.handleBuildRequest(routedText); return;
     }
     if (isInit) { await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType); return; }
-    panel.webview.postMessage({ type: 'show-mode-popover', pendingText: userText });
-    return;
+    // [P0] Don't force a "How do you want to work?" choice — that meta-question is pure friction. Default
+    // to Auto (direct) and just build. Guided stays opt-in via the header mode badge. Fall through to the
+    // build flow below with the mode now set.
+    deps.buildMode = 'direct';
   }
   
   const root = wsRoot;
   if (root) {
     const config = isInit ? deps.redivivus?.loadConfig?.() : null;
     const gapResult = detectBlueprintGaps(config?.blueprint);
-    if (gapResult.hasGaps) {
+    // [P0] Auto mode never interrogates for blueprint gaps — the AI infers the 5 W's and builds;
+    // correction is cheap (P3). Only Guided ('plan') mode pauses to fill gaps with the user.
+    if (gapResult.hasGaps && deps.buildMode !== 'direct') {
       _pendingGuidedBuilds.set(gapResult.sessionId, userText);
       conversation.push({ role: 'assistant', content: buildGapPromptMessage(gapResult, userText), timestamp: Date.now() });
       refresh(); return;
