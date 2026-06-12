@@ -87,34 +87,10 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
           }
         }
       } catch { /* no package.json or unreadable — continue */ }
-      const info = detectPostBuildInfo(runRoot, recentFiles);
-      if (!info.runCmd && info.type === 'unknown') { vscode.window.showInformationMessage('No runnable entry point detected. Build something first!'); return; }
-      if (info.type === 'html') {
-        const htmlFile = info.entryFile || (info.detectedJsEntry ? createHtmlWrapperIfNeeded(runRoot, info.detectedJsEntry) : null);
-        if (!htmlFile) { vscode.window.showInformationMessage('Ask Redivivus: "create an index.html for this project"'); return; }
-        if (!info.entryFile) {
-          deps.conversation.push({ role: 'assistant', content: `This is browser code — it needs an HTML page to run. I created \`index.html\` for you automatically.`, timestamp: Date.now() });
-          deps.refresh();
-        }
-        // [FIX][RUN-WEB-HTTP] Serve over http + open the real browser (NOT file:// — modular apps break there).
-        const { openWebInBrowser } = await import('./openWebInBrowser.js');
-        const servedHttp = await openWebInBrowser(runRoot, htmlFile);
-        debugLog(runRoot, 'run-command', `runProject: opened ${servedHttp ? 'via http' : 'via file://'}: ${htmlFile}`);
-        return;
-      }
-      const term = vscode.window.createTerminal({ name: 'Redivivus: Run', cwd: runRoot });
-      term.show();
-      if (info.needsDeps && info.depsCmd) { term.sendText(info.depsCmd + ' && ' + (info.runCmd || '')); }
-      else if (info.runCmd) { term.sendText(info.runCmd); }
-      debugLog(runRoot, 'run-command', `runProject: terminal type=${info.type} cmd=${info.runCmd}`);
-      const _monitorDelay = info.needsDeps ? 10000 : 4000;
-      setTimeout(() => {
-        const _err = getLastTerminalError();
-        if (_err?.errorBlock && ChatPanel.currentPanel) {
-          ChatPanel.currentPanel.handleMessage({ type: 'inject-terminal-error', error: _err });
-          (ChatPanel.currentPanel as any)._panel?.reveal(undefined, false);
-        }
-      }, _monitorDelay);
+      // [CONSOLIDATE] Delegate to the ONE shared type-aware runProject (web→http, .js→node, else→terminal +
+      // terminal-error monitoring). This was a forked copy of the same logic. See core/project/runProject.ts.
+      const { runProject } = await import('./runProject.js');
+      await runProject(runRoot);
     } else if (command === 'redivivus.openVisualEditor') {
       const root = _root;
       if (!root) { vscode.window.showWarningMessage('Redivivus: Open a project folder first.'); return; }

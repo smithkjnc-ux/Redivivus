@@ -27,56 +27,9 @@ export function registerInlineCommandsC(
       let root = rootOverride || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       try { if (!rootOverride) { const _a = require('./ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); if (_a) { root = _a; } } } catch {}
       if (!root) { vscode.window.showWarningMessage('No project folder open.'); return; }
-      const recentFiles = new BuildHistoryService(root).list().filter(e => !e.undone).slice(0, 1).flatMap(e => e.files);
-      const info = detectPostBuildInfo(root, recentFiles);
-      if (!info.runCmd && info.type === 'unknown') { vscode.window.showInformationMessage('No runnable entry point detected. Build something first!'); return; }
-
-      if (info.type === 'html' && info.entryFile) {
-        // [FIX][RUN-WEB-HTTP] Serve over http + open the REAL browser — NOT file://. ES-module apps
-        // (<script type="module">) are CORS-blocked on file://: the page renders but the JS never runs
-        // ("plays in Preview, dead via Run"). http://localhost runs it for real.
-        try {
-          const { detectDevServer, startPreviewServer, waitForPort } = await import('./ui/panels/chat/chatPanelPreview.js');
-          const dsInfo = detectDevServer(root);
-          if (dsInfo) {
-            const { port } = await startPreviewServer(root, dsInfo);
-            if (await waitForPort(port, dsInfo.type === 'static' ? 2_000 : 30_000)) {
-              const file = require('path').basename(info.entryFile);
-              const urlPath = file.toLowerCase() === 'index.html' ? '' : file;
-              await vscode.env.openExternal(vscode.Uri.parse(`http://localhost:${port}/${urlPath}`));
-              return;
-            }
-          }
-        } catch { /* fall through to file:// for a self-contained single-file page */ }
-        vscode.env.openExternal(vscode.Uri.file(require('path').join(root, info.entryFile)));
-        return;
-      }
-
-      const term = vscode.window.createTerminal({ name: 'Redivivus: Run', cwd: root });
-      term.show();
-      if (info.needsDeps && info.depsCmd) {
-        term.sendText(info.depsCmd + ' && ' + (info.runCmd || ''));
-      } else if (info.runCmd) {
-        term.sendText(info.runCmd);
-      }
-
-      // [FIX] inject-terminal-error auto-triggers fix pipeline in chatPanelMessages.ts
-      // No stale "Want me to fix it?" prompt needed — fix starts immediately on injection
-      const monitorDelay = info.needsDeps ? 8000 : 3000;
-      setTimeout(() => {
-        const err = getLastTerminalError();
-        if (err && err.errorBlock) {
-          if (ChatPanel.currentPanel) {
-            ChatPanel.currentPanel.handleMessage({ type: 'inject-terminal-error', error: err });
-            ChatPanel.currentPanel['_panel']?.reveal(undefined, false);
-          } else {
-            vscode.commands.executeCommand('redivivus.openChat');
-            setTimeout(() => {
-              ChatPanel.currentPanel?.handleMessage({ type: 'inject-terminal-error', error: err });
-            }, 600);
-          }
-        }
-      }, monitorDelay);
+      // [CONSOLIDATE] One shared, type-aware runProject (web→http, .js→node, else→terminal + error monitor).
+      const { runProject } = await import('./core/project/runProject.js');
+      await runProject(root);
     })
   );
 

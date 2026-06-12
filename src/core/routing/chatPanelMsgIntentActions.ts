@@ -40,41 +40,11 @@ export async function handleRunIntent(intent: any, deps: MessageHandlerDeps, con
     refresh(); return;
   }
 
-  // [FIX][RUN type-aware] Run = execute the build like a standalone program, per type:
-  //  - web/HTML → serve over http (local server) + open the REAL browser. NEVER file:// — ES-module apps
-  //    (<script type="module">) are CORS-blocked on file://, so the page renders but the JS never runs
-  //    ("plays in Preview, dead via Run"). http://localhost runs it for real.
-  //  - .js → node in a terminal.   - .py → python in a terminal.
-  const htmlMain = ['index.html', 'main.html'].find(f => fs.existsSync(path.join(root, f)));
-  if (htmlMain) {
-    try {
-      const { detectDevServer, startPreviewServer, waitForPort } = await import('../../ui/panels/chat/chatPanelPreview.js');
-      const info = detectDevServer(root);
-      if (info) {
-        const { port } = await startPreviewServer(root, info);
-        if (await waitForPort(port, info.type === 'static' ? 2_000 : 30_000)) {
-          const urlPath = htmlMain.toLowerCase() === 'index.html' ? '' : htmlMain;
-          await vscode.env.openExternal(vscode.Uri.parse(`http://localhost:${port}/${urlPath}`));
-          conversation.push({ role: 'assistant', content: `Running \`${htmlMain}\` at http://localhost:${port} ...`, timestamp: Date.now() });
-          refresh(); return;
-        }
-      }
-    } catch { /* fall through to file:// for a self-contained single-file page */ }
-    await vscode.env.openExternal(vscode.Uri.file(path.join(root, htmlMain)));
-    conversation.push({ role: 'assistant', content: `Opening \`${htmlMain}\` in your browser.`, timestamp: Date.now() });
-    refresh(); return;
-  }
-  const jsMain = ['index.js', 'main.js', 'app.js'].find(f => fs.existsSync(path.join(root, f)));
-  if (jsMain) {
-    const t = vscode.window.createTerminal('Redivivus: Run (node)'); t.show(); t.sendText(`node ${jsMain}`);
-    conversation.push({ role: 'assistant', content: `Running \`node ${jsMain}\` in terminal...`, timestamp: Date.now() }); refresh(); return;
-  }
-  const pyMain = ['main.py', 'app.py', 'index.py'].find(f => fs.existsSync(path.join(root, f)));
-  if (pyMain) {
-    const t = vscode.window.createTerminal('Redivivus: Run (python)'); t.show(); t.sendText(`python3 ${pyMain}`);
-    conversation.push({ role: 'assistant', content: `Running \`python3 ${pyMain}\` in terminal...`, timestamp: Date.now() }); refresh(); return;
-  }
-  conversation.push({ role: 'assistant', content: 'I couldn\'t find a main file (index.html, main.js, main.py, ...) to run.', timestamp: Date.now() });
+  // [CONSOLIDATE] Delegate to the ONE shared type-aware runProject (web→http+browser, .js→node, .py→python,
+  // else→terminal + error monitoring). See core/project/runProject.ts.
+  const { runProject } = await import('../project/runProject.js');
+  await runProject(root);
+  conversation.push({ role: 'assistant', content: 'Running your project...', timestamp: Date.now() });
   refresh();
 }
 
