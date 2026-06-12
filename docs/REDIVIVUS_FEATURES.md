@@ -10,6 +10,16 @@
 
 ## Active Backlog — Work Top-to-Bottom
 
+### [DESIGN] Preview vs Run — two distinct, type-aware actions (PapaJoe, Jun 12 2026)
+Two different things the user does with a build; keep them distinct:
+- **Preview** = *in-editor* iteration. Lets the user tweak visuals/content and see changes **without leaving the window**. In-app webview over a local http server. (Web/HTML only.)
+- **Run** = open the **actual program** and run it **as it would normally run, standalone** — the real end-product experience. **Type-aware:**
+  - **web/HTML** → real browser, served over **http** (never `file://` — modular apps break there). *(fixed Jun 12)*
+  - **.exe / binary** → launch the executable.
+  - **Python / node-cli / shell** → run in a terminal.
+  - (future types as needed)
+**Principle:** Run must execute the build the way its type actually runs, so the user sees/uses it like a standalone app. `detectRunCommand`/`TOK_RUN_PROJECT` already covers non-web Run; web Run now goes through the http preview server. Future: unify the result-card buttons into a clear **Preview** (web, in-editor) + **Run** (type-aware, standalone) pair, and label them so the distinction is obvious.
+
 ### [DESIGN] In-project operation taxonomy — "fix" is too coarse (PapaJoe, Jun 12 2026)
 Today the router is effectively binary: **new-project build** vs **fix** (surgical repair of existing files). But operations *inside* an existing project are not all fixes. PapaJoe's framing: **an edit inside a project may be an edit, an addition, or a subtraction — it all depends.** Real categories:
 - **Add** — new file/feature/screen into an existing project (e.g. "add a high-score screen to my tetris"). Needs scaffolding NEW files — the fix pipeline can't, because **a fix never creates a folder or structure; it assumes everything already exists and just edits in place.**

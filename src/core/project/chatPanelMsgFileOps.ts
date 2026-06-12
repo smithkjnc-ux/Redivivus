@@ -87,12 +87,30 @@ export async function handleOpenInBrowser(msg: any): Promise<void> {
   }
 }
 
+// [SCOPE] RUN a web build like a standalone program — serve it over http (a local server) and open the
+// REAL browser, NOT file://. Preview = in-editor iteration; RUN = the actual program as it would normally
+// run. ES-module apps (<script type="module">) are CORS-blocked on file://, so file:// renders the page
+// but the JS never runs (the "works in Preview, dead in the browser" bug). http://localhost runs it for real.
 export async function handlePreviewBrowser(msg: any): Promise<void> {
   const filePath = decodePath(msg.path);
-  if (filePath && fs.existsSync(filePath)) {
-    const uri = vscode.Uri.file(filePath);
-    await vscode.env.openExternal(uri);
-  }
+  if (!filePath || !fs.existsSync(filePath)) { return; }
+  try {
+    const root = path.dirname(filePath);
+    const { detectDevServer, startPreviewServer, waitForPort } = await import('../../ui/panels/chat/chatPanelPreview.js');
+    const info = detectDevServer(root);
+    if (info) {
+      const { port } = await startPreviewServer(root, info);
+      const ready = await waitForPort(port, info.type === 'static' ? 2_000 : 30_000);
+      if (ready) {
+        const file = path.basename(filePath);
+        const urlPath = file.toLowerCase() === 'index.html' ? '' : file;
+        await vscode.env.openExternal(vscode.Uri.parse(`http://localhost:${port}/${urlPath}`));
+        return;
+      }
+    }
+  } catch { /* fall through to file:// for single-file pages that don't need a server */ }
+  // Fallback: a self-contained single-file page (no module imports) still runs fine from file://.
+  try { await vscode.env.openExternal(vscode.Uri.file(filePath)); } catch {}
 }
 
 export async function handleOpenHtmlByName(msg: any): Promise<void> {

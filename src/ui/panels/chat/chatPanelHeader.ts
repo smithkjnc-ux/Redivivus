@@ -30,11 +30,14 @@ export function buildHeaderInfo(
   // present, always wins. `svc` is a service pointed at the effective root for config/isInitialized.
   const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   let effectiveRoot = wsRoot;
-  if (!effectiveRoot) {
+  // [Model A][W2] When the workspace IS the projects container (home), the ACTIVE project is the built/
+  // opened subfolder (tracked by the Project Files tree), not the container. Prefer it so the chat
+  // recognizes the project the user just built — otherwise the header reads ~/projects (home) = no project.
+  if (!effectiveRoot || isProjectsContainer(effectiveRoot)) {
     let activeRoot: string | undefined;
     try { activeRoot = require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); } catch {}
     if (!activeRoot) { activeRoot = redivivus.getWorkspaceRoot(); }
-    if (activeRoot && fs.existsSync(path.join(activeRoot, '.redivivus'))) { effectiveRoot = activeRoot; }
+    if (activeRoot && !isProjectsContainer(activeRoot) && fs.existsSync(path.join(activeRoot, '.redivivus'))) { effectiveRoot = activeRoot; }
   }
   let svc = redivivus;
   if (effectiveRoot && redivivus.getWorkspaceRoot() !== effectiveRoot) {

@@ -17,6 +17,19 @@
 
 ---
 
+## Session — Jun 12, 2026: W2 active-project + RUN serves web over http (not file://)
+
+First successful end-to-end build: "build a tic tac toe game" → built 7 files into `~/projects/tic-tac-toe-game/` (index.html, style.css, src/{state,logic,ai,renderer,controller}.js), rendered correctly. Two Redivivus gaps surfaced:
+
+**(1) Chat didn't recognize the built project (W2).** `buildHeaderInfo` set `effectiveRoot = wsRoot` (= `~/projects` container) and only fell back to the active build subfolder when NO workspace folder was open. So after a build, the chat header read the container = "no project," even though the Project Files tree pointed at `tic-tac-toe-game`.
+- **File:** `src/ui/panels/chat/chatPanelHeader.ts` — `effectiveRoot` now also falls through to the active project subfolder when the workspace IS the projects container (`|| isProjectsContainer(effectiveRoot)`), preferring a real subfolder with `.redivivus`. So the chat recognizes the project you just built (needed before "fix the game" can target it). (Rule 9: header is 213 lines, pre-existing over-limit — surgical change, split still owed.)
+
+**(2) "Preview in Browser" opened file:// → modular web apps don't run.** The game worked in the in-editor Preview (served over http) but was dead in the browser. Cause: the index.html loads `<script type="module" src="src/*.js">` (5 ES modules); browsers CORS-block module scripts on `file://`, so the page renders but JS never runs. `handlePreviewBrowser` did `openExternal(Uri.file(...))`.
+- **File:** `src/core/project/chatPanelMsgFileOps.ts` — RUN now serves the project over http via `startPreviewServer` and opens `http://localhost:<port>/<file>` in the real browser (falls back to `file://` for self-contained single-file pages). The game is correct; this was a launch-method bug, not a game bug. **(NOT fixing the game itself — PapaJoe's instruction; the "renders but interactivity" question was purely the file:// issue.)**
+- **Both deployed (client-only).** **Still queued from same report:** Build Activity panel shows only Supervisor + "Build complete" (missing Worker/file-writes/Verify/Guardian steps); result-card summary is truncated ("WHO: Anyone / g...").
+
+---
+
 ## Session — Jun 12, 2026: card-confirmed build stalled at the Vault-Hit gate — skip all gates
 
 **Symptom:** "Build it" on the Tetris card → "Blueprint confirmed… Building now…" → then nothing (no folder, no result, status "ready"). Debug log's last event: `type=vault-hit-vault-…`.
