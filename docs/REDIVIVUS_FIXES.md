@@ -39,6 +39,8 @@
 - **Setting added to package.json** (`redivivus.protectedFolders`); both watcher + setting verified in the running extension.
 - **Explicit command DONE:** `redivivus.openAsProject` — right-click any folder in the Explorer → "Open as Redivivus Project" → `activateProject()` sets it active + opens chat. Registered in `activeProjectWatcher.ts`; `package.json` got the command + an `explorer/context` menu entry (top-level, `when: explorerResourceIsFolder`, group `9_redivivus@0`, above the Redivivus submenu). Needed because **VS Code has no "folder selected" event** — clicking/expanding a folder can't auto-activate; only opening a FILE (the watcher) or this command can. (Requires an extension-host reload to pick up the new menu.)
 
+**Explorer emphasis for the active project (PapaJoe request).** New `projectFolderDecorations.ts` — a `FileDecorationProvider` that, when a project is active, **dims every other immediate subfolder** of the projects home (`disabledForeground`) and **badges the active one** with a green ● (`charts.green`). No active project (home/launcher) → nothing dimmed. Registered in `extension.ts`; `activateProject()` calls `refreshProjectFolderDecorations()` on switch so the Explorer re-paints. (Note: FileDecoration tints the label + adds a badge; folder icons keep their color — that's the only API VS Code exposes for Explorer styling.)
+
 Also clarified for PapaJoe: **`.redivivus/` is the per-project memory folder** Redivivus creates INSIDE each project (config.json = name+blueprint, build_history, dead_ends, learned, logs, sessions, rules). Its presence = "this folder is a managed project." Home (`~/projects`) must NEVER have one (that stray was the earlier dashboard bug).
 
 ---

@@ -37,6 +37,7 @@ import { initProjectContextLogger, resetProjectContext } from './services/loggin
 import { wasProjectClosedRecently } from './services/project/closeMarker.js';
 import { ensureProjectsWorkspace } from './core/project/ensureProjectsWorkspace.js';
 import { registerActiveProjectWatcher } from './core/project/activeProjectWatcher.js';
+import { registerProjectFolderDecorations } from './core/project/projectFolderDecorations.js';
 import { invalidateRosterCache } from './services/ai/routingServiceRoster.js';
 import { initMasterLogger } from './core/logging/masterLogger.js';
 
@@ -281,6 +282,8 @@ export function activate(context: vscode.ExtensionContext) {
   // ── Active-project detection — opening a file in a projects-home subfolder makes it the active project
   //    (chat follows it). Redivivus's own source repos are PROTECTED (skipped) so it never targets itself.
   registerActiveProjectWatcher(context);
+  // ── Explorer emphasis — dim the other project folders, badge the active one.
+  registerProjectFolderDecorations(context);
 
   // ── auto-open chat panel on startup (first activation only) ──
   // Open panel at startup if none is running. suppressAutoOpen only prevents DUPLICATES (currentPanel exists).

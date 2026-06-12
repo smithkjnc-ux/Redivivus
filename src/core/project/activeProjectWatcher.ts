@@ -44,6 +44,7 @@ export function activateProject(projectDir: string): void {
     if (PFP.instance?.getRoot() === projectDir) { return; } // already the active project
     PFP.instance?.setRoot(projectDir);
     require('../../ui/panels/chat/chatPanel.js').ChatPanel.currentPanel?.refresh();
+    require('./projectFolderDecorations.js').refreshProjectFolderDecorations(); // dim others, badge the active
   } catch { /* non-fatal — active-project switching is a convenience, never block */ }
 }
 
