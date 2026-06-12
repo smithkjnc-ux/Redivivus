@@ -116,6 +116,23 @@ export interface IntentResult {
 }
 
 // Fire-and-forget telemetry after direct AI calls — never blocks, never throws
+// [FIX] Reliable extension version for telemetry. The old inline code read
+// `(await import('../../extension.js')).default.packageJSON.version`, which NEVER resolves — extension.js
+// exports activate/deactivate, not a `default` with packageJSON — so ide_version was effectively never sent
+// and the rigops admin dashboard showed "—". Read the extension's own package.json, with a vscode.extensions
+// fallback, cached after the first successful resolve.
+let _ideVersionCache: string | undefined;
+function getIdeVersion(): string {
+  if (_ideVersionCache) { return _ideVersionCache; }
+  let v = '';
+  try { v = String(require('../../../package.json').version || ''); } catch { /* not found at this path */ }
+  if (!v) {
+    try { v = String((vscode.extensions.all.find(e => e.id.toLowerCase().endsWith('.redivivus')) as any)?.packageJSON?.version || ''); } catch { /* no vscode */ }
+  }
+  _ideVersionCache = v || 'unknown';
+  return _ideVersionCache;
+}
+
 export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
   model?: string; provider?: string; input_tokens?: number; output_tokens?: number;
   success?: boolean; intent?: string; project_name?: string;
@@ -128,9 +145,7 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
       body: JSON.stringify({
         event,
         ...data,
-        ide_version: (await import('../../extension.js').catch(() => null) as any)?.default?.packageJSON?.version
-          || require('../../../package.json').version
-          || 'unknown',
+        ide_version: getIdeVersion(),
         configured_providers: (() => { try { return require('./secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
       }),
     }).then(res => {
