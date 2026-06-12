@@ -52,16 +52,34 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
       panel.webview.postMessage({ type: 'show-projects-modal', projects });
       debugLog(_root, 'run-command', `listed ${projects.length} Redivivus projects`);
     } else if (command === 'workbench.action.closeFolder') {
-      const folders = vscode.workspace.workspaceFolders;
-      if (folders && folders.length > 0) {
-        // Suppress "Do you want to save workspace?" dialog for untitled workspaces.
-        const cfg = vscode.workspace.getConfiguration();
-        await cfg.update('window.confirmSaveUntitledWorkspace', false, vscode.ConfigurationTarget.Global);
-        await vscode.workspace.updateWorkspaceFolders(0, folders.length);
+      // [Model A][LOOP FIX] NEVER close the projects home — it IS the workspace. Removing it drops to 0
+      // folders, which under Model A is invalid and was driving a tight reopen<->close reload loop (the
+      // "Activating Extensions…" hang). At home, "close" means "deactivate the active project" (back to the
+      // launcher), NOT remove the folder. Only a genuine standalone-folder workspace still closes the folder.
+      const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const { isProjectsContainer } = require('../../services/project/redivivusPaths.js');
+      if (wsRoot && isProjectsContainer(wsRoot)) {
+        // At home: deactivate the active project ONLY if one is active (idempotent — repeated closeFolder
+        // can't thrash). Never remove the home folder.
+        try {
+          const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
+          const activeRoot = PFP.instance?.getRoot();
+          if (activeRoot && !isProjectsContainer(activeRoot)) {
+            await vscode.commands.executeCommand('redivivus.closeProject');
+          }
+        } catch {}
+        debugLog(_root, 'run-command', 'closeFolder at home -> kept workspace (no folder removal)');
       } else {
-        await vscode.commands.executeCommand(command);
+        const folders = vscode.workspace.workspaceFolders;
+        if (folders && folders.length > 0) {
+          const cfg = vscode.workspace.getConfiguration();
+          await cfg.update('window.confirmSaveUntitledWorkspace', false, vscode.ConfigurationTarget.Global);
+          await vscode.workspace.updateWorkspaceFolders(0, folders.length);
+        } else {
+          await vscode.commands.executeCommand(command);
+        }
+        debugLog(_root, 'run-command', `executed OK: ${command}`);
       }
-      debugLog(_root, 'run-command', `executed OK: ${command}`);
     } else if (command === 'redivivus.runProject') {
       // [FIX] Run directly — VS Code command dispatch unreliable for this command
       // [FIX] Use the active project root (Project Files tree) so Run works in the no-reload flow.

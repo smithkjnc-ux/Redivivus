@@ -133,20 +133,33 @@ function getIdeVersion(): string {
   return _ideVersionCache;
 }
 
+// [FIX] Decode the user id (`sub`) from the access JWT — readable even when EXPIRED. Sent as a telemetry-only
+// fallback header so the backend can attribute events when JWT validation fails. Supabase access tokens
+// expire ~hourly and are never refreshed in the IDE, so every telemetry row was landing with user_id: null —
+// the admin dashboard could never attribute ide_version. Telemetry is not security-sensitive (the route is
+// intentionally anonymous-tolerant), so trusting this header for attribution is acceptable.
+function userIdFromJwt(token: string): string | null {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1] || '', 'base64').toString('utf8'));
+    return typeof payload?.sub === 'string' ? payload.sub : null;
+  } catch { return null; }
+}
+
 export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
   model?: string; provider?: string; input_tokens?: number; output_tokens?: number;
   success?: boolean; intent?: string; project_name?: string;
 }): void {
   getAccountToken().then(async token => {
     if (!token) return;
+    const uid = userIdFromJwt(token);
     fetch(`${getApiBase()}/telemetry`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(uid ? { 'x-redivivus-user-id': uid } : {}) },
       body: JSON.stringify({
         event,
         ...data,
         ide_version: getIdeVersion(),
-        configured_providers: (() => { try { return require('./secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
+        configured_providers: (() => { try { return require('../ai/secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
       }),
     }).then(res => {
       if (res.status === 401) {
@@ -163,13 +176,14 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
 export function logSessionStart(): void {
   getAccountToken().then(token => {
     if (!token) { return; }
+    const uid = userIdFromJwt(token);
     fetch(`${getApiBase()}/telemetry`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(uid ? { 'x-redivivus-user-id': uid } : {}) },
       body: JSON.stringify({
         event: 'session_start',
         ide_version: getIdeVersion(),
-        configured_providers: (() => { try { return require('./secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
+        configured_providers: (() => { try { return require('../ai/secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
       }),
     }).catch(() => {});
   }).catch(() => {});

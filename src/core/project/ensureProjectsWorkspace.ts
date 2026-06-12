@@ -38,9 +38,14 @@ export function ensureProjectsWorkspace(context: vscode.ExtensionContext): void 
 
   // A folder is already open (home or a project) — nothing to do.
   if (vscode.workspace.workspaceFolders?.length) { return; }
-  // [Model A] No folder open → ALWAYS re-open the projects home: the first-run establish AND the recovery
-  // for any state that left 0 folders (e.g. an old "Close Project" that removed the folder). The established
-  // flag now only gates the one-time welcome NOTE, not the open — under Model A, 0 folders is never valid.
+  // [Model A] No folder open → re-open the projects home: the first-run establish AND the recovery for any
+  // state that left 0 folders. The established flag now only gates the one-time welcome NOTE.
+  // [LOOP GUARD] Don't re-open if we JUST did (within 8s). If something keeps removing folders, re-opening
+  // would reload-loop ("Activating Extensions…" hang). The throttle survives reloads (globalState), so a
+  // loop self-stops after one re-open; a genuine 0-folder recovery (>8s since last) still re-opens.
+  const REOPEN_KEY = 'redivivus.lastReopenTs';
+  const lastReopen = context.globalState.get<number>(REOPEN_KEY) || 0;
+  if (Date.now() - lastReopen < 8000) { return; }
 
   const projectsDir = vscode.workspace.getConfiguration('redivivus')
     .get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
@@ -57,6 +62,7 @@ export function ensureProjectsWorkspace(context: vscode.ExtensionContext): void 
     context.globalState.update(ESTABLISHED_KEY, true);
     context.globalState.update(NOTE_PENDING_KEY, true);
   }
+  context.globalState.update(REOPEN_KEY, Date.now()); // mark the re-open for the loop guard above
   // forceNewWindow:false reloads THIS window into the ~/projects workspace (the single idle reload).
   vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectsDir), { forceNewWindow: false });
 }

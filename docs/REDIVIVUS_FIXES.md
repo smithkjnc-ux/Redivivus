@@ -57,6 +57,30 @@ Also clarified for PapaJoe: **`.redivivus/` is the per-project memory folder** R
 
 ---
 
+## Session — Jun 12, 2026: "Activating Extensions…" hang — close/reopen reload loop
+
+**Symptom:** extension host stuck "Activating Extensions…", chat panel wouldn't open, blank Architecture Map tab. Debug log showed a tight loop: `[handleMessage] type=run-command` → `currentRoot=undefined` (0 folders) → re-open `~/projects` → reload → repeat.
+
+**Cause:** a `run-command` with `workbench.action.closeFolder` (`chatPanelMsgRunCommand.ts:54`) removed the home folder → 0 folders. Combined with the Jun 12 change making `ensureProjectsWorkspace` ALWAYS re-open `~/projects` at 0 folders, this created a close→reopen→reload loop. Under Model A you should NEVER close the projects home (it IS the workspace) — that invariant was violated.
+
+- **`chatPanelMsgRunCommand.ts`:** `closeFolder` at home no longer removes the folder. It deactivates the active project (`redivivus.closeProject`) ONLY if one is active (idempotent — repeated firing can't thrash); a genuine standalone-folder workspace still closes. Breaks the loop at its source.
+- **`ensureProjectsWorkspace.ts`:** added an 8s throttle (globalState `lastReopenTs`, survives reloads) on the 0-folder re-open — defense in depth so any future folder-removal source self-stops after one re-open instead of reload-looping.
+- **Note:** the repeated `run-command` firing itself (a stale-webview/panel-lifecycle symptom — Audit C.3) is now harmless; the deeper panel-lifecycle consolidation remains owed.
+- `tsc` clean; deployed.
+
+---
+
+## Session — Jun 12, 2026: IDE Version "—" — real fix (token-expiry attribution + require path)
+
+**Per Fable's audit (`docs/AUDIT_HANDOFF_2026-06-12.md`, Part A), verified against the code.** The earlier heartbeat sent `ide_version` correctly, but it landed unattributable: Supabase access tokens expire ~hourly and the IDE never refreshes them, so the backend's `supabase.auth.getUser(token)` rejected the expired JWT → `user_id: null` → rigops (which skips null-user rows) could never show the version. Plus `configured_providers` was always `[]` due to a wrong require path.
+
+- **`apiClient.ts` (client, deployed):** (1) fixed the require path `./secretKeyStore.js` → `../ai/secretKeyStore.js` (the module is at `services/ai/`, not `services/api/`) — `configured_providers` now populates (also kills rigops "Configured AIs (inferred)"). (2) Added `userIdFromJwt()` — decodes the user id from the JWT's `sub` (readable even when expired) — and sends it as an `x-redivivus-user-id` header on both `logTelemetry` and `logSessionStart`.
+- **`telemetry/route.ts` (backend, needs Fly redeploy):** when JWT validation fails, falls back to the `x-redivivus-user-id` header (UUID-shape-checked) for `user_id` on both the activity_logs and guardian_catches inserts. Telemetry is intentionally anonymous-tolerant, so trusting the header for attribution is acceptable (mild spoofing tradeoff noted; a token-refresh flow is the fuller fix — Audit A.1 Option B).
+- **Result (after backend deploy):** new telemetry attributes to the real user even with an expired token → rigops shows IDE Version + real Configured AIs. Won't backfill historical null-user rows.
+- **Audit correction:** Fable's proposed path `../../ai/` was off by one; correct is `../ai/`.
+
+---
+
 ## Session — Jun 12, 2026: Untitled-workspace self-heal + Run pill moved to the header
 
 **(1) Untitled multi-root workspace — self-heal.** The earlier prevention stopped *new* duplication, but an existing "Untitled (Workspace)" (`~/projects` + `tic-tac-toe-game` added as its own root, shown twice) persisted across reloads. **Fix:** `ensureProjectsWorkspace.ts` runs `healUntitledProjectsWorkspace()` at activation — if the workspace is **untitled** and every root is the projects container OR a subfolder of it, it reopens `~/projects` as a clean single-folder workspace. Guarded so a deliberate multi-root with any external folder is never clobbered; loop-safe (single-folder result is no longer untitled).
