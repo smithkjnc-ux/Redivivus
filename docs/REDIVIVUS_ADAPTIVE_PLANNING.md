@@ -272,3 +272,19 @@ is invisible but part of the body, like tool-use under a chat. The gates were ba
 - [ ] **Step 3 — Dress up.** Put back ONLY: auth, one cost-confirm (expensive builds), one merged vault-reuse
       check, fix folded into the one body, Guided opt-in. Placement gate / 5W interrogation / mode popover /
       blueprint-gap prompt stay OFF (failed the form test).
+
+### Workspace model (Model A) — the body's workshop
+**Decision (Jun 12):** the workspace is the **parent** `~/projects`; each project is a **subfolder**. Open
+once, never switch, never reload. (Model B — project == workspace — was rejected: switching projects reloads
+the host and wipes builds.) Establish it as a **deliberate first-run step** (after AI keys), default
+`~/projects`, with a one-line note; one-time flag so it never re-fires.
+- Why it kills the reload bug: the host reload is triggered by the **0-folders → 1-folder** transition. With
+  `~/projects` always open we are never at zero, so a build (which only creates a subfolder) never trips it.
+- Already half-wired: `getLiveRoot()` (`chatPanelBuildRunner.ts`) treats "workspace root == projects
+  container" as "no active project → auto-create a subfolder," which IS Model A behavior.
+- [x] **W1 (DONE Jun 12)** — `ensureProjectsWorkspace.ts` + 2 lines in `extension.ts`: first-run establish of
+      `~/projects` as workspace root (one idle reload, then sticky). *Awaiting test.*
+- [ ] **W2** — Active-project tracking: after a build, the active project = the built subfolder (not the
+      workspace root). So follow-up edits/fixes target the right subfolder without re-creating. Then retire
+      the remaining `openFolder`-reload paths (`chatPanelBuildSteps.ts:167`, `chatPanelGates.ts:58`) and the
+      custom Project-Files-tree workaround (native Explorer always works under Model A).

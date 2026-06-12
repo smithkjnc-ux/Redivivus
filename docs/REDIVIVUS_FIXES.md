@@ -3,6 +3,17 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: Model A workspace — W1 (establish ~/projects as the persistent workspace root)
+
+**Decision (PapaJoe):** workspace = the **parent** (`~/projects`); each project is a **subfolder**. Open once, never switch, never reload. The codebase was a confused mix of two models (stores projects under `~/projects` like Model A, but treated each project as its own workspace like Model B → the 0→1 folder transition reloads the host and wipes in-flight builds). `getLiveRoot()` already treats "workspace root == projects container" as "auto-create a subfolder," so Model A is mostly wired — it just was never made the actual workspace. Also decided: establish the home as a **deliberate first-run step** (after AI keys), default `~/projects`, show a one-line note (PapaJoe's idea — better than a silent auto-open).
+
+- **Files changed:** NEW `src/core/project/ensureProjectsWorkspace.ts`; `src/extension.ts` (1 import + 1 call in `activate`).
+- **What changed:** On first run with no folder open, `ensureProjectsWorkspace` creates `~/projects` (if missing), marks it established (one-time globalState flag), queues a one-line note, and `openFolder`s it — the single idle establish reload. VS Code then remembers `~/projects`, so every later launch/host-restart starts there with NO reload, and builds (which create subfolders) never trip the 0→1 reload. Post-reload activation shows the note once ("your projects live in ~/projects — change in Settings") then clears it. Gated by a one-time flag so a deliberate close-to-launcher later never bounces the user back.
+- **Why:** Kill the "no-folder build gets wiped by a host reload" bug at the root, and make the workspace model consistent (native Explorer always works; the custom Project-Files-tree workaround becomes unnecessary in later steps). Foundation for Model A.
+- **Risk:** low-med. `tsc` clean; deployed. One idle reload on first run only (loop-safe: established flag + folder-count guard; soft-fails to the existing no-reload tree path if `openFolder` no-ops). `extension.ts` is already >200 lines (pre-existing Rule 9 violation) — added only a 2-line delegation, logic lives in the new <60-line module. **Test:** Restart Extension Host from the no-folder launcher → expect ONE reload into a `~/projects` workspace + the note. Then "build a tetris game" → builds into `~/projects/tetris-game`, no further reload, files appear in Explorer. Restart host again → starts in `~/projects`, no reload.
+
+---
+
 ## Session — Jun 12, 2026: Adaptive strip-down Step 0 — naked build body
 
 Strip-down of the AI pipeline, one phase at a time, to the "naked body" (classify -> infer -> confirm card -> build), then dress back only layers that pass the BOUNDARIES-not-BLINDERS test. Foundation chosen: the new streaming `/plan` pipeline (legacy `supervisorOrchestrator` retires in Step 1). Old code is **commented out, not deleted**, per user instruction + Rule 8.

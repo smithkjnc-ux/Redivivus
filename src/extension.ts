@@ -35,6 +35,7 @@ import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
 import { initProjectContextLogger, resetProjectContext } from './services/logging/projectContextLogger.js';
 import { wasProjectClosedRecently } from './services/project/closeMarker.js';
+import { ensureProjectsWorkspace } from './core/project/ensureProjectsWorkspace.js';
 import { invalidateRosterCache } from './services/ai/routingServiceRoster.js';
 import { initMasterLogger } from './core/logging/masterLogger.js';
 
@@ -50,6 +51,9 @@ export function activate(context: vscode.ExtensionContext) {
     context.globalState.update('redivivus.hasLaunched', true);
   }
   ChatPanel.extensionContext = context;
+  // [Model A] Establish ~/projects as the workspace root on first run (projects are subfolders; no
+  // mid-build host reload). One-time + idle; no-op after the first establish. See ensureProjectsWorkspace.
+  ensureProjectsWorkspace(context);
   initApiClient(context);
   // Migrate chassis.* → redivivus.* first, then SecretStorage init reads the promoted values.
   // [FIX] After init resolves, invalidate the roster cache and re-render the panel — the panel
