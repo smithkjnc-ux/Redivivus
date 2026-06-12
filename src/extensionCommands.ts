@@ -154,6 +154,7 @@ export function registerAllCommands(
           const PFP = require('./ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
           PFP.instance?.setRoot(wsRoot); // active project = the container = none -> chat shows the launcher
           try { require('./core/project/projectFolderDecorations.js').refreshProjectFolderDecorations(); } catch {}
+          try { import('./core/project/projectFocusMode.js').then(m => m.clearFocus()).catch(() => {}); } catch {} // un-hide the other projects
           const cp = ChatPanel.currentPanel as any;
           if (cp?.state) { cp.state.conversation = []; cp._initialized = false; cp.refresh?.(); }
           return;

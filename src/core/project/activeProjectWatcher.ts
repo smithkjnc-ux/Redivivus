@@ -45,16 +45,18 @@ export function activateProject(projectDir: string): void {
     PFP.instance?.setRoot(projectDir);
     require('../../ui/panels/chat/chatPanel.js').ChatPanel.currentPanel?.refresh();
     require('./projectFolderDecorations.js').refreshProjectFolderDecorations(); // dim others, badge the active
+    import('./projectFocusMode.js').then(m => m.applyFocus(projectDir)).catch(() => {}); // hide the other projects
   } catch { /* non-fatal — active-project switching is a convenience, never block */ }
 }
 
-/** Auto-activate from an opened file — skips protected folders so Redivivus never auto-targets itself. */
-function activateProjectForFile(filePath?: string): void {
-  if (!filePath) { return; }
+/** Auto-activate from an opened file — skips protected folders. Returns true if a project was activated. */
+function activateProjectForFile(filePath?: string): boolean {
+  if (!filePath) { return false; }
   const projectDir = projectForFile(filePath);
-  if (!projectDir) { return; }
-  if (isProtectedProject(projectDir)) { return; } // Redivivus's own source — never auto-target it
+  if (!projectDir) { return false; }
+  if (isProtectedProject(projectDir)) { return false; } // Redivivus's own source — never auto-target it
   activateProject(projectDir);
+  return true;
 }
 
 export function registerActiveProjectWatcher(context: vscode.ExtensionContext): void {
@@ -72,6 +74,8 @@ export function registerActiveProjectWatcher(context: vscode.ExtensionContext): 
       vscode.commands.executeCommand('redivivus.openChatPanel'); // surface the chat so the switch is visible
     })
   );
-  // Activate for whatever is already open at startup.
-  activateProjectForFile(vscode.window.activeTextEditor?.document.uri.fsPath);
+  // Activate for whatever is already open at startup. If nothing activates (home/launcher), clear any
+  // stale focus-mode excludes from a prior session so all project folders are visible.
+  const activated = activateProjectForFile(vscode.window.activeTextEditor?.document.uri.fsPath);
+  if (!activated) { import('./projectFocusMode.js').then(m => m.clearFocus()).catch(() => {}); }
 }
