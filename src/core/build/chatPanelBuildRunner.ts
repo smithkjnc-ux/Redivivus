@@ -192,7 +192,13 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
     removeWorkingMessage();
     const files = result.files ?? [];
     const fileList = files.map(f => `- \`${f.path}\``).join('\n');
-    const openWorkspaceToken = files.length > 0 && root && !vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === root)
+    // [Model A] Don't offer "Open Project in Explorer" when the project is ALREADY inside the open
+    // workspace (a subfolder of ~/projects) — it's already visible in the Explorer. Adding it as its own
+    // root converted the single ~/projects workspace into a confusing multi-root "Untitled (Workspace)"
+    // with the project shown twice. Only offer it when the project is genuinely outside the workspace.
+    const _rootInOpenWs = !!root && !!vscode.workspace.workspaceFolders?.some(wf =>
+      root === wf.uri.fsPath || root.startsWith(wf.uri.fsPath + path.sep));
+    const openWorkspaceToken = files.length > 0 && root && !_rootInOpenWs
       ? `\n${TOK_OPEN_WORKSPACE}${root}${DELIM}${TOK_OPEN_WORKSPACE_END}`
       : '';
     // [FIX] Skip scaffold placeholder index.html (content is just the filename text).
