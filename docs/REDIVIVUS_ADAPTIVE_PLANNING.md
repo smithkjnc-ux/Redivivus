@@ -274,6 +274,15 @@ is invisible but part of the body, like tool-use under a chat. The gates were ba
       blueprint-gap prompt stay OFF (failed the form test).
 
 ### Workspace model (Model A) — the body's workshop
+**Governing invariant (PapaJoe, Jun 12):** *Redivivus owns the workspace (= the projects home, default
+`~/projects`, changeable via `redivivus.projectsDirectory`, established once at first install); the user
+works in **folders** inside it.* That way **VS Code always sees the projects home as THE workspace and never
+as "another folder"** — so the workspace identity never changes → no host reloads, no "Untitled (Workspace)"
+churn, no project-vs-folder confusion. This one invariant kills the whole class of bugs (reload-wipes-build,
+untitled multi-root, chat-doesn't-see-project). The heal (`ensureProjectsWorkspace.healUntitledProjectsWorkspace`)
+exists only to *enforce* it. (Open follow-up: changing the setting AFTER first install doesn't auto-migrate
+the home yet.)
+
 **Decision (Jun 12):** the workspace is the **parent** `~/projects`; each project is a **subfolder**. Open
 once, never switch, never reload. (Model B — project == workspace — was rejected: switching projects reloads
 the host and wipes builds.) Establish it as a **deliberate first-run step** (after AI keys), default

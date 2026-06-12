@@ -68,12 +68,19 @@ export function ensureProjectsWorkspace(context: vscode.ExtensionContext): void 
  */
 function healUntitledProjectsWorkspace(): boolean {
   const wf = vscode.workspace.workspaceFolders || [];
-  if (vscode.workspace.workspaceFile?.scheme !== 'untitled' || wf.length < 2) { return false; }
+  // ANY untitled workspace that is just the projects container (or container + its subfolders) — including a
+  // SINGLE-folder untitled workspace (VS keeps "Untitled (Workspace)" when a folder is ADDED to an empty
+  // window, or after roots are removed down to one) — collapses to a clean single-FOLDER "projects" workspace.
+  if (vscode.workspace.workspaceFile?.scheme !== 'untitled' || wf.length < 1) { return false; }
   const container = wf.find(f => isProjectsContainer(f.uri.fsPath));
   if (!container) { return false; }
   const onlyContainerAndItsSubfolders = wf.every(f =>
     isProjectsContainer(f.uri.fsPath) || f.uri.fsPath.startsWith(container.uri.fsPath + path.sep));
   if (!onlyContainerAndItsSubfolders) { return false; }
-  vscode.commands.executeCommand('vscode.openFolder', container.uri, { forceNewWindow: false });
+  // [VSCodium quirk] openFolder in the SAME window from an untitled workspace KEEPS it "Untitled (Workspace)"
+  // (that was this very bug). The proven pattern — same as open-existing/open-recent (chatPanelMsgProjectOps)
+  // — is a NEW window + close the old one, which yields a clean single-FOLDER "projects" workspace.
+  vscode.commands.executeCommand('vscode.openFolder', container.uri, { forceNewWindow: true });
+  setTimeout(() => vscode.commands.executeCommand('workbench.action.closeWindow'), 1000);
   return true;
 }
