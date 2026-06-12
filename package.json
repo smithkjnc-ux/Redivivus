@@ -50,6 +50,10 @@
     },
     "commands": [
       {
+        "command": "redivivus.openAsProject",
+        "title": "Open as Redivivus Project"
+      },
+      {
         "command": "redivivus.init",
         "title": "Redivivus: Initialize Project"
       },
@@ -466,6 +470,11 @@
         }
       ],
       "explorer/context": [
+        {
+          "command": "redivivus.openAsProject",
+          "when": "explorerResourceIsFolder",
+          "group": "9_redivivus@0"
+        },
         {
           "submenu": "redivivus.explorer",
           "group": "9_redivivus@1"

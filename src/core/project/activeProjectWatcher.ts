@@ -37,12 +37,8 @@ export function projectForFile(filePath: string): string | undefined {
   return path.join(container, seg);
 }
 
-/** Sets the active project (no-op if unchanged or protected) and refreshes the chat header to follow it. */
-function activateProjectForFile(filePath?: string): void {
-  if (!filePath) { return; }
-  const projectDir = projectForFile(filePath);
-  if (!projectDir) { return; }
-  if (isProtectedProject(projectDir)) { return; } // Redivivus's own source — never auto-target it
+/** Sets the active project and refreshes the chat header to follow it. No-op if it's already active. */
+export function activateProject(projectDir: string): void {
   try {
     const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
     if (PFP.instance?.getRoot() === projectDir) { return; } // already the active project
@@ -51,9 +47,29 @@ function activateProjectForFile(filePath?: string): void {
   } catch { /* non-fatal — active-project switching is a convenience, never block */ }
 }
 
+/** Auto-activate from an opened file — skips protected folders so Redivivus never auto-targets itself. */
+function activateProjectForFile(filePath?: string): void {
+  if (!filePath) { return; }
+  const projectDir = projectForFile(filePath);
+  if (!projectDir) { return; }
+  if (isProtectedProject(projectDir)) { return; } // Redivivus's own source — never auto-target it
+  activateProject(projectDir);
+}
+
 export function registerActiveProjectWatcher(context: vscode.ExtensionContext): void {
+  // Auto: opening a file in a project subfolder makes it active.
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(e => activateProjectForFile(e?.document.uri.fsPath))
+  );
+  // Explicit: right-click a folder -> "Open as Redivivus Project" (VS Code has no folder-select event,
+  // so selecting/expanding a folder can't auto-activate — this command is the reliable folder path).
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redivivus.openAsProject', (uri?: vscode.Uri) => {
+      const dir = uri?.fsPath;
+      if (!dir) { return; }
+      activateProject(dir);
+      vscode.commands.executeCommand('redivivus.openChatPanel'); // surface the chat so the switch is visible
+    })
   );
   // Activate for whatever is already open at startup.
   activateProjectForFile(vscode.window.activeTextEditor?.document.uri.fsPath);
