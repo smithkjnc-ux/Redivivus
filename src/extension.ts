@@ -36,6 +36,7 @@ import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './se
 import { initProjectContextLogger, resetProjectContext } from './services/logging/projectContextLogger.js';
 import { wasProjectClosedRecently } from './services/project/closeMarker.js';
 import { ensureProjectsWorkspace } from './core/project/ensureProjectsWorkspace.js';
+import { registerActiveProjectWatcher } from './core/project/activeProjectWatcher.js';
 import { invalidateRosterCache } from './services/ai/routingServiceRoster.js';
 import { initMasterLogger } from './core/logging/masterLogger.js';
 
@@ -276,6 +277,10 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.window.registerTreeDataProvider('redivivusProjectFiles', projectFilesProvider));
   // If a workspace folder is already open, seed the tree with it so the view is never empty.
   { const _r = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath; if (_r) { projectFilesProvider.setRoot(_r); } }
+
+  // ── Active-project detection — opening a file in a projects-home subfolder makes it the active project
+  //    (chat follows it). Redivivus's own source repos are PROTECTED (skipped) so it never targets itself.
+  registerActiveProjectWatcher(context);
 
   // ── auto-open chat panel on startup (first activation only) ──
   // Open panel at startup if none is running. suppressAutoOpen only prevents DUPLICATES (currentPanel exists).

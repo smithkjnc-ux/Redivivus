@@ -44,6 +44,18 @@ export async function runBuildAfterGates(
   let root = getLiveRoot(deps);
   let autoCreated = false;
 
+  // [PARADOX GUARD] Refuse to build on a protected folder (Redivivus's own source). Even if the active
+  // project is somehow Redivivus itself, the tool must never modify its own running source.
+  if (root) {
+    const { isProtectedProject } = await import('../project/activeProjectWatcher.js');
+    if (isProtectedProject(root)) {
+      deps.postToWebview({ type: 'set-status', status: 'ready' });
+      deps.conversation.push({ role: 'assistant', content: `🛡️ **\`${path.basename(root)}\` is protected** — it's Redivivus's own source. Building/fixing here is disabled so Redivivus never modifies itself. Work on it in a separate editor.`, timestamp: Date.now() });
+      deps.refresh();
+      return;
+    }
+  }
+
   // No project open — auto-create a folder
   if (!root) {
     // [FIX] autoCreateProject makes AI calls (blueprint extract + name derivation) BEFORE the build's

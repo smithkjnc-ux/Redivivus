@@ -17,6 +17,20 @@
 
 ---
 
+## Session — Jun 12, 2026: Active-project detection + paradox guard (protected folders)
+
+**Feature (PapaJoe request):** opening a file inside a projects-home subfolder makes that subfolder the ACTIVE project — the chat header/dashboard follows it — WITHOUT changing the workspace (stays `~/projects`, no reload). Completes Model A: workspace = home, navigating folders = switching projects.
+- **New:** `src/core/project/activeProjectWatcher.ts` — `onDidChangeActiveTextEditor` → `projectForFile()` maps the open file to its immediate home-subfolder → `ProjectFilesProvider.setRoot()` + chat refresh (header reads PFP under W2). Registered in `extension.ts`.
+
+**Paradox guard (PapaJoe concern — Redivivus working on its own self):** the Redivivus source repos live in `~/projects`, so the watcher would otherwise activate them and a stray build/fix could modify Redivivus's own running source.
+- **Protected folders:** `isProtectedProject()` — folder name in the new `redivivus.protectedFolders` setting (default `redivivus`, `redivivus-backend`, `redivivus-web`, `redivivus-build`, `redivivus-templates`) OR a `.redivivusignore` marker in the folder. (a) the watcher **skips** protected folders (never auto-activates them); (b) `runBuildAfterGates` **refuses** a build/fix on a protected root with a 🛡️ message. Defense in depth — Redivivus can't target itself even manually.
+- **Setting added to package.json** (`redivivus.protectedFolders`); both watcher + setting verified in the running extension.
+- **Follow-up (optional):** an explicit Explorer right-click → "Open as Redivivus Project" command (needs package.json `menus` wiring) for switching without opening a file.
+
+Also clarified for PapaJoe: **`.redivivus/` is the per-project memory folder** Redivivus creates INSIDE each project (config.json = name+blueprint, build_history, dead_ends, learned, logs, sessions, rules). Its presence = "this folder is a managed project." Home (`~/projects`) must NEVER have one (that stray was the earlier dashboard bug).
+
+---
+
 ## Session — Jun 12, 2026: Untitled-workspace self-heal + Run pill moved to the header
 
 **(1) Untitled multi-root workspace — self-heal.** The earlier prevention stopped *new* duplication, but an existing "Untitled (Workspace)" (`~/projects` + `tic-tac-toe-game` added as its own root, shown twice) persisted across reloads. **Fix:** `ensureProjectsWorkspace.ts` runs `healUntitledProjectsWorkspace()` at activation — if the workspace is **untitled** and every root is the projects container OR a subfolder of it, it reopens `~/projects` as a clean single-folder workspace. Guarded so a deliberate multi-root with any external folder is never clobbered; loop-safe (single-folder result is no longer untitled).
