@@ -36,11 +36,11 @@ export function ensureProjectsWorkspace(context: vscode.ExtensionContext): void 
   // EVERY root is ~/projects or a subfolder of it, so a deliberate multi-root with external folders is safe.
   if (healUntitledProjectsWorkspace()) { return; } // reload incoming — collapses to single-root ~/projects
 
-  // Already established once — never fire again (so a deliberate close-to-launcher does not bounce back).
-  if (context.globalState.get<boolean>(ESTABLISHED_KEY)) { return; }
-  // A folder is already open (user opened a specific project, or ~/projects from a prior session).
-  // Wait for a genuine no-folder moment to establish; do not override their choice.
+  // A folder is already open (home or a project) — nothing to do.
   if (vscode.workspace.workspaceFolders?.length) { return; }
+  // [Model A] No folder open → ALWAYS re-open the projects home: the first-run establish AND the recovery
+  // for any state that left 0 folders (e.g. an old "Close Project" that removed the folder). The established
+  // flag now only gates the one-time welcome NOTE, not the open — under Model A, 0 folders is never valid.
 
   const projectsDir = vscode.workspace.getConfiguration('redivivus')
     .get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
@@ -52,10 +52,11 @@ export function ensureProjectsWorkspace(context: vscode.ExtensionContext): void 
     return; // can't create the projects home — leave the launcher as-is rather than thrash a reload
   }
 
-  // Mark established + queue the note BEFORE the reload (globalState survives the host restart; in-memory
-  // state does not). The reload re-enters activation, where the note block above fires once.
-  context.globalState.update(ESTABLISHED_KEY, true);
-  context.globalState.update(NOTE_PENDING_KEY, true);
+  // First time only → queue the welcome note (globalState survives the reload; in-memory state does not).
+  if (!context.globalState.get<boolean>(ESTABLISHED_KEY)) {
+    context.globalState.update(ESTABLISHED_KEY, true);
+    context.globalState.update(NOTE_PENDING_KEY, true);
+  }
   // forceNewWindow:false reloads THIS window into the ~/projects workspace (the single idle reload).
   vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectsDir), { forceNewWindow: false });
 }

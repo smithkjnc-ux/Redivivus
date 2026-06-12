@@ -29,6 +29,16 @@
 
 ---
 
+## Session — Jun 12, 2026: "Close Project" no longer empties the workspace
+
+**Symptom:** clicking "X Close Project" left **"NO FOLDER OPENED"** ("Extension 'Redivivus' removed 1 folder from the workspace"). Under Model A that's wrong — closing a project should drop to the HOME launcher, not empty the workspace.
+
+- **(1) `extensionCommands.ts` `redivivus.closeProject`:** was `updateWorkspaceFolders(0, folders.length)` → 0 folders. Now, when the workspace is the projects home, it **deactivates the active subfolder** instead: `ProjectFilesProvider.setRoot(container)` (→ chat shows launcher), refreshes folder decorations (un-dim), clears the conversation — and **keeps `~/projects` as the workspace**. Legacy fallback (a standalone-folder workspace) still closes the folder.
+- **(2) `ensureProjectsWorkspace.ts`:** the `established` flag used to `return` early, which **stranded** the user at 0 folders (reload wouldn't recover). Now: if no folder is open, ALWAYS re-open `~/projects` (Model A: 0 folders is never valid) — the flag only gates the one-time welcome note. Recovers any 0-folder state, including the one this bug created.
+- `tsc` clean; deployed. **Recovery:** a reload re-opens `~/projects` automatically.
+
+---
+
 ## Session — Jun 12, 2026: Active-project detection + paradox guard (protected folders)
 
 **Feature (PapaJoe request):** opening a file inside a projects-home subfolder makes that subfolder the ACTIVE project — the chat header/dashboard follows it — WITHOUT changing the workspace (stays `~/projects`, no reload). Completes Model A: workspace = home, navigating folders = switching projects.

@@ -144,14 +144,25 @@ export function registerAllCommands(
   // and the auto-open timer creates exactly ONE fresh launcher panel.
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.closeProject', async () => {
-      const folders = vscode.workspace.workspaceFolders;
       markProjectClosed();
-      // Dispose the panel — kills the tab so VS Code has nothing to serialize/restore
+      // [Model A] "Close Project" = deactivate the active subfolder and drop back to the HOME launcher.
+      // Do NOT remove ~/projects from the workspace — that left "NO FOLDER OPENED". The workspace IS home.
+      try {
+        const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const { isProjectsContainer } = require('./services/project/redivivusPaths.js');
+        if (wsRoot && isProjectsContainer(wsRoot)) {
+          const PFP = require('./ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
+          PFP.instance?.setRoot(wsRoot); // active project = the container = none -> chat shows the launcher
+          try { require('./core/project/projectFolderDecorations.js').refreshProjectFolderDecorations(); } catch {}
+          const cp = ChatPanel.currentPanel as any;
+          if (cp?.state) { cp.state.conversation = []; cp._initialized = false; cp.refresh?.(); }
+          return;
+        }
+      } catch { /* fall through to legacy close */ }
+      // Legacy fallback (workspace is a standalone folder, not the projects home): close the folder.
       ChatPanel.close();
-      // Remove workspace folders (causes window reload for single-folder workspaces)
-      if (folders && folders.length > 0) {
-        await vscode.workspace.updateWorkspaceFolders(0, folders.length);
-      }
+      const folders = vscode.workspace.workspaceFolders;
+      if (folders && folders.length > 0) { await vscode.workspace.updateWorkspaceFolders(0, folders.length); }
     })
   );
 
