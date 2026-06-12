@@ -156,6 +156,25 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
   }).catch(() => {});
 }
 
+/** [FIX] Session heartbeat — records the IDE version + configured providers on activation, so the admin
+ *  dashboard (rigops) reliably shows each user's IDE Version. Without this, ide_version only rode on the
+ *  occasional client-side ai_prompt call; normal usage (chat/build go through backend endpoints) never
+ *  carried it, so the dashboard showed "—". Stored in activity_logs (event 'session_start') like any event. */
+export function logSessionStart(): void {
+  getAccountToken().then(token => {
+    if (!token) { return; }
+    fetch(`${getApiBase()}/telemetry`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        event: 'session_start',
+        ide_version: getIdeVersion(),
+        configured_providers: (() => { try { return require('./secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
+      }),
+    }).catch(() => {});
+  }).catch(() => {});
+}
+
 /** Fire-and-forget: send a Guardian-caught issue to backend for collective learning.
  *  Stored in guardian_catches table → aggregated into community_gotchas view →
  *  fetched by all extension users → injected into every Worker + Guardian prompt.

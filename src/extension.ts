@@ -28,7 +28,7 @@ import { runDiagnostic } from './core/diagnostics/selfDiagnostic';
 
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
-import { initApiClient } from './services/api/apiClient.js';
+import { initApiClient, logSessionStart } from './services/api/apiClient.js';
 import { initSecretKeyStore, onSecretKeyStoreReady } from './services/ai/secretKeyStore.js';
 import { migrateChassisSettings } from './extensionMigration.js';
 import { resumePendingState } from './extensionResumeState.js';
@@ -66,6 +66,9 @@ export function activate(context: vscode.ExtensionContext) {
     .catch(err => console.error('[Redivivus] Init failed:', err));
   onSecretKeyStoreReady(() => {
     invalidateRosterCache();
+    // [FIX] Session heartbeat — records IDE version + configured providers now that keys are loaded, so the
+    // admin dashboard reliably shows each user's IDE Version (was "—" because normal usage never sent it).
+    logSessionStart();
     // [FIX] currentPanel may be the deserializer sentinel (no .refresh) or not yet constructed.
     // Poll until a real panel with refresh() is available, then update the badge.
     const tryRefresh = () => {
