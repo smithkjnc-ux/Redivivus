@@ -69,7 +69,7 @@ export async function handleBuildIntent(
     const gapResult = detectBlueprintGaps(config?.blueprint);
     // [P0] Auto mode never interrogates for blueprint gaps — the AI infers the 5 W's and builds;
     // correction is cheap (P3). Only Guided ('plan') mode pauses to fill gaps with the user.
-    if (gapResult.hasGaps && deps.buildMode !== 'direct') {
+    if (gapResult.hasGaps && deps.buildMode === 'plan') {
       _pendingGuidedBuilds.set(gapResult.sessionId, userText);
       conversation.push({ role: 'assistant', content: buildGapPromptMessage(gapResult, userText), timestamp: Date.now() });
       refresh(); return;

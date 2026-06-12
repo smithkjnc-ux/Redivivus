@@ -126,10 +126,11 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   let clarify = { cancelled: false, routedText: userText };
   let _jobTier = 'offer-choices'; // hoisted for Stage 4 diagnostic
 
-  // [FIX] Skip clarify for new-project builds — blueprint inference card handles pre-build questions
+  // [P0] Clarify wizard runs ONLY in explicit Guided mode. An unset mode means Auto (skip the wizard) —
+  // it must never be treated as "ask 5 questions first." (Was `!== 'direct'`, which fired by default.)
   const _wsR = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   const _pd = (vscode.workspace.getConfiguration('redivivus').get('projectsDirectory', '~/projects') as string).replace('~', require('os').homedir());
-  if (!msg.fromPreview && deps.buildMode !== 'direct' && intent.type === 'build' && _wsR && require('path').resolve(_wsR) !== require('path').resolve(_pd)) {
+  if (!msg.fromPreview && deps.buildMode === 'plan' && intent.type === 'build' && _wsR && require('path').resolve(_wsR) !== require('path').resolve(_pd)) {
     const { sizeJob } = await import('../ai/jobSizer.js');
     const jobSize = await sizeJob(userText, deps.routing);
     _jobTier = jobSize.tier;
@@ -155,7 +156,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     // [P0] In Auto ('direct') mode the AI NEVER interrogates the user — it infers and the blueprint card
     // confirms; correction is cheap (P3). Only Guided ('plan') mode pauses to resolve a 5W mismatch.
     // (The runFiveWsDiagnostic call above is silent — no user prompt — so we still get WHO calibration.)
-    if (!diagnostic.aligned && deps.buildMode !== 'direct') {
+    if (!diagnostic.aligned && deps.buildMode === 'plan') {
       const resolved = await handleMismatch(diagnostic, routedText, deps.routing, conversation, refresh);
       if (!resolved) { return; } // user cancelled or chose "let me explain"
       routedText = resolved;
