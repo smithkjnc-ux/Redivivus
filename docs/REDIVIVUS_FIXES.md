@@ -3,6 +3,19 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: Fix-pipeline Worker failover — a dead AI no longer kills the build
+
+**Symptom:** "build a tetris arcade game" → Supervisor planned → Worker phase died with `401 Incorrect API key provided: sk-proj-…` and stopped. System Health confirmed **3 of 6 providers dead** (OpenAI invalid, xAI HTTP 403, Kimi invalid; valid = Claude, Gemini, Groq). The fix-pipeline Worker picked OpenAI (a dead provider — selected by key *presence*, not validity) and threw instead of falling over.
+
+**Root cause:** `chatPanelMsgFixPhases.ts runPhase2Worker` called `/fix-worker` with a SINGLE provider and `throw` on any failure (`Worker AI error` / `Worker phase failed`). No failover — unlike the build worker (`executeClientAI`) which walks a fallback list.
+
+- **File changed:** `src/core/routing/chatPanelMsgFixPhases.ts`
+- **What changed:** `runPhase2Worker` now builds a worker-first, rank-ordered list of every key-configured provider and **loops**: on ANY failure (non-OK HTTP, inline `[ERROR: …]` stream, empty body, network throw) it records the error and drops to the next provider. Returns the first success (attributing usage/byline to the provider that actually ran). Only when EVERY provider fails does it throw a graceful "Every available AI failed. Last error: …". (PapaJoe's rule: fall to the next in line until none remain, then fail gracefully.)
+- **Why:** A single dead/expired key must never hard-fail a build. With 3/6 providers dead, this is the difference between "broken" and "just works on Claude."
+- **Risk:** low-med. `tsc` clean (190 lines); deployed (client-only, no Fly redeploy). **Known minor:** during failover the live stream preview can briefly show a failed provider's `[ERROR …]` blip before the working provider's output (the APPLIED result is the successful provider's clean response — cosmetic only). **Follow-ups:** (1) apply the same failover to the Supervisor phase (`runPhase1Supervisor`) and any other single-provider AI call for universal coverage; (2) **build→fix misroute** — this "build" ran the FIX pipeline at all ("Scanning N files", "writing the fix"); investigate why a fresh build routed to fix (suspect the bug-report regex pre-classify or classifier).
+
+---
+
 ## Session — Jun 12, 2026: THE "nothing happens" bug — builds silently dropped at classify
 
 **Symptom:** "build a tetris arcade game" → message appears, send-button spinner briefly spins, then clears — no working bubble, no blueprint card, no project, no error. Debug log stopped at `conv=1`.

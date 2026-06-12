@@ -123,53 +123,68 @@ export async function runPhase2Worker(
   const { supervisor, worker } = deps.routing.selectSupervisorAndWorker();
   const workerAI = escalated ? supervisor : (worker || deps.routing.getAvailableAI().ai);
   const { bestModelForRole } = require('../../services/ai/modelRegistry.js');
-  const workerModel = bestModelForRole(workerAI, 'flash')?.modelId || workerAI;
 
+  // [FIX][FAILOVER] When an AI fails for ANY reason (bad/expired key → 401/403, quota, empty response,
+  // inline [ERROR] stream, network), drop to the NEXT key-configured provider in rank order. Only when
+  // EVERY provider has failed do we throw — graceful fail. (PapaJoe's rule: "when an AI does not work it
+  // falls to the next in line, unless there are no more AI to use, then it can fail gracefully.")
+  // Order: the selected worker first, then all remaining providers that have a key, highest rank first.
+  const { AI_RANK } = require('../../services/ai/guardianAI.js');
+  const _keyMap = deps.routing.getKeyMap();
+  const _ranked: string[] = Object.entries(AI_RANK)
+    .filter(([ai]: any) => _keyMap[ai]?.())
+    .sort((a: any, b: any) => b[1] - a[1])
+    .map(([ai]: any) => ai);
+  const providerOrder = [workerAI, ..._ranked.filter((p) => p !== workerAI)];
+
+  const _ErrTail = /\[ERROR:\s*([^\]]+)\]\s*$/;
   let workerResponse = '';
-  try {
-    const res = await fetch(`${base}/fix-worker`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        diagnosis,
-        files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
-        context: {
-          patternRules: buildWorkerRules(activePatterns, 9) || undefined,
-          fileMetrics: {
-            totalSize,
-            largestFile: { path: largestFile.path, size: largestFile.size },
-            fileCount: files.length
+  let providerUsed = workerAI;
+  let lastError = '';
+  for (const provider of providerOrder) {
+    const pModel = bestModelForRole(provider, 'flash')?.modelId || provider;
+    let attempt = '';
+    try {
+      const res = await fetch(`${base}/fix-worker`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          diagnosis,
+          files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
+          context: {
+            patternRules: buildWorkerRules(activePatterns, 9) || undefined,
+            fileMetrics: { totalSize, largestFile: { path: largestFile.path, size: largestFile.size }, fileCount: files.length },
+            forceSurgical: !!forceSurgical
           },
-          forceSurgical: !!forceSurgical
-        },
-        worker: workerAI,
-        workerModel,
-        supervisorProvider: supervisor,
-        escalated: !!escalated,
-        keys: keysPayload,
-        stream: true,
-      })
-    });
-    if (!res.ok) { const err: any = await res.json().catch(() => ({})); throw new Error(err.error || 'Worker API failed'); }
-    if (res.body) {
-      const reader = res.body.getReader(); const decoder = new TextDecoder();
-      while (true) { const { done, value } = await reader.read(); if (done) break; const chunk = decoder.decode(value, { stream: true }); workerResponse += chunk; if (onChunk) onChunk(chunk); }
-    }
-  } catch (err: any) {
-    throw new Error(`Worker failed: ${err.message || 'unknown'}`);
+          worker: provider,
+          workerModel: pModel,
+          supervisorProvider: supervisor,
+          escalated: !!escalated,
+          keys: keysPayload,
+          stream: true,
+        })
+      });
+      if (!res.ok) { const err: any = await res.json().catch(() => ({})); lastError = err.error || `Worker API ${res.status}`; continue; }
+      if (res.body) {
+        const reader = res.body.getReader(); const decoder = new TextDecoder();
+        while (true) { const { done, value } = await reader.read(); if (done) break; const chunk = decoder.decode(value, { stream: true }); attempt += chunk; if (onChunk) onChunk(chunk); }
+      }
+    } catch (err: any) { lastError = err?.message || 'unknown'; continue; }
+
+    // The backend appends "[ERROR: ...]" inline on provider failure (executor.ts executeAIStream).
+    // Treat that — and an empty body — as a provider failure and fall over to the next.
+    const em = attempt.match(_ErrTail);
+    if (em) { lastError = em[1].trim(); continue; }
+    if (!attempt.trim()) { lastError = 'empty response'; continue; }
+    workerResponse = attempt; providerUsed = provider; break; // success
   }
 
-  if (!workerResponse.trim()) throw new Error('Worker returned empty response.');
-  // [FIX] The backend streams provider errors inline as "[ERROR: ...]" (executor.ts executeAIStream).
-  // Detect it here — otherwise the error text is treated as the fix and the Supervisor rejects it as
-  // "not a code fix, it's an API error message" (the confusing retry loop users saw).
-  // Anchored at end: the backend APPENDS "[ERROR: ...]" on failure, so this won't false-positive on
-  // generated code that contains "[ERROR:" in a string literal mid-file.
-  const errMatch = workerResponse.match(/\[ERROR:\s*([^\]]+)\]\s*$/);
-  if (errMatch) { throw new Error(`Worker AI error: ${errMatch[1].trim()}`); }
+  if (!workerResponse.trim()) {
+    throw new Error(`Every available AI failed. Last error: ${lastError || 'unknown'}`);
+  }
   deps.usageTracker?.recordUsage(
-    Math.ceil((diagnosis.length + workerResponse.length) / 4), 0, workerAI,
+    Math.ceil((diagnosis.length + workerResponse.length) / 4), 0, providerUsed,
     0, Math.ceil(workerResponse.length / 4), 'worker', path.basename(root)
   );
-  return { workerResponse: workerResponse.trim(), workerLabel: modelLabel(workerAI) };
+  return { workerResponse: workerResponse.trim(), workerLabel: modelLabel(providerUsed) };
 }
