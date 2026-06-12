@@ -133,11 +133,12 @@ function getIdeVersion(): string {
   return _ideVersionCache;
 }
 
-// [FIX] Decode the user id (`sub`) from the access JWT — readable even when EXPIRED. Sent as a telemetry-only
-// fallback header so the backend can attribute events when JWT validation fails. Supabase access tokens
-// expire ~hourly and are never refreshed in the IDE, so every telemetry row was landing with user_id: null —
-// the admin dashboard could never attribute ide_version. Telemetry is not security-sensitive (the route is
-// intentionally anonymous-tolerant), so trusting this header for attribution is acceptable.
+// [FIX] Resolve the user id from the IDE's auth token and send it as an x-redivivus-user-id telemetry
+// header. The IDE issues `existing-user-token-{uuid}` tokens (NOT JWTs) which the backend's
+// supabase.auth.getUser() can't parse — so every telemetry row landed with user_id: null and the admin
+// dashboard could never attribute ide_version. Telemetry is not security-sensitive (the route is
+// intentionally anonymous-tolerant), so the header attribution is acceptable. (Backend also has the cleaner
+// resolveUserFromToken fix.)
 function userIdFromToken(token: string): string | null {
   try {
     // [FIX] The IDE's token is `existing-user-token-{uuid}` — NOT a JWT (this is why JWT decoding gave null).
@@ -181,16 +182,8 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
  *  dashboard (rigops) reliably shows each user's IDE Version. Without this, ide_version only rode on the
  *  occasional client-side ai_prompt call; normal usage (chat/build go through backend endpoints) never
  *  carried it, so the dashboard showed "—". Stored in activity_logs (event 'session_start') like any event. */
-const _hbLog = (m: string) => { try { require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', `[heartbeat] ${m}\n`); } catch {} };
 export function logSessionStart(): void {
   getAccountToken().then(token => {
-    const uid0 = token ? userIdFromToken(token) : null;
-    // [DIAG] Inspect the token structure so we can see WHY uid is null (is it even a 3-part JWT?).
-    const _t = token || '';
-    const _parts = _t.split('.');
-    let _decoded = '';
-    try { let b = (_parts[1] || '').replace(/-/g, '+').replace(/_/g, '/'); while (b.length % 4) { b += '='; } _decoded = Buffer.from(b, 'base64').toString('utf8').slice(0, 140); } catch (e) { _decoded = 'ERR:' + e; }
-    _hbLog(`fired uid=${uid0} tokenLen=${_t.length} parts=${_parts.length} head=${_t.slice(0, 14)} payload=${_decoded}`);
     if (!token) { return; }
     const uid = userIdFromToken(token);
     fetch(`${getApiBase()}/telemetry`, {
@@ -201,7 +194,7 @@ export function logSessionStart(): void {
         ide_version: getIdeVersion(),
         configured_providers: (() => { try { return require('../ai/secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
       }),
-    }).then(r => _hbLog(`sent status=${r.status}`)).catch(e => _hbLog(`fetch error ${e}`));
+    }).catch(() => {});
   }).catch(() => {});
 }
 

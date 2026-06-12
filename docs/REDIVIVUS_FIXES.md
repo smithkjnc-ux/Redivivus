@@ -57,6 +57,14 @@ Also clarified for PapaJoe: **`.redivivus/` is the per-project memory folder** R
 
 ---
 
+## Session — Jun 12, 2026: Run "no entry point" + Preview serving the wrong project — Model A path bugs
+
+**Symptom (PapaJoe):** with tic-tac-toe-game active, Run → "No runnable entry point detected"; Preview → served the ASTEROIDS game; but the project's own `index.html` IS tic-tac-toe (works in the browser). Correctly diagnosed as "paths wrong for the projects."
+
+- **Root cause #1 — `getActiveProjectRoot()` returned the container.** `services/project/activeProjectRoot.ts` returned `workspaceFolders[0]` FIRST — which under Model A is `~/projects` (home), not the active project subfolder. So Run/Preview/Map resolved the container: Run found no single entry point, Preview's `findHtmlRoot(~/projects)` picked a random sibling (asteroids). **Fix:** prefer the active project SUBFOLDER (Project Files tree root) when the workspace folder is the projects container — mirrors the W2 header fix (which I'd applied to the chat header but missed here).
+- **Root cause #2 — preview server reused the wrong root.** `chatPanelPreview.ts startPreviewServer` reused ANY server already on port 5500 (`_isPortOpen`) without checking which root it served — so after previewing one project, every other project's static preview kept serving the first one (asteroids on 5500). **Fix:** track `_staticRoot`; reuse only if it matches the requested root, otherwise stop + re-root the static server. `stopPreviewServer` clears `_staticRoot`.
+- `tsc` clean; deployed. **Still separate:** the Architecture Map renders a blank screen (its own webview issue, blank in multiple screenshots today — not the path bug).
+
 ## Session — Jun 12, 2026: "Activating Extensions…" hang — close/reopen reload loop
 
 **Symptom:** extension host stuck "Activating Extensions…", chat panel wouldn't open, blank Architecture Map tab. Debug log showed a tight loop: `[handleMessage] type=run-command` → `currentRoot=undefined` (0 folders) → re-open `~/projects` → reload → repeat.
@@ -70,7 +78,14 @@ Also clarified for PapaJoe: **`.redivivus/` is the per-project memory folder** R
 
 ---
 
-## Session — Jun 12, 2026: IDE Version "—" — real fix (token-expiry attribution + require path)
+## Session — Jun 12, 2026: IDE Version "—" — REAL cause was the token format (not JWT expiry) — FIXED ✅
+
+**Confirmed working in rigops:** IDE Version `0.4.7`, Configured AIs `claude, gemini, groq, kimi, openai, xai` (no "(inferred)"), Last Active updated. The audit's "expired JWT" theory was WRONG — a heartbeat diagnostic revealed the token is `existing-user-token-{uuid}` (`parts=1`, not a JWT). `supabase.auth.getUser()` can't parse it → every telemetry row had `user_id: null`.
+- **Client (deployed):** `userIdFromToken()` extracts the uuid from `existing-user-token-{uuid}` and sends it as `x-redivivus-user-id`; the v134 backend's header fallback attributes it → no second backend deploy needed for the fix.
+- **Backend (staged, cleaner):** telemetry route now uses `resolveUserFromToken` (handles both `existing-user-token-{uuid}` AND JWTs — the route's own helper warning said to always use it). Deploy when convenient; the header path already works.
+- Plus the require-path fix (`../ai/secretKeyStore.js`) → configured_providers populates. Temporary heartbeat diagnostic removed.
+
+## Session — Jun 12, 2026: IDE Version "—" — first attempt (token-expiry attribution + require path)
 
 **Per Fable's audit (`docs/AUDIT_HANDOFF_2026-06-12.md`, Part A), verified against the code.** The earlier heartbeat sent `ide_version` correctly, but it landed unattributable: Supabase access tokens expire ~hourly and the IDE never refreshes them, so the backend's `supabase.auth.getUser(token)` rejected the expired JWT → `user_id: null` → rigops (which skips null-user rows) could never show the version. Plus `configured_providers` was always `[]` due to a wrong require path.
 

@@ -32,6 +32,7 @@ const MIME: Record<string, string> = {
 };
 
 let _staticServer: http.Server | null = null;
+let _staticRoot: string | null = null; // which webRoot our static server is serving (to detect stale roots)
 let _devTerminal: vscode.Terminal | null = null;
 
 // Returns root if it directly contains HTML, else first immediate subdir that does, else null.
@@ -117,16 +118,25 @@ export function detectDevServer(root: string): DevServerInfo | null {
 }
 
 export async function startPreviewServer(root: string, info: DevServerInfo): Promise<{ port: number; stop: () => void; alreadyRunning: boolean }> {
-  // Reuse an already-running dev server without touching it
+  if (info.type === 'static') {
+    const webRoot = info.webRoot || root;
+    // [FIX] Our static server already serving THIS root → reuse. If it's serving a DIFFERENT project's root
+    // (e.g. asteroids), RE-ROOT it. The old code reused any server on port 5500 without checking the root,
+    // so after previewing one project, every other project's preview kept serving the first one.
+    if (_staticServer && _staticRoot === webRoot) {
+      return { port: info.port, stop: stopPreviewServer, alreadyRunning: true };
+    }
+    stopPreviewServer(); // closes our stale-root server (frees the port for the new root)
+    _staticServer = _buildStaticServer(webRoot, info.port);
+    _staticRoot = webRoot;
+    _staticServer.listen(info.port, 'localhost');
+    return { port: info.port, stop: stopPreviewServer, alreadyRunning: false };
+  }
+  // Non-static dev server (npm/vite/next) — reuse if already up on its port; these own their port.
   if (await _isPortOpen(info.port)) {
     return { port: info.port, stop: () => {}, alreadyRunning: true };
   }
   stopPreviewServer();
-  if (info.type === 'static') {
-    _staticServer = _buildStaticServer(info.webRoot || root, info.port);
-    _staticServer.listen(info.port, 'localhost');
-    return { port: info.port, stop: stopPreviewServer, alreadyRunning: false };
-  }
   const terminal = vscode.window.createTerminal({ name: 'Redivivus Preview', cwd: root });
   terminal.sendText(info.command);
   terminal.show(true);
@@ -135,7 +145,7 @@ export async function startPreviewServer(root: string, info: DevServerInfo): Pro
 }
 
 export function stopPreviewServer(): void {
-  if (_staticServer) { try { _staticServer.close(); } catch {} _staticServer = null; }
+  if (_staticServer) { try { _staticServer.close(); } catch {} _staticServer = null; _staticRoot = null; }
   if (_devTerminal)  { try { _devTerminal.dispose(); } catch {} _devTerminal = null; }
 }
 
