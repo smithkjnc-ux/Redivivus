@@ -10,6 +10,8 @@
 import * as vscode from 'vscode';
 import * as os from 'os';
 import * as fs from 'fs';
+import * as path from 'path';
+import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
 
 const ESTABLISHED_KEY = 'redivivus.projectsHomeEstablished';
 const NOTE_PENDING_KEY = 'redivivus.projectsHomeNotePending';
@@ -27,6 +29,12 @@ export function ensureProjectsWorkspace(context: vscode.ExtensionContext): void 
       'Redivivus: your projects live in ~/projects — every build you create lands here. Change it anytime in Redivivus Settings.'
     );
   }
+
+  // ── Self-heal: collapse a multi-root "Untitled (Workspace)" back to single-root ~/projects. ──
+  // A subfolder got added as its own workspace root (old "Open Project in Explorer" behavior), turning the
+  // single ~/projects workspace into an untitled multi-root with the project shown twice. Fires only when
+  // EVERY root is ~/projects or a subfolder of it, so a deliberate multi-root with external folders is safe.
+  if (healUntitledProjectsWorkspace()) { return; } // reload incoming — collapses to single-root ~/projects
 
   // Already established once — never fire again (so a deliberate close-to-launcher does not bounce back).
   if (context.globalState.get<boolean>(ESTABLISHED_KEY)) { return; }
@@ -50,4 +58,22 @@ export function ensureProjectsWorkspace(context: vscode.ExtensionContext): void 
   context.globalState.update(NOTE_PENDING_KEY, true);
   // forceNewWindow:false reloads THIS window into the ~/projects workspace (the single idle reload).
   vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(projectsDir), { forceNewWindow: false });
+}
+
+/**
+ * If the workspace is an UNTITLED multi-root containing the projects container AND only subfolders of it,
+ * reopen ~/projects as a single folder (collapsing the duplicate roots). Returns true if a reload was
+ * triggered. No-op for a single-folder workspace, a saved .code-workspace, or a multi-root with any folder
+ * outside ~/projects (a deliberate setup we must not clobber).
+ */
+function healUntitledProjectsWorkspace(): boolean {
+  const wf = vscode.workspace.workspaceFolders || [];
+  if (vscode.workspace.workspaceFile?.scheme !== 'untitled' || wf.length < 2) { return false; }
+  const container = wf.find(f => isProjectsContainer(f.uri.fsPath));
+  if (!container) { return false; }
+  const onlyContainerAndItsSubfolders = wf.every(f =>
+    isProjectsContainer(f.uri.fsPath) || f.uri.fsPath.startsWith(container.uri.fsPath + path.sep));
+  if (!onlyContainerAndItsSubfolders) { return false; }
+  vscode.commands.executeCommand('vscode.openFolder', container.uri, { forceNewWindow: false });
+  return true;
 }

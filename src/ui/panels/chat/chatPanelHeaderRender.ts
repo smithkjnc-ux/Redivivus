@@ -13,6 +13,7 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
       <button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>
       <button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Build History">&#x1F4CB; History</button>
       <button class="header-btn header-btn--preview" ${header.primaryAction?.actionAttr}="${header.primaryAction?.actionValue}" title="${header.primaryAction?.tooltip}">${header.primaryAction?.icon} ${header.primaryAction?.label}</button>
+      <button class="header-btn header-btn--run" data-cmd="redivivus.runProject" title="Run your project standalone — opens it the way it really runs (web in your browser, scripts in a terminal)">&#x25B6; Run</button>
       ` : ''}
       ${header && header.projectTokens ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
       <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
@@ -23,8 +24,9 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
 
 /** Inner HTML for the #input-left container (the bottom-left pill row). */
 export function renderInputLeftInner(header?: ChatHeaderInfo): string {
+  // [MOVED] Run pill relocated to the header (next to Preview) — it was out of place in the input bar and
+  // confusing alongside the Preview button up top. Preview (in-editor) + Run (standalone) now sit together.
   return `<button class="input-pill" data-cmd="redivivus.openVault" title="Browse Vault">&#x229E; Vault</button>
-          ${header && header.hasProjectOpen ? `<button class="input-pill input-pill--run" data-cmd="redivivus.runProject" title="Run your project in the terminal">&#x25B6; Run</button>` : ''}
           ${header ? (header.rosterDisplay && header.rosterDisplay.length > 0
             ? `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="AI Team: ${header.rosterDisplay.map(r => r.emoji + ' ' + r.label + ' (' + r.role + ')').join(', ')}">${header.rosterDisplay[0].emoji} ${header.rosterDisplay[0].label}${header.rosterDisplay.length > 1 ? ' +' + (header.rosterDisplay.length - 1) : ''}</span>`
             : `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="Click to configure AI model">${!header.hasKey ? '⚠️ No AI key' : '🧠 ' + header.aiLabel}</span>`

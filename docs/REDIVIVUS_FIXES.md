@@ -17,6 +17,14 @@
 
 ---
 
+## Session — Jun 12, 2026: Untitled-workspace self-heal + Run pill moved to the header
+
+**(1) Untitled multi-root workspace — self-heal.** The earlier prevention stopped *new* duplication, but an existing "Untitled (Workspace)" (`~/projects` + `tic-tac-toe-game` added as its own root, shown twice) persisted across reloads. **Fix:** `ensureProjectsWorkspace.ts` now runs `healUntitledProjectsWorkspace()` at activation — if the workspace is an **untitled** multi-root where every root is the projects container OR a subfolder of it, it reopens `~/projects` as a single folder (one reload, collapsing the duplicate roots). Guarded so a deliberate multi-root with any external folder is never clobbered; loop-safe (single-folder result is no longer untitled). The user no longer has to manually File→Open Folder.
+
+**(2) Run pill moved from the input bar to the header (next to Preview).** PapaJoe: the green Run in the input bar "looks out of place and is confusing" alongside the Preview button up top. **Fix:** `chatPanelHeaderRender.ts` — removed the `input-pill--run` from `renderInputLeftInner`, added a `header-btn--run` to `renderHeaderRightInner` right after Preview. Preview (in-editor) + Run (standalone) now sit together, matching the Preview-vs-Run design. Tooltip updated from "Run in the terminal" to "Run standalone — web in your browser, scripts in a terminal" (it's type-aware now). `tsc` clean; deployed.
+
+---
+
 ## Session — Jun 12, 2026: W2 active-project + RUN serves web over http (not file://)
 
 First successful end-to-end build: "build a tic tac toe game" → built 7 files into `~/projects/tic-tac-toe-game/` (index.html, style.css, src/{state,logic,ai,renderer,controller}.js), rendered correctly. Two Redivivus gaps surfaced:
