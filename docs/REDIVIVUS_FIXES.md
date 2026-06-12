@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: home screen — container shows the launcher, not a project dashboard
+
+**Symptom:** the `~/projects` home screen rendered a project **dashboard** — "🚀 projects", "Blueprint: No blueprint yet — create one", and a **Close Project** button — implying a project was open, even though `isInitialized/hasProject=false`.
+
+**Cause:** `chatPanelEmptyState.ts` picks dashboard-vs-launcher off `header.workspaceHasRedivivus`, which (`chatPanelHeader.ts:61`) was just `fs.existsSync(<root>/.redivivus)`. The chat-history/session logger keeps recreating a stray `~/projects/.redivivus/` (chat_history.md + logs, no config) → flag true → dashboard.
+
+- **File changed:** `src/ui/panels/chat/chatPanelHeader.ts` (1 import + `workspaceHasRedivivus` now excludes the projects container via `isProjectsContainer()`).
+- **What changed:** the container is HOME — `workspaceHasRedivivus` is false for it regardless of a stray `.redivivus/`, so the home screen always renders the **launcher** ("Tell me what you want to build" + templates + recent projects), never the project dashboard / "Close Project".
+- **Why:** the container is not a project; it must look like home.
+- **Risk:** low. `tsc` clean; deployed (client-only). **Rule 9 note:** `chatPanelHeader.ts` is 210 lines (pre-existing over-limit); made a minimal surgical change rather than splitting mid-fix — split is still owed. **Follow-up (W2):** route the chat-history/session logger to a home-level location so it stops recreating `.redivivus/` in the container at all.
+- **Second branch (same fix):** killing `workspaceHasRedivivus` for the container then fell into the NEXT wrong branch — `chatPanelEmptyState.ts:24` `workspaceFolderIsOpen && !workspaceHasRedivivus` rendered the **"Project detected: projects → Assist Mode / Full Redivivus"** mode-choice (the open-but-unsetup-folder screen). Added an explicit `workspaceIsProjectsContainer` flag to `ChatHeaderInfo` (set in `buildHeaderInfo` via `isProjectsContainer`) and guarded that branch with `&& !header.workspaceIsProjectsContainer`, so the container skips dashboard AND project-detected and falls through to the real launcher. Files: `chatPanelHtml.ts` (interface field), `chatPanelHeader.ts` (set flag), `chatPanelEmptyState.ts` (guard).
+
+---
+
 ## Session — Jun 12, 2026: build→fix misroute — confirmed blueprint card now routes straight to build
 
 **Symptom:** "build a tetris arcade game" → blueprint card → "Build it" → ran the **FIX** pipeline (Supervisor/Worker/Verify/Guardian, "writing fix 1.2 KB", "The fix didn't apply cleanly"), created **no project folder**. (Failover worked here — the retry survived the dead OpenAI key — but the wrong engine ran.)

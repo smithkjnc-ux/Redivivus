@@ -34,6 +34,7 @@ export interface ChatHeaderInfo {
   lastModel?: string;
   hasProjectOpen: boolean;
   workspaceHasRedivivus: boolean;
+  workspaceIsProjectsContainer?: boolean; // [Model A] root is ~/projects (HOME) -> always the launcher
   workspaceFolderIsOpen: boolean; workspaceIsAssistMode: boolean; assistMode?: boolean;
   recentProjects: Array<{ path: string; name: string; timestamp?: number }>;
   vaultItemCount?: number;  // user-built items only (excludes seeded starters)

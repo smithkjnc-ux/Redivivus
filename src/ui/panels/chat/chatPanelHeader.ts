@@ -10,6 +10,7 @@ import { BuildHistoryService } from '../../../services/build/buildHistoryService
 import { getAccountToken } from '../../../services/api/apiClient.js';
 import * as fs from 'fs';
 import { determineBlueprintStatus } from './chatPanelHeaderUtils.js';
+import { isProjectsContainer } from '../../../services/project/redivivusPaths.js';
 
 export function buildHeaderInfo(
   redivivus: RedivivusService,
@@ -58,7 +59,12 @@ export function buildHeaderInfo(
 
   // Check if effective root has a .redivivus/ folder or .redivivus-assist shim
   const workspaceRoot = effectiveRoot;
-  const workspaceHasRedivivus = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.redivivus')) : false;
+  // [Model A] The projects container (~/projects) is HOME, never a project — even though the chat-history
+  // logger writes a stray .redivivus/ there. Counting it as "has Redivivus" would render the project
+  // DASHBOARD ("Close Project"/"create blueprint"), and being an open-but-unsetup folder would render the
+  // "Project detected — Assist/Full?" mode-choice. Both are wrong for home. Home = the launcher, always.
+  const workspaceIsProjectsContainer = isProjectsContainer(workspaceRoot);
+  const workspaceHasRedivivus = !!workspaceRoot && !workspaceIsProjectsContainer && fs.existsSync(path.join(workspaceRoot, '.redivivus'));
   // [FIX] Check .redivivus-assist regardless of whether .redivivus/ exists — .redivivus/ now exists in both modes
   const workspaceIsAssistMode = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.redivivus-assist')) : false;
 
@@ -178,6 +184,7 @@ export function buildHeaderInfo(
     lastModel,
     hasProjectOpen,
     workspaceHasRedivivus,
+    workspaceIsProjectsContainer,
     workspaceFolderIsOpen,
     workspaceIsAssistMode,
     assistMode,
