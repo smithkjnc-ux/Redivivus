@@ -3,6 +3,32 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Context-aware routing guard + advisory client tier + pill format
+
+**Three changes in one session:**
+
+### 1. Advisory client tier (backend `chat/route.ts`)
+The client tier hint from the pill was acting as a mandate — skipping the AI pre-pass entirely. Changed so the pre-pass ALWAYS runs. Client hint is now only honoured for Q&A downgrades (cheaper = fine) or user upgrades (manual ultra = trust them). For fix/build actions, AI classification always wins. PREPASS_SYSTEM now emits `action` in addition to `tier` and `prompt` so `prepassAction` is always populated for the tier arbitration logic.
+
+### 2. Project context guard (`chatPanelProjectContextGuard.ts` — NEW FILE)
+Enforces: "certain things can and cannot be done inside an open project."
+- **Project IS open + confident build verb** → blocked. User shown options: add to project / close and build / open projects folder.
+- **No project open + confident fix verb** → blocked. User shown options: open a project / build something new / ask a question.
+- **Compound commands** ("open X then build Y", "close project and open X") → always pass through regardless of state.
+- **Questions** → always pass through (flashScore path in assessTier).
+- Guard runs BEFORE cloudChat so no tokens burned on misroutes.
+
+### 4. `projectOpen` context field
+Added `projectOpen?: boolean` to `ChatContext` (client) and backend body type. Backend injects it into the context string sent to both Phase 1 (pre-pass) and Phase 2 (main model) so the AI classifier knows project state. Prevents the AI from returning `action='build'` inside a project or `action='fix'` with no project open.
+
+### 5. Pill display format (`chatPanelScriptTier.ts`)
+Changed from icon-first to mode-first: `Adaptive · Groq` / `Manual · Gemini`. Blank state shows `Adaptive` (faded, no AI named). Mode word is bold, AI name is the secondary part. Separator is a `·` (U+00B7) with narrow no-break space around the emoji.
+
+**Deploy:** Compile clean (0 errors). Extension ready for rigops deploy.
+- **Risk:** Guard uses conservative heuristics (only blocks on confident signals). Ambiguous messages always pass through to cloudChat. Compound-command regex tested against common patterns.
+
+---
+
 ## Session — Jun 13, 2026: Fix tier assessment + silent fallback bug (frog cannot jump on logs)
 
 **Symptom:** User sent "in the river part of the game, the frog cannot jump on the logs." No response appeared. Status returned to "ready" with nothing in chat.

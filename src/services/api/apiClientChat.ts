@@ -25,6 +25,10 @@ export interface ChatContext {
   fileList?: string[];
   // [ADAPTIVE-PILL] When user locks a provider manually, pass it here so the backend respects it.
   preferred?: string;
+  // [CONTEXT-GUARD] Whether a Redivivus project is currently open in the editor.
+  // When true: fix/edit/add are valid; new standalone builds are not.
+  // When false: new builds are valid; fix/edit have nothing to target.
+  projectOpen?: boolean;
 }
 
 export async function cloudChat(

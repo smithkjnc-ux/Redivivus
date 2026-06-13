@@ -21,6 +21,7 @@ import { createTurnContext } from './turnContext.js';
 import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
 import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
 import { handleChangeRequest } from './handleChangeRequest.js';
+import { checkProjectContextGuard } from './chatPanelProjectContextGuard.js';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { conversation, refresh } = deps;
@@ -92,12 +93,24 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
     return;
   }
+  // ── Project context guard — runs before any AI call ──
+  // Blocks new builds inside an open project; blocks fix/edit with no project open.
+  // Compound commands ("open X then build Y") always pass through.
+  const _ctxBlock = checkProjectContextGuard(userText, conversation, refresh);
+  if (_ctxBlock) {
+    conversation.push({ role: 'assistant', content: _ctxBlock, timestamp: Date.now() });
+    refresh();
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+    return;
+  }
 
-  // ── Supervisor chat — Claude classifies AND answers in one call ──
   // [FIX] Replaces broken cloudClassify() (/classify never existed) + promptCheap() (wrong model for Q&A).
   const { cloudChat } = await import('../../services/api/apiClientChat.js');
   const _cfgBlueprint = deps.redivivus.isInitialized() ? (deps.redivivus.loadConfig?.() as any)?.blueprint : undefined;
   const _wsRootFL = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  // [CONTEXT] Pass project state to cloudChat so the backend AI classifier knows if a project is open.
+  // Without this the AI can return action='build' for a fix request inside a project, or vice versa.
+  const _hasProjectOpen = _wsRootFL ? require('fs').existsSync(require('path').join(_wsRootFL, '.redivivus', 'config.json')) : false;
   const chatResult = await cloudChat(userText, {
     blueprint: _cfgBlueprint,
     recentMessages: conversation.slice(-6).map(m => ({ role: m.role, content: m.content })),
@@ -105,8 +118,9 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     personality: vscode.workspace.getConfiguration('redivivus').get<string>('personality', 'plain'),
     fileList: _wsRootFL ? getWorkspaceFileList(_wsRootFL) : undefined,
-    // [ADAPTIVE-PILL] When user locked a provider manually, pass it as preferred so backend respects it.
     preferred: (msg.manualProvider as string | undefined) || undefined,
+    // [CONTEXT] Tell the backend whether a project is open — so the classifier can't return build inside a project
+    projectOpen: _hasProjectOpen,
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
   // [FIX] cloudChat returned null — backend unavailable or all providers capped (e.g. Claude billing).

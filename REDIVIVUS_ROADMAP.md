@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-13 — Fix tier assessment bug: 'game' keyword no longer forces ultra for fix requests; now requires build verb ('build a game'). Fix silent failure: cloudChat=null + fix signals → fix pipeline (full failover), not Q&A promptCheap (which silently returned nothing). Root cause: Claude billing cap → ultra tier → no fallback → silence.
+*Last updated:* 2026-06-13 — Context-aware routing guard: project-open/closed rules enforced before cloudChat. Advisory client tier: pre-pass always runs, AI wins for fix/build. Pill format: Adaptive·Groq / Manual·Gemini. projectOpen field flows client→backend→AI classifier. Compound commands (open X then do Y) always bypass guard.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
