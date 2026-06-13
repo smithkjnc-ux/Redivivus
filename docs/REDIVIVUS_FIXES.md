@@ -3,6 +3,22 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 13, 2026: Context guard wrongly blocked "make the vehicles look more real" as a new build
+
+**Symptom:** Inside the open frogger project, "make the vehicles look more real" was blocked with *"You're inside frogger-arcade-game. Builds create a new standalone project."* It's a MODIFICATION of existing code, not a new build.
+
+**Root cause — `chatPanelProjectContextGuard.ts`:** `isConfidentNewBuild()` fired on any build verb (`make`) with no fix verb present. "make the vehicles look more real" has the verb `make` but none of the FIX_VERBS (fix/change/improve/...), so it was classified as a confident new build and hard-blocked. The classifier had no notion of WHAT was being made — a new thing vs an existing one.
+
+**Fix:** a confident *new build* must name a NEW, indefinite object (`a tetris game`, `me a login screen`, `a new app`) — `NEW_OBJECT_RE`. A definite reference to existing content (`the vehicles`, `it`, `the game`, `them`) means a MODIFICATION of the open project — `DEFINITE_REF_RE` — and must NOT trip the guard. Added two checks to `isConfidentNewBuild`: require a new-object signal, and bail when a definite reference is present (unless the word "new" appears). This makes the guard strictly more conservative (fewer false blocks), deferring ambiguous cases to the downstream AI classifier — exactly its stated design ("only hard-block on high-confidence").
+
+**Verified:** 9 cases pass — "make the vehicles look more real", "make the game have sounds", "make it faster", "improve the graphics", "add sounds to the game" all pass through (not blocked); "build me a tetris game", "create a login screen", "make a snake game from scratch", "build a new project" still correctly flagged as new builds.
+
+**Risk:** low — only narrows when the guard blocks. A genuine new-build typed inside a project without an explicit new-object word now passes to cloudChat, where the AI classifier + project-open context still handle it.
+
+**Compile:** 0 errors, deployed.
+
+---
+
 ## Feature — Jun 13, 2026: Living Blueprint Phase 3 — revision trail reaches the Supervisor
 
 The HEAD contract already flowed to the fix-Supervisor (Phase 0). Phase 3 adds the **change history** so the Supervisor can reason about how the project evolved, not just its current state.

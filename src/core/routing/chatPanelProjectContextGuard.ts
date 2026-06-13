@@ -30,6 +30,12 @@ export function isCompoundContextCommand(text: string): boolean {
 const BUILD_VERBS_RE   = /\b(build|make|create|generate|write|code( up)?|implement|scaffold|start( a| an| the)?)\b/i;
 const FIX_VERBS_RE     = /\b(fix|debug|repair|update|change|improve|edit|modify|refactor|add to|remove from|cannot|broken|not working|fails|error|crash|blank)\b/i;
 const QUESTION_RE      = /^(how|what|why|when|where|who|can you|could you|would you|should|is there|are there|does|do you|will|explain|tell me|show me)\b/i;
+// [FIX] A NEW build names a NEW, indefinite object ("a tetris game", "me a login screen", "a new app"). A request
+// that points at EXISTING content with a definite reference ("the vehicles", "it", "the game", "them") is a
+// MODIFICATION of the open project, not a new build — it must NOT trip the new-build guard. (Caused "make the
+// vehicles look more real" to be wrongly blocked as a build inside frogger — Jun 13, 2026.)
+const NEW_OBJECT_RE    = /\b(a|an|me a|me an|new|another)\b/i;
+const DEFINITE_REF_RE  = /\b(the|this|that|these|those|it|its|them|their|they)\b/i;
 
 // Returns true ONLY when the message is unambiguously a "create something new" request.
 export function isConfidentNewBuild(text: string): boolean {
@@ -38,6 +44,8 @@ export function isConfidentNewBuild(text: string): boolean {
   if (FIX_VERBS_RE.test(t)) { return false; }        // fix/repair/update = not a new build
   if (!BUILD_VERBS_RE.test(t)) { return false; }     // must have a build verb
   if (t.split(/\s+/).length < 3) { return false; }   // too short to be confident
+  if (!NEW_OBJECT_RE.test(t)) { return false; }      // a new build names a NEW object ("a X", "me a X", "new X")
+  if (DEFINITE_REF_RE.test(t) && !/\bnew\b/i.test(t)) { return false; } // definite ref = modify existing, not new
   return true;
 }
 
