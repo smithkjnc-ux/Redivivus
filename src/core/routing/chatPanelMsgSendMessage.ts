@@ -67,14 +67,17 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   }
 
   const lowerText = userText.toLowerCase();
+  // Helper: release input after any keyword/early-exit path that doesn't enter the AI pipeline.
+  // doSend() always calls setInputBusy(true) — these paths never reach the releaseInput() in cloudChat.
+  const _releaseNow = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 100);
 
   // [FIX] Skip keyword shortcuts for blueprint card confirmations — the enriched task text contains
   // portfolio/project language that trips the "my.*project" keyword pattern and shows the wrong picker.
-  if (!msg.fromBlueprintCard && await handleKeywordShortcuts(userText, lowerText, deps)) { return; }
-  if (!msg.fromBlueprintCard && await handleUrlRead(userText, lowerText, conversation, refresh)) { return; }
-  if (!msg.fromBlueprintCard && await handleWebSearch(userText, lowerText, conversation, refresh)) { return; }
-  if (await handleRememberIntent(userText, conversation, refresh)) { return; }
-  if (await handleReadResult(lowerText, conversation, refresh)) { return; }
+  if (!msg.fromBlueprintCard && await handleKeywordShortcuts(userText, lowerText, deps)) { _releaseNow(); return; }
+  if (!msg.fromBlueprintCard && await handleUrlRead(userText, lowerText, conversation, refresh)) { _releaseNow(); return; }
+  if (!msg.fromBlueprintCard && await handleWebSearch(userText, lowerText, conversation, refresh)) { _releaseNow(); return; }
+  if (await handleRememberIntent(userText, conversation, refresh)) { _releaseNow(); return; }
+  if (await handleReadResult(lowerText, conversation, refresh)) { _releaseNow(); return; }
 
   // ── Build confirmations — extracted to chatPanelMsgSendConfirmCheck.ts (Rule 9 split) ──
   if (await checkBuildConfirmation(lowerText, userText, deps, conversation, refresh)) { return; }
