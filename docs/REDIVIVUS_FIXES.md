@@ -3,6 +3,15 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Intent architecture design note + migration plan (new doc)
+
+**Context:** PapaJoe asked how Redivivus's intent handling compares to agent-mode editors (Claude Code, Cursor, Windsurf) and for a plan to fix the difference WITHOUT discarding Redivivus's structure.
+- **New file:** `docs/REDIVIVUS_INTENT_ARCHITECTURE.md`. Reframes this session's bugs (make≠build, "losing something between plan and worker", "edits aren't fixes", build↔fix flip) as ONE root cause: Redivivus **classifies intent then dispatches to isolated pipelines**, whereas agent editors **infer intent continuously in one context-keeping loop**. Lays out the target (intent = SOFT hint + a shared `TurnContext` that flows through Supervisor→Worker→Guardian; build-vs-fix decided by the Supervisor with full context, not a sentence classifier) and a **6-phase reversible migration plan** (Phase 0 TurnContext scaffold → … → optional continuous turn), explicitly preserving the Workshop 7 principles, blueprint, vault, BYOK routing, and all project rules.
+- **Index:** updated `REDIVIVUS_ROADMAP.md` `*Last updated:*` line (kept as index, no bulk added).
+- **Risk:** none — documentation only; implementation NOT started. The note is the design contract for the next big refactor; the few-shot + prescription-pass-through patches done this session are interim within the old architecture.
+
+---
+
 ## Session — Jun 13, 2026: "make a X game" classified as answer (tutorial) not build — few-shot fix
 
 **Symptom:** `make a frogger arcade game` returned `{"action":"answer", text:"Here's a comprehensive guide to building…"}` — a tutorial — instead of building. `build a frogger arcade game` worked. The classifier wasn't treating *make* as a build verb in practice.

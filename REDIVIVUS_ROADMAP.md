@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-10 (Evening) — Auto-detect free-tier quota (new providerTierState.ts): repeated quota errors silently downshift a provider's planning capability (Gemini free => Flash) so builds match the real ceiling — no toggles, soft/self-recovering. Builds on the constraint/cost/ceiling-aware Supervisor routing (supervisorPlanner.ts). Earlier today: DeepSeek provider, encrypted key backup (.rdvkeys), no-AI UX fixes, auto-update + /api/version (v0.4.6).
+*Last updated:* 2026-06-13 — Intent architecture: new `docs/REDIVIVUS_INTENT_ARCHITECTURE.md` reframes a class of bugs (make≠build, plan→worker context loss, build↔fix flip) as ONE root cause — classify-then-route vs agent-loop — and lays out a phased plan to make intent a SOFT signal on a shared TurnContext while keeping the Workshop pipeline, blueprint, vault, and rules. Today also: dead-canvas completeness gate + make-classifier few-shot (backend, needs Fly deploy); fix path pinned to active project + paradox guard (cross-project edit bug); Map auto-refresh (FileSystemWatcher); architect review rebuilds topology fresh (stale-map cry-wolf).
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
