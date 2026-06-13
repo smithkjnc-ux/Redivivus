@@ -32,6 +32,12 @@ export class MapPanel {
   private _root: string;
   private _projectName: string;
   private _guardian: GuardianService;
+  // [FEATURE] Auto-refresh the visual graph when project files change (e.g. after a multi-file build), so the
+  // on-screen map is never stale without a manual Refresh. Debounced + visibility-aware (see _scheduleRefresh).
+  private _watcher: vscode.FileSystemWatcher | undefined;
+  private _watchedRoot: string | undefined;
+  private _refreshTimer: ReturnType<typeof setTimeout> | undefined;
+  private _dirty = false;
 
   /** Builds simplified map HTML for embedding as srcdoc in the chat panel tab iframe (no timeline). */
   public static buildMapHtml(root: string, projectName: string): string {
@@ -64,13 +70,22 @@ export class MapPanel {
     this._root = root;
     this._projectName = projectName;
     this._guardian = guardian;
-    this._panel.onDidDispose(() => { MapPanel._instance = undefined; });
+    this._panel.onDidDispose(() => {
+      MapPanel._instance = undefined;
+      this._watcher?.dispose();
+      if (this._refreshTimer) { clearTimeout(this._refreshTimer); }
+    });
     this._panel.webview.onDidReceiveMessage(msg => this._handleMessage(msg));
+    // If the panel was hidden while files changed, rebuild the moment it becomes visible again.
+    this._panel.onDidChangeViewState(() => {
+      if (this._panel.visible && this._dirty) { this._dirty = false; this.refresh(this._root); }
+    });
     this.refresh(root);
   }
 
   public refresh(root: string): void {
     this._root = root;
+    this._ensureWatcher(root);
     try {
       this._map = buildProjectMap(root);
     } catch (e) {
@@ -80,6 +95,36 @@ export class MapPanel {
     this._panel.webview.html = buildFullMapHtml(
       this._projectName, this._map, this._panel.webview, this._buildTimelineData()
     );
+  }
+
+  // Watch the ACTIVE project's source files; rebuild the graph when they change. Re-created when the active
+  // project (root) switches. Ignores Redivivus internals and deps that churn during a build.
+  private _ensureWatcher(root: string): void {
+    if (this._watchedRoot === root && this._watcher) { return; }
+    this._watcher?.dispose();
+    this._watchedRoot = root;
+    const pattern = new vscode.RelativePattern(root, '**/*.{ts,tsx,js,jsx,py,go,rs,rb,vue,svelte,c,cpp,cs,java,html,css}');
+    const w = vscode.workspace.createFileSystemWatcher(pattern);
+    const onChange = (uri: vscode.Uri) => {
+      const p = uri.fsPath.replace(/\\/g, '/');
+      if (p.includes('/.redivivus/') || p.includes('/node_modules/') || p.includes('/.git/')) { return; }
+      this._scheduleRefresh();
+    };
+    w.onDidCreate(onChange); w.onDidChange(onChange); w.onDidDelete(onChange);
+    this._watcher = w;
+  }
+
+  // Debounced + visibility-aware: a multi-file build triggers exactly ONE rebuild after the writes settle, and
+  // we never reload the webview while it's hidden (stay dirty, rebuild when it next becomes visible).
+  private _scheduleRefresh(): void {
+    this._dirty = true;
+    if (this._refreshTimer) { clearTimeout(this._refreshTimer); }
+    this._refreshTimer = setTimeout(() => {
+      this._refreshTimer = undefined;
+      if (!this._panel.visible) { return; } // stay dirty; onDidChangeViewState handles it
+      this._dirty = false;
+      this.refresh(this._root);
+    }, 800);
   }
 
   // [SCOPE] Reads build history, save points, and orphan snapshots for the timeline view

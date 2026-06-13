@@ -3,6 +3,31 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Map panel auto-refreshes on file change (FileSystemWatcher)
+
+**Feature (PapaJoe request, follow-up to the stale-map fix):** the architect review already rebuilds topology fresh, but the *visual* Architecture Map only updated on manual Refresh / reopen — so after a build it showed a stale graph. Added a `FileSystemWatcher` to `MapPanel`.
+- **File changed:** `src/ui/map/mapPanel.ts` (126 -> 170 lines, under 200).
+- **What changed:** `_ensureWatcher(root)` (called from `refresh`, re-created when the active project switches) watches the ACTIVE project's source files (`**/*.{ts,js,py,…,html,css}`) and ignores `/.redivivus/`, `/node_modules/`, `/.git/` (which churn during a build). Changes go through `_scheduleRefresh()`: **debounced 800ms** (a multi-file build triggers exactly one rebuild) and **visibility-aware** (never reloads the webview while hidden — stays `_dirty` and rebuilds via `onDidChangeViewState` when the panel next becomes visible). Watcher + timer disposed on panel dispose.
+- **Why:** the on-screen map must reflect current disk state without a manual refresh.
+- **Risk:** low. `tsc` clean; deployed. Watcher is scoped to the active project root (Model A) so it never watches sibling projects.
+
+---
+
+## Session — Jun 13, 2026: Architect review false "CRITICAL — 0 connections" on healthy wired code (stale map snapshot / cry-wolf)
+
+**Symptom (live test, after Fix All wired the tic-tac-toe imports):** re-running the Architect Review reported **CRITICAL — "Topology metadata shows 0 connections… ISOLATED FILES (possibly dead code)"** even though the code was fully wired. The review text itself caught the contradiction twice: *"the metadata tool is wrong… the code shows real import statements… this is a data integrity issue with your topology tool, not the code."* Design Rule 1 violation (cry-wolf: false alarm on healthy code).
+
+**Proof it was NOT a scanner bug:** ran the compiled `buildProjectMap('/…/tic-tac-toe-game')` directly → **5 nodes, 6 edges**, exactly the real graph (`controller.js → state.js, logic.js, ai.js, renderer.js`; `ai.js → logic.js`; `renderer.js → state.js`). The scanner + ES6-import regex (`mapBuilderHelpers.extractImports`) + edge resolution are all correct.
+
+**Cause:** the architect-review prompt is built **in the webview from `GRAPH_DATA`** — a snapshot frozen into the map HTML when the panel was last opened/refreshed (`mapPanel.ts:42`). The map has **no file-watcher** (only manual 🔄 Refresh / reopen rebuilds it, `mapPanel.ts:72-78`). The map was opened before the fixes wired the imports, so its snapshot showed 0 edges; the review ran against that stale graph and `mapScriptActions.ts:63` fed the AI *"ISOLATED FILES … possibly dead code"* for every file.
+
+- **File changed:** `src/ui/map/commands/architectReviewCommand.ts` (+ import of `buildProjectMap`).
+- **What changed:** `executeArchitectReview` now **rebuilds the topology fresh from disk** (`buildProjectMap(root)`) before generating the review — using the live graph for the file-content enrichment AND appending an **AUTHORITATIVE CURRENT TOPOLOGY** block ("TRUST THIS over any earlier 'connections/isolated/dead code' stats above, which may be a stale snapshot") that lists the real node/edge counts and every connection. Falls back to the webview snapshot only if the rebuild yields nothing.
+- **Why:** the review must never call healthy, wired code CRITICAL because of a stale visual-map cache. Rebuilds are cheap (pure fs scan, no vscode dep) and make the review authoritative against current disk state.
+- **Risk:** low. `tsc` clean; deployed. File is 49 lines (well under 200). **Reload the extension host**, then re-run the Architect Review — expect it to see the 6 connections and stop flagging CRITICAL. **Follow-up (optional):** give MapPanel a FileSystemWatcher so the *visual* graph also auto-refreshes, not just the review. Ties to [[competitive-analysis-reality]] (Preview/diagnostics freshness).
+
+---
+
 ## Session — Jun 12, 2026: Architect "Fix All" — only 1 of 5 files fixed + cosmetic fixes (root cause: blocking history toast + generic task)
 
 **Context:** After the path fix (prev entry), live retest on the tic-tac-toe fixture: Fix All correctly found the real `src/*.js` files and edited `src/ai.js` — but (a) only **1 of 5** files changed (controller/logic/renderer/state untouched), and (b) the one edit was **cosmetic** (+3 `[WARN]` comment lines, didn't remove the duplicate `makeMove` the review prescribed). Three fixes.
