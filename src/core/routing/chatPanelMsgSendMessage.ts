@@ -19,6 +19,8 @@ import { checkBuildConfirmation, getWorkspaceFileList } from './chatPanelMsgSend
 import { fixLog } from '../../services/logging/fixPipelineLogger';
 import { createTurnContext } from './turnContext.js';
 import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
+import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
+import { handleChangeRequest } from './handleChangeRequest.js';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { conversation, refresh } = deps;
@@ -109,9 +111,18 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it on all non-build paths.
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
-  // [PHASE 0] Record the classifier's decision as the turn hint (scaffold — not yet read). confidence is
-  // added in Phase 1; in Phase 3 the Supervisor, not this hint, decides build-vs-fix for code requests.
-  turnCtx.hint = { action: chatResult.action, task: chatResult.task, model: chatResult.model, provider: chatResult.provider };
+  // [PHASE 1] Record the classifier's decision + confidence as the turn hint — now READ (just below). In
+  // Phase 3 the Supervisor, not this hint, will decide build-vs-fix for code requests.
+  turnCtx.hint = { action: chatResult.action, task: chatResult.task, confidence: chatResult.confidence, model: chatResult.model, provider: chatResult.provider };
+  // [PHASE 1] First soft-signal use of the hint: a LOW-confidence 'fix' with NO project open can't be a real
+  // fix (there's nothing to fix) — it's almost certainly a build. Flip it here so we skip the fix-pipeline
+  // churn ("Scanning… no files… building instead") and route straight to build. Absent/high confidence is
+  // unchanged (?? 1), so obvious cases behave exactly as before. (Backend must emit confidence — needs deploy.)
+  if (chatResult.action === 'fix' && (chatResult.confidence ?? 1) < 0.5 && isProjectsContainer(getActiveProjectRoot() || '')) {
+    fixLog(`[PHASE1] low-confidence fix (conf=${chatResult.confidence}) with no active project -> routing as build`);
+    chatResult.action = 'build';
+    if (turnCtx.hint) { turnCtx.hint.action = 'build'; }
+  }
 
   const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
   const _m = chatResult.model || '', _pr = PROVIDER_LABEL[chatResult.provider] ?? 'Claude';
@@ -251,11 +262,15 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   [DEAD][STRIP-0] end preserved block */
 
   // ── Final routing by intent — use Claude's extracted task when available ──
-  // [FIX] Pass original userText — _claudeTask is AI-rewritten and shows up in history/vault/deadends instead of the user's actual words.
-  if (intent.type === 'fix') { await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType); return; }
+  // [PHASE 2a] build + fix now route through the unified handleChangeRequest seam (single context-owning
+  // entrypoint). Behaviour-preserving: it dispatches to the same pipelines (fix gets the original userText via
+  // turnCtx.rawMessage; build gets routedText||task). scaffold/service stay inline (different pipelines).
+  if (intent.type === 'fix' || intent.type === 'build') {
+    await handleChangeRequest(msg, deps, { intent: intent.type, routedText: routedText || _claudeTask, claudeTask: _claudeTask });
+    return;
+  }
   if (intent.type === 'scaffold') { await handleScaffoldIntent(_claudeTask, deps, conversation, refresh); return; }
   if (intent.type === 'service') { await handleServiceIntent(_claudeTask, deps, conversation, refresh); return; }
-  if (intent.type === 'build') { await handleBuildIntent(routedText || _claudeTask, _claudeTask, msg, deps, conversation, refresh); return; }
 
   await handleAIChat(msg, userText, deps, conversation, refresh);
 }

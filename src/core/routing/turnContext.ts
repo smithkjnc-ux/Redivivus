@@ -22,6 +22,7 @@ export interface IntentHint {
 
 // Artifacts accumulated AS the turn executes — shared, not re-summarized between stages.
 export interface TurnArtifacts {
+  decision?: 'build' | 'fix';                               // [Phase 2] what the change-request seam dispatched to
   prescription?: unknown;                                   // Supervisor contract (/plan or fix-supervisor)
   files?: Array<{ path: string; description?: string }>;    // files the build/fix targets
   written?: string[];                                       // files actually written

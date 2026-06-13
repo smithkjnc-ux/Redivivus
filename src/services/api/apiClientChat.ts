@@ -12,6 +12,7 @@ export interface ChatResult {
   provider: string;
   inputTokens: number;
   outputTokens: number;
+  confidence?: number; // [PHASE 1] 0..1 — classifier's certainty about `action`. undefined = treat as confident.
 }
 
 export interface ChatContext {

@@ -101,16 +101,26 @@ after every phase.** Each phase ships value on its own and can be reverted.
   fix, post-classify). Verified pure scaffold: in compiled output only the definition + the writer reference it;
   nothing reads/branches on it, so behavior is identical. `tsc` clean, deployed.
 
-- **Phase 1 — Classifier returns `{action, confidence}`.** `MAIN_SYSTEM` emits confidence. Client keeps
-  routing on HIGH-confidence build/fix/answer/command; LOW-confidence code requests go to the unified handler
-  (Phase 2) instead of guessing. Keep the few-shot. *Test: low-confidence prompts stop misrouting; obvious
-  ones unchanged.*
+- **Phase 1 — Classifier returns `{action, confidence}`. [DONE Jun 13, 2026]** Backend `chat/route.ts`
+  `MAIN_SYSTEM` emits `confidence` (0..1, "be honest, don't inflate"); route clamps + returns it (absent →
+  undefined). Client `ChatResult.confidence` threaded; `turnCtx.hint.confidence` populated — the **first READ
+  of the hint**. First soft-signal use: a LOW-confidence (`< 0.5`) `fix` with **no project open** can't be a real
+  fix, so it's flipped to `build` (skips the "Scanning… no files… building instead" churn). Absent/high
+  confidence (`?? 1`) = unchanged, so obvious cases are identical. Few-shot kept. Client clean+deployed; backend
+  needs a **Fly deploy** to start emitting confidence (until then `undefined` → no behavior change — safe).
+  *Note: LLM self-reported confidence is poorly calibrated; treat coarsely (low vs not), never as a precise
+  probability. Broader low-confidence handling lands in Phase 2 (the unified handler).*
 
-- **Phase 2 — One `handleChangeRequest(turnCtx)` that shares context.** Merge the build + fix entrypoints
-  behind one handler that collects context ONCE (`getActiveProjectRoot`, files, blueprint, vault) into
-  `TurnContext`, runs the Supervisor ONCE with the FULL turn (conversation + project state), and lets the
-  Worker(s) read the SAME `TurnContext` (prescription **and** relevant conversation). *Fixes "losing something
-  between plan and worker." Test: a build's Worker has the conversation context; a fix still fixes.*
+- **Phase 2 — One `handleChangeRequest(turnCtx)` that shares context.** Split into two safe sub-steps:
+  - **2a — unified seam. [DONE Jun 13, 2026]** New `handleChangeRequest.ts`: the single entrypoint for
+    code-change turns (build OR fix). `handleSendMessage`'s final routing now sends build+fix through it
+    (scaffold/service stay inline). Behaviour-preserving — it dispatches to the existing pipelines (fix gets the
+    original `userText` via `turnCtx.rawMessage`; build gets `routedText||task`) and records
+    `turnCtx.artifacts.decision`. `tsc` clean, deployed. Value: one context-owning seam for Phase 2b/3 to build on.
+  - **2b — share context into the prompts. [NEXT]** Thread `turnCtx` (recent conversation + the Supervisor
+    prescription) INTO the Supervisor/Worker prompts so the Worker sees the conversation, not a re-summarized
+    handoff. Collect context ONCE into `turnCtx` (root, files, blueprint, vault). *Fixes "losing something
+    between plan and worker." Test: a build's Worker has the conversation context; a fix still fixes.*
 
 - **Phase 3 — Supervisor decides the operation.** The classifier stops deciding build-vs-fix; it only
   fast-paths obvious `answer`/`command`. For code, the Supervisor (full context) prescribes operation

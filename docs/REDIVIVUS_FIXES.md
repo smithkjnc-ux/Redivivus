@@ -3,6 +3,44 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Intent architecture Phase 2a — unified change-request seam + backend deployed
+
+**Backend deploy:** committed + pushed `chat/route.ts` (few-shot + Phase 1 confidence) and ran `fly deploy --remote-only` → redivivus-backend **v138 live** (health checks passed, serving 0.4.8). So in production now: make/create→build few-shot, the dead-canvas completeness gate, and classifier `confidence`.
+
+**Phase 2a — unified seam (`docs/REDIVIVUS_INTENT_ARCHITECTURE.md`):**
+- **New file:** `src/core/routing/handleChangeRequest.ts` — the single entrypoint for code-change turns (build OR fix). Owns the shared `TurnContext`; records `turnCtx.artifacts.decision`. **Behaviour-preserving**: dispatches to the existing pipelines (fix → `handleFixRequest(turnCtx.rawMessage)` = the original userText; build → `handleBuildIntent(routedText||task)`).
+- **`turnContext.ts`:** added `artifacts.decision?: 'build'|'fix'`.
+- **`chatPanelMsgSendMessage.ts`:** final routing now sends `build`+`fix` through `handleChangeRequest`; `scaffold`/`service` stay inline (different pipelines). Verified the dispatched args match the old inline calls exactly — no behaviour change. `tsc` clean; deployed.
+- **Why:** Phase 2 (merge build+fix to kill the lossy handoff) is the riskiest phase, so it's split — 2a establishes the one context-owning seam (safe, reversible); **2b (next)** threads `turnCtx` (conversation + prescription) INTO the Supervisor/Worker prompts so the Worker stops getting a re-summarized handoff.
+- **Risk:** low (behaviour-preserving refactor). Reversible: route build/fix back inline. See [[intent-architecture-direction]].
+
+---
+
+## Session — Jun 13, 2026: Intent architecture Phase 1 — classifier confidence (first READ of the hint)
+
+**Context:** Phase 1 of `docs/REDIVIVUS_INTENT_ARCHITECTURE.md`. The classifier now reports how sure it is, and the client makes its first soft-signal decision from the `TurnContext` hint (Phase 0 only wrote it).
+- **Backend `redivivus-backend/src/app/api/v1/chat/route.ts`:** `MAIN_SYSTEM` JSON gains `"confidence":0.0-1.0` with an honesty instruction (certain → 0.9-1.0; genuinely ambiguous build-vs-fix → 0.3-0.5; never inflate). Parse type + return include `confidence`, clamped 0..1; absent → `undefined`. `tsc` clean.
+- **Client `apiClientChat.ts`:** `ChatResult.confidence?` added (interface field — passes through `res.json()`).
+- **Client `chatPanelMsgSendMessage.ts`:** `turnCtx.hint.confidence` now populated and **read**. First behavioral use: `action === 'fix'` with `confidence < 0.5` AND `isProjectsContainer(getActiveProjectRoot())` (no project open) → flip to `build`, skipping the fix-pipeline churn ("Scanning… no files… building instead"). Guarded by `?? 1` so absent/high confidence is unchanged — obvious cases behave exactly as before. `tsc` clean; deployed.
+- **Why:** start acting on the soft signal — don't commit to the fix pipeline on a low-confidence guess when context (no project) contradicts it. Same end result as the existing downstream fallback, but cleaner UX and the first step of intent-as-hint.
+- **Caveat (logged in doc):** LLM self-reported confidence is poorly calibrated — treated coarsely (low vs not), never as a precise probability. Broader low-confidence handling is Phase 2 (unified handler).
+- **Risk:** low. **Backend needs a Fly deploy** to start emitting confidence; until then client sees `undefined` → `?? 1` → no behavior change. See [[intent-architecture-direction]].
+
+---
+
+## Session — Jun 13, 2026: v0.4.8 "release not hitting" — no GitHub Release was published + rigops harden
+
+**Symptom:** PapaJoe pushed + released v0.4.8 several times; users stayed on v0.4.7. Suspected push failure.
+
+**Diagnosis:** (1) **Push was fine** — `git push --dry-run` = "Everything up-to-date"; the v0.4.8 tag was on origin. (2) **Real cause:** `/api/version` (the IDE's update check) reads GitHub `releases/latest`, but the latest *Release* was still v0.4.7 — **no v0.4.8 Release existed**, only the tag. The rigops release flow *does* call `gh release create` (step 4/6), but on failure it logged red and **CONTINUED to 5/6 reporting success** — so the release "completed" with nothing published. (`gh` auth + `repo` scope were fine; `deploy-ide.yml.disabled` was a red herring — rigops creates the Release itself.)
+
+- **Action taken:** published the Release — `gh release create v0.4.8 redivivus-0.4.8.vsix` with **auto-summarized, plain-English notes** distilled from this file's Jun 12–13 entries (grouped: Builds & fixes / Your work is protected / Clearer feedback / Smoother flow / Under the hood). Verified: v0.4.8 is now `Latest` with the VSIX asset, and `/api/version` returns `{"version":"0.4.8","source":"github"}` after the route's 60s cache lapsed. Users will be offered the update.
+- **Harden — `rigops/rigops/panels/admin/sysop.py` `run_full_release` step 4/6:** if `gh release create`/`upload` returns non-zero, **abort loudly** — red log lines (which surface to the `#push-last-action` card via `_log`) + an error toast naming the likely cause (gh auth / missing asset), then `return` so the flow can NEVER report a false success again. Also a loud warning if the Release published with no VSIX asset; a green confirmation on success. Re-running Release re-creates cleanly (tag already exists → the existing "release exists? upload assets" path). Imports clean.
+- **Why:** a release that silently no-ops is the worst failure — it looks done but ships nothing. Fail loud, on the card, and stop. Never-cry-wolf's inverse: never falsely-reassure.
+- **Risk:** low (rigops tooling only). The published Release is outward-facing (done with explicit user go-ahead).
+
+---
+
 ## Session — Jun 13, 2026: Intent architecture Phase 0 — TurnContext scaffold (no behavior change)
 
 **Context:** First implementation step of `docs/REDIVIVUS_INTENT_ARCHITECTURE.md` — introduce the shared per-turn object that later phases use to kill the lossy classify→plan→worker handoff. Phase 0 is pure plumbing.
