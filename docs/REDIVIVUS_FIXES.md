@@ -3,6 +3,33 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: "Could not apply the fix" on a GOOD fix — truncation guard false-positive on HTML
+
+**Symptom (PapaJoe, capped-Claude failover test):** the **failover worked perfectly** — Supervisor + Worker promoted to **Gemini**, which produced a complete, correct full-file frogger fix — but it ended in **"Could not apply the fix."** PapaJoe: *"Gemini should have fixed it."* It DID; the apply step blocked it.
+
+**Diagnosis (from the fix-pipeline log):** the parser extracted Gemini's file fine — log: *"XML match #1: path=index.html, content length 13044, 1 valid fixes."* Then: **`[SAFETY] BLOCKING WRITE: 1 file(s) have truncated content`** -> *"index.html: Content appears truncated — write blocked to protect file."* So `isTruncatedOutput()` (`fileSizeGate.ts`) falsely flagged the COMPLETE HTML as truncated.
+
+**Root cause:** the "ends cleanly" check used a JS-centric `validEndings = [';','}',')',']','"',"'",'`','*/','---','EOF']`. A complete HTML/XML/SVG file ends with a closing TAG (`</html>`), which ends in **`>`** — not in the list. So `endsCleanly=false` -> flagged truncated -> the `[SAFETY]` gate blocked the write. **Every full-file HTML fix was being blocked** (JS fixes ending in `}` passed, which is why earlier `src/*.js` fixes worked).
+- **File changed:** `src/core/routing/fileSizeGate.ts` — added `'>'` to `validEndings`.
+- **Verified:** complete HTML (`</html>`) -> NOT truncated; genuinely truncated mid-statement (`const next =`) and mid-tag (`<di`) -> still caught. `tsc` clean; deployed.
+- **Why it matters:** this is the bug behind "the AI fixed it but the game still didn't change" for HTML projects — the fix was generated and parsed, then silently rejected by a false truncation guard. Generalizes beyond Gemini (any full-file HTML fix from any AI).
+- **Risk:** low (one entry added; truncation detection for the patterns that matter is unchanged). Client-side — already live on reload.
+
+---
+
+## Session — Jun 13, 2026: Build pipeline failover audit — /plan Supervisor now steps down to the next AI
+
+**Context:** extend the fix-pipeline failover work to the BUILD pipeline (PapaJoe: same step-down everywhere). Note: build AI calls run on the BACKEND (client sends all keys, backend picks providers), so failover is a backend concern here — unlike the client-side fix pipeline.
+- **Audit result:**
+  - **`/plan` Supervisor** — picked ONE provider, NO failover -> a capped Claude killed build PLANNING. **THE gap.**
+  - **`/build` single-file** — already has a failover loop (`for (const p of availableProviders)`). OK.
+  - **`/build` multi-file (per-file)** — retries the SAME worker + escalates to the guardian provider; no cross-provider WORKER failover. Partial — but low exposure (the multi-file worker is normally a different provider from the capped supervisor). Smaller follow-up.
+- **Fix — `redivivus-backend/src/app/api/v1/plan/route.ts`:** the Supervisor stream now loops `planOrder = [supervisorProvider, ...other availableProviders]`; on a provider failing at the start (throw) or returning empty/`[ERROR:`, it emits a `failover` step ("X unavailable - trying the next AI") and promotes the next provider; `usedProvider`/`usedModel` (the AI that actually produced the plan) drive the flash-fallback planner and the `@@RDV_RESULT@@` cost/label. A start-failure provider emits no chunks, so failover is clean (the usage-limit case throws before streaming). `tsc --noEmit` clean.
+- **Status of the whole failover effort:** fix pipeline (Supervisor diagnosis, Worker, Verify via `routing.prompt`, Guardian) = all step down, **client-side, LIVE**. Build `/plan` Supervisor = now steps down, **BACKEND — needs a Fly deploy.** Remaining: build multi-file per-file worker cross-provider failover (minor).
+- **Risk:** low. Mirrors the proven fix-pipeline pattern. See [[ai-routing-philosophy]] / [[build-pipeline-open-issues]].
+
+---
+
 ## Session — Jun 13, 2026: Guardian failover — now ALL fix roles step down to the next AI
 
 **Context (PapaJoe):** *"they should all step down… and if not enough AI are available then it falls to what AI is left — could be one AI doing all three positions."* (Workshop principle 7: single-model mode always works.)

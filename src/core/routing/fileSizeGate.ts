@@ -175,7 +175,10 @@ export function isTruncatedOutput(text: string): boolean {
 
   // Check if file ends mid-statement (truncated mid-word or mid-expression)
   const lastNonEmptyLine = text.split('\n').reverse().find(l => l.trim().length > 0) || '';
-  const validEndings = [';', '}', ')', ']', '"', "'", '`', '*/', '---', 'EOF'];
+  // [FIX] '>' added — a COMPLETE HTML/XML/SVG file ends with a closing tag (e.g. </html>), which ends in '>'.
+  // The old JS-centric list lacked it, so isTruncatedOutput FALSELY flagged every full HTML file as truncated
+  // and the [SAFETY] gate blocked the write — a good full-file fix (e.g. Gemini's frogger) "could not apply".
+  const validEndings = [';', '}', ')', ']', '"', "'", '`', '*/', '---', 'EOF', '>'];
   const endsCleanly = validEndings.some(e => lastNonEmptyLine.trimEnd().endsWith(e));
   if (!endsCleanly && lastNonEmptyLine.trim().length > 0) {
     return true;
