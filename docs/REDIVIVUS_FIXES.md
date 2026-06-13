@@ -3,6 +3,24 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 13, 2026: Guardian failed targeted fixes for build-quality features the user never asked for + WORKER_TIER not emitted
+
+Two root causes behind "make the vehicles look more real" failing after 3 attempts (the guard correctly routed it to the fix pipeline this time — that part worked).
+
+### 1. Guardian applied a full-BUILD quality rubric to a targeted FIX (backend `guardianAIPrompt.ts`)
+The Guardian rejected the fix citing *"parallax scrolling — required visual quality bar item," "gradients to individual pixels," "tab-visibility pause feature."* None of that is "make the vehicles look more real." Root cause: `buildGuardianPrompt` always injected a `CANVAS VISUAL QUALITY GATE` (gradients/particles/parallax/screen-shake/score-outside-canvas) **and** treated the entire build `WORKER CONTRACT` as mandatory pass/fail — even though every real caller of `/guardian` (fix escalation, chat edits, agent) reviews a TARGETED change, never a from-scratch build. It even contradicted the prompt's own SCOPE RULE ("the user did not ask for improvements, only the specific thing").
+- **Fix:** added `isTargetedFix` param **defaulting true** (matches every actual caller). When true: the visual quality gate is omitted and the worker-contract section becomes a scope note ("judge against the request + behavioral contract; do NOT require build-quality features the user didn't ask for — that's a false rejection"). Extracted the gate into a `VISUAL_QUALITY_GATE` const, applied only for full builds (`isTargetedFix=false`). All the genuinely useful checks stay (fulfils request, no stubs/undefined-funcs/narrative-text, scope creep, over-engineering, import validation, truncation).
+
+### 2. Supervisor (Gemini) didn't emit WORKER_TIER -> Worker defaulted to flash -> truncated (backend `fix-supervisor/route.ts`)
+The sprite-system refactor is heavy generation, but no `WORKER_TIER:` line was emitted, so the client defaulted the Worker to **flash** — which truncated mid-`buildLanes` (plus Gemini stream-parse errors). The instruction existed but was buried.
+- **Fix:** made WORKER_TIER **mandatory and terminal** — folded into REQUIRED FORMAT as "the ABSOLUTE LAST line… if you omit it the Worker is under-powered and the fix fails," and strengthened the WORKER TIER block header to MANDATORY. (If Gemini still drops it, a client-side fallback is the next step — held to avoid Rule-18 keyword-matching.)
+
+**Note — what's working:** the Verify/Guardian **honesty** behaved correctly — it REJECTED the incomplete/truncated fix across 3 attempts instead of fake-approving (the earlier guardian-honesty fix paying off). The problem was the rubric being wrong, not the rejection mechanism.
+
+**Deploy:** both are backend — **need a Fly deploy.** Backend tsc clean; guardian variable wiring verified.
+
+---
+
 ## Fix — Jun 13, 2026: Context guard wrongly blocked "make the vehicles look more real" as a new build
 
 **Symptom:** Inside the open frogger project, "make the vehicles look more real" was blocked with *"You're inside frogger-arcade-game. Builds create a new standalone project."* It's a MODIFICATION of existing code, not a new build.
