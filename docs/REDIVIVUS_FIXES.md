@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Fix pipeline now SHOWS its work in the Build Activity panel (was a vague 4-line bubble)
+
+**Symptom (PapaJoe):** the fix progress was a cramped chat bubble — "Supervisor: done / Worker: writing fix / Verify: pending / Guardian: pending" — far too vague. *"User watches it and says: something's going on but I don't know what."* The BUILD streams its work to a rich Build Activity panel; the FIX should too — showing what the Supervisor found, the Worker's actual fix, the Verify comparison, and the Guardian verdict.
+- **New file:** `src/core/routing/fixActivityPanel.ts` — thin best-effort bridge over the existing `BuildActivityPanel` singleton (`fixActStart` / `fixActSupervisor` / `fixActStep` / `fixActCode` / `fixActFinish`).
+- **Wired across the pipeline:**
+  - `chatPanelMsgFix.ts` — opens the panel on fix start ("Reading N files to find the problem"); after diagnosis shows **"Found: <plain summary>"** with the FULL Supervisor diagnosis as expandable detail; red finish on the failure path.
+  - `chatPanelMsgFixEscalation.ts` — **Worker** row with the fix **streaming live** into its code block (`live:true` + `fixActCode` on each chunk) → "Fix written"; **Verify** row showing "matches what you asked" OR "didn't match — retrying" with the **logic mismatch (what was different) as detail**; **Guardian** row "approved" OR "found issues — improving" with the issues as detail; retry rows.
+  - `chatPanelMsgFixFinalize.ts` — green "Fixed <files>" / red "Could not apply the fix" finish marker.
+- **Result:** a fix now reads like a build — Supervisor → Worker → Verify → Guardian → done, each row expandable to read the actual work. The user can SEE why a fix succeeds or stalls.
+- **Why:** "done" told the user nothing; visibility is also the fastest way to see WHY a hard fix (e.g. frogger's blank game needs a whole generated game loop) isn't landing.
+- **Risk:** low (every call is try/caught, never blocks the fix). `tsc` clean; deployed. **Note:** wired on the escalation path (single-file/non-subtask fixes, e.g. frogger). The multi-subtask path (`runSubtasksLoop`) still shows start+supervisor+finish only — per-subtask Worker/Guardian rows are a follow-up. Reload to use.
+
+---
+
 ## Session — Jun 13, 2026: Fix pipeline dropped the FIRST file (single-file projects got ZERO) — filesBlock split bug
 
 **Symptom:** fixing the frogger game ("the game window is blank…") → Supervisor replied *"no source files were provided — I cannot diagnose without seeing the code,"* even though the scan found `index.html` and read its content (log: `chars: 7938`). Fix failed with the Retry card.

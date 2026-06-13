@@ -5,6 +5,7 @@ import type { MessageHandlerDeps } from './chatPanelMessages';
 import { modelLabel } from './chatPanelMsgFixUtils';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
 import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds';
+import { fixActStep, fixActCode } from './fixActivityPanel.js';
 
 export interface EscalationResult {
   finalResponse: string;
@@ -64,6 +65,9 @@ export async function runEscalationLoop(params: {
     // ── Phase 2: Worker generates fix ──
     updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated);
     refresh();
+    // [FIX-ACTIVITY] Live Worker row — its code streams into this row's code block (live:true).
+    fixActStep({ phase: 'worker', status: 'running', live: true,
+      label: attempt > 0 ? `Rewriting the fix (retry ${attempt})` : 'Writing the fix' });
 
     try {
       const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
@@ -73,6 +77,7 @@ export async function runEscalationLoop(params: {
       const onChunk = (chunk: string) => {
         streamBytes += chunk.length;
         updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated, streamBytes);
+        fixActCode(chunk); // [FIX-ACTIVITY] stream the Worker's fix into the panel live
         refresh();
       };
       // [STAGE 2] Use currentDiagnosis (may be updated by re-prescription)
@@ -80,6 +85,8 @@ export async function runEscalationLoop(params: {
       if (!p2) { throw new Error('Worker returned null'); }
       workerResponse = p2.workerResponse;
       workerLabel = p2.workerLabel;
+      // [FIX-ACTIVITY] Worker done — mark the row complete (the streamed code stays as its detail).
+      fixActStep({ phase: 'worker', status: 'pass', label: 'Fix written', model: workerLabel });
     } catch (err) {
       throw new Error(`Worker phase failed: ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -107,6 +114,8 @@ export async function runEscalationLoop(params: {
         const logicIssue = verifyResult.issues.join('; ') || 'Logic does not match intent';
         accumulatedCritiques.push(`[SUPERVISOR LOGIC CHECK] ${logicIssue}`);
         fixLog(`Supervisor REJECTED Worker logic (attempt ${attempt + 1})`, { issue: logicIssue.substring(0, 300) });
+        // [FIX-ACTIVITY] Verify step — show WHAT was different from what the fix should be (the logic mismatch).
+        fixActStep({ phase: 'supervisor', status: 'fix', label: "Checked the fix — it didn't match the intent, retrying", detail: logicIssue });
 
         // [FIX] Detect truncation errors and force surgical format on retry
         const isTruncated = /truncated|incomplete|cuts off mid-function|max_tokens|finish_reason.*length/i.test(logicIssue);
@@ -125,6 +134,8 @@ export async function runEscalationLoop(params: {
           throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${logicIssue}`);
         }
       }
+      // [FIX-ACTIVITY] Verify passed — the fix matches the intent.
+      fixActStep({ phase: 'supervisor', status: 'pass', label: 'Checked — the fix matches what you asked for' });
     } catch (e: any) {
       if (e.message?.startsWith('Supervisor rejected Worker output')) throw e;
       fixLog(`Supervisor verify skipped (error): ${e?.message || e}`);
@@ -141,6 +152,11 @@ export async function runEscalationLoop(params: {
       fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
       const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), '');
       fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
+      // [FIX-ACTIVITY] Guardian verdict — approved, or the issues it wants addressed (expandable detail).
+      fixActStep({ phase: 'guardian', status: guardianResult.passed ? 'pass' : 'fix',
+        label: guardianResult.passed ? 'Final review — approved' : 'Final review found issues — improving',
+        detail: (guardianResult.issues || []).join('\n') || undefined,
+        model: modelLabel(guardianResult.guardianAI || '') });
       if (guardianResult.issues?.length) {
         fixLog(`Guardian issues found`, { issues: guardianResult.issues });
       }

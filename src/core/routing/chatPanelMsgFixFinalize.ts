@@ -5,6 +5,7 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { finalizeFixLogger, fixLog } from '../../services/logging/fixPipelineLogger';
+import { fixActFinish } from './fixActivityPanel.js';
 
 export async function runFixFinalize(params: {
   written: string[];
@@ -61,6 +62,7 @@ export async function runFixFinalize(params: {
   finalizeFixLogger();
   const { presentFixResult } = await import('./chatPanelMsgFixOutput.js');
   await presentFixResult({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns });
+  fixActFinish(written, failed); // [FIX-ACTIVITY] final marker on the Build Activity panel (green if fixed, red if not)
   if (written.length > 0) {
     try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch {}
   }

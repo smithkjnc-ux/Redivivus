@@ -22,6 +22,7 @@ import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService';
 import { initFixLogger, fixLog, finalizeFixLogger, getCurrentLogPath } from '../../services/logging/fixPipelineLogger';
 import { runFixFinalize } from './chatPanelMsgFixFinalize';
+import { fixActStart, fixActSupervisor, fixActFinish } from './fixActivityPanel.js';
 
 // [DEAD] modelLabel defined here -- moved to chatPanelMsgFixUtils.ts to keep this file under 200 lines
 
@@ -152,6 +153,10 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   const projectRules = readProjectRules(root);
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
 
+  // [FIX-ACTIVITY] Open the rich Build Activity panel for this fix so the user can WATCH the work (Supervisor
+  // diagnosis -> Worker fix -> Guardian verdict), not just a vague chat bubble. Best-effort; never blocks.
+  fixActStart(userText, sourceFiles.length);
+
   // Phase 1: Supervisor diagnoses ALL bugs
   conversation.push({ role: 'assistant', content: `Scanning ${sourceFiles.length} file${sourceFiles.length !== 1 ? 's' : ''}...`, timestamp: Date.now() });
   refresh();
@@ -176,6 +181,9 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     }
     fixLog('Phase 1: Supervisor diagnosis received', { diagnosisPreview: diagnosis.substring(0, 500) });
     supervisorLabel = p1.supervisorLabel;
+    // [FIX-ACTIVITY] Show the Supervisor's verdict in the panel — a plain "Found: …" line plus the full
+    // diagnosis as expandable detail, so the user can read exactly what it found.
+    fixActSupervisor(diagnosis, supervisorLabel);
 
     // [PHASE-1-HARDENING] Agentic Fetch removed — complex asset orchestration moves to backend in Phase 2.
 
@@ -316,6 +324,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       if (prescriptionLines) { failMsg += `**What to do:**\n${prescriptionLines}\n\n`; }
       failMsg += `The fix didn't apply cleanly. Click the button to retry with a more specific prompt:\n\n__RETRY_FIX__:${_b64sug}__END_RETRY__${skipNote}`;
       conversation[conversation.length - 1].content = failMsg;
+      fixActFinish([], failed.length ? failed : ['fix']); // [FIX-ACTIVITY] red finish marker
       refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
     }
   }
