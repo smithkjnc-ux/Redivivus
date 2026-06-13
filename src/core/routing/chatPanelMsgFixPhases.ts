@@ -26,7 +26,12 @@ export async function runPhase1Supervisor(
 
   // Parse structured files from filesBlock for the new endpoint
   const files: { path: string, content: string, size: number }[] = [];
-  const fileBlocks = filesBlock.split(/\n\/\/ === FILE: /).slice(1);
+  // [FIX] Split on the FILE marker at start-of-string OR after a newline, then drop empties. The old
+  // `.split(/\n\/\/ === FILE: /).slice(1)` required a newline BEFORE the marker — but filesBlock starts with
+  // "// === FILE: ..." (no leading newline), so the FIRST file was never a split point and slice(1) dropped it.
+  // For a single-file project (e.g. a self-contained index.html) that left ZERO files -> the Supervisor saw no
+  // source and refused ("no source files provided"). This captures every file, including the first.
+  const fileBlocks = filesBlock.split(/(?:^|\n)\/\/ === FILE: /).filter(b => b.trim());
   for (const blk of fileBlocks) {
     const nl = blk.indexOf('\n');
     if (nl === -1) continue;
@@ -106,7 +111,12 @@ export async function runPhase2Worker(
 ): Promise<{ workerResponse: string, workerLabel: string } | null> {
   // Parse structured files from filesBlock
   const files: { path: string, content: string, size: number }[] = [];
-  const fileBlocks = filesBlock.split(/\n\/\/ === FILE: /).slice(1);
+  // [FIX] Split on the FILE marker at start-of-string OR after a newline, then drop empties. The old
+  // `.split(/\n\/\/ === FILE: /).slice(1)` required a newline BEFORE the marker — but filesBlock starts with
+  // "// === FILE: ..." (no leading newline), so the FIRST file was never a split point and slice(1) dropped it.
+  // For a single-file project (e.g. a self-contained index.html) that left ZERO files -> the Supervisor saw no
+  // source and refused ("no source files provided"). This captures every file, including the first.
+  const fileBlocks = filesBlock.split(/(?:^|\n)\/\/ === FILE: /).filter(b => b.trim());
   for (const blk of fileBlocks) {
     const nl = blk.indexOf('\n');
     if (nl === -1) continue;

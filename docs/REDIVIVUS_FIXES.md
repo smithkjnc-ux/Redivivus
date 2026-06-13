@@ -3,6 +3,19 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Fix pipeline dropped the FIRST file (single-file projects got ZERO) — filesBlock split bug
+
+**Symptom:** fixing the frogger game ("the game window is blank…") → Supervisor replied *"no source files were provided — I cannot diagnose without seeing the code,"* even though the scan found `index.html` and read its content (log: `chars: 7938`). Fix failed with the Retry card.
+
+**Cause (pre-existing, NOT a Phase 2 regression — `chatPanelMsgFixPhases.ts`):** the Supervisor parses the files context with `filesBlock.split(/\n\/\/ === FILE: /).slice(1)`. The split delimiter requires a **newline before** the `// === FILE:` marker, but `filesBlock` starts with that marker (no leading newline) — so the FIRST file is never a split point and `.slice(1)` drops it. Multi-file fixes silently lost their first file too (tolerated); a **single-file project (frogger's self-contained `index.html`) left ZERO files** → the Supervisor's prompt had "PROJECT SOURCE FILES:" with nothing after → it refused. Exposed now because frogger is one self-contained file.
+- **File changed:** `src/core/routing/chatPanelMsgFixPhases.ts` (both occurrences, lines 29 + 109).
+- **What changed:** `split(/(?:^|\n)\/\/ === FILE: /).filter(b => b.trim())` — matches the marker at start-of-string OR after a newline, then drops empties. Captures EVERY file including the first. Verified: single → `[index.html]` (was `[]`); multi → `[a.js, b.js]` (was `[b.js]` — first dropped). `tsc` clean; deployed.
+- **Why:** a single-file project is a normal case (self-contained HTML game); the fix Supervisor must see its code. Bonus: multi-file fixes now get their first file back (more complete diagnosis).
+- **Risk:** low; strictly more-complete context to the Supervisor.
+- **Separate report (right-click menu empty):** deployed extension verified intact (v0.4.8, 3 context-menu contributions present, `out/` fresh) — not this code path. Likely a degraded extension host after reload; advised a clean **Restart Extension Host**. Investigate `when`-clauses / activation log only if it persists.
+
+---
+
 ## Session — Jun 13, 2026: Intent architecture Phase 2b — share conversation+prescription into the fix pipeline
 
 **Context:** The "kill the lossy handoff" step. **Finding:** the BUILD path already shares the conversation — `buildContextCollector` builds `recentChat` from `deps.conversation`, so the build Supervisor isn't blind. The **gap was the FIX path**: `chatPanelMsgFix.ts:140` assembled `buildContext` (which feeds BOTH the fix Supervisor and the Worker) with zero conversation — a fix was built blind to what the user said earlier this turn.
