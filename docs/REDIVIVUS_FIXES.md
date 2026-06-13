@@ -3,6 +3,65 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 13, 2026: Living Blueprint Phase 3 — revision trail reaches the Supervisor
+
+The HEAD contract already flowed to the fix-Supervisor (Phase 0). Phase 3 adds the **change history** so the Supervisor can reason about how the project evolved, not just its current state.
+
+- **Client (`chatPanelMsgFixPhases.ts`):** adds `context.revisions = recentRevisionsBlock(root)` (last ~10 ledger entries as compact one-liners) to the `/fix-supervisor` payload.
+- **Backend (`fix-supervisor/route.ts`):** `buildSupervisorPrompt` gains `revisionsContext`, rendered as a `CHANGE HISTORY (most recent accepted changes, oldest to newest)` block placed AFTER the authoritative `INTENDED BEHAVIOR` block. Framing is deliberate: history is **context** ("why the code looks this way; don't re-introduce something a past change fixed"), while the contract remains the **authority** on what is correct now.
+
+**Deploy state:** client compiled + deployed. **Backend needs a Fly deploy** before the Supervisor sees the history. Absent revisions → empty block → unchanged behavior.
+
+**Risk:** low — additive optional field. The history is advisory; the contract still governs correctness.
+
+**Compile:** client 0 errors; backend tsc clean.
+
+---
+
+## Feature — Jun 13, 2026: Living Blueprint Phases 1 + 2 — auto-seed contract on build, auto-revise on every fix
+
+Builds on the Phase-0 slice (mechanics contract reaching the fix-Supervisor — proven on frogger). Now the contract is **generated and maintained automatically**, and every accepted change is logged as a behavioral revision.
+
+**New files:**
+- `src/services/blueprint/livingBlueprintService.ts` (72 lines) — pure I/O. HEAD = `config.blueprint.mechanics` (`getMechanics`/`setMechanics`, the latter also re-renders `blueprint.md`). LEDGER = `.redivivus/blueprint_revisions.jsonl` (`readRevisions`/`nextRev`/`appendRevision`/`recentRevisionsBlock`). All best-effort — never throws into the pipeline.
+- `src/services/blueprint/livingBlueprintDistill.ts` (51 lines) — the two AI distillers, routed via `routing.prompt(role='worker')` (reuses whoever did the work — the locked decision). Prompts forbid file/function/variable names (behavioral only → never goes stale). `distillBuildMechanics` → contract text; `distillFixRevision` → `{summary, delta, reconciled mechanics}` as JSON.
+
+**Phase 1 — build seed (`cloudBuildResultProcessor.ts`):** after a successful build, if no contract exists yet, distill one (ONE AI call) + write `rev 1` (kind=build). Rebuilds just append a `build` revision (no AI call). Fire-and-forget.
+
+**Phase 2 — fix revision (`chatPanelMsgFixFinalize.ts`):** after an accepted fix (files written), distill the behavioral change, append a `fix` revision (summary + delta + files + worker + snapshotId), and fold the reconciled contract back into the HEAD via `setMechanics`. Fire-and-forget. Because the next fix reloads config, the HEAD the Supervisor sees stays current — the loop closes.
+
+**Retroactive seed** is covered for free: `distillFixRevision` is told "(no contract yet)" when mechanics is empty, so the first fix on an un-seeded project writes a full contract.
+
+**Cost:** one ~150-token worker call per first-build and per accepted fix (~$0.0001–0.0005). No call on rebuilds. Matches the cost-conscious / aces-in-their-places stance.
+
+**Verified:** ledger I/O tested in isolation (`nextRev` 1→3, read/append/recent-block all correct). Client compiles 0 errors.
+
+**Not yet (Phase 3 extension):** forwarding the explicit revision LIST into the Supervisor prompt (the HEAD already flows; the list is extra "how we got here" context and would need another backend deploy). Phase 4 (relevance retrieval + rolling compaction) also deferred.
+
+---
+
+## Fix — Jun 13, 2026: Pipeline Usage now breaks down by role (Supervisor / Worker / Guardian)
+
+**Symptom:** When all three roles ran on one provider (e.g. Gemini doing Supervisor + Worker + Guardian), the fix result's `Pipeline Usage` showed a single lump — `gemini: 15,700 tokens ($0.0020)` — with no idea who spent what.
+
+**Root cause:** the data was always there. `usageTracker` records a `role` per call and `getReport()` builds `byAI[].byRole` (RoleBreakdown). The fix output renderer (`chatPanelMsgFixOutput.ts`) only printed the per-AI total and ignored `byRole`.
+
+**Fix — `chatPanelMsgFixOutput.ts`:** render each AI's `byRole` as an indented sub-list under the provider line, ordered Supervisor -> Worker -> Guardian -> Q&A -> Solo with friendly labels:
+```
+**Pipeline Usage:**
+- gemini: 15,700 tokens ($0.0020)
+    - Supervisor: 6,200 tokens ($0.0008)
+    - Worker: 7,300 tokens ($0.0009)
+    - Guardian: 2,200 tokens ($0.0003)
+**Total Session Cost:** $0.0020
+```
+
+**Risk:** none — display-only; falls back to the flat line when `byRole` is empty.
+
+**Compile:** 0 errors, deployed. (File 114 lines.)
+
+---
+
 ## Feature — Jun 13, 2026: Living Blueprint Phase-0 slice — mechanics contract reaches the fix-Supervisor
 
 **Why:** the fix-Supervisor had no statement of *intended behavior*, so a vague "it's broken" forced it to reverse-engineer intent from buggy code and over-engineer (the frogger mid-hop-drown misdiagnosis). First concrete slice of `docs/REDIVIVUS_LIVING_BLUEPRINT.md`: a behavioral contract that the Supervisor diffs the code against.

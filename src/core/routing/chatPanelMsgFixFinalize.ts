@@ -114,4 +114,22 @@ export async function runFixFinalize(params: {
     const { autoCaptureFiles } = await import('../../services/vault/vaultAutoCapture.js');
     autoCaptureFiles(absPaths, path.basename(root), deps.vault, `fix: ${userText.slice(0, 120)}`, callAI).catch(() => {});
   }
+
+  // [LIVING BLUEPRINT Phase 2] Record this accepted change as a behavioral revision: distill what changed (reusing
+  // the worker that did the fix), append it to the ledger, and fold the reconciled contract back into the HEAD.
+  // Fire-and-forget so it never delays the result; only on a real change. See docs/REDIVIVUS_LIVING_BLUEPRINT.md.
+  if (written.length > 0) {
+    (async () => {
+      try {
+        const { distillFixRevision } = await import('../../services/blueprint/livingBlueprintDistill.js');
+        const { appendRevision, nextRev, setMechanics } = await import('../../services/blueprint/livingBlueprintService.js');
+        const d = await distillFixRevision(deps.routing, deps, userText, diagnosis);
+        if (d) {
+          appendRevision(root, { rev: nextRev(root), ts: new Date().toISOString(), kind: 'fix', request: userText.slice(0, 200), summary: d.summary, mechanics_delta: d.delta, files: written, by: workerLabel, snapshotId: fixSnapId });
+          setMechanics(deps, d.mechanics);
+          fixLog('[LIVING BLUEPRINT] Revision recorded', { rev: nextRev(root) - 1, summary: d.summary });
+        }
+      } catch { /* living-blueprint capture is best-effort — never affect the fix outcome */ }
+    })();
+  }
 }

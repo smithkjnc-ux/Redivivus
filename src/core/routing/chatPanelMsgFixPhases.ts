@@ -78,6 +78,9 @@ export async function runPhase1Supervisor(
           files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
           context: {
             blueprint: _bp || undefined,
+            // [LIVING BLUEPRINT Phase 3] The trail of accepted changes (how the project got to its present state),
+            // so the Supervisor can reason about recent history, not just the current HEAD contract.
+            revisions: (() => { try { return require('../../services/blueprint/livingBlueprintService.js').recentRevisionsBlock(root) || undefined; } catch { return undefined; } })(),
             projectRules: projectRules || undefined,
             deadEnds: projectDeadEnds || undefined,
             roadmapSnippet: roadmapSnippet || undefined,

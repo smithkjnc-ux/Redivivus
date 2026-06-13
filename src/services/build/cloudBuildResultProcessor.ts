@@ -213,6 +213,28 @@ export async function processBuildResults(
     captureCount = captured?.newItems ?? 0;
   }
 
+  // [LIVING BLUEPRINT Phase 1] Seed the behavioral contract from this build (once) and log it as a revision. The
+  // first build distills a full contract; later rebuilds just append a 'build' revision (no AI call). The fix path
+  // keeps the contract current afterward. Fire-and-forget. See docs/REDIVIVUS_LIVING_BLUEPRINT.md.
+  if (writtenPaths.length > 0 && routing && (deps as any).redivivus) {
+    (async () => {
+      try {
+        const lb = await import('../blueprint/livingBlueprintService.js');
+        const relFiles = writtenPaths.map(p => path.relative(root, p).replace(/\\/g, '/'));
+        if (!lb.getMechanics(deps)) {
+          const { distillBuildMechanics } = await import('../blueprint/livingBlueprintDistill.js');
+          const mech = await distillBuildMechanics(routing, task, relFiles);
+          if (mech) {
+            lb.setMechanics(deps, mech);
+            lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: task.slice(0, 200), summary: 'Initial build — behavioral contract seeded.', files: relFiles, by: data.model || 'AI' });
+          }
+        } else {
+          lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: task.slice(0, 200), summary: 'Rebuild / additional build.', files: relFiles, by: data.model || 'AI' });
+        }
+      } catch { /* living-blueprint seeding is best-effort — never affect the build outcome */ }
+    })();
+  }
+
   const normalizedFiles = data.files.map((f: any) => ({ ...f, path: stripSlug(f.path) }));
   return { success: true, files: normalizedFiles, narration: data.narration, model: data.model, inputTokens: data.inputTokens, outputTokens: data.outputTokens, captureCount };
 }
