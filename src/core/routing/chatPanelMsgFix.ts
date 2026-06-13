@@ -23,6 +23,7 @@ import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build
 import { initFixLogger, fixLog, finalizeFixLogger, getCurrentLogPath } from '../../services/logging/fixPipelineLogger';
 import { runFixFinalize } from './chatPanelMsgFixFinalize';
 import { fixActStart, fixActSupervisor, fixActFinish } from './fixActivityPanel.js';
+import { fixSessionCostBefore, fixCostByline } from './chatPanelMsgFixUsage.js';
 
 // [DEAD] modelLabel defined here -- moved to chatPanelMsgFixUtils.ts to keep this file under 200 lines
 
@@ -49,6 +50,9 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   const root = getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   // [FIX] No workspace open means no code to fix — treat as a new build request so autoCreateProject runs.
   if (!root) { await deps.handleBuildRequest(userText, true); return; }
+
+  // [FIX] Snapshot session cost now so every result message (incl. failures) can show THIS fix's cost (delta).
+  const _costBefore = fixSessionCostBefore(deps, root);
 
   // [LOG] Initialize file-based logging for this fix session
   initFixLogger(root);
@@ -207,7 +211,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     const _b64 = Buffer.from(userText, 'utf8').toString('base64');
     conversation[conversation.length - 1].content =
       `⚠️ **Something went wrong while analysing your fix.** ${_hint}\n\n` +
-      `_Details: ${_errMsg.slice(0, 300)}_\n\n` +
+      `_Details: ${_errMsg.slice(0, 300)}_${fixCostByline(deps, root, _costBefore)}\n\n` +
       `__RETRY_FIX__:${_b64}__END_RETRY__`;
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
@@ -275,7 +279,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     const _b642 = Buffer.from(userText, 'utf8').toString('base64');
     conversation[conversation.length - 1].content =
       `⚠️ **Something went wrong while writing the fix.** ${_hint2}\n\n` +
-      `_Details: ${_errMsg2.slice(0, 300)}_\n\n` +
+      `_Details: ${_errMsg2.slice(0, 300)}_${fixCostByline(deps, root, _costBefore)}\n\n` +
       `__RETRY_FIX__:${_b642}__END_RETRY__`;
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
@@ -334,7 +338,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       finalizeFixLogger();
       let failMsg = plain ? `**What I found:** ${plain}\n\n` : '';
       if (prescriptionLines) { failMsg += `**What to do:**\n${prescriptionLines}\n\n`; }
-      failMsg += `The fix didn't apply cleanly. Click the button to retry with a more specific prompt:\n\n__RETRY_FIX__:${_b64sug}__END_RETRY__${skipNote}`;
+      failMsg += `The fix didn't apply cleanly. Click the button to retry with a more specific prompt:\n\n__RETRY_FIX__:${_b64sug}__END_RETRY__${skipNote}${fixCostByline(deps, root, _costBefore)}`;
       conversation[conversation.length - 1].content = failMsg;
       fixActFinish([], failed.length ? failed : ['fix']); // [FIX-ACTIVITY] red finish marker
       refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;

@@ -3,7 +3,55 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 13, 2026: "Open project" vanishes after 2 seconds
+## Fix — Jun 13, 2026: Cost shown on fix-pipeline FAILURE messages too
+
+**Follow-up to the chat-cost change.** The fix pipeline's **success** result already printed a full `Pipeline Usage` block with per-AI cost + `Total Session Cost` (`chatPanelMsgFixOutput.ts`). But the three **failure / early-return** exits in `chatPanelMsgFix.ts` returned *before* that block, so a fix that burned the Supervisor (and maybe Worker) calls and then failed showed **no cost at all** — violating "every AI call has a cost, on the bottom of every response."
+
+**Fix — new `chatPanelMsgFixUsage.ts`:** two small helpers.
+- `fixSessionCostBefore(deps, root)` — snapshots cumulative session cost at the start of `handleFixRequest`.
+- `fixCostByline(deps, root, costBefore)` — returns a compact inconspicuous line `_AI cost this fix: $X_` using the **delta** (cost now − costBefore), so it reports THIS fix's cost, not the cumulative session total (honest per-fix accounting).
+
+**Wired into `chatPanelMsgFix.ts`:** snapshot `_costBefore` right after `root` resolves; appended `fixCostByline(...)` to all three failure messages — "Something went wrong while analysing your fix", "...while writing the fix", and "The fix didn't apply cleanly". Success path left as-is (it already shows cost).
+
+**Why a helper / separate file:** keeps it DRY across the three exits, stays well under 200 lines, and follows NO-FLAT-FILES (lives in the routing folder with its siblings).
+
+**Risk:** none — display-only; helpers swallow errors and return `''` if the tracker is absent, so a missing report never breaks the failure message.
+
+**Compile:** 0 errors, deployed.
+
+---
+
+## Fix — Jun 13, 2026: Cost shown on every chat AI response
+
+**Requirement (user):** "Every AI call has a cost — that needs to be on the bottom of every AI response. Can be small and inconspicuous but still needs to be there and recorded on costs. This is very important."
+
+**State before:** Build *result cards* already showed per-role `· $X.XXXX` (done in an earlier session via shared `calcCost`). But plain chat answers (Q&A, clarify, command, personality-picker) showed only tokens — the byline ended in `↑X ↓Y tok` with no dollar figure. Recording was already happening (`recordUsage(...'qa')`), so only the *display* was missing.
+
+**Fix — `chatPanelMsgSendMessage.ts`:** Imported the shared `calcCost(model, inTok, outTok)` from `usageTracker.ts` (single source of truth, same table the build card uses). The `_byline` is built once and reused across all four response paths, so adding cost there covers every AI response. Appended ` · ${_costStr}` where `_costStr` is `<$0.0001` for sub-cent-fraction calls, `$0.00XX` (4 dp) under a cent, else `$0.XX` (2 dp) — small and readable. No new recording added; it was already in place.
+
+**Why one place:** all answer/clarify/command/personality-picker branches share `_byline`, so a single edit is honest and DRY.
+
+**Risk:** none — display-only string append; cost falls back to a flat rate for unknown models in `calcCost`.
+
+**File over 200 lines (318):** modification was a net display-only change to an existing byline line + one import; full split of this core routing file deferred (tracked under existing Rule 9 debt list).
+
+**Compile:** 0 errors, deployed.
+
+---
+
+## Fix — Jun 13, 2026: Fix pipeline writes twice and still fails to apply
+
+**Bug:** The AI would generate a valid surgical edit (SEARCH/REPLACE block), Guardian would approve it, the Build Activity panel would show "Fix written" and "Final review — approved", then show `[!] Could not apply the fix`. Since `written=[]`, the retry path (`retryNoOutput`) then ran the Worker a **second** time, also failing, leaving the "The fix didn't apply cleanly" message with the Retry button.
+
+**Root Cause — `surgicalEditService.ts` Strategy 2:** The "normalized match" strategy found the search block in the *normalized* string, then tried to map that index back to the *original* content via line count. But `normalizeForMatch()` collapses blank lines (3+ → 2) and converts tabs to spaces, so the line count in the normalized string doesn't equal the line count in the original at the same logical position. The resulting `charIndex` pointed to the wrong location, so `content.slice(idx + edit.searchBlock.length)` cut the file at the wrong place — writing garbage or triggering an immediate "search block not found" failure.
+
+**Fix:** Replaced Strategy 2 with a true line-range approach: slide a window of N original lines, normalize the window, compare to the normalized search block. When they match, replace those exact original lines with the replaceBlock. Added ±2 line delta tolerance to handle blank-line count drift between the search block and the file. Used `idx = 0` as a sentinel (with `strategy === 'normalized'` guard) so the post-loop apply block skips for edits already applied inline.
+
+**Compile:** 0 errors.
+
+---
+
+
 
 **Bug:** When the user typed "open frogger project" in the chat, the project appeared to open briefly (the chat header showed "frogger-arcade-game") and then snapped back to the launcher/container after ~2 seconds.
 

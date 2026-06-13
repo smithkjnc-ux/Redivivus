@@ -17,6 +17,7 @@ import { runChatClarifyStep } from './chatPanelMsgSendClarify';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent';
 import { checkBuildConfirmation, getWorkspaceFileList } from './chatPanelMsgSendConfirmCheck';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
+import { calcCost } from '../../services/usageTracker';
 import { createTurnContext } from './turnContext.js';
 import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
 import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
@@ -169,7 +170,10 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
   const _m = chatResult.model || '', _pr = PROVIDER_LABEL[chatResult.provider] ?? 'Claude';
   const _ms = _m.includes('haiku')?'Haiku':_m.includes('sonnet')?'Sonnet':_m.includes('opus')?'Opus':_m.includes('flash')?'Flash':_m.includes('4o-mini')?'GPT-4o mini':_m.includes('4o')?'GPT-4o':'';
-  const _byline = `${_pr}${_ms&&_ms!==_pr?' '+_ms:''} · ↑${chatResult.inputTokens??0} ↓${chatResult.outputTokens??0} tok`;
+  // [FIX] Every AI call has a cost -- show it (small, inconspicuous) on every response. Recorded via recordUsage below.
+  const _cost = calcCost(chatResult.model || '', chatResult.inputTokens ?? 0, chatResult.outputTokens ?? 0);
+  const _costStr = _cost < 0.00005 ? '<$0.0001' : '$' + _cost.toFixed(_cost < 0.01 ? 4 : 2);
+  const _byline = `${_pr}${_ms&&_ms!==_pr?' '+_ms:''} · ↑${chatResult.inputTokens??0} ↓${chatResult.outputTokens??0} tok · ${_costStr}`;
 
   if (chatResult.action === 'answer' || chatResult.action === 'clarify') {
     // [FIX][SILENT-DROP] The classifier sometimes returns a BUILD request mislabeled as answer/clarify,

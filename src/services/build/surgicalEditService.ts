@@ -209,26 +209,61 @@ export function applySurgicalEdits(edits: SurgicalEdit[], root: string): EditRes
       let idx = content.indexOf(edit.searchBlock);
       let strategy = 'exact';
       
-      // Strategy 2: Normalized match (handles line endings, trailing whitespace)
+      // Strategy 2: Normalized match (handles line endings, trailing whitespace, tab/space drift).
+      // [FIX] Use line-range replacement instead of character-index remapping. The old approach mapped
+      // nIdx (an index into the NORMALIZED string) back to the original via line count — but normalizeForMatch
+      // collapses blank lines and converts tabs, so the line count mapping was wrong and idx pointed to the
+      // wrong position. Instead: find which window of ORIGINAL lines normalizes to match the search block,
+      // then replace exactly those original lines with the replaceBlock.
       if (idx === -1) {
-        surgicalLog(`  Exact match failed -- trying normalized match...`);
-        const normalizedContent = normalizeForMatch(content);
+        surgicalLog(`  Exact match failed -- trying normalized line-range match...`);
         const normalizedSearch = normalizeForMatch(edit.searchBlock);
-        const nIdx = normalizedContent.indexOf(normalizedSearch);
-        if (nIdx !== -1) {
-          // Map normalized index back to original content
-          const beforeMatch = normalizedContent.slice(0, nIdx);
-          const linesBefore = beforeMatch.split('\n').length - 1;
-          const searchLines = normalizedSearch.split('\n').length;
-          const origLines = content.split('\n');
-          const charIndex = origLines.slice(0, linesBefore).join('\n').length + (linesBefore > 0 ? 1 : 0);
-          idx = charIndex;
+        const searchLineCount = edit.searchBlock.split('\n').length;
+        const contentLines = content.split('\n');
+        let normMatchLine = -1;
+        // Slide a window of searchLineCount original lines and see if normalizing it matches
+        for (let i = 0; i <= contentLines.length - searchLineCount; i++) {
+          const window = contentLines.slice(i, i + searchLineCount).join('\n');
+          if (normalizeForMatch(window) === normalizedSearch) {
+            normMatchLine = i;
+            break;
+          }
+        }
+        // Widen/narrow the window by ±2 lines to absorb blank-line count drift from normalizeForMatch
+        if (normMatchLine === -1) {
+          outer: for (let delta = 1; delta <= 2; delta++) {
+            for (const sc of [searchLineCount - delta, searchLineCount + delta]) {
+              if (sc < 1) { continue; }
+              for (let i = 0; i <= contentLines.length - sc; i++) {
+                const window = contentLines.slice(i, i + sc).join('\n');
+                if (normalizeForMatch(window) === normalizedSearch) {
+                  normMatchLine = i;
+                  // Replace the window lines with replaceBlock, overriding the post-loop slice
+                  const before = contentLines.slice(0, normMatchLine).join('\n');
+                  const after = contentLines.slice(normMatchLine + sc).join('\n');
+                  content = [before, edit.replaceBlock, after].filter(s => s !== '').join('\n');
+                  appliedCount++;
+                  strategy = 'normalized';
+                  surgicalLog(`  Normalized line-range match (±${delta} lines) succeeded (line ${normMatchLine + 1})`);
+                  idx = 0; // sentinel — edit already applied above
+                  break outer;
+                }
+              }
+            }
+          }
+        } else {
+          // Exact window size match — do the replacement
+          const before = contentLines.slice(0, normMatchLine).join('\n');
+          const after = contentLines.slice(normMatchLine + searchLineCount).join('\n');
+          content = [before, edit.replaceBlock, after].filter(s => s !== '').join('\n');
+          appliedCount++;
           strategy = 'normalized';
-          surgicalLog(`  Normalized match succeeded`);
+          surgicalLog(`  Normalized line-range match succeeded (line ${normMatchLine + 1})`);
+          idx = 0; // sentinel — edit already applied above
         }
       }
       
-      // Strategy 3: Trimmed-line match (handles indentation drift)
+      // Strategy 3: Trimmed-line match (handles indentation drift) — skip if Strategy 2 already applied
       if (idx === -1) {
         surgicalLog(`  Normalized match failed -- trying trimmed-line match...`);
         const contentLines = content.split('\n');
@@ -268,13 +303,15 @@ export function applySurgicalEdits(edits: SurgicalEdit[], root: string): EditRes
         }
       }
       
-      // Apply the edit if any strategy found a match
-      if (idx !== -1) {
+      // Apply the edit if any strategy found a match (idx=0 is sentinel: Strategy 2 already applied inline)
+      if (idx === 0 && strategy === 'normalized') {
+        surgicalLog(`  Edit already applied by Strategy 2 (line-range replacement)`);
+      } else if (idx !== -1) {
         const before = content.slice(0, idx);
         const after = content.slice(idx + edit.searchBlock.length);
         content = before + edit.replaceBlock + after;
         appliedCount++;
-        surgicalLog(`  Applied edit using ${strategy} strategy`);
+        surgicalLog(`  Applied edit using ${strategy} strategy)`);
       } else {
         // All strategies failed -- log detailed failure info
         failedEdit = { searchBlock: edit.searchBlock, strategy: 'all-4-failed' };
