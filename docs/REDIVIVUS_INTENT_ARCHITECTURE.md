@@ -117,10 +117,16 @@ after every phase.** Each phase ships value on its own and can be reverted.
     (scaffold/service stay inline). Behaviour-preserving — it dispatches to the existing pipelines (fix gets the
     original `userText` via `turnCtx.rawMessage`; build gets `routedText||task`) and records
     `turnCtx.artifacts.decision`. `tsc` clean, deployed. Value: one context-owning seam for Phase 2b/3 to build on.
-  - **2b — share context into the prompts. [NEXT]** Thread `turnCtx` (recent conversation + the Supervisor
-    prescription) INTO the Supervisor/Worker prompts so the Worker sees the conversation, not a re-summarized
-    handoff. Collect context ONCE into `turnCtx` (root, files, blueprint, vault). *Fixes "losing something
-    between plan and worker." Test: a build's Worker has the conversation context; a fix still fixes.*
+  - **2b — share context into the prompts. [DONE Jun 13, 2026]** Finding: the **build path already shares the
+    conversation** — `buildContextCollector` builds `recentChat` from `deps.conversation` and includes it, so
+    the build Supervisor isn't blind. The **gap was the fix path**: `chatPanelMsgFix.ts` assembled `buildContext`
+    (which feeds BOTH the fix Supervisor and the Worker) with no conversation. Fixed: thread the recent user
+    messages from `turnCtx.conversation` into `buildContext`, bringing the fix path to parity — the fix
+    Supervisor+Worker now see what the user said this turn (e.g. the prior "build a frogger game" this fix
+    follows). Also record the Supervisor's prescription on `turnCtx.artifacts.prescription` (first-class on the
+    shared context, not a re-summary). `tsc` clean, deployed. *Note: the deeper "collect ALL context once into
+    turnCtx (root/files/blueprint/vault), dedup across build+fix" lands in Phase 4 when the pipelines actually
+    merge — 2b delivered the conversation+prescription sharing that was the practical lossy-handoff fix.*
 
 - **Phase 3 — Supervisor decides the operation.** The classifier stops deciding build-vs-fix; it only
   fast-paths obvious `answer`/`command`. For code, the Supervisor (full context) prescribes operation

@@ -137,7 +137,18 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   } catch (e) { fixLog('[GLOBAL_VAULT] Query failed (non-blocking)', { error: String(e) }); }
 
   const vaultCtx = (deps.vault && isVaultEnabled()) ? (() => { const h = findRelevantByTask(userText, deps.vault!.listItems()); return h.items.length > 0 ? formatVaultContext(h.items.slice(0, 4)) + '\n' : ''; })() : '';
-  const buildContext = vaultCtx + collectFixContext(root, sourceFiles) + globalDeadEndCtx;
+  // [PHASE 2b] Share the recent conversation with the fix Supervisor AND Worker via the shared TurnContext, so
+  // the fix isn't built from a re-summarized handoff — they see what the user actually said this turn (e.g. the
+  // prior "build a frogger game" that this fix follows). Brings the fix path to parity with the build path,
+  // which already threads recentChat. See docs/REDIVIVUS_INTENT_ARCHITECTURE.md.
+  const convoCtx = (() => {
+    const msgs = (deps.turnContext?.conversation ?? conversation)
+      .filter(m => m.role === 'user')
+      .slice(-4)
+      .map(m => `- ${String(m.content).replace(/\s+/g, ' ').slice(0, 400)}`);
+    return msgs.length ? `\n\nRECENT USER MESSAGES (this turn's intent — honor what they actually asked):\n${msgs.join('\n')}` : '';
+  })();
+  const buildContext = vaultCtx + collectFixContext(root, sourceFiles) + globalDeadEndCtx + convoCtx;
   const projectRules = readProjectRules(root);
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
 
@@ -151,6 +162,9 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     const p1 = await runPhase1Supervisor(userText, filesBlock, buildContext, activePatterns, projectDeadEnds, projectRules, deps, root, imageBase64, imageType);
     if (!p1) {return;} // shouldn't happen based on throw
     diagnosis = p1.diagnosis;
+    // [PHASE 2b] Record the Supervisor's prescription on the shared turn so later stages read THIS, not a
+    // re-summarized handoff. (Worker already gets it via `diagnosis`; this makes it first-class on the context.)
+    if (deps.turnContext) { deps.turnContext.artifacts.prescription = diagnosis; }
     subtasks = p1.subtasks;
     executionMode = p1.executionMode || 'sequential';
     // If Supervisor fetched additional files, expand Worker context and allowedRels

@@ -3,6 +3,16 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Intent architecture Phase 2b — share conversation+prescription into the fix pipeline
+
+**Context:** The "kill the lossy handoff" step. **Finding:** the BUILD path already shares the conversation — `buildContextCollector` builds `recentChat` from `deps.conversation`, so the build Supervisor isn't blind. The **gap was the FIX path**: `chatPanelMsgFix.ts:140` assembled `buildContext` (which feeds BOTH the fix Supervisor and the Worker) with zero conversation — a fix was built blind to what the user said earlier this turn.
+- **`src/core/routing/chatPanelMsgFix.ts`:** (1) thread the recent user messages from the shared `deps.turnContext.conversation` into `buildContext` (`convoCtx`), so the fix Supervisor + Worker now see the turn's intent (e.g. the prior "build a frogger game" this fix follows) — parity with the build path. (2) Record the Supervisor's prescription on `turnCtx.artifacts.prescription` — first-class on the shared context, not a re-summarized handoff.
+- **Verified:** `tsc` clean; deployed. The Worker already received the prescription via `diagnosis`; this makes both the conversation and the prescription live on the shared `TurnContext`.
+- **Why:** the fix path was the one genuinely building from a context-less handoff; this closes it without touching the backend (client-only). The deeper "collect ALL context once / dedup root-files-blueprint-vault across build+fix" is deferred to Phase 4 when the pipelines merge.
+- **Risk:** low (additive context; ~2.4KB to the fix prompt, capped). Reversible: drop `convoCtx` from `buildContext`. See [[intent-architecture-direction]].
+
+---
+
 ## Session — Jun 13, 2026: Intent architecture Phase 2a — unified change-request seam + backend deployed
 
 **Backend deploy:** committed + pushed `chat/route.ts` (few-shot + Phase 1 confidence) and ran `fly deploy --remote-only` → redivivus-backend **v138 live** (health checks passed, serving 0.4.8). So in production now: make/create→build few-shot, the dead-canvas completeness gate, and classifier `confidence`.
