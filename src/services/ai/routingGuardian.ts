@@ -5,6 +5,7 @@
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import type { GuardianReviewResult } from './guardianAI.js';
 import { selectGuardianAI, AI_RANK } from './guardianAI.js';
+import { bestModelForRole } from './modelRegistry.js';
 import type { RoutingService } from './routingService.js';
 import { logAICall } from './aiCallLogger.js';
 import { detectProjectType, getFolderStructureTemplate } from './routingGuardianUtils.js';
@@ -122,10 +123,15 @@ export async function guardianReviewImpl(
   for (const guardianAI of order) {
     const startTime = Date.now();
     try {
+      // [FIX] Send a REAL model ID, not the provider name. Was `model: guardianAI` (e.g. 'gemini') — the backend
+      // passed that straight to the SDK, which rejected it as an unknown model, so the guardian failed on EVERY
+      // provider and silently auto-approved (guardianAI:'none', passed:true) — shipping fixes unreviewed. The
+      // Worker/Supervisor calls already resolve via bestModelForRole; the guardian must do the same. (Jun 13, 2026)
+      const guardianModel = bestModelForRole(guardianAI, 'pro')?.modelId || guardianAI;
       const res = await fetchFn(`${base}/guardian`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Provider-Keys': JSON.stringify(keys) },
-        body: JSON.stringify({ task: originalTask, workerResponse, blueprintContext, provider: guardianAI, model: guardianAI }),
+        body: JSON.stringify({ task: originalTask, workerResponse, blueprintContext, provider: guardianAI, model: guardianModel }),
       }, 50_000);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { gLastError = (data && data.error) || `Guardian API ${res.status}`; continue; }

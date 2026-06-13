@@ -96,7 +96,7 @@ export async function runEscalationLoop(params: {
     if (isTrivial) {
       fixLog(`Supervisor flagged fix as trivial — skipping Verify and Guardian`);
       guardianNote = `Guardian: Skipped (trivial fix)`;
-      return { finalResponse: workerResponse, workerLabel, guardianLabel: 'none', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated };
+      return { finalResponse: workerResponse, workerLabel, guardianLabel: 'skipped (trivial)', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated };
     }
 
     // ── Phase 2.5: Supervisor verifies Worker logic ──
@@ -156,25 +156,41 @@ export async function runEscalationLoop(params: {
       // it used; fall back to the Supervisor's provider (the Guardian IS the Supervisor-tier model — Workshop
       // principle 3). Empty was rendering a bogus "none" row in Pipeline Usage AND pricing those tokens at ~$0,
       // which UNDERCOUNTED the cost. A real provider both labels it correctly and prices it correctly.
-      const guardianProvider = guardianResult.guardianAI || (() => { try { return routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude';
-      // [FIX-ACTIVITY] Guardian verdict — approved, or the issues it wants addressed (expandable detail).
-      fixActStep({ phase: 'guardian', status: guardianResult.passed ? 'pass' : 'fix',
-        label: guardianResult.passed ? 'Final review — approved' : 'Final review found issues — improving',
-        detail: (guardianResult.issues || []).join('\n') || undefined,
-        model: modelLabel(guardianProvider) });
-      if (guardianResult.issues?.length) {
-        fixLog(`Guardian issues found`, { issues: guardianResult.issues });
+      // [FIX] Distinguish a REAL guardian verdict from the "couldn't run on any provider" fallback. routingGuardian
+      // returns guardianAI:'none', passed:true when EVERY provider failed — that is NOT an approval, it's an
+      // unreviewed pass. Be honest: don't label it "approved", don't book a phantom 'none' cost row, don't price
+      // tokens that were never spent. (Was showing "Guardian (none)" + a bogus "none: 482 tokens" usage row.)
+      const guardianRan = !!guardianResult.guardianAI && guardianResult.guardianAI !== 'none';
+      const guardianProvider = guardianRan
+        ? guardianResult.guardianAI
+        : ((() => { try { return routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude');
+
+      if (guardianRan) {
+        // [FIX-ACTIVITY] Guardian verdict — approved, or the issues it wants addressed (expandable detail).
+        fixActStep({ phase: 'guardian', status: guardianResult.passed ? 'pass' : 'fix',
+          label: guardianResult.passed ? 'Final review — approved' : 'Final review found issues — improving',
+          detail: (guardianResult.issues || []).join('\n') || undefined,
+          model: modelLabel(guardianProvider) });
+        if (guardianResult.issues?.length) {
+          fixLog(`Guardian issues found`, { issues: guardianResult.issues });
+        }
+        deps.usageTracker?.recordUsage(
+          Math.ceil(workerResponse.length / 4), 0,
+          guardianProvider, guardianResult.inputTokens, guardianResult.outputTokens,
+          'guardian', require('path').basename(root)
+        );
+        guardianLabel = modelLabel(guardianProvider);
+      } else {
+        // No reviewer available on ANY provider — the fix still applies (graceful degradation, Workshop principle
+        // 7), but say so plainly. No phantom cost row, no "approved" claim. (Never cry wolf — in either direction.)
+        fixLog(`Guardian could not run on any provider — fix applied WITHOUT final review`);
+        fixActStep({ phase: 'guardian', status: 'failover', label: 'Final review skipped — no AI reviewer available' });
+        guardianLabel = 'skipped';
       }
-      deps.usageTracker?.recordUsage(
-        Math.ceil(workerResponse.length / 4), 0,
-        guardianProvider, guardianResult.inputTokens, guardianResult.outputTokens,
-        'guardian', require('path').basename(root)
-      );
 
       if (guardianResult.scopeAlerts?.length) {
         scopeNote = `\n\n**Guardian also noticed (not applied -- say "also fix..." to address):**\n${guardianResult.scopeAlerts.map((a: string) => `- ${a}`).join('\n')}`;
       }
-      guardianLabel = modelLabel(guardianProvider);
 
       // Check Simple Pipeline insufficiency
       if (guardianResult.issues?.some((issue: string) => issue.includes("Simple Pipeline is insufficient"))) {
@@ -182,8 +198,10 @@ export async function runEscalationLoop(params: {
       }
 
       if (guardianResult.passed) {
-        guardianNote = `Guardian (${guardianLabel}): Approved`;
-        fixLog(`Guardian APPROVED the fix`);
+        guardianNote = guardianRan
+          ? `Guardian (${guardianLabel}): Approved`
+          : `Guardian: skipped (no reviewer available — fix applied without final review)`;
+        fixLog(guardianRan ? `Guardian APPROVED the fix` : `Guardian SKIPPED (no provider) — fix passed through unreviewed`);
         return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical };
       }
 

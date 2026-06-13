@@ -6,6 +6,10 @@ export interface Blueprint {
   where: string;
   when: string;
   why: string;
+  // [LIVING BLUEPRINT] Behavioral contract — observable rules of what the project SHOULD do. The fix-Supervisor
+  // diffs this against the actual code to diagnose "it's broken" without re-deriving intent from buggy code.
+  // Behavioral only (no file/function names) so it never goes stale on a refactor. See REDIVIVUS_LIVING_BLUEPRINT.md.
+  mechanics?: string;
   health: BlueprintHealth;
   locked: boolean;
   lockedAt?: string;

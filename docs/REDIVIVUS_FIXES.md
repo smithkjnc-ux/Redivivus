@@ -3,6 +3,50 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 13, 2026: Living Blueprint Phase-0 slice — mechanics contract reaches the fix-Supervisor
+
+**Why:** the fix-Supervisor had no statement of *intended behavior*, so a vague "it's broken" forced it to reverse-engineer intent from buggy code and over-engineer (the frogger mid-hop-drown misdiagnosis). First concrete slice of `docs/REDIVIVUS_LIVING_BLUEPRINT.md`: a behavioral contract that the Supervisor diffs the code against.
+
+**Changes (minimal, durable, no client-logic change needed — the blueprint object is already forwarded whole):**
+- **`src/types/index.ts`** — `Blueprint.mechanics?: string` (behavioral contract; observable rules only, no file/function names so it never goes stale).
+- **`src/services/blueprint/blueprintWriter.ts`** — `writeBlueprintMd` now renders a `## MECHANICS` section when `bp.mechanics` is set. Previously the writer regenerated `blueprint.md` from the 5 W's only, which would have CLOBBERED a hand-added mechanics section on the next build/revision. Now it round-trips from config.
+- **`frogger-arcade-game/.redivivus/config.json`** — manual seed: `blueprint.mechanics` populated with frogger's behavioral rules distilled from the actual code (the river rule explicitly states "the frog must NOT drown while a hop is in progress; drowning is judged only once it lands" — the exact thing the earlier fix missed). `loadConfig` is a raw `JSON.parse`, so this forwards automatically.
+- **(backend) `fix-supervisor/route.ts`** — `buildSupervisorPrompt` gains `mechanicsContext`; renders an authoritative `INTENDED BEHAVIOR (...the code must match THIS; find where it deviates)` block FIRST in the prompt, and nudges "pay attention to WHEN a condition is evaluated, not just what it computes." Reads `context.blueprint.mechanics`.
+
+**Deploy state:** client compiled + deployed. **Backend `fix-supervisor` change needs a Fly deploy** before the Supervisor actually sees the mechanics.
+
+**Test plan:** after the backend deploy, re-run the frogger "the frog dies on logs" fix and check the diagnosis — it should now cite the mid-hop drown rule directly (diff against the contract) instead of the interpolated-collision-box theory.
+
+**Risk:** low — additive optional field; absent mechanics → empty block → unchanged behavior. This is a proof slice, not the full Living Blueprint (no revision ledger / auto-distill yet — Phases 1-4).
+
+**Compile:** client 0 errors; backend tsc clean.
+
+---
+
+## Fix — Jun 13, 2026: Guardian silently auto-approved unreviewed fixes ("Guardian (none)" + phantom "none" cost row)
+
+**Symptom:** Fix result showed `Pipeline: Supervisor (Gemini) -> Worker (Gemini) -> Guardian (none)` and a usage row `- none: 482 tokens ($0.0001)`. The Build Activity said "Final review — approved" but the Guardian had not actually reviewed anything.
+
+**Root cause — two bugs:**
+1. **Guardian never ran (model-id bug).** `routingGuardian.ts` POSTed to `/guardian` with `model: guardianAI` — the *provider name* (e.g. `'gemini'`), not a real model ID. The backend passed that straight to the SDK, which rejected it as an unknown model. So the failover loop failed on EVERY provider (Claude/OpenAI keys invalid + Gemini rejected for the bad model name) and fell through to `return { passed: true, guardianAI: 'none' }`.
+2. **The fallback dishonestly claimed approval.** `passed: true` with `guardianAI: 'none'` = an *unreviewed pass* presented as "approved". Escalation's `guardianProvider = guardianResult.guardianAI || supervisor || ...` couldn't catch it because `'none'` is a truthy string, so it labeled `Guardian (none)` and recorded a phantom usage row (the "482 tokens" was just `workerResponse.length/4`, booked under provider `none` at ~$0 — which also undercounted true cost).
+
+**Fix A — `routingGuardian.ts`:** resolve a real model with `bestModelForRole(guardianAI, 'pro')?.modelId || guardianAI` before the call (same pattern the Worker/Supervisor use). Verified: `gemini -> gemini-2.5-flash`, `claude -> claude-sonnet-4-6`, etc. The guardian now actually runs on the available provider.
+
+**Fix B — `chatPanelMsgFixEscalation.ts`:** treat `guardianAI === 'none'` as "did not run", not as an approval:
+- `guardianRan = !!guardianResult.guardianAI && guardianResult.guardianAI !== 'none'`.
+- Only record a guardian usage row + show "Final review — approved" when it actually ran.
+- When it didn't run, the fix still applies (graceful degradation — Workshop principle 7) but the panel says **"Final review skipped — no AI reviewer available"** and the pipeline label reads `Guardian (skipped)`, never a fake "approved". No phantom cost.
+- Trivial-skip path relabeled `none` -> `skipped (trivial)` for the same honesty.
+
+**Why it matters:** with Claude/OpenAI keys intentionally invalid right now (failover testing), the guardian was the ONE role still silently failing — every fix shipped unreviewed while claiming approval. This was masking review quality during exactly the period we're hardening the pipeline. Never cry wolf — in either direction.
+
+**Risk:** low. Fix A only changes the model field to a valid ID. Fix B is display/accounting honesty + keeps graceful degradation. Re-run a fix with only Gemini configured to confirm the guardian now runs and labels correctly.
+
+**Compile:** 0 errors, deployed.
+
+---
+
 ## Fix — Jun 13, 2026: "Could not apply the fix" on a clean HTML surgical edit (frogger collision)
 
 **Symptom:** User asked to fix the frog dying on logs. Supervisor (Gemini, after Claude/OpenAI key failover) diagnosed it correctly (collision box not updated to the interpolated hop position), Worker wrote a clean `<edit>/<search>/<replace>` for `index.html`, Verify passed, Guardian approved — then `[!] Could not apply the fix`. The retry ran the Worker a second time, same result.

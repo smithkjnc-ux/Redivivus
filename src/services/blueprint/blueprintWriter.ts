@@ -27,7 +27,12 @@ ${bp.when || '❓ Not answered'}
 
 ## WHY
 ${bp.why || '❓ Not answered'}
-
+${bp.mechanics ? `
+## MECHANICS
+<!-- Behavioral contract (HEAD). What the project SHOULD do, observable only. The fix-Supervisor diffs this
+     against the code to diagnose issues. See REDIVIVUS_LIVING_BLUEPRINT.md. -->
+${bp.mechanics}
+` : ''}
 ---
 
 ## Health
