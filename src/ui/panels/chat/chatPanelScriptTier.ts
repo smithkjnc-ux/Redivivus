@@ -139,6 +139,10 @@ export function buildTierScript(): string {
       }
 
       // ── Pill render ─────────────────────────────────────────────────────────
+      // GREEN = adaptive mode (any tier). PURPLE = manual lock. Simple rule, always consistent.
+      var GREEN = '#4caf50';
+      var PURPLE = '#a78bfa';
+      var PURPLE_DARK = '#7c3aed';
       function renderPill() {
         var pill = document.getElementById('adaptive-pill');
         if (!pill) return;
@@ -146,44 +150,43 @@ export function buildTierScript(): string {
         var text = (inp && inp.value) ? inp.value : '';
 
         if (_manualProvider) {
-          // MANUAL MODE — format: "Manual · [AI Name]"
+          // MANUAL MODE — purple. Format: "Manual · [AI Name]"
           var lockedTier = assessTier(text) || 'pro';
           var modelLabel = (PROVIDER_TIER_LABEL[_manualProvider.id] || {})[lockedTier] || _manualProvider.label;
           pill.innerHTML =
-            '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;opacity:0.9;">Manual</span>' +
-            '<span style="opacity:0.4;margin:0 4px;">\u00B7</span>' +
-            _manualProvider.emoji + '\u202F' + modelLabel;
-          pill.style.color = '#a78bfa';
-          pill.style.borderColor = '#7c3aed';
-          pill.style.background = '#7c3aed22';
+            '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">' + 'Manual' + '</span>' +
+            '<span style="opacity:0.45;margin:0 5px;">\u00B7</span>' +
+            (_manualProvider.emoji ? _manualProvider.emoji + '\u202F' : '') + modelLabel;
+          pill.style.color = PURPLE;
+          pill.style.borderColor = PURPLE_DARK;
+          pill.style.background = PURPLE_DARK + '22';
           pill.title = 'Manual: locked to ' + _manualProvider.label + ' \u2014 no failover. Click to change or return to Adaptive.';
           return;
         }
 
-        // ADAPTIVE MODE
+        // ADAPTIVE MODE — always green border
         var tier = assessTier(text);
         if (!tier) {
-          // Blank input — show "Adaptive" label only, no AI committed yet
-          pill.innerHTML = '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;opacity:0.6;">Adaptive</span>';
-          pill.style.color = '#666';
-          pill.style.borderColor = '#3d3d3d';
-          pill.style.background = 'transparent';
+          // Blank input — green but dimmed
+          pill.innerHTML = '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">Adaptive</span>';
+          pill.style.color = GREEN;
+          pill.style.borderColor = GREEN + '55';
+          pill.style.background = GREEN + '0e';
           pill.title = 'Adaptive: picks the right AI as you type. Click to lock a specific provider.';
           return;
         }
 
-        // Typing — show "Adaptive · [AI]"
+        // Typing — green label + provider name. "Adaptive · Groq"
         var provider = pickProvider(tier);
-        var color = TIER_COLOR[tier] || '#818cf8';
         var provLabel = provider ? ((PROVIDER_TIER_LABEL[provider.id] || {})[tier] || provider.label) : tier;
-        var provEmoji = provider ? provider.emoji : '';
+        var provEmoji = provider ? (provider.emoji ? provider.emoji + '\u202F' : '') : '';
         pill.innerHTML =
-          '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">Adaptive</span>' +
-          '<span style="opacity:0.35;margin:0 4px;">\u00B7</span>' +
-          provEmoji + '\u202F' + provLabel;
-        pill.style.color = color;
-        pill.style.borderColor = color + '55';
-        pill.style.background = color + '18';
+          '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">' + 'Adaptive' + '</span>' +
+          '<span style="opacity:0.35;margin:0 5px;">\u00B7</span>' +
+          provEmoji + provLabel;
+        pill.style.color = GREEN;
+        pill.style.borderColor = GREEN + '77';
+        pill.style.background = GREEN + '18';
         pill.title = 'Adaptive: ' + (provider ? provider.label : '') + ' (' + tier + ') for this message. Click to lock a provider.';
       }
 

@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 13, 2026: Pill showing ⚡ AI instead of Adaptive (static HTML + color bug)
+
+**Bug:** The adaptive pill showed `⚡ AI` (old static initial HTML) with no green/purple coloring. Two causes:
+1. `chatPanelHeaderRender.ts` hardcoded `&#x26A1; AI` as the button's initial innerHTML — shown whenever JS hadn't run yet or on initial panel paint.
+2. `renderPill()` used tier-colors for the adaptive border (green only when tier = flash-tier color) instead of a consistent green-always rule.
+
+**Fix A — `chatPanelHeaderRender.ts`:** Changed initial button HTML to `<span>Adaptive</span>` with green border (`#4caf5055`) so the correct label shows even before JS executes.
+
+**Fix B — `chatPanelScriptTier.ts`:** Defined `GREEN = #4caf50` and `PURPLE = #a78bfa` as constants. All adaptive states (blank, typing) use green border + green text. Manual mode uses purple. The AI provider name stays as secondary text — only the mode color ever changes.
+
+**Compile:** 0 errors.
+
+---
+
 ## Session — Jun 13, 2026: Context-aware routing guard + advisory client tier + pill format
 
 **Three changes in one session:**

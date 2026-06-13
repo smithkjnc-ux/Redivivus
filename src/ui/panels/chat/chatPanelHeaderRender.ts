@@ -49,5 +49,6 @@ export function renderInputLeftInner(header?: ChatHeaderInfo): string {
   return `<button id="adaptive-pill"
     data-providers="${providersJson}"
     title="Adaptive: picks the right AI as you type. Click to lock a specific provider."
-  >&#x26A1; AI</button>`;
+    style="font-size:11px;font-weight:600;padding:3px 10px 3px 10px;border-radius:99px;border:1px solid #4caf5055;background:transparent;cursor:pointer;white-space:nowrap;transition:all 0.2s;font-family:inherit;color:#4caf50;letter-spacing:0.01em;"
+  ><span style="font-size:10px;font-weight:700;letter-spacing:0.04em;opacity:0.7;">Adaptive</span></button>`;
 }
