@@ -3,6 +3,42 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Preview Auto-Fix Phase 1+2 — headless run-check + honest result gate
+
+**Context:** continuing `docs/REDIVIVUS_PREVIEW_AUTOFIX.md`. Phase 1 = the reusable "does it actually run?" probe; Phase 2 = use it so the pipeline stops claiming "Fixed" when the result is a dead program.
+- **New file:** `src/ui/panels/chat/chatPanelPreviewVerify.ts` — `verifyPreviewRuns(root)`: serves the project, loads it in a short-lived webview (iframe to the served page via `vscode.env.asExternalUri`), waits ~2.8s for the injected capture script (Phase 0) to beacon, then reads `getRuntimeReports()` and returns `{ applicable, ok, errors, blank, noLoop, summary }`. Best-effort — a verify failure is "inconclusive", never "broken"; non-static/non-web projects return `applicable:false`.
+- **`chatPanelMsgFixFinalize.ts` (Phase 2):** after a fix, runs `verifyPreviewRuns`. Activity panel gets "Ran the preview - it works" (pass) or "...- <problem>" (fix); on failure the chat adds an HONEST note ("the file was changed and passed review, but the preview still has a problem -- <summary>… needs another pass"). Replaces the silent "Fixed" on dead output.
+- **Loop philosophy baked into the plan (PapaJoe):** the auto-fix loop (Phase 3) is a SAFETY NET, not the quality mechanism. **Hard cap = 1** corrective pass (2 only for genuinely complex), NEVER 3+. First-pass quality (precise prescription + right-tier Worker) is the real lever; frequent looping is a SIGNAL to fix the first pass, not add loops. Doc section 2a.
+- **Sequencing:** Phase 3 (the capped loop) is held until detection accuracy is validated in real use — a false "broken" verdict would trigger exactly the wasteful loop we want to avoid.
+- **Risk:** low (verify is best-effort; only acts on static web fixes; adds ~2.8s + a brief webview to a web fix). `tsc` clean; deployed.
+
+---
+
+## Session — Jun 13, 2026: Preview Auto-Fix Phase 0 — runtime capture (execution feedback foundation)
+
+**Context:** PapaJoe's "why didn't the first fix fully land?" led to the real root cause — Redivivus verifies fixes by AI *reasoning* (Verify + Guardian read the code), never by *execution*, so a complete file that's a dead program (no game loop, throws on load) passes review and ships. Design doc: new `docs/REDIVIVUS_PREVIEW_AUTOFIX.md` (the execution-feedback / "preview as truth" loop, 5 phases). Phase 0 = capture the runtime signals.
+- **New file:** `src/ui/panels/chat/chatPanelPreviewCapture.ts` — `getCaptureScript()`, **ASCII-only (Rule 13)**, injected EARLY into served HTML (after `<head>`, before page scripts) so its `requestAnimationFrame`/`setInterval` + error hooks see the page's behaviour. Beacons (`sendBeacon` -> `fetch` fallback) to `POST /__rdv_runtime`: uncaught `error`s, failed `<script src>` loads, `console.error`, and a 1.5s probe (canvas all-one-colour AND no loop started -> "the game is not running").
+- **`chatPanelPreview.ts`:** `_injectInspector` now also injects the capture script early; `_buildStaticServer` handles `POST /__rdv_runtime` and buffers reports (`_runtimeReports`, capped 200, cleared per new preview); exported `getRuntimeReports()` / `clearRuntimeReports()`.
+- **Verified:** `tsc` clean; compiled output ASCII-only; capture script carries the beacon + rAF hook + blank-canvas probe. Pure observability — the build/fix pipeline is unchanged (no behaviour change yet).
+- **Why:** "real execution > AI opinion." This is the data foundation; Phase 1 adds a headless `verifyPreviewRuns(root)`, Phase 2 gates the result on it, Phase 3 loops the fix on the concrete runtime evidence.
+- **Risk:** ~none (best-effort capture; can't block a preview). See [[competitive-analysis-reality]] (Preview auto-fix loop was a named keep-up priority).
+
+---
+
+## Session — Jun 13, 2026: Fix cost ~2x + "none" provider — double-run after approval + empty Guardian model
+
+**Symptoms (PapaJoe, on a frogger fix that DID work):** (1) *"it approved the first fix then did it again"* — the whole pipeline ran twice; (2) the result card showed *"~40¢ but states $0.23 — twice what it states"*; (3) Pipeline Usage listed a bogus **"none: 9,318 tokens"** row and **"Guardian (none)"** — *"cannot have none."* All three are the same two bugs.
+
+**Bug A — double-run after Guardian approval (`chatPanelMsgFixFinalize.ts` + `chatPanelMsgFix.ts`):** `retryPatternFix` runs its OWN `validateOutputFiles` pattern check and, on any hit, re-runs the **entire escalation loop** (Worker + Verify + Guardian) again — even after the authoritative Guardian already approved the fix. For frogger that was a false positive (the game runs), so it "did it again," roughly doubling the cost (and the result card only counted the first run → "$0.23 ≈ half"). **Fix:** thread a `guardianApproved` flag (`/approved|skipped/i` on the Guardian note) into `runFixFinalize` and **skip the pattern-retry when the Guardian approved** — trust the authoritative review. The safety-net still runs when the fix was NOT cleanly approved.
+
+**Bug B — Guardian attributed to empty provider -> "none" (`chatPanelMsgFixEscalation.ts`):** the Guardian's usage was recorded with `guardianResult.guardianAI || ''`; when `guardianReview` didn't echo its model, the provider was `''` -> displayed as **"none"** AND priced at ~$0 (no price model), which **also undercounted cost**. **Fix:** `guardianProvider = guardianResult.guardianAI || <supervisor provider> || workerLabel || 'claude'` (the Guardian IS the Supervisor-tier model — Workshop principle 3); used for `recordUsage`, `guardianLabel`, and the activity-panel model. No more "none" row; those tokens now priced correctly.
+
+- **Net effect:** a cleanly-approved fix runs ONCE (cost ~halves to match the displayed number), and the Guardian's spend is counted under its real model — so the displayed cost is both lower AND accurate.
+- **Risk:** low. `tsc` clean; deployed. **Note (residual):** within a single run, failover/continuation passes may still be under-attributed — a deeper telemetry pass for [[build-pipeline-open-issues]] if the number still looks off after this.
+- **Separate (acknowledged, not a bug):** the rendered frogger is "blocky" — the FIX made it *run*; visual polish is a Visual-Editor / "improve the look" pass, not a fix-pipeline issue.
+
+---
+
 ## Session — Jun 13, 2026: Fix pipeline now SHOWS its work in the Build Activity panel (was a vague 4-line bubble)
 
 **Symptom (PapaJoe):** the fix progress was a cramped chat bubble — "Supervisor: done / Worker: writing fix / Verify: pending / Guardian: pending" — far too vague. *"User watches it and says: something's going on but I don't know what."* The BUILD streams its work to a rich Build Activity panel; the FIX should too — showing what the Supervisor found, the Worker's actual fix, the Verify comparison, and the Guardian verdict.

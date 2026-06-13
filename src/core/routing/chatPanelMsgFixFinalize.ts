@@ -25,14 +25,21 @@ export async function runFixFinalize(params: {
   conversation: any[];
   refresh: () => void;
   allowedRels: Set<string>;
+  guardianApproved?: boolean; // [FIX] true when the Guardian already approved — skip the redundant pattern-retry
 }): Promise<void> {
   let { written, workerLabel } = params;
   const { failed, skipped, fixSnapId, diagnosis, supervisorLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels } = params;
 
-  // Auto-retry if known patterns survived the first write — transparent to user on success
-  const { retryPatternFix } = await import('./chatPanelMsgFixRetry.js');
-  const retryRes = await retryPatternFix({ written, activePatterns, root, diagnosis, supervisorLabel, allowedRels, deps, userText, conversation, refresh });
-  if (retryRes.retried && retryRes.written.length > 0) { written = retryRes.written; workerLabel = retryRes.workerLabel; }
+  // [FIX] Auto-retry if known patterns survived — BUT skip it entirely when the Guardian already APPROVED the
+  // fix. retryPatternFix re-runs a FULL escalation (Worker + Verify + Guardian) on its own pattern check; doing
+  // that after the authoritative Guardian already passed the fix is the "approved it, then did it again" bug —
+  // it doubled the cost (and a second run that the result card didn't even count). Only run the pattern
+  // safety-net when the fix did NOT get a clean Guardian approval.
+  if (!params.guardianApproved) {
+    const { retryPatternFix } = await import('./chatPanelMsgFixRetry.js');
+    const retryRes = await retryPatternFix({ written, activePatterns, root, diagnosis, supervisorLabel, allowedRels, deps, userText, conversation, refresh });
+    if (retryRes.retried && retryRes.written.length > 0) { written = retryRes.written; workerLabel = retryRes.workerLabel; }
+  }
 
   // [Stage 3] Extract success pattern to global dead end vault
   if (written.length > 0) {
@@ -72,6 +79,26 @@ export async function runFixFinalize(params: {
     const { runCompileAutoFix } = await import('../../services/build/compileAutoFix.js');
     const ctx = { task: userText, root, blueprintContext: '', routing: deps.routing, conversation, refresh, logError: () => {}, vault: deps.vault, postToWebview: (m: any) => deps.panel?.webview?.postMessage(m) };
     await runCompileAutoFix(ctx as any, written);
+  }
+
+  // [PREVIEW-AUTOFIX Phase 2] Preview as truth — for a web project, actually RUN the result. Verify/Guardian
+  // only READ the code; this proves it executes. If it still doesn't run, say so HONESTLY instead of leaving a
+  // flat "Fixed" (the file WAS changed, but it doesn't work yet). The auto-fix loop (Phase 3) will act on this.
+  if (written.length > 0) {
+    try {
+      const { verifyPreviewRuns } = await import('../../ui/panels/chat/chatPanelPreviewVerify.js');
+      const v = await verifyPreviewRuns(root);
+      if (v.applicable) {
+        const { BuildActivityPanel } = await import('../../ui/panels/buildActivity/buildActivityPanel.js');
+        if (v.ok) {
+          BuildActivityPanel.current?.step({ phase: 'guardian', status: 'pass', label: 'Ran the preview - it works' });
+        } else {
+          BuildActivityPanel.current?.step({ phase: 'guardian', status: 'fix', label: 'Ran the preview - ' + v.summary });
+          conversation.push({ role: 'assistant', content: `Heads up: the file was changed and it passed review, but I ran the preview and it still has a problem -- ${v.summary}\n\nThat usually means it needs another pass. Click Fix again (or describe what you see) and I'll take another run at it.`, timestamp: Date.now() });
+          refresh();
+        }
+      }
+    } catch { /* preview verify is best-effort — never block finalize */ }
   }
 
   if (needsAgentHandoff) {

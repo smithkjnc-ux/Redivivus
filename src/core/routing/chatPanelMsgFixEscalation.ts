@@ -152,24 +152,29 @@ export async function runEscalationLoop(params: {
       fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
       const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), '');
       fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
+      // [FIX] The Guardian's model must never be empty -> "none". guardianReview sometimes doesn't echo the model
+      // it used; fall back to the Supervisor's provider (the Guardian IS the Supervisor-tier model — Workshop
+      // principle 3). Empty was rendering a bogus "none" row in Pipeline Usage AND pricing those tokens at ~$0,
+      // which UNDERCOUNTED the cost. A real provider both labels it correctly and prices it correctly.
+      const guardianProvider = guardianResult.guardianAI || (() => { try { return routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude';
       // [FIX-ACTIVITY] Guardian verdict — approved, or the issues it wants addressed (expandable detail).
       fixActStep({ phase: 'guardian', status: guardianResult.passed ? 'pass' : 'fix',
         label: guardianResult.passed ? 'Final review — approved' : 'Final review found issues — improving',
         detail: (guardianResult.issues || []).join('\n') || undefined,
-        model: modelLabel(guardianResult.guardianAI || '') });
+        model: modelLabel(guardianProvider) });
       if (guardianResult.issues?.length) {
         fixLog(`Guardian issues found`, { issues: guardianResult.issues });
       }
       deps.usageTracker?.recordUsage(
         Math.ceil(workerResponse.length / 4), 0,
-        guardianResult.guardianAI || '', guardianResult.inputTokens, guardianResult.outputTokens,
+        guardianProvider, guardianResult.inputTokens, guardianResult.outputTokens,
         'guardian', require('path').basename(root)
       );
 
       if (guardianResult.scopeAlerts?.length) {
         scopeNote = `\n\n**Guardian also noticed (not applied -- say "also fix..." to address):**\n${guardianResult.scopeAlerts.map((a: string) => `- ${a}`).join('\n')}`;
       }
-      guardianLabel = modelLabel(guardianResult.guardianAI || '');
+      guardianLabel = modelLabel(guardianProvider);
 
       // Check Simple Pipeline insufficiency
       if (guardianResult.issues?.some((issue: string) => issue.includes("Simple Pipeline is insufficient"))) {

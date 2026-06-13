@@ -9,6 +9,16 @@ import * as fs from 'fs';
 import * as http from 'http';
 import * as net from 'net';
 import { getInspectorScript } from './chatPanelPreviewInspector';
+import { getCaptureScript } from './chatPanelPreviewCapture';
+
+// [PREVIEW-AUTOFIX Phase 0] Runtime reports beaconed by the injected capture script (POST /__rdv_runtime).
+// Buffered here so the extension can read "did this preview actually run?" — uncaught errors, failed script
+// loads, console.error, and the blank-canvas / no-loop probe. See docs/REDIVIVUS_PREVIEW_AUTOFIX.md.
+let _runtimeReports: Array<{ kind: string; msg: string; t: number }> = [];
+export function getRuntimeReports(): Array<{ kind: string; msg: string }> {
+  return _runtimeReports.map(r => ({ kind: r.kind, msg: r.msg }));
+}
+export function clearRuntimeReports(): void { _runtimeReports = []; }
 
 export interface DevServerInfo {
   port: number;
@@ -127,6 +137,7 @@ export async function startPreviewServer(root: string, info: DevServerInfo): Pro
       return { port: info.port, stop: stopPreviewServer, alreadyRunning: true };
     }
     stopPreviewServer(); // closes our stale-root server (frees the port for the new root)
+    clearRuntimeReports(); // [PREVIEW-AUTOFIX] fresh runtime signals for this project's preview
     _staticServer = _buildStaticServer(webRoot, info.port);
     _staticRoot = webRoot;
     _staticServer.listen(info.port, 'localhost');
@@ -171,12 +182,36 @@ function _isPortOpen(port: number): Promise<boolean> {
 
 function _injectInspector(html: string): string {
   const script = getInspectorScript();
-  return html.includes('</body>') ? html.replace('</body>', script + '</body>') : html + script;
+  // [PREVIEW-AUTOFIX] Capture script goes EARLY (right after <head>/<html>) so its rAF + error hooks are
+  // installed BEFORE the page's own scripts run. Falls back to prepend if there's no head/html tag.
+  const capture = getCaptureScript();
+  let out = html;
+  if (/<head[^>]*>/i.test(out)) { out = out.replace(/<head[^>]*>/i, m => m + capture); }
+  else if (/<html[^>]*>/i.test(out)) { out = out.replace(/<html[^>]*>/i, m => m + capture); }
+  else { out = capture + out; }
+  // Inspector stays at the end (it activates on demand from the webview parent).
+  return out.includes('</body>') ? out.replace('</body>', script + '</body>') : out + script;
 }
 
 function _buildStaticServer(root: string, port: number): http.Server {
   return http.createServer((req, res) => {
     const urlPath = (req.url || '/').split('?')[0].split('#')[0];
+    // [PREVIEW-AUTOFIX] Runtime beacon endpoint — the injected capture script POSTs failures here.
+    if (req.method === 'POST' && urlPath === '/__rdv_runtime') {
+      let body = '';
+      req.on('data', c => { body += c; if (body.length > 10000) { req.destroy(); } });
+      req.on('end', () => {
+        try {
+          const r = JSON.parse(body);
+          if (r && r.kind) {
+            _runtimeReports.push({ kind: String(r.kind), msg: String(r.msg || '').slice(0, 400), t: Date.now() });
+            if (_runtimeReports.length > 200) { _runtimeReports.shift(); }
+          }
+        } catch { /* malformed beacon — ignore */ }
+        res.writeHead(204); res.end();
+      });
+      return;
+    }
     const normalized = urlPath === '/' ? '/index.html' : urlPath;
     const filePath = path.join(root, normalized);
     if (!filePath.startsWith(root)) { res.writeHead(403); res.end('Forbidden'); return; }

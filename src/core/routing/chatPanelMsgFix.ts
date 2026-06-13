@@ -329,5 +329,8 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     }
   }
 
-  await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels });
+  // [FIX] A clean Guardian approval (or trivial-skip) means the fix passed review — tell finalize to skip the
+  // redundant pattern-retry that was re-running the whole pipeline (the "approved then did it again" double-run).
+  const guardianApproved = /approved|skipped/i.test(guardianNote || '');
+  await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels, guardianApproved });
 }
