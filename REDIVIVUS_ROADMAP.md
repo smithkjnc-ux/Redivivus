@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-13 — Intent architecture: new `docs/REDIVIVUS_INTENT_ARCHITECTURE.md` reframes a class of bugs (make≠build, plan→worker context loss, build↔fix flip) as ONE root cause — classify-then-route vs agent-loop — and lays out a phased plan to make intent a SOFT signal on a shared TurnContext while keeping the Workshop pipeline, blueprint, vault, and rules. Today also: dead-canvas completeness gate + make-classifier few-shot (backend, needs Fly deploy); fix path pinned to active project + paradox guard (cross-project edit bug); Map auto-refresh (FileSystemWatcher); architect review rebuilds topology fresh (stale-map cry-wolf).
+*Last updated:* 2026-06-13 — Smart AI tier routing: right model for the right job. Flash (Groq→mini models) for Q&A; pro (DeepSeek→Gemini→Sonnet) for fixes; ultra (Opus→Gemini Pro→o3) for complex builds. Backend: `routingTiers.ts` (TIER_PRIORITY tables + PROVIDER_MODELS + getOrderedProvidersForTier), Phase 1 pre-pass uses cheapest flash provider not supervisor, Phase 2 has full provider failover loop + tier escalation. `routingService.ts` split 406→130 lines (Rule 9). Client: `promptCheap` now passes `tier='flash'`, capped at 4 attempts. Backend deployed to Fly; extension deployed.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

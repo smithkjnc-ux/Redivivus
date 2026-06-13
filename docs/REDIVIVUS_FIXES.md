@@ -3,7 +3,32 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Smart AI Tier Routing — right model for the right job
+
+**Context (PapaJoe):** "any AI can tell you the time, so this should have used the lowest model." Simple Q&A was cycling through 5 providers including Claude Opus before failing — the opposite of the intent. Root causes found and fixed.
+
+**Root cause A — Claude billing cap killed the pre-pass:** Phase 1 pre-pass always called `supervisor` (Claude) for the flash classification model. When Claude hit its monthly billing cap, the pre-pass silently failed, defaulted to `tier='pro'`, and Phase 2 also tried Claude → 500 from backend → client `cloudChat` returned null → `handleAIChat` → `promptCheap` fired the full local failover chain (Groq → Grok → GPT-4o → Gemini → Claude) before giving up.
+
+**Root cause B — backend had no provider failover loop:** `executeAI` threw on any error; the chat route had one `try/catch` that converted any failure to a 500 — no retry, no tier escalation.
+
+**Root cause C — client `promptCheap` used ultra-tier models for Q&A:** sorted cheapest-first but never capped — would eventually try Claude Opus, GPT-4o, Gemini Pro for "what time is it".
+
+**Fixes — backend (`redivivus-backend`):**
+- **NEW `src/lib/ai/routingTiers.ts`** — Single source of truth for tier-priority ordering (cheapest-capable-first per tier) and exact model IDs per provider per tier. `flash: [groq, openai, claude, gemini, ...]` · `pro: [deepseek, gemini, claude, openai, ...]` · `ultra: [claude, gemini, openai, ...]`. `getOrderedProvidersForTier()` exported for all callers. Tier escalation path (flash→pro→ultra) defined here.
+- **NEW `src/lib/ai/routingServicePrompts.ts`** — Extracted from `routingService.ts` (Rule 9: was 406 lines). Contains `generateSupervisorPrompt`, `generateRoutingInstructions`, `generateSystemMessage`, `assessComplexity`, `selectTemperature`, `selectMaxTokens`, `selectModel`, `routeByComplexity`.
+- **MODIFIED `src/lib/ai/routingService.ts`** — Split from 406 → ~130 lines. Core routing class now delegates to `routingTiers.ts` and `routingServicePrompts.ts`. Added `getOrderedProvidersForTier()` + `getTierEscalation()` public methods. Added compat delegate methods for `buildPipeline.ts` callers. Old `getProviderForTier()` (single-return) kept as shim.
+- **MODIFIED `src/app/api/v1/chat/route.ts`** — Phase 1 pre-pass now uses cheapest flash provider (not supervisor), tries up to 3 flash providers with failover. If all fail: gracefully skips pre-pass, uses `tier='pro'` default. Phase 2 has full provider failover loop: tries all providers in resolved tier (cheapest-capable-first), on any error tries the next; if all fail in tier → step up to next tier (flash→pro→ultra); if all tiers exhausted → returns 503 (not 500) with clear message.
+
+**Fix — client extension (`redivivus`):**
+- **MODIFIED `src/services/ai/routingServiceCheap.ts`** — Now passes `tier='flash'` to `callProvider` so each provider uses its cheapest model (Haiku not Opus, Llama 8B not 70B). Added `MAX_QA_ATTEMPTS=4` cap — Q&A never cycles more than 4 providers. Added `ULTRA_ONLY_PROVIDERS` exclusion set.
+
+**Deploy:** Backend deployed to Fly.io; extension deployed to baked IDE.
+- **Risk:** Low. Additive tier routing; all callers backward-compatible via compat shims. Claude intentionally left in the tier lists to test billing-cap failover — it will be skipped automatically when capped.
+
+---
+
 ## Session — Jun 13, 2026: Supervisor sizes the Worker (adaptive Worker tier) — fix pipeline
+
 
 **Context (PapaJoe's idea):** the chat bar's adaptive selector picks the model for a prompt; the SUPERVISOR should do the same for the Worker — it wrote the plan, so it knows how strong the implementer must be. **Root insight:** the fix Worker (which writes the actual code) was **hardcoded to the cheap `flash` tier** (`bestModelForRole(provider, 'flash')`) — for Claude that's **Haiku 4.5**, a small model. So a "Claude fix" had Sonnet *plan* it and **Haiku *write* it** -> thin/blocky output on big rebuilds (the blocky-vs-Gemini-Flash gap PapaJoe saw was really Haiku-vs-Flash on the WRITING).
 - **Backend `fix-supervisor/route.ts` (`SUPERVISOR_SYSTEM`):** the Supervisor now appends one line — `WORKER_TIER: flash` (trivial/moderate: edits, small functions, surgical changes) or `WORKER_TIER: pro` (substantial GENERATION: a full game loop / rendering / input system, rebuilding most of a file, creative/visual logic). It judges the WORKER's implementation effort, defaults to flash, picks pro only when a cheap model would be "thin/blocky."
