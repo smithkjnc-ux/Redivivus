@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: Architect "Fix All" — only 1 of 5 files fixed + cosmetic fixes (root cause: blocking history toast + generic task)
+
+**Context:** After the path fix (prev entry), live retest on the tic-tac-toe fixture: Fix All correctly found the real `src/*.js` files and edited `src/ai.js` — but (a) only **1 of 5** files changed (controller/logic/renderer/state untouched), and (b) the one edit was **cosmetic** (+3 `[WARN]` comment lines, didn't remove the duplicate `makeMove` the review prescribed). Three fixes.
+
+**(1) Root cause of "only 1 of 5" — the blocking history prompt (also PapaJoe: "snapshots should be automatic, not a question").** `gitAutoCommitService.autoCommitIfEnabled()` is `await`ed at the end of every edit (`chatPanelEditHandler.ts:37`). When the per-project pref was unset it did `await vscode.window.showInformationMessage("Want Redivivus to save your change history?" …)` — a **blocking** prompt. So file #1's edit sat waiting on that toast → its `executeCommand` never resolved → the Fix All loop's `await` for file #1 never returned → files 2..5 never started. **Fix:** history/snapshots are now AUTOMATIC — when pref is unset, default to `'auto'`, persist it, and commit; no prompt ever. Opt-out still possible via `autoCommit:"off"` in `.redivivus/config.json`. Removed the now-unused `vscode` import. (`src/services/gitAutoCommitService.ts`.) This single change fixes both the user's request AND the batch-stops-after-one bug.
+
+**(2) Cosmetic fixes — Worker now gets the actual prescription, not a generic task.** Fix All / Fix One sent each file a generic *"address health problems, reduce complexity, improve quality"* task and threw away the Supervisor's specific Quick-Wins prescription, so the Worker re-guessed and played safe by adding comments (Workshop principle 2 "Supervisor prescribes, Worker executes" was violated). **Fix:** new `_fixTaskFor(reviewText, file)` pulls every review line naming the file (problems-table row + Quick-Wins items) and builds a task that hands the Worker the prescription verbatim with an explicit *"make REAL code changes — do NOT just add explanatory comments, do NOT re-analyze, do NOT leave placeholders"* instruction. Wired into both `handleArchitectFixAll` and `handleArchitectFixOne`. Falls back to the generic task if no line matched. (`src/ui/panels/chat/chatPanelMsgArchitect.ts`.)
+
+**(3)** (carried from investigation, no code change) Observed the **Architect diagnosis itself over-claimed** on this run: it flagged "missing `getBestMove` export" and "minimax truncated at line 77" but both were already present/complete in the fixture — i.e. Supervisor variance, separate from the Worker execution gap. Noted for the adaptive-planning track ([[adaptive-planning-direction]]): prescriptions should be verifiable against the file before they're offered as fixes.
+
+- **Risk:** low. `tsc` clean; deployed (`out/` confirms `_fixTaskFor` wired and the prompt gone). **Reload the extension host**, then re-run Fix All — expect: no history toast, all 5 files processed, and real code edits (e.g. ai.js's duplicate `makeMove` actually removed) rather than comment-only changes.
+
+---
+
 ## Session — Jun 12, 2026: Architect "Fix All" — "No existing files to fix" (Model A path bug, write-side)
 
 **Symptom (live fix-pipeline test on the broken tic-tac-toe fixture):** the ARCHITECT REVIEW diagnosed correctly (duplicate `makeMove`, missing exports, truncated `renderer.js`), but clicking **Fix All** printed *"Skipping 10 file(s) that don't exist yet: `src/ai.js, logic.js, src/controller.js, …`"* then *"No existing files to fix. The review only suggested new files to create."* — and did nothing. PapaJoe thought it hallucinated; it didn't. The files genuinely exist at `~/projects/tic-tac-toe-game/src/*.js`.

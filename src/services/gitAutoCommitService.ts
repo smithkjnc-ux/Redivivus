@@ -2,7 +2,6 @@
 // Asks once per project on first build. Stores answer in .redivivus/config.json.
 // Silent on all errors — never interrupts the build pipeline.
 
-import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync, execFileSync } from 'child_process';
@@ -81,15 +80,12 @@ export async function autoCommitIfEnabled(root: string, message: string, files?:
     if (!fs.existsSync(path.join(root, '.redivivus', 'config.json'))) { return; }
     const pref = readPref(root);
     if (pref === 'off') { return; }
-    if (pref === 'auto') { doCommit(root, message, files); return; }
-    // Never asked — prompt once, plain English
-    const choice = await vscode.window.showInformationMessage(
-      'Want Redivivus to automatically save your change history? You\'ll be able to undo any change at any time.',
-      'Yes, save history',
-      'No thanks'
-    );
-    if (choice === 'Yes, save history') { savePref(root, 'auto'); doCommit(root, message, files); }
-    else if (choice === 'No thanks') { savePref(root, 'off'); }
-    // Dismissed = ask again next build
+    // [FIX] Change history / snapshots are AUTOMATIC — never a blocking question (PapaJoe: "snapshots should
+    // be an automatic thing, not a question"). The old code awaited a showInformationMessage when the pref was
+    // unset, which (a) interrupted the user and (b) BLOCKED the Architect "Fix All" batch: the first file's
+    // edit awaited this prompt, so files 2..N never started (only 1 of 5 got fixed). Default to 'auto', persist
+    // it so the prompt never appears, and commit. Opt out is still possible via autoCommit:"off" in config.json.
+    if (pref === undefined) { savePref(root, 'auto'); }
+    doCommit(root, message, files);
   } catch { /* silent */ }
 }

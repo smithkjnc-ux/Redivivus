@@ -18,6 +18,24 @@ function _projectRoot(): string {
   return getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
 }
 
+// [FIX] Build a per-file fix TASK that carries the Supervisor's ACTUAL prescription to the Worker, instead of
+// a generic "improve quality" instruction. Without this the Worker re-diagnosed each file and tended to add
+// explanatory COMMENTS rather than implement the fix (observed on tic-tac-toe: ai.js got +3 comment lines and
+// no real change). We pull every review line that names the file (the problems-table row + Quick-Wins items)
+// and tell the Worker to implement them as REAL code edits. Falls back to the generic task if nothing matched.
+function _fixTaskFor(reviewText: string, file: string): string {
+  const base = path.basename(file);
+  const lines = reviewText.split('\n').map(l => l.trim()).filter(l => l.length > 0 && l.includes(base));
+  const prescription = lines.join('\n').slice(0, 1500);
+  if (!prescription) {
+    return `Fix issues identified in architect review for ${file}: address health problems, reduce complexity, and improve code quality.`;
+  }
+  return `Implement these architect-review fixes for \`${file}\` EXACTLY as prescribed. Make REAL code changes -- `
+    + `do NOT just add explanatory comments, do NOT re-analyze the file, do NOT leave placeholders. If a fix says `
+    + `remove a function, delete it; if it says add an export, add the actual export statement.\n\n`
+    + `PRESCRIPTION (from the architect review):\n${prescription}`;
+}
+
 // [Redivivus] Architect review text store — keyed by reviewId, used by action handlers
 export const _architectReviews = new Map<string, string>();
 // [Redivivus] Fix-one-at-a-time state — keyed by reviewId
@@ -132,7 +150,7 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
   refresh();
   for (let i = 0; i < existingFiles.length; i++) {
     const f = existingFiles[i];
-    const task = 'Fix issues identified in architect review for ' + f + ': address health problems, reduce complexity, and improve code quality.';
+    const task = _fixTaskFor(reviewText, f);
     try {
       await vscode.commands.executeCommand('redivivus.runEditFix', task, f, 'refactor');
       const progress = conversation[conversation.length - 1];
@@ -176,7 +194,7 @@ export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[
   }
   const currentFile = state.issues[state.index];
   if (msg.action === 'apply') {
-    const task = 'Fix issues identified in architect review for ' + currentFile + ': address health problems, reduce complexity, and improve code quality.';
+    const task = _fixTaskFor(reviewText, currentFile);
     await vscode.commands.executeCommand('redivivus.runEditFix', task, currentFile, 'refactor');
   }
   const nextFile = state.issues[state.index];
