@@ -53,49 +53,59 @@ export async function runPhase1Supervisor(
   const keysPayload = require('../../services/api/apiClient.js').collectKeys();
   const { supervisor } = deps.routing.selectSupervisorAndWorker();
   const { bestModelForRole } = require('../../services/ai/modelRegistry.js');
-  const supervisorModel = bestModelForRole(supervisor, 'pro')?.modelId || supervisor;
 
-  let diagRes: any;
-  try {
-    const res = await fetchFn(`${base}/fix-supervisor`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({
-        userText,
-        files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
-        context: {
-          blueprint: _bp || undefined,
-          projectRules: projectRules || undefined,
-          deadEnds: projectDeadEnds || undefined,
-          roadmapSnippet: roadmapSnippet || undefined,
-          patternNotes: buildSupervisorNotes(activePatterns) || undefined,
-          fileMetrics: {
-            totalSize,
-            largestFile: { path: largestFile.path, size: largestFile.size },
-            fileCount: files.length
-          }
-        },
-        supervisor,
-        supervisorModel,
-        keys: keysPayload,
-      })
-    }, 120_000);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Supervisor API failed');
-    diagRes = data;
-  } catch (err: any) {
-    throw new Error(err.message || 'Supervisor request failed');
+  // [FIX][FAILOVER] Mirror the Worker's failover for the SUPERVISOR: if the chosen provider fails for ANY reason
+  // (usage/quota limit, bad key, network), PROMOTE the next key-configured provider in rank order to Supervisor
+  // and continue. A capped Claude must not kill the whole fix when Gemini/etc. are configured. Throw only when
+  // EVERY provider fails. (PapaJoe: "it should have fallen back to the next-in-line AI and promoted it to supervisor.")
+  const { AI_RANK } = require('../../services/ai/guardianAI.js');
+  const _supKeyMap = deps.routing.getKeyMap();
+  const _rankedSup: string[] = Object.entries(AI_RANK)
+    .filter(([ai]: any) => _supKeyMap[ai]?.())
+    .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
+    .map(([ai]: any) => ai);
+  const supProviderOrder = [supervisor, ..._rankedSup.filter((p) => p !== supervisor)];
+
+  let diagRes: any; let supProviderUsed = supervisor; let supLastError = '';
+  for (const provider of supProviderOrder) {
+    const pModel = bestModelForRole(provider, 'pro')?.modelId || provider;
+    try {
+      const res = await fetchFn(`${base}/fix-supervisor`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          userText,
+          files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
+          context: {
+            blueprint: _bp || undefined,
+            projectRules: projectRules || undefined,
+            deadEnds: projectDeadEnds || undefined,
+            roadmapSnippet: roadmapSnippet || undefined,
+            patternNotes: buildSupervisorNotes(activePatterns) || undefined,
+            fileMetrics: { totalSize, largestFile: { path: largestFile.path, size: largestFile.size }, fileCount: files.length }
+          },
+          supervisor: provider,
+          supervisorModel: pModel,
+          keys: keysPayload,
+        })
+      }, 120_000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { supLastError = (data && data.error) || `Supervisor API ${res.status}`; continue; }
+      if (!data || !data.diagnosis) { supLastError = 'no diagnosis returned'; continue; }
+      diagRes = data; supProviderUsed = provider; break; // success — this provider is the Supervisor for this fix
+    } catch (err: any) { supLastError = err?.message || 'unknown'; continue; }
   }
+  if (!diagRes) { throw new Error(`Every available AI failed to diagnose. Last error: ${supLastError || 'unknown'}`); }
 
   const { diagnosis, subtasks = [], executionMode = 'sequential', inputTokens, outputTokens } = diagRes;
   if (!diagnosis) throw new Error('Supervisor returned no diagnosis.');
 
   deps.usageTracker?.recordUsage(
-    Math.ceil((diagnosis.length) / 4), 0, supervisor,
+    Math.ceil((diagnosis.length) / 4), 0, supProviderUsed,
     inputTokens, outputTokens, 'supervisor', path.basename(root)
   );
 
-  return { diagnosis, subtasks, executionMode, supervisorLabel: modelLabel(supervisor), expandedFilesBlock: filesBlock };
+  return { diagnosis, subtasks, executionMode, supervisorLabel: modelLabel(supProviderUsed), expandedFilesBlock: filesBlock };
 }
 
 export async function runPhase2Worker(

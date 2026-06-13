@@ -4,7 +4,7 @@
 
 import { callProvider } from '../../core/ai/providers/providerFactory.js';
 import type { GuardianReviewResult } from './guardianAI.js';
-import { selectGuardianAI } from './guardianAI.js';
+import { selectGuardianAI, AI_RANK } from './guardianAI.js';
 import type { RoutingService } from './routingService.js';
 import { logAICall } from './aiCallLogger.js';
 import { detectProjectType, getFolderStructureTemplate } from './routingGuardianUtils.js';
@@ -97,43 +97,50 @@ export async function guardianReviewImpl(
   blueprintContext: string
 ): Promise<GuardianReviewResult> {
   const keyMap = svc.getKeyMap();
-  const guardianAI = selectGuardianAI(workerAI, keyMap);
-  if (!guardianAI) {
+  const preferred = selectGuardianAI(workerAI, keyMap);
+  if (!preferred) {
     return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
   }
+  // [FIX][FAILOVER] Step the Guardian DOWN across configured AIs (preferred Guardian first, then the rest by
+  // rank). If providers run out it degrades to whatever is left — even ONE AI doing Supervisor+Worker+Guardian
+  // (Workshop principle 7). Only return "skipped/none" when EVERY provider failed. Previously the Guardian used
+  // a single provider and silently skipped on any error (e.g. a capped Claude), shipping the fix unreviewed.
+  // (PapaJoe: "they should all step down... could be one AI doing all three positions.")
+  const ranked = Object.entries(AI_RANK)
+    .filter(([ai]: any) => keyMap[ai]?.())
+    .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
+    .map(([ai]: any) => ai);
+  const order = [preferred, ...ranked.filter((p) => p !== preferred)];
+
   const fetchFn = (svc as any).fetchWithTimeout.bind(svc);
-  const startTime = Date.now();
-  try {
-    const { getApiBase, getAccountToken } = require('../api/apiClient.js');
-    const base = getApiBase();
-    const token = await getAccountToken();
-    // [FIX] Send keys as X-Provider-Keys header, NOT in body.
-    // Previous: keys: keyMap -- keyMap holds function references, JSON.stringify drops them -> {} -> guardian called with no keys -> silently failed every build.
-    const keys = collectKeys();
-    const res = await fetchFn(`${base}/guardian`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        'X-Provider-Keys': JSON.stringify(keys),
-      },
-      body: JSON.stringify({ task: originalTask, workerResponse, blueprintContext, provider: guardianAI, model: guardianAI }),
-    }, 50_000);
-
-    const data = await res.json();
-    if (!res.ok) { throw new Error(data.error || 'Guardian API failed'); }
-
-    const raw = data.text;
-    const isPass = raw.includes('GUARDIAN_PASS');
-    const issuesMatch = raw.match(/GUARDIAN_ISSUES:([\s\S]*?)(?:GUARDIAN_SCOPE_ALERTS:|$)/);
-    const scopeMatch = raw.match(/GUARDIAN_SCOPE_ALERTS:([\s\S]*?)$/);
-    const issues = issuesMatch ? issuesMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
-    const scopeAlerts = scopeMatch ? scopeMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
-    const result = { passed: isPass && issues.length === 0, correctedText: null, issues, scopeAlerts, guardianAI, workerAI };
-    logAICall({ role: 'guardian', model: guardianAI, prompt: `[Secure Backend Prompt] TASK: ${originalTask}`, response: JSON.stringify({ passed: result.passed, issues: result.issues, scopeAlerts: result.scopeAlerts }), durationMs: Date.now() - startTime });
-    return result;
-  } catch (e: any) {
-    console.error('Guardian review failed:', e);
-    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
+  const { getApiBase, getAccountToken } = require('../api/apiClient.js');
+  const base = getApiBase();
+  const token = await getAccountToken();
+  // [FIX] Keys go in the X-Provider-Keys header, NOT the body (keyMap holds function refs -> JSON drops them).
+  const keys = collectKeys();
+  let gLastError = '';
+  for (const guardianAI of order) {
+    const startTime = Date.now();
+    try {
+      const res = await fetchFn(`${base}/guardian`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Provider-Keys': JSON.stringify(keys) },
+        body: JSON.stringify({ task: originalTask, workerResponse, blueprintContext, provider: guardianAI, model: guardianAI }),
+      }, 50_000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { gLastError = (data && data.error) || `Guardian API ${res.status}`; continue; }
+      const raw: string = data.text || '';
+      if (!raw.trim()) { gLastError = 'empty guardian response'; continue; }
+      const isPass = raw.includes('GUARDIAN_PASS');
+      const issuesMatch = raw.match(/GUARDIAN_ISSUES:([\s\S]*?)(?:GUARDIAN_SCOPE_ALERTS:|$)/);
+      const scopeMatch = raw.match(/GUARDIAN_SCOPE_ALERTS:([\s\S]*?)$/);
+      const issues = issuesMatch ? issuesMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
+      const scopeAlerts = scopeMatch ? scopeMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
+      const result = { passed: isPass && issues.length === 0, correctedText: null, issues, scopeAlerts, guardianAI, workerAI };
+      logAICall({ role: 'guardian', model: guardianAI, prompt: `[Secure Backend Prompt] TASK: ${originalTask}`, response: JSON.stringify({ passed: result.passed, issues: result.issues, scopeAlerts: result.scopeAlerts }), durationMs: Date.now() - startTime });
+      return result;
+    } catch (e: any) { gLastError = e?.message || 'unknown'; continue; }
   }
+  console.error('Guardian review failed on all providers:', gLastError);
+  return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
 }

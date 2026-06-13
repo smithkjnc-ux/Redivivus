@@ -3,6 +3,29 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Guardian failover — now ALL fix roles step down to the next AI
+
+**Context (PapaJoe):** *"they should all step down… and if not enough AI are available then it falls to what AI is left — could be one AI doing all three positions."* (Workshop principle 7: single-model mode always works.)
+- **Audit result:** of the four AI-tier calls in the fix pipeline — **Supervisor diagnosis** (just got failover), **Worker** (already had it), **Verify** (uses `routing.prompt`, which already fails over on ANY error — the line-93 "timeout/network only" comment is stale; the real logic at 125-144 fails over on quota/auth/4xx/5xx), and **Guardian** — only the **Guardian had no failover.** It used a single `selectGuardianAI` provider and on any error returned "skipped" (`guardianAI:'none'`), so a capped Claude shipped the fix UNREVIEWED.
+- **Fix — `src/services/ai/routingGuardian.ts` `guardianReviewImpl`:** now loops `order = [preferred, ...ranked-by-AI_RANK]`, trying `/guardian` per provider; on failure (`!res.ok` / empty / throw) it promotes the next configured AI and continues; returns "skipped/none" only when EVERY provider fails. Degrades to whatever is left — even one AI doing Supervisor+Worker+Guardian. (Imported `AI_RANK` from `guardianAI.js`.)
+- **Net:** every role in the fix pipeline now steps down across configured AIs; the pipeline only fails when ALL providers are exhausted. `tsc` clean; deployed.
+- **Follow-up logged:** the BUILD pipeline (`/plan` Supervisor, guardian on builds) deserves the same audit — [[build-pipeline-open-issues]].
+
+---
+
+## Session — Jun 13, 2026: Supervisor had no failover + a usage-limit error shown as "network hiccup"
+
+**Symptom (PapaJoe, fixing frogger):** Anthropic returned `400 "You have reached your specified API usage limits…"` and the fix DIED with *"Something went wrong… usually a temporary network hiccup — try again."* PapaJoe: *"it should have fallen back to the next-in-line AI and promoted it to supervisor to continue"* — exactly the bug.
+
+**Bug B — the Supervisor had NO failover (`chatPanelMsgFixPhases.ts`, `runPhase1Supervisor`):** the WORKER already fails over across ranked key-configured providers (drop to next on any failure), but the SUPERVISOR used a single provider and threw — so a capped Claude killed the whole fix even with 5 other AIs configured ("Claude +5"), violating the routing rule "builds must succeed on any AI, soft-fail only" ([[ai-routing-philosophy]]). **Fix:** mirror the Worker's failover — build `supProviderOrder` (chosen supervisor first, then all key-configured providers by `AI_RANK`), loop `/fix-supervisor` per provider, on failure (`!res.ok` / no diagnosis / throw) PROMOTE the next provider to Supervisor and continue; throw only when EVERY provider fails. `supProviderUsed` now drives the usage attribution + label.
+
+**Bug A — wrong error message (`chatPanelMsgFix.ts`):** both fix catch-blocks classified any non-key error as "temporary network hiccup — try again." A usage/quota limit isn't transient and retrying hits the same wall. **Fix:** new `_fixErrorHint()` classifies usage/quota/billing/429/402 -> "Your AI provider has hit its usage limit or run out of credit. Add credit / raise the limit, or switch to another configured AI from the picker below. Retrying will hit the same limit." (Then key-error, then genuine transient.) Both catch-blocks use it. Cry-wolf / plain-English (Design Rule 1, [[plain-english-user-messages]]).
+
+- **Net:** a capped/failing Supervisor AI now auto-promotes the next configured AI and continues; if EVERYTHING fails, the message is honest about *why* (usage limit vs key vs network) instead of "try again."
+- **Risk:** low. `tsc` clean; deployed. **Note:** the build pipeline's Supervisor (`/plan`) should get the same failover audit — logged as follow-up for [[build-pipeline-open-issues]].
+
+---
+
 ## Session — Jun 13, 2026: Preview Auto-Fix Phase 1+2 — headless run-check + honest result gate
 
 **Context:** continuing `docs/REDIVIVUS_PREVIEW_AUTOFIX.md`. Phase 1 = the reusable "does it actually run?" probe; Phase 2 = use it so the pipeline stops claiming "Fixed" when the result is a dead program.

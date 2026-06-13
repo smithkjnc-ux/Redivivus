@@ -26,6 +26,20 @@ import { fixActStart, fixActSupervisor, fixActFinish } from './fixActivityPanel.
 
 // [DEAD] modelLabel defined here -- moved to chatPanelMsgFixUtils.ts to keep this file under 200 lines
 
+// [FIX] Classify a fix-pipeline failure into a plain-English hint. Distinguishes a USAGE/QUOTA limit (retry
+// won't help — add credit or switch AI) from an auth/key problem from a genuine transient error. Without this,
+// an Anthropic "you have reached your specified API usage limits" 400 was shown as "temporary network hiccup —
+// try again", which is misleading (cry-wolf) and the wrong advice. ASCII-safe (plain text, used in chat markdown).
+function _fixErrorHint(errMsg: string): string {
+  if (/usage limit|rate.?limit|\bquota\b|insufficient.{0,12}(credit|balance|fund|quota)|reached your specified|regain access|\b429\b|too many requests|billing|payment required|\b402\b/i.test(errMsg)) {
+    return 'Your AI provider has hit its usage limit or run out of credit. Add credit / raise the limit in your provider account, or switch to another configured AI from the picker below. Retrying will hit the same limit.';
+  }
+  if (/401|403|invalid.{0,10}(api.)?key|api.key.{0,10}(invalid|missing|expired)|unauthorized/i.test(errMsg)) {
+    return 'This looks like an API key issue — check **Setup → AI API Keys**.';
+  }
+  return 'This is usually a temporary network hiccup — try again.';
+}
+
 export async function handleFixRequest(userText: string, deps: MessageHandlerDeps, imageBase64?: string, imageType?: string): Promise<void> {
   const { routing, conversation, refresh } = deps;
   // [FIX] Resolve the ACTIVE project root, not the raw workspace folder. Under Model A the workspace is the
@@ -189,8 +203,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
 
   } catch (err) {
     const _errMsg = err instanceof Error ? err.message : String(err);
-    const _isKeyErr = /401|403|invalid.{0,10}(api.)?key|api.key.{0,10}(invalid|missing|expired)|unauthorized/i.test(_errMsg);
-    const _hint = _isKeyErr ? 'This looks like an API key issue — check **Setup → AI API Keys**.' : 'This is usually a temporary network hiccup — try again.';
+    const _hint = _fixErrorHint(_errMsg);
     const _b64 = Buffer.from(userText, 'utf8').toString('base64');
     conversation[conversation.length - 1].content =
       `⚠️ **Something went wrong while analysing your fix.** ${_hint}\n\n` +
@@ -258,8 +271,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     }
   } catch (err) {
     const _errMsg2 = err instanceof Error ? err.message : String(err);
-    const _isKeyErr2 = /401|403|invalid.{0,10}(api.)?key|api.key.{0,10}(invalid|missing|expired)|unauthorized/i.test(_errMsg2);
-    const _hint2 = _isKeyErr2 ? 'This looks like an API key issue — check **Setup → AI API Keys**.' : 'This is usually a temporary network hiccup — try again.';
+    const _hint2 = _fixErrorHint(_errMsg2);
     const _b642 = Buffer.from(userText, 'utf8').toString('base64');
     conversation[conversation.length - 1].content =
       `⚠️ **Something went wrong while writing the fix.** ${_hint2}\n\n` +
