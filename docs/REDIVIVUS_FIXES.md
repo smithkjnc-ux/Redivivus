@@ -3,6 +3,23 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: "Build Complete" but blank game — dead canvas shell shipped (backend completeness gate)
+
+**Symptom:** "build a frogger arcade game" → Build Complete (1 file, index.html) → blank, non-working game.
+
+**Investigation corrected an earlier wrong assumption.** First framing was "Worker dropped the prescribed multi-file architecture." Checked the actual artifacts: `frogger-arcade-game/.redivivus/build_history.json` shows `files: ['index.html']`, and the built `index.html` is **single-file, self-contained** (one inline `<script>`, NO external `src=`) and **NOT truncated** (closes cleanly). The "index.html references src/ui/menuRenderer.js" claim came from the FIX operating on **breakout** (the prev entry's container-root contamination bug) — not a real frogger issue. So single-file was the correct plan; the defect was elsewhere.
+
+**Real cause:** the Worker (Gemini) produced a complete FILE but an incomplete PROGRAM — it defined helpers (`updateHUD`, `resetLevel`, `addScore`) but wrote **no render loop (no `requestAnimationFrame`/`setInterval`), no input listeners, no `draw`/`init`**, referenced an undefined `drawGame`, and ended with a `// [NEXT]` placeholder. The backend completeness gate (`checkWorkerOutput`, build `route.ts`) only catches **truncation** (unbalanced fences/`<script>`, missing `</html>`) — by design it avoids subjective "implements the contract?" judgement (that AI critic was removed as a cost leak). A complete-but-dead file passed and shipped.
+
+- **File changed:** `redivivus-backend/src/app/api/v1/build/route.ts` — `checkWorkerOutput()`.
+- **What changed:** added a **deterministic** dead-canvas check: a `<canvas>` + `getContext('2d')` build with **neither** a render loop (`requestAnimationFrame`/`setInterval`) **nor** input wiring (`addEventListener('key|pointer|mouse|touch|click|gamepad'...)` / `.onkey…`) is flagged as "renders blank and cannot be played." Requires BOTH absent to flag, so a legit one-shot static-canvas render is not caught. On flag, the existing single-file path auto-retries the Worker with the specific issue (route.ts:695-709).
+- **Verified:** ran the check against the real artifacts — **frogger (broken) → flagged**, **breakout (working, has loop+input) → not flagged**; `tsc --noEmit` clean for the route.
+- **Why:** "Build Complete" must never ship a blank game when a certain string check can prove it can't run. Fits the existing gate's philosophy (deterministic, no API call) rather than re-adding the removed subjective critic.
+- **Risk:** low, but it's a **BACKEND change — needs a Fly deploy** to take effect (extension already calls this route). Rule 18 note: true "is this a complete program" judgement is an understanding task better suited to a cheap AI completeness classifier; this deterministic check is the pragmatic catch for the most common/visible failure (blank canvas games). Logged as a candidate for [[build-pipeline-open-issues]] / [[adaptive-planning-direction]].
+- **Still open (backend):** `make a X game` → answer not build (classifier prompt already covers make/create/generate; needs Fly deploy / few-shot).
+
+---
+
 ## Session — Jun 13, 2026: Natural-language fix edited a SIBLING project (`breakout` inside `frogger`) — paradox-guard breach
 
 **Symptom (live test):** built a Frogger game (in `frogger-arcade-game`); it was blank; the natural-language fix ("game has a blank window…") kept referencing and ultimately **editing `breakout/src/ui/menuRenderer.js`** — a *different* project. Confirmed it modified the live file (`~/projects/breakout/src/ui/menuRenderer.js`: 3186 bytes vs 3262 in the pre-edit snapshot).
