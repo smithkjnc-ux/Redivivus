@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
-  "version": "0.4.7",
+  "version": "0.4.8",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -616,8 +616,16 @@
         },
         "redivivus.protectedFolders": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["redivivus", "redivivus-backend", "redivivus-web", "redivivus-build", "redivivus-templates"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "redivivus",
+            "redivivus-backend",
+            "redivivus-web",
+            "redivivus-build",
+            "redivivus-templates"
+          ],
           "description": "Folder names under the projects directory that Redivivus must never auto-activate or build/fix (its own source, to avoid modifying itself). Any folder can also be protected by adding a .redivivusignore marker file in it."
         },
         "redivivus.geminiApiKey": {
