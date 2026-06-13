@@ -43,7 +43,14 @@ export function activateProject(projectDir: string): void {
     const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
     if (PFP.instance?.getRoot() === projectDir) { return; } // already the active project
     PFP.instance?.setRoot(projectDir);
-    require('../../ui/panels/chat/chatPanel.js').ChatPanel.currentPanel?.refresh();
+    const chatPanel = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+    chatPanel.currentPanel?.refresh();
+    // [FIX] Update the webview panel tab title so the "projects" label tracks the active project.
+    // The tab title is set once at creation time from the workspace folder name; since we never
+    // reload the workspace in Model A, we must update it explicitly here on every activation.
+    try { const _cp = chatPanel.currentPanel as any; if (_cp?._panel) { _cp._panel.title = require('path').basename(projectDir); } } catch {}
+    // [FIX] Push the project name into the #project-name-label div above "● ready" in the chat panel.
+    try { const _cp2 = chatPanel.currentPanel as any; if (_cp2?._panel) { _cp2._panel.webview.postMessage({ type: 'update-project-name', name: require('path').basename(projectDir) }); } } catch {}
     require('./projectFolderDecorations.js').refreshProjectFolderDecorations(); // dim others, badge the active
     import('./projectFocusMode.js').then(m => m.applyFocus(projectDir)).catch(() => {}); // hide the other projects
   } catch { /* non-fatal — active-project switching is a convenience, never block */ }

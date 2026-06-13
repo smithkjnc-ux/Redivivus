@@ -57,6 +57,13 @@ export function buildListenerScript(): string {
       }
       if (msg.type === 'inject-text' && input && msg.text) { input.value = msg.text; input.focus(); }
       if (msg.type === 'update-title') { var ts = document.querySelector('.header-left strong'); if (ts && msg.html) { ts.innerHTML = msg.html; } }
+      if (msg.type === 'update-project-name') {
+        var pnl = document.getElementById('project-name-label');
+        if (pnl) {
+          if (msg.name) { pnl.textContent = msg.name; pnl.style.display = ''; }
+          else { pnl.textContent = ''; pnl.style.display = 'none'; }
+        }
+      }
       if (msg.type === 'update-header') {
         var hr = document.querySelector('.header-right'); if (hr && msg.headerRight !== undefined) { hr.innerHTML = msg.headerRight; }
         var il = document.getElementById('input-left'); if (il && msg.inputLeft !== undefined) { il.innerHTML = msg.inputLeft; }

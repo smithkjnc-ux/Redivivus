@@ -115,6 +115,13 @@ export async function handleKeywordShortcuts(
         if (ChatPanel.extensionContext) {
           ChatPanel.extensionContext.globalState.update('redivivus.lastActiveProject', named.fullPath);
         }
+        // [FIX] Update the webview panel TAB title from "projects" → the project name.
+        // The tab title is set once at panel creation (from wsFolder[0] = ~/projects).
+        // Since we aren't reloading the workspace, VS Code never updates it automatically.
+        try {
+          const _cp = ChatPanel.currentPanel as any;
+          if (_cp?._panel) { _cp._panel.title = named.name; }
+        } catch {}
         conversation.push({ role: 'assistant', content: `✅ **${named.name}** is now active — I can see its files and context. What would you like to do?`, timestamp: Date.now() });
         refresh();
       } else if (!alreadyOpen) {

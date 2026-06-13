@@ -86,6 +86,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
   <style nonce="${nonce}">${buildChatCss()}</style></head><body>
   <div class="header">
     <div class="header-left">
+      <div id="project-name-label" style="font-size:12px;font-weight:700;color:var(--vscode-foreground);letter-spacing:0.02em;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;${header && header.hasProjectOpen && header.projectName ? '' : 'display:none;'}">${header && header.hasProjectOpen ? (header.projectName || '') : ''}</div>
       <span id="redivivus-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);">${header && header.sessionActive ? '&#x25cf; working' : '&#x25cf; ready'}</span>
       <div style="text-align:right;line-height:1.35;">
         <span style="display:inline-block;font-size:11px;font-weight:700;letter-spacing:0.08em;color:#f59e0b;background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:2px 6px;user-select:none;">BETA</span>
