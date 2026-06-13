@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-13 — Smart AI tier routing: right model for the right job. Flash (Groq→mini models) for Q&A; pro (DeepSeek→Gemini→Sonnet) for fixes; ultra (Opus→Gemini Pro→o3) for complex builds. Backend: `routingTiers.ts` (TIER_PRIORITY tables + PROVIDER_MODELS + getOrderedProvidersForTier), Phase 1 pre-pass uses cheapest flash provider not supervisor, Phase 2 has full provider failover loop + tier escalation. `routingService.ts` split 406→130 lines (Rule 9). Client: `promptCheap` now passes `tier='flash'`, capped at 4 attempts. Backend deployed to Fly; extension deployed.
+*Last updated:* 2026-06-13 — Adaptive AI Pill: Vault+roster pills removed; new `#adaptive-pill` shows neutral until user types, then live-evaluates prompt and shows cheapest capable provider (⚡ Groq·flash / ◆ DeepSeek·pro / ✶ Opus·ultra). Click → manual-picker popover; manual mode locks ONE provider (no failover, purple border). `manualProvider` threads from webview → postMessage → cloudChat(preferred) → promptWithProvider(). Supervisor/worker cap preserved. Compile clean, deployed.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

@@ -45,9 +45,12 @@ export function buildChatScript(): string {
       // [FIX] Hide preview overlay so user can see the chat conversation unfold
       if (window.__redivivusPreviewHide) { window.__redivivusPreviewHide(); }
       var _tier = (window._getActiveTier && window._getActiveTier()) || undefined;
-      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier });
+      var _manual = (window._getManualProvider && window._getManualProvider()) || undefined;
+      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier, manualProvider: _manual || undefined });
       input.value = ''; input.style.height = 'auto'; window._pendingImage = null; window._pendingImageType = null;
       const _ip = document.getElementById('img-prev'); if (_ip) _ip.remove();
+      // Reset pill to neutral after send
+      if (window._renderTierBadge) { window._renderTierBadge(); }
     }
     input.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }

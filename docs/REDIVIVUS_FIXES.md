@@ -3,7 +3,30 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Adaptive AI Pill — live prompt-aware provider selector
+
+**Context (PapaJoe):** "remove the vault pill, remove the AI pill, move the adaptive AI pill to the left. It should show nothing until the user starts typing, then evaluate the prompt and show the AI. Also support manual mode to lock a single provider."
+
+**What changed:**
+- **MODIFIED `src/ui/panels/chat/chatPanelHeaderRender.ts`:** Removed Vault pill and AI roster pill from `#input-left`. Replaced with single `#adaptive-pill` button. Pill carries `data-providers` (JSON array of configured providers) so the webview manual-picker needs no round-trip. Has 3 states: loading (keyStore not ready), no-key nudge, and the live adaptive button.
+- **MODIFIED `src/ui/panels/chat/chatPanelHtml.ts`:** Added `configuredProviders` field to `ChatHeaderInfo` interface. Removed the old `#tier-badge` button from `#input-right` (pill moved to left). `#input-right` now only holds the send button.
+- **MODIFIED `src/ui/panels/chat/chatPanelHeader.ts`:** Populates `configuredProviders` in `buildHeaderInfo()` — walks all 7 providers (Groq, OpenAI, DeepSeek, Gemini, Claude, Grok, Kimi), filters to those with a configured key, returns `{id, label, emoji}` list. Ordered cheapest-first (flash priority order) so the picker reflects real routing priority.
+- **REWRITTEN `src/ui/panels/chat/chatPanelScriptTier.ts`:** Full rewrite. Neutral "⚡ AI" on blank input. Debounced 400ms assessTier() on every keystroke → picks cheapest configured provider for that tier from `TIER_PRIORITY` table (mirrors backend). Pill shows `⚡ Groq · flash` / `◆ DeepSeek · pro` / `✶ Opus · ultra`. Click opens manual-picker popover: Adaptive (auto) at top + all configured providers with their pro-tier model name. Manual mode shows `🔒 [Provider] · [tier]` with purple border — single provider, no failover. Exports `window._getManualProvider()` for doSend.
+- **MODIFIED `src/ui/panels/chat/chatPanelScript.ts`:** `doSend()` reads `window._getManualProvider()` and includes `manualProvider` in the `send-message` postMessage payload. Resets pill to neutral after send.
+- **MODIFIED `src/core/routing/chatPanelMsgSendMessage.ts`:** Passes `preferred: msg.manualProvider` to `cloudChat()`. Passes `manualProvider` option into all `handleAIChat()` call sites.
+- **MODIFIED `src/core/routing/chatPanelMsgSendAI.ts`:** Added `manualProvider` to options interface. In Q&A path: when `manualProvider` is set, calls `routing.promptWithProvider(provider, ...)` instead of `routing.promptCheap()` — single provider, no failover. Build/convert path flows through the same option.
+- **MODIFIED `src/services/ai/routingService.ts`:** Added `promptWithProvider(providerId, text, ...)` — delegates to `callProvider` with a single target. No rank loop, no failover. Kept file at exactly 200 lines (Rule 9: trimmed blank lines between methods).
+- **MODIFIED `src/services/api/apiClientChat.ts`:** Added `preferred?: string` to `ChatContext` interface so `cloudChat` can forward the manual provider to the backend `/chat` endpoint.
+
+**Supervisor/worker cap:** The manual-locked provider is the supervisor for builds. Worker is always flash-tier (via the existing `WORKER_TIER` system in `chatPanelMsgFixPhases.ts`), so worker tier ≤ supervisor tier is preserved automatically.
+
+**Deploy:** Compiled clean (0 TS errors), deployed to baked IDE.
+- **Risk:** Low. Adaptive mode behaves identically to the old tier badge (same `assessTier` logic). Manual mode is additive. `promptWithProvider` only fires when user explicitly locks a provider.
+
+---
+
 ## Session — Jun 13, 2026: Smart AI Tier Routing — right model for the right job
+
 
 **Context (PapaJoe):** "any AI can tell you the time, so this should have used the lowest model." Simple Q&A was cycling through 5 providers including Claude Opus before failing — the opposite of the intent. Root causes found and fixed.
 

@@ -214,6 +214,19 @@ export function buildHeaderInfo(
     })(),
     isSignedIn: false,
     healthStatus: extensionContext?.globalState.get<'green' | 'yellow' | 'red'>('redivivus.healthStatus'), // populated async below — caller uses refreshHeader() to get updated value
+    // [ADAPTIVE-PILL] All providers with an active key — used by the manual-picker popover in the webview.
+    configuredProviders: (() => {
+      const PROVIDER_META: Array<{ id: string; label: string; emoji: string; key: () => string | null }> = [
+        { id: 'groq',     label: 'Groq',     emoji: '\u26A1', key: () => { try { const { getGroqKey }     = require('../../../services/ai/routingKeys.js'); return getGroqKey(); }     catch { return null; } } },
+        { id: 'openai',   label: 'GPT-4o',   emoji: '\u25C6', key: () => { try { const { getOpenAIKey }   = require('../../../services/ai/routingKeys.js'); return getOpenAIKey(); }   catch { return null; } } },
+        { id: 'deepseek', label: 'DeepSeek', emoji: '\u25BA', key: () => { try { const { getDeepseekKey } = require('../../../services/ai/routingKeys.js'); return getDeepseekKey(); } catch { return null; } } },
+        { id: 'gemini',   label: 'Gemini',   emoji: '\u2B22', key: () => { try { const { getGeminiKey }   = require('../../../services/ai/routingKeys.js'); return getGeminiKey(); }   catch { return null; } } },
+        { id: 'claude',   label: 'Claude',   emoji: '\uD83D\uDFE0', key: () => { try { const { getClaudeKey }  = require('../../../services/ai/routingKeys.js'); return getClaudeKey(); }  catch { return null; } } },
+        { id: 'xai',      label: 'Grok',     emoji: '\u2736', key: () => { try { const { getXAIKey }      = require('../../../services/ai/routingKeys.js'); return getXAIKey(); }      catch { return null; } } },
+        { id: 'kimi',     label: 'Kimi',     emoji: '\uD83C\uDF19', key: () => { try { const { getKimiKey }     = require('../../../services/ai/routingKeys.js'); return getKimiKey(); }     catch { return null; } } },
+      ];
+      return PROVIDER_META.filter(p => !!p.key()).map(({ id, label, emoji }) => ({ id, label, emoji }));
+    })(),
   };
 }
 

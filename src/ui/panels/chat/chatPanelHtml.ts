@@ -50,6 +50,9 @@ export interface ChatHeaderInfo {
   isSignedIn?: boolean;
   healthStatus?: 'green' | 'yellow' | 'red';
   primaryAction?: { label: string; actionAttr: string; actionValue: string; tooltip: string; icon: string };
+  // [ADAPTIVE-PILL] All configured providers for the manual-picker popover in the webview.
+  // Each entry: id = provider key (claude/gemini/...), label = display name, emoji = icon char.
+  configuredProviders?: Array<{ id: string; label: string; emoji: string }>;
 }
 
 export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderInfo, progress?: SetupProgress): string {
@@ -105,7 +108,6 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
           ${renderInputLeftInner(header)}
         </div>
         <div id="input-right">
-          <button id="tier-badge" style="font-size:11px;font-weight:600;padding:3px 9px;border-radius:99px;border:1px solid #555;background:transparent;cursor:pointer;white-space:nowrap;transition:all 0.15s;font-family:inherit;" title="Model tier — click to change"></button>
           <button id="send-btn" title="Send (Enter)">↑</button>
         </div>
       </div>

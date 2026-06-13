@@ -1,5 +1,4 @@
-// [SCOPE] AI Routing Service orchestrator — thin facade over keys, providers, and roster modules
-// Complexity routing and guardian logic extracted to routingComplexity.ts and routingGuardian.ts.
+// [SCOPE] AI Routing Service orchestrator — thin facade over keys, providers, and roster modules. Complexity routing and guardian logic extracted to routingComplexity.ts and routingGuardian.ts.
 
 import * as vscode from 'vscode';
 import type { VaultContextService } from '../vault/vaultContextService.js';
@@ -152,6 +151,12 @@ export class RoutingService {
     return promptCheapImpl(this, text, timeoutMs, imageBase64, imageType, systemMessage, role);
   }
 
+  // [ADAPTIVE-PILL] Single-provider call with no failover — used by manual-lock mode.
+  async promptWithProvider(providerId: string, text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string): Promise<AIResponse> {
+    const fetchFn = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
+    return callProvider(providerId, text, fetchFn, undefined, imageBase64, imageType);
+  }
+
   private async fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
@@ -179,17 +184,14 @@ export class RoutingService {
   async guardianReview(originalTask: string, workerResponse: string, workerAI: string, blueprintContext: string) {
     return guardianReviewImpl(this, originalTask, workerResponse, workerAI, blueprintContext);
   }
-
   isGuardianActive(): boolean {
     const { guardianEnabled } = require('./guardianAI.js');
     return guardianEnabled(this.getKeyMap());
   }
-
   getGuardianFor(workerAI: string): string | null {
     const { selectGuardianAI } = require('./guardianAI.js');
     return selectGuardianAI(workerAI, this.getKeyMap());
   }
-
   /** Multi-AI orchestrated build — delegates to routingOrchestration.ts */
   async orchestratedBuild(task: string, context: string, onProgress?: ProgressCallback): Promise<OrchestratedResult> {
     const { orchestratedBuildImpl } = await import('./routingOrchestration.js');

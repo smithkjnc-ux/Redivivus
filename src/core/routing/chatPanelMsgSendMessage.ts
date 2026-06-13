@@ -105,9 +105,13 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     personality: vscode.workspace.getConfiguration('redivivus').get<string>('personality', 'plain'),
     fileList: _wsRootFL ? getWorkspaceFileList(_wsRootFL) : undefined,
+    // [ADAPTIVE-PILL] When user locked a provider manually, pass it as preferred so backend respects it.
+    preferred: (msg.manualProvider as string | undefined) || undefined,
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
-  if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh); return; }
+  // [ADAPTIVE-PILL] If cloudChat fails AND user has manually locked a provider, fall through to
+  // handleAIChat with manualProvider set — it will enforce single-provider mode (no failover).
+  if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh, { manualProvider: (msg.manualProvider as string) || undefined }); return; }
   // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it on all non-build paths.
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
@@ -165,7 +169,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     return;
   }
   if (chatResult.action === 'run') { releaseInput(); await handleRunIntent({ type: 'run' }, deps, conversation, refresh); return; }
-  if (chatResult.action === 'convert') { await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true }); return; }
+  if (chatResult.action === 'convert') { await handleAIChat(msg, userText, deps, conversation, refresh, { isConvert: true, manualProvider: (msg.manualProvider as string) || undefined }); return; }
 
   const intent = { type: chatResult.action as 'build' | 'fix' | 'scaffold' | 'service' };
   const _claudeTask = chatResult.task || userText;

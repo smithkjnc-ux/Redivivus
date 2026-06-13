@@ -23,6 +23,8 @@ export interface ChatContext {
   timezone?: string;
   personality?: string;
   fileList?: string[];
+  // [ADAPTIVE-PILL] When user locks a provider manually, pass it here so the backend respects it.
+  preferred?: string;
 }
 
 export async function cloudChat(

@@ -22,14 +22,32 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
       <button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">&#x1F41B; Report</button>`;
 }
 
-/** Inner HTML for the #input-left container (the bottom-left pill row). */
+/** Inner HTML for the #input-left container (the bottom-left pill row).
+ *  [ADAPTIVE-PILL] Removed: Vault pill (use header or command palette), AI roster pill.
+ *  Added: single adaptive AI pill — neutral/faded until user types, then updates live to show
+ *  the cheapest available provider for the assessed prompt tier.
+ *  Clicking opens a manual-picker popover listing all configured providers.
+ *  data-providers carries the serialised provider list so the webview needs no round-trip.
+ */
 export function renderInputLeftInner(header?: ChatHeaderInfo): string {
-  // [MOVED] Run pill relocated to the header (next to Preview) — it was out of place in the input bar and
-  // confusing alongside the Preview button up top. Preview (in-editor) + Run (standalone) now sit together.
-  return `<button class="input-pill" data-cmd="redivivus.openVault" title="Browse Vault">&#x229E; Vault</button>
-          ${header ? (header.rosterDisplay && header.rosterDisplay.length > 0
-            ? `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="AI Team: ${header.rosterDisplay.map(r => r.emoji + ' ' + r.label + ' (' + r.role + ')').join(', ')}">${header.rosterDisplay[0].emoji} ${header.rosterDisplay[0].label}${header.rosterDisplay.length > 1 ? ' +' + (header.rosterDisplay.length - 1) : ''}</span>`
-            : `<span class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="Click to configure AI model">${header.keyStoreReady === false ? '🧠 …' : (!header.hasKey ? '⚠️ No AI key' : '🧠 ' + header.aiLabel)}</span>`
-          ) : ''}
-          `;
+  // Key store not yet initialised — show a loading placeholder, never the "No AI" alarm.
+  if (header && header.keyStoreReady === false) {
+    return `<span id="adaptive-pill" style="font-size:11px;padding:3px 10px;border-radius:99px;border:1px solid #3d3d3d;color:#555;font-family:inherit;user-select:none;">&#x1F9E0; &hellip;</span>`;
+  }
+  // No keys at all — nudge the user to configure.
+  if (header && !header.hasKey) {
+    return `<span id="adaptive-pill" class="input-pill input-pill--ai" data-cmd="redivivus.openSettings" title="Click to configure AI provider" style="cursor:pointer;">&#x26A0; No AI key</span>`;
+  }
+
+  // [WARN] data-providers must be valid JSON in a double-quoted HTML attribute.
+  // We serialise the array and escape internal quotes with &quot; so innerHTML assignment is safe.
+  const providersJson = (header?.configuredProviders && header.configuredProviders.length > 0)
+    ? JSON.stringify(header.configuredProviders).replace(/"/g, '&quot;')
+    : '[]';
+
+  // Adaptive pill — starts neutral, JS in chatPanelScriptTier.ts drives all live updates.
+  return `<button id="adaptive-pill"
+    data-providers="${providersJson}"
+    title="Adaptive: picks the right AI as you type. Click to lock a specific provider."
+  >&#x26A1; AI</button>`;
 }

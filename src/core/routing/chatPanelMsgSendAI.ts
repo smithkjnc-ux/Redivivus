@@ -18,17 +18,22 @@ import { runChunkedConvert } from './chatPanelMsgSendAIConvert';
 const PREFERENCE_RE = /\b(i prefer|i want|always use|never use|use only|don'?t use|we decided|we always|entry point is|main file is|i like|i hate|i don'?t like|our stack|our framework|we use|keep it|make sure|remember that|from now on)\b/i;
 const AI_LABEL: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
 /** Main AI chat handler — routes to chunked gen, single-call, or question path.
- *  isConvert: true = transform existing code (inject source files). false = Q&A. */
+ *  isConvert: true = transform existing code (inject source files). false = Q&A.
+ *  manualProvider: when set, only that provider is used — no failover. */
 export async function handleAIChat(
   msg: any,
   userText: string,
   deps: MessageHandlerDeps,
   conversation: ChatMessage[],
   refresh: () => void,
-  options?: { isConvert?: boolean },
+  options?: { isConvert?: boolean; manualProvider?: string },
 ): Promise<void> {
   const { redivivus, routing, usageTracker } = deps;
   const isConvert = options?.isConvert ?? false;
+  // [ADAPTIVE-PILL] manualProvider: single-provider lock — no failover to other providers.
+  // When set, ALL AI calls go through routing.promptWithProvider(provider, ...) which targets
+  // only that provider. Worker cap (worker ≤ supervisor tier) is enforced by the routing service.
+  const manualProvider = options?.manualProvider || null;
   try {
     deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
     const recentUserMsgs = conversation.filter(m => m.role === 'user').slice(-4, -1).map(m => m.content);
@@ -88,7 +93,10 @@ export async function handleAIChat(
       }
     } else {
       // Question / answer path — use cheap models first (Groq/Gemini), save expensive models for code gen
-      const aiResponse = await routing.promptCheap(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
+      // [ADAPTIVE-PILL] Manual lock: only the locked provider is called, no failover.
+      const aiResponse = manualProvider
+        ? await (routing as any).promptWithProvider(manualProvider, prefix + userText, 60_000, msg.imageBase64, msg.imageType).catch((e: any) => ({ success: false, error: e?.message || 'provider error', text: '' }))
+        : await routing.promptCheap(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
       if (!aiResponse.success) {
         // NO_API_KEY: show guardian setup message as a normal reply, not an error wrapper
         const content = aiResponse.error === 'NO_API_KEY'
