@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: "make a X game" classified as answer (tutorial) not build — few-shot fix
+
+**Symptom:** `make a frogger arcade game` returned `{"action":"answer", text:"Here's a comprehensive guide to building…"}` — a tutorial — instead of building. `build a frogger arcade game` worked. The classifier wasn't treating *make* as a build verb in practice.
+
+**Cause:** the `MAIN_SYSTEM` prompt (chat `route.ts`) already *instructed* make/create/generate → build, and the pre-pass (`PREPASS_SYSTEM`) only sets tier + fixes typos (preserves intent, never classifies) — so the miss was the Phase-2 model **ignoring the instruction** (instruction-only adherence, no exemplars). It did exactly what the prompt forbade: wrote an architecture guide in `text`.
+
+- **File changed:** `redivivus-backend/src/app/api/v1/chat/route.ts` (`MAIN_SYSTEM`).
+- **What changed:** added an explicit line — *"make X / build X / create X are IDENTICAL; the verb does not matter; an imperative to produce something is always build"* — plus a **few-shot EXAMPLES block** (input -> exact JSON output) covering the precise failure case (`make a frogger arcade game` -> build with a one-sentence `text` and a detailed `task`), `create a todo app` -> build, `generate a landing page` -> build, and two contrast cases (`how do I center a div?` -> answer, `fix the score not updating` -> fix). Few-shot pins the decision far harder than instructions alone.
+- **Verified:** `tsc --noEmit` clean for the route. (Behavioral verification is post-deploy — needs a real model call.)
+- **Risk:** low. **BACKEND change — needs a Fly deploy** (separate from the dead-canvas gate deployed just before this). After deploy, re-test `make a …` phrasings.
+- Closes the last item from the frogger test run. Remaining build-quality work (general "complete file, incomplete program" beyond canvas games) tracked in [[build-pipeline-open-issues]].
+
+---
+
 ## Session — Jun 13, 2026: "Build Complete" but blank game — dead canvas shell shipped (backend completeness gate)
 
 **Symptom:** "build a frogger arcade game" → Build Complete (1 file, index.html) → blank, non-working game.
