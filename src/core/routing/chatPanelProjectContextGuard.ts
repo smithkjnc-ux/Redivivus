@@ -50,8 +50,8 @@ export function isConfidentFixRequest(text: string): boolean {
 }
 
 // ── Helper: is the current workspace an active (initialized) project? ────────────────────────────
-function getProjectContext(): { hasProject: boolean; projectName: string | null; isContainer: boolean } {
-  const wsPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+function getProjectContext(effectiveRoot?: string): { hasProject: boolean; projectName: string | null; isContainer: boolean } {
+  const wsPath = effectiveRoot || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!wsPath) { return { hasProject: false, projectName: null, isContainer: false }; }
   const os = require('os');
   const path = require('path');
@@ -71,11 +71,12 @@ export function checkProjectContextGuard(
   userText: string,
   conversation: ChatMessage[],
   refresh: () => void,
+  effectiveRoot?: string
 ): string | null {
   // Compound commands always pass through — user is explicitly managing context
   if (isCompoundContextCommand(userText)) { return null; }
 
-  const { hasProject, projectName, isContainer } = getProjectContext();
+  const { hasProject, projectName, isContainer } = getProjectContext(effectiveRoot);
 
   // ── Guard A: New build attempted while a project is open ─────────────────────────────────────
   // The user is inside an existing project. A "build me a X" request is almost certainly

@@ -3,7 +3,29 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 13, 2026: "Clear the chat" AI hallucination
+## Fix — Jun 13, 2026: Project Context Guard blocking sub-project fixes
+
+**Bug:** When the workspace is the `projects` container, the chat header successfully resolved the active sub-project (like `frogger-arcade-game`) using `ProjectFilesProvider`, but the message routing and Project Context Guard fell back to the raw `vscode.workspace.workspaceFolders[0]`. If `~/projects` had a stray `.redivivus` folder, the UI proudly showed project pills (Blueprint, Map, History) for the *container* while the Context Guard correctly blocked fix intents, telling the user no project was open. The UI and the guard violently disagreed.
+
+**Fix — Root Resolution:** Centralized `getEffectiveProjectRoot()` in `chatPanelHeaderUtils.ts`. Updated `chatPanelMsgSendMessage.ts` to re-instantiate `deps.redivivus` if the effective root differs from the workspace root. This ensures `cloudChat` and the fix pipeline accurately route to the nested project.
+
+**Fix — UI Consistency:** Hardened `chatPanelHeader.ts` to force `hasProjectOpen = false` if the effective root is the `projects` container. Even if a stray `.redivivus` folder exists in `~/projects`, the header will no longer hallucinate project pills or display the project name as "projects", forcing the UI to align perfectly with the Context Guard.
+
+**Compile:** 0 errors.
+
+---
+
+**Bug:** When pasting an image, the preview rendered as a full-width flex row (`display: flex` with `flex: 1` text) saying "Screenshot attached -- AI will read it". This took up the entire width of the input area and looked unnecessarily large.
+
+**Fix — `chatPanelScriptImage.ts`:** Rewrote the HTML injection for `_showImagePreview`. It now creates a compact `display:inline-block` 56x56 thumbnail with `object-fit:cover`. Removed the redundant text label. Added a nice floating circular 'x' button to remove the image.
+
+**Fix — `chatPanelScript.ts`:** Updated the send logic to properly clean up the new `img-preview-container` wrapper so the thumbnail doesn't linger after the message is sent.
+
+**Note:** The backend API currently only processes the *first* `imageBase64` payload it receives per message. If a user tries to paste a second image, the UI visually replaces the first thumbnail with the new one. Expanding the `AIResponse` type and prompt structures across all providers (Gemini, Claude, OpenAI) to accept a string array `images[]` is deferred as a feature request. 
+
+**Compile:** 0 errors.
+
+---
 
 **Bug:** When the user typed "clear the chat" or "clear the chat screen", the request bypassed the local intent handlers and hit the AI classifier. The AI responded with a literal text response ("Clearing the chat now") but the UI obviously didn't clear because it was just standard conversational output.
 

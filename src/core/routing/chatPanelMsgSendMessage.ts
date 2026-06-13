@@ -81,7 +81,16 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
 
   // [FIX] Pre-classification: if workspace is open and message looks like a bug report,
   // skip the general chat classifier and go directly to fix pipeline.
-  const hasWorkspace = !!vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const { getEffectiveProjectRoot } = await import('../../ui/panels/chat/chatPanelHeaderUtils.js');
+  const effectiveRoot = getEffectiveProjectRoot(deps.redivivus.getWorkspaceRoot());
+  
+  // Re-instantiate the service if the effective root differs (e.g. when the VS Code workspace is the generic 'projects' container)
+  if (effectiveRoot && effectiveRoot !== deps.redivivus.getWorkspaceRoot()) {
+    deps.redivivus = new (deps.redivivus as any).constructor(effectiveRoot);
+  }
+  
+  const hasWorkspace = !!effectiveRoot;
+  
   const looksLikeBugReport = hasWorkspace && (
     /\b(blank|empty|not working|broken|error|crash|freeze|hang|slow|weird|strange|bug|issue|problem|fix|correct|repair)\b/i.test(lowerText) ||
     /\b(preview|browser|screen|display|render|show|load|fetch)\b.*\b(broken|fail|error|blank|empty|not)/i.test(lowerText) ||
@@ -96,7 +105,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // ── Project context guard — runs before any AI call ──
   // Blocks new builds inside an open project; blocks fix/edit with no project open.
   // Compound commands ("open X then build Y") always pass through.
-  const _ctxBlock = checkProjectContextGuard(userText, conversation, refresh);
+  const _ctxBlock = checkProjectContextGuard(userText, conversation, refresh, effectiveRoot);
   if (_ctxBlock) {
     conversation.push({ role: 'assistant', content: _ctxBlock, timestamp: Date.now() });
     refresh();
@@ -107,17 +116,17 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // [FIX] Replaces broken cloudClassify() (/classify never existed) + promptCheap() (wrong model for Q&A).
   const { cloudChat } = await import('../../services/api/apiClientChat.js');
   const _cfgBlueprint = deps.redivivus.isInitialized() ? (deps.redivivus.loadConfig?.() as any)?.blueprint : undefined;
-  const _wsRootFL = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  
   // [CONTEXT] Pass project state to cloudChat so the backend AI classifier knows if a project is open.
   // Without this the AI can return action='build' for a fix request inside a project, or vice versa.
-  const _hasProjectOpen = _wsRootFL ? require('fs').existsSync(require('path').join(_wsRootFL, '.redivivus', 'config.json')) : false;
+  const _hasProjectOpen = effectiveRoot ? require('fs').existsSync(require('path').join(effectiveRoot, '.redivivus', 'config.json')) : false;
   const chatResult = await cloudChat(userText, {
     blueprint: _cfgBlueprint,
     recentMessages: conversation.slice(-6).map(m => ({ role: m.role, content: m.content })),
     currentTime: new Date().toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }),
     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     personality: vscode.workspace.getConfiguration('redivivus').get<string>('personality', 'plain'),
-    fileList: _wsRootFL ? getWorkspaceFileList(_wsRootFL) : undefined,
+    fileList: effectiveRoot ? getWorkspaceFileList(effectiveRoot) : undefined,
     preferred: (msg.manualProvider as string | undefined) || undefined,
     // [CONTEXT] Tell the backend whether a project is open — so the classifier can't return build inside a project
     projectOpen: _hasProjectOpen,

@@ -26,20 +26,8 @@ export function buildHeaderInfo(
 
   // [FIX] Effective project root — the no-reload build flow shows the project in the Redivivus
   // "Project Files" tree WITHOUT adding it to the VS Code workspace, so workspaceFolders is empty.
-  // Fall back to the active build root (ProjectFilesProvider) and then the redivivus service root so
-  // the header still recognizes the project (Preview pill, Blueprint, etc.). A workspace folder, when
-  // present, always wins. `svc` is a service pointed at the effective root for config/isInitialized.
-  const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  let effectiveRoot = wsRoot;
-  // [Model A][W2] When the workspace IS the projects container (home), the ACTIVE project is the built/
-  // opened subfolder (tracked by the Project Files tree), not the container. Prefer it so the chat
-  // recognizes the project the user just built — otherwise the header reads ~/projects (home) = no project.
-  if (!effectiveRoot || isProjectsContainer(effectiveRoot)) {
-    let activeRoot: string | undefined;
-    try { activeRoot = require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); } catch {}
-    if (!activeRoot) { activeRoot = redivivus.getWorkspaceRoot(); }
-    if (activeRoot && !isProjectsContainer(activeRoot) && fs.existsSync(path.join(activeRoot, '.redivivus'))) { effectiveRoot = activeRoot; }
-  }
+  // We use getEffectiveProjectRoot to correctly resolve the nested project when the workspace is 'projects'.
+  const effectiveRoot = require('./chatPanelHeaderUtils.js').getEffectiveProjectRoot(redivivus.getWorkspaceRoot());
   let svc = redivivus;
   if (effectiveRoot && redivivus.getWorkspaceRoot() !== effectiveRoot) {
     try { svc = new (redivivus as any).constructor(effectiveRoot); } catch { svc = redivivus; }
@@ -53,22 +41,13 @@ export function buildHeaderInfo(
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  // A project is "open" if there is an effective root (workspace folder OR active build root) AND it is initialized.
-  const workspaceFolderIsOpen = !!effectiveRoot;
-  const hasProjectOpen = workspaceFolderIsOpen && isInitialized;
-
-  // [DEBUG] Log header state to diagnose header button issue
-  require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-    `[buildHeaderInfo] ws0=${wsRoot} effRoot=${effectiveRoot} isInit=${isInitialized} hasProject=${hasProjectOpen} wsFolderOpen=${workspaceFolderIsOpen}\n`);
-
-  // Check if effective root has a .redivivus/ folder or .redivivus-assist shim
   const workspaceRoot = effectiveRoot;
-  // [Model A] The projects container (~/projects) is HOME, never a project — even though the chat-history
-  // logger writes a stray .redivivus/ there. Counting it as "has Redivivus" would render the project
-  // DASHBOARD ("Close Project"/"create blueprint"), and being an open-but-unsetup folder would render the
-  // "Project detected — Assist/Full?" mode-choice. Both are wrong for home. Home = the launcher, always.
-  const workspaceIsProjectsContainer = isProjectsContainer(workspaceRoot);
+  const workspaceIsProjectsContainer = workspaceRoot ? isProjectsContainer(workspaceRoot) : false;
   const workspaceHasRedivivus = !!workspaceRoot && !workspaceIsProjectsContainer && fs.existsSync(path.join(workspaceRoot, '.redivivus'));
+
+  // A project is "open" if there is an effective root (workspace folder OR active build root), it is initialized, AND it is not the container.
+  const workspaceFolderIsOpen = !!effectiveRoot;
+  const hasProjectOpen = workspaceFolderIsOpen && isInitialized && !workspaceIsProjectsContainer;
   // [FIX] Check .redivivus-assist regardless of whether .redivivus/ exists — .redivivus/ now exists in both modes
   const workspaceIsAssistMode = workspaceRoot ? fs.existsSync(path.join(workspaceRoot, '.redivivus-assist')) : false;
 

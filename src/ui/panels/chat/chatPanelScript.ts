@@ -49,6 +49,7 @@ export function buildChatScript(): string {
       vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier, manualProvider: _manual || undefined });
       input.value = ''; input.style.height = 'auto'; window._pendingImage = null; window._pendingImageType = null;
       const _ip = document.getElementById('img-prev'); if (_ip) _ip.remove();
+      const _ipc = document.getElementById('img-preview-container'); if (_ipc) _ipc.remove();
       // Reset pill to neutral after send
       if (window._renderTierBadge) { window._renderTierBadge(); }
     }

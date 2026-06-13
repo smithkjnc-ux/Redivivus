@@ -10,18 +10,27 @@ export function buildImageScript(): string {
       var prev = document.getElementById('img-prev'); if (prev) prev.remove();
       window._pendingImage = dataUrl.split(',')[1];
       window._pendingImageType = mime;
+      
+      var inpWrapper = document.getElementById('message-input').parentNode;
+      var container = document.getElementById('img-preview-container');
+      if (!container) {
+        container = document.createElement('div');
+        container.id = 'img-preview-container';
+        container.style.cssText = 'display:flex;flex-wrap:wrap;padding:6px 12px 0 12px;gap:8px;';
+        inpWrapper.insertBefore(container, document.getElementById('message-input'));
+      }
+      
       var wrap = document.createElement('div'); wrap.id = 'img-prev';
-      wrap.style.cssText = 'display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(255,255,255,0.05);border-radius:6px;margin-bottom:6px;border:1px solid var(--vscode-input-border);';
+      wrap.style.cssText = 'display:inline-block;position:relative;';
       var img = document.createElement('img'); img.src = dataUrl;
-      img.style.cssText = 'max-height:56px;max-width:110px;border-radius:3px;object-fit:contain;';
-      var lbl = document.createElement('span'); lbl.textContent = 'Screenshot attached -- AI will read it';
-      lbl.style.cssText = 'font-size:11px;color:var(--vscode-descriptionForeground);flex:1;';
-      var rm = document.createElement('button'); rm.textContent = 'x'; rm.title = 'Remove image';
-      rm.style.cssText = 'background:none;border:none;color:var(--vscode-descriptionForeground);cursor:pointer;font-size:15px;padding:0 4px;line-height:1;';
+      img.style.cssText = 'height:56px;width:56px;border-radius:6px;object-fit:cover;border:1px solid var(--vscode-input-border);box-shadow:0 2px 6px rgba(0,0,0,0.15);';
+      
+      var rm = document.createElement('button'); rm.innerHTML = '&times;'; rm.title = 'Remove image';
+      rm.style.cssText = 'position:absolute;top:-6px;right:-6px;height:18px;width:18px;background:var(--vscode-editorError-foreground, #f87171);color:#fff;border:none;border-radius:50%;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;line-height:1;padding-bottom:2px;box-shadow:0 1px 4px rgba(0,0,0,0.3);';
       rm.addEventListener('click', function() { wrap.remove(); window._pendingImage = null; window._pendingImageType = null; });
-      wrap.appendChild(img); wrap.appendChild(lbl); wrap.appendChild(rm);
-      var inp = document.getElementById('message-input');
-      if (inp && inp.parentNode) { inp.parentNode.insertBefore(wrap, inp); }
+      
+      wrap.appendChild(img); wrap.appendChild(rm);
+      container.appendChild(wrap);
     }
     document.addEventListener('paste', function(e) {
       var items = e.clipboardData ? e.clipboardData.items : [];
