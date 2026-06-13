@@ -3,7 +3,25 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 13, 2026: Pill showing ⚡ AI instead of Adaptive (static HTML + color bug)
+## Fix — Jun 13, 2026: "Clear the chat" AI hallucination
+
+**Bug:** When the user typed "clear the chat" or "clear the chat screen", the request bypassed the local intent handlers and hit the AI classifier. The AI responded with a literal text response ("Clearing the chat now") but the UI obviously didn't clear because it was just standard conversational output.
+
+**Fix — `chatPanelMsgSendKeywords.ts`:** Added an exact-match local keyword intercept for `/^clear(\s+the)?\s+(chat|screen|messages|history|log)$/i`. When triggered, it calls `clearPersistedConversation()`, wipes the local `conversation` array, calls `refresh()`, and returns true to stop propagation. 
+
+**Compile:** 0 errors.
+
+---
+
+**Bug:** The ↩ and 📋 icons appeared absolutely positioned `top:6px; right:8px` inside the assistant bubble, overlapping the first line of text on hover.
+
+**Fix — `chatPanelStylesMid.ts`:** Removed `position: absolute` from `.msg-fwd-bar`. Changed to a normal flow block (`display: none → flex`) with `justify-content: flex-end`, a `border-top` separator, and `margin-top: 6px`. Removed `position: relative` from `.assistant-bubble` (no longer needed). Button hover state now uses accent color instead of generic border.
+
+**Fix — `chatPanelRenderer.ts`:** Moved `${fwdBar}` to after `${html}` in the bubble template, so the bar renders below the message content in the DOM — matching the new CSS flow layout.
+
+**Result:** Icons appear as a slim footer row below the message text on hover, right-aligned, never overlapping content.
+
+---
 
 **Bug:** The adaptive pill showed `⚡ AI` (old static initial HTML) with no green/purple coloring. Two causes:
 1. `chatPanelHeaderRender.ts` hardcoded `&#x26A1; AI` as the button's initial innerHTML — shown whenever JS hadn't run yet or on initial panel paint.

@@ -62,6 +62,17 @@ export async function handleKeywordShortcuts(
     refresh(); return true;
   }
 
+  // [FIX] Clear the chat UI when user types "clear chat", "clear screen", etc.
+  if (/^clear(\s+the)?\s+(chat|screen|messages|history|log)$/i.test(lowerText.trim())) {
+    try {
+      const { clearPersistedConversation } = await import('../../ui/panels/chat/chatPanelPublicAPI.js');
+      clearPersistedConversation();
+    } catch {}
+    conversation.length = 0;
+    refresh();
+    return true;
+  }
+
   if (/how'?s\s+my\s+setup|setup\s+progress|what'?s\s+left|what\s+to\s+do\s+next/i.test(lowerText)) {
     const _spRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (_spRoot && redivivus) {

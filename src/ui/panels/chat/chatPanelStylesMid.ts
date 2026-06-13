@@ -15,16 +15,20 @@ export function buildChatCssMid(): string {
       box-shadow: 0 2px 12px rgba(37,99,235,0.35);
     }
     .assistant-bubble {
-      align-self: flex-start; background: var(--c-surface); position: relative;
+      align-self: flex-start; background: var(--c-surface);
       border: 1px solid var(--c-border); border-radius: 4px 16px 16px 16px;
       padding: 11px 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
     }
-    .msg-fwd-bar { position: absolute; top: 6px; right: 8px; display: none; gap: 4px; }
+    .msg-fwd-bar {
+      display: none; gap: 4px; justify-content: flex-end;
+      margin-top: 6px; padding-top: 5px;
+      border-top: 1px solid var(--c-border);
+    }
     .assistant-bubble:hover .msg-fwd-bar { display: flex; }
-    .msg-fwd-btn { background: var(--c-raised); border: 1px solid var(--c-border); color: var(--c-text-dim);
-      border-radius: 5px; padding: 2px 7px; font-size: 11px; cursor: pointer; font-family: inherit;
+    .msg-fwd-btn { background: transparent; border: 1px solid var(--c-border); color: var(--c-text-dim);
+      border-radius: 5px; padding: 2px 8px; font-size: 11px; cursor: pointer; font-family: inherit;
       transition: all 0.12s; line-height: 1.6; }
-    .msg-fwd-btn:hover { background: var(--c-border); color: var(--c-text); }
+    .msg-fwd-btn:hover { background: var(--c-accent-lo); border-color: var(--c-accent); color: var(--c-text); }
     .message-content { line-height: 1.6; white-space: pre-wrap; word-break: break-word; font-size: 13px; user-select: text; }
     .message-meta { font-size: 10px; color: var(--c-text-faint); margin-top: 5px; }
     .story-panel { display: flex; flex-direction: column; gap: 5px; padding: 2px 0; }
