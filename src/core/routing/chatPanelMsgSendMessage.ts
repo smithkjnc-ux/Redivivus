@@ -17,6 +17,8 @@ import { runChatClarifyStep } from './chatPanelMsgSendClarify';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent';
 import { checkBuildConfirmation, getWorkspaceFileList } from './chatPanelMsgSendConfirmCheck';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
+import { createTurnContext } from './turnContext.js';
+import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
 
 export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buildMode?: any): Promise<void> {
   const { conversation, refresh } = deps;
@@ -43,12 +45,20 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     if (!/\bdone.*session\b|\bstart.*session\b/i.test(userText)) { try { const _CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; const ss = (_CP as any).startSessionSilent; if (ss) { ss(userText); } } catch {} }
   }
 
+  // [PHASE 0] Create the shared TurnContext for this turn and thread it via deps. Scaffold only — nothing
+  // reads it yet, so behavior is unchanged. The `hint` is set at each routing decision below for later phases.
+  // See docs/REDIVIVUS_INTENT_ARCHITECTURE.md.
+  const _bpForCtx = deps.redivivus.isInitialized() ? (deps.redivivus.loadConfig?.() as any)?.blueprint : undefined;
+  const turnCtx = createTurnContext(userText, conversation, { projectRoot: getActiveProjectRoot(), blueprint: _bpForCtx });
+  deps.turnContext = turnCtx;
+
   // [FIX][BUILD-NOT-FIX] A confirmed blueprint card is unambiguously a BUILD. Skip re-classification here —
   // cloudChat flips the enriched task to 'fix' when the workspace holds existing project folders (it read
   // "arcade game collection addition" + the 12 sibling folders as "modify my collection"). That misroute
   // ran the FIX pipeline ("Scanning N files", "fix didn't apply"), wrote a surgical edit, and created NO
   // project folder. Route straight to the build path, which auto-creates the project subfolder and builds.
   if (msg.fromBlueprintCard) {
+    turnCtx.hint = { action: 'build', task: userText };
     await handleBuildIntent(userText, userText, msg, deps, conversation, refresh);
     return;
   }
@@ -75,6 +85,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     /\b(game|app|page|site|project)\b.*\b(broken|not working|blank|empty|weird)/i.test(lowerText)
   );
   if (looksLikeBugReport) {
+    turnCtx.hint = { action: 'fix' };
     fixLog(`[PRE-CLASSIFY] Bug report detected, routing to fix pipeline: "${userText.slice(0, 60)}..."`);
     await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
     return;
@@ -98,6 +109,9 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it on all non-build paths.
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
+  // [PHASE 0] Record the classifier's decision as the turn hint (scaffold — not yet read). confidence is
+  // added in Phase 1; in Phase 3 the Supervisor, not this hint, decides build-vs-fix for code requests.
+  turnCtx.hint = { action: chatResult.action, task: chatResult.task, model: chatResult.model, provider: chatResult.provider };
 
   const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
   const _m = chatResult.model || '', _pr = PROVIDER_LABEL[chatResult.provider] ?? 'Claude';

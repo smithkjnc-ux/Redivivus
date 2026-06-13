@@ -22,4 +22,7 @@ export interface MessageHandlerDeps {
   buildMode?: 'plan' | 'direct'; assistMode?: boolean; vault?: import('../../services/vault/vaultService').VaultService;
   planInterview?: import('../../ui/panels/chat/chatPanelPlanInterview').PlanInterviewState;
   setBlueprintContext?: (ctx: string) => void;
+  // [PHASE 0] Shared per-turn context (see turnContext.ts + docs/REDIVIVUS_INTENT_ARCHITECTURE.md). Set at the
+  // top of handleSendMessage and threaded everywhere deps flows. SCAFFOLD ONLY — nothing reads it yet.
+  turnContext?: import('./turnContext').TurnContext;
 }

@@ -94,9 +94,12 @@ AI for understanding, code for execution).
 Follows the strip-down method: **comment out old code (don't delete), feature-flag new paths, test + commit
 after every phase.** Each phase ships value on its own and can be reverted.
 
-- **Phase 0 — `TurnContext` scaffold (no behavior change).** Extend `MessageHandlerDeps` into a `TurnContext`
-  created at the top of `handleSendMessage`. Initially it only *carries* what's already passed around. Thread
-  it through build + fix entrypoints. Pure plumbing; reversible. *Test: everything behaves identically.*
+- **Phase 0 — `TurnContext` scaffold (no behavior change). [DONE Jun 13, 2026]** New `turnContext.ts`
+  (`TurnContext` = rawMessage, conversation, projectRoot, blueprint, `hint`, `artifacts`). Created at the top of
+  `handleSendMessage`, attached to `deps.turnContext` (threads everywhere `deps` flows — build + fix entrypoints
+  included, no signature changes). `hint` is recorded at each routing decision (blueprint-card build, bug-report
+  fix, post-classify). Verified pure scaffold: in compiled output only the definition + the writer reference it;
+  nothing reads/branches on it, so behavior is identical. `tsc` clean, deployed.
 
 - **Phase 1 — Classifier returns `{action, confidence}`.** `MAIN_SYSTEM` emits confidence. Client keeps
   routing on HIGH-confidence build/fix/answer/command; LOW-confidence code requests go to the unified handler
@@ -153,4 +156,4 @@ The agent-loop ideas are absorbed as *boundaries, not blinders* — the same fra
 
 ---
 
-*Last updated: Jun 13, 2026 — initial draft. Owner: PapaJoe. Feeds REDIVIVUS_ADAPTIVE_PLANNING.md.*
+*Last updated: Jun 13, 2026 — initial draft + Phase 0 (TurnContext scaffold) shipped. Owner: PapaJoe. Feeds REDIVIVUS_ADAPTIVE_PLANNING.md.*

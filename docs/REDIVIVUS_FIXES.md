@@ -3,6 +3,18 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Intent architecture Phase 0 — TurnContext scaffold (no behavior change)
+
+**Context:** First implementation step of `docs/REDIVIVUS_INTENT_ARCHITECTURE.md` — introduce the shared per-turn object that later phases use to kill the lossy classify→plan→worker handoff. Phase 0 is pure plumbing.
+- **New file:** `src/core/routing/turnContext.ts` — `TurnContext` (rawMessage, conversation, projectRoot, blueprint, `hint: {action, task, confidence?, model, provider}`, `artifacts: {prescription, files, written, diffs, guardianNotes}`) + `createTurnContext()`.
+- **`src/core/routing/chatPanelMessageDeps.ts`:** added optional `turnContext?` field (TS type — vanishes at runtime).
+- **`src/core/routing/chatPanelMsgSendMessage.ts`:** create the context at the top of `handleSendMessage` (`projectRoot` via `getActiveProjectRoot()`, blueprint from config), attach to `deps.turnContext` (threads everywhere `deps` flows — build + fix entrypoints, no signature changes), and record the routing decision as `hint` at each branch (blueprint-card build, bug-report fix, post-classify).
+- **No behavior change — proven:** in the compiled `out/`, the only references to `turnContext` are the definition and the writer (`chatPanelMsgSendMessage.js`); nothing reads or branches on it. `tsc` clean; deployed.
+- **Why:** scaffolding for Phase 1 (classifier confidence) → Phase 2 (one shared handler) → Phase 3 (Supervisor decides operation). Reversible: delete `turnContext.ts` + 3 small edits.
+- **Risk:** ~none (write-only carrier). See [[intent-architecture-direction]].
+
+---
+
 ## Session — Jun 13, 2026: Intent architecture design note + migration plan (new doc)
 
 **Context:** PapaJoe asked how Redivivus's intent handling compares to agent-mode editors (Claude Code, Cursor, Windsurf) and for a plan to fix the difference WITHOUT discarding Redivivus's structure.
