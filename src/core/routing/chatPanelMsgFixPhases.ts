@@ -161,8 +161,15 @@ export async function runPhase2Worker(
   let workerResponse = '';
   let providerUsed = workerAI;
   let lastError = '';
+  // [FIX] The Supervisor SIZES the Worker to the job — it emits WORKER_TIER in its diagnosis (flash for a
+  // trivial/moderate fix, pro for substantial GENERATION like a full game-loop rebuild). Honour it instead of
+  // the old hardcoded 'flash', which made EVERY fix use the small/cheap model (e.g. Claude Haiku) -> thin,
+  // blocky output on big rebuilds. (PapaJoe: the Supervisor should pick the Worker like the chat bar's adaptive
+  // model selector picks for a prompt.) ultra is supervisor-only, so the Worker is capped at pro.
+  const _wt = diagnosis.match(/WORKER_TIER:\s*(flash|pro|ultra)/i)?.[1]?.toLowerCase();
+  const workerTier: 'flash' | 'pro' = (_wt === 'pro' || _wt === 'ultra') ? 'pro' : 'flash';
   for (const provider of providerOrder) {
-    const pModel = bestModelForRole(provider, 'flash')?.modelId || provider;
+    const pModel = bestModelForRole(provider, workerTier)?.modelId || provider;
     let attempt = '';
     try {
       const res = await fetch(`${base}/fix-worker`, {

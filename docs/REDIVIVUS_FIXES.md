@@ -3,6 +3,17 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Supervisor sizes the Worker (adaptive Worker tier) — fix pipeline
+
+**Context (PapaJoe's idea):** the chat bar's adaptive selector picks the model for a prompt; the SUPERVISOR should do the same for the Worker — it wrote the plan, so it knows how strong the implementer must be. **Root insight:** the fix Worker (which writes the actual code) was **hardcoded to the cheap `flash` tier** (`bestModelForRole(provider, 'flash')`) — for Claude that's **Haiku 4.5**, a small model. So a "Claude fix" had Sonnet *plan* it and **Haiku *write* it** -> thin/blocky output on big rebuilds (the blocky-vs-Gemini-Flash gap PapaJoe saw was really Haiku-vs-Flash on the WRITING).
+- **Backend `fix-supervisor/route.ts` (`SUPERVISOR_SYSTEM`):** the Supervisor now appends one line — `WORKER_TIER: flash` (trivial/moderate: edits, small functions, surgical changes) or `WORKER_TIER: pro` (substantial GENERATION: a full game loop / rendering / input system, rebuilding most of a file, creative/visual logic). It judges the WORKER's implementation effort, defaults to flash, picks pro only when a cheap model would be "thin/blocky."
+- **Client `chatPanelMsgFixPhases.ts` (`runPhase2Worker`):** parses `WORKER_TIER` from the diagnosis and uses `bestModelForRole(provider, workerTier)` for ALL failover providers (ultra capped to pro — supervisor-only). Absent -> defaults to `flash` (no behaviour change until the backend emits it).
+- **Why:** quality floor rises for EVERY provider exactly where the plan needs it, and trivial fixes stay cheap/fast — quality- AND cost-aware, no across-the-board cost hit. Better than a "games -> pro" category heuristic (Rule 18: understanding, not pattern-matching). The Supervisor staffs the right Worker, like the chat bar staffs the right model.
+- **Deploy:** client clean+deployed (safe — defaults to flash). **Backend `fix-supervisor` needs a Fly deploy** to start emitting `WORKER_TIER`.
+- **Next (per plan):** build side — `/plan`'s prescription already has a `workerTier` field; tighten the `/plan` Supervisor prompt to set it deliberately by plan complexity. See [[ai-routing-philosophy]] / [[adaptive-planning-direction]].
+
+---
+
 ## Session — Jun 13, 2026: "Could not apply the fix" on a GOOD fix — truncation guard false-positive on HTML
 
 **Symptom (PapaJoe, capped-Claude failover test):** the **failover worked perfectly** — Supervisor + Worker promoted to **Gemini**, which produced a complete, correct full-file frogger fix — but it ended in **"Could not apply the fix."** PapaJoe: *"Gemini should have fixed it."* It DID; the apply step blocked it.
