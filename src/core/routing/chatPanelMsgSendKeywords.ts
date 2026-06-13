@@ -93,20 +93,45 @@ export async function handleKeywordShortcuts(
     const named = nameMatch ? projects.find(p => p.name.toLowerCase().includes(nameMatch[1].toLowerCase())) : null;
     if (named) {
       conversation.push({ role: 'assistant', content: `Opening **${named.name}**...`, timestamp: Date.now() }); refresh();
-      // Set suppression flags BEFORE updateWorkspaceFolders — without them the auto-open
-      // mechanism creates a duplicate panel when the extension host reloads on folder change.
-      const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
-      if (ChatPanel.extensionContext) {
-        const _ctx = ChatPanel.extensionContext;
-        _ctx.globalState.update('redivivus.suppressAutoOpen', named.fullPath);
-        _ctx.globalState.update('redivivus.suppressConversationClear', true);
-        const _conv = (ChatPanel.currentPanel as any)?.state?.conversation;
-        if (_conv?.length) { _ctx.globalState.update('redivivus.pendingRescueConversation', _conv); }
-      }
-      if (!vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === named.fullPath)) {
+      // [FIX][MODEL-A] When ~/projects is already the workspace root (Model A no-reload design),
+      // calling updateWorkspaceFolders() turns it into an untitled multi-root workspace.
+      // ensureProjectsWorkspace.healUntitledProjectsWorkspace() then collapses it BACK to ~/projects,
+      // making the project appear open for ~2 seconds then vanish. Fix: use activateProject() instead —
+      // it sets the ProjectFilesProvider root and refreshes the chat header without touching workspace folders.
+      const { isProjectsContainer } = await import('../../services/project/redivivusPaths.js');
+      const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const inProjectsContainer = wsRoot && isProjectsContainer(wsRoot);
+      const alreadyOpen = vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === named.fullPath);
+
+      if (inProjectsContainer && !alreadyOpen) {
+        // Model A path: ~/projects is open — just activate the sub-project in the tree without reloading
+        const { activateProject } = await import('../../core/project/activeProjectWatcher.js');
+        activateProject(named.fullPath);
+        // Also update the chat service so routing knows about the new project root
+        try {
+          (deps as any).redivivus = new ((deps as any).redivivus.constructor)(named.fullPath);
+        } catch {}
+        const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
+        if (ChatPanel.extensionContext) {
+          ChatPanel.extensionContext.globalState.update('redivivus.lastActiveProject', named.fullPath);
+        }
+        conversation.push({ role: 'assistant', content: `✅ **${named.name}** is now active — I can see its files and context. What would you like to do?`, timestamp: Date.now() });
+        refresh();
+      } else if (!alreadyOpen) {
+        // Not in projects container — old-style updateWorkspaceFolders is still the right call
+        const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
+        if (ChatPanel.extensionContext) {
+          const _ctx = ChatPanel.extensionContext;
+          _ctx.globalState.update('redivivus.suppressAutoOpen', named.fullPath);
+          _ctx.globalState.update('redivivus.suppressConversationClear', true);
+          const _conv = (ChatPanel.currentPanel as any)?.state?.conversation;
+          if (_conv?.length) { _ctx.globalState.update('redivivus.pendingRescueConversation', _conv); }
+        }
         vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(named.fullPath) });
       } else {
         // Already open — just focus the Redivivus project files tree
+        const { activateProject } = await import('../../core/project/activeProjectWatcher.js');
+        activateProject(named.fullPath);
         vscode.commands.executeCommand('redivivusProjectFiles.focus');
       }
     } else {

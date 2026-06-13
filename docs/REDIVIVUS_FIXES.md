@@ -3,7 +3,19 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 13, 2026: Project Context Guard blocking sub-project fixes
+## Fix — Jun 13, 2026: "Open project" vanishes after 2 seconds
+
+**Bug:** When the user typed "open frogger project" in the chat, the project appeared to open briefly (the chat header showed "frogger-arcade-game") and then snapped back to the launcher/container after ~2 seconds.
+
+**Root Cause:** The keyword handler in `chatPanelMsgSendKeywords.ts` was calling `vscode.workspace.updateWorkspaceFolders()` to add the project sub-folder as a second workspace root. This converted the single-folder `~/projects` workspace into an **untitled multi-root workspace**. `ensureProjectsWorkspace.healUntitledProjectsWorkspace()` immediately detected this, saw it was an untitled multi-root with only containers/sub-folders of `~/projects`, and re-opened a new `~/projects` window while closing the current one — undoing the project activation in ~2 seconds.
+
+**Fix:** Under Model A (when the workspace IS the `~/projects` container), the handler now calls `activateProject()` instead of `updateWorkspaceFolders()`. This silently sets the `ProjectFilesProvider` singleton root and refreshes the chat header without touching workspace folders, so the "heal" function never triggers. It also persists `lastActiveProject` so the next startup reopens to this project.
+
+**Compile:** 0 errors.
+
+---
+
+
 
 **Bug:** When the workspace is the `projects` container, the chat header successfully resolved the active sub-project (like `frogger-arcade-game`) using `ProjectFilesProvider`, but the message routing and Project Context Guard fell back to the raw `vscode.workspace.workspaceFolders[0]`. If `~/projects` had a stray `.redivivus` folder, the UI proudly showed project pills (Blueprint, Map, History) for the *container* while the Context Guard correctly blocked fix intents, telling the user no project was open. The UI and the guard violently disagreed.
 
