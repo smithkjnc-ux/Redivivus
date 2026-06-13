@@ -6,6 +6,17 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { ChatMessage } from './chatPanelHtml';
 import type { RoutingService } from '../../../services/ai/routingService';
+import { getActiveProjectRoot } from '../../../services/project/activeProjectRoot.js';
+
+// [FIX] Under Model A the workspace root is the projects CONTAINER (~/projects); the ACTIVE project is a
+// subfolder (e.g. ~/projects/tic-tac-toe-game). Architect-review file paths (e.g. `src/ai.js`) are relative
+// to that subfolder. Resolving them against the container made fs.existsSync fail for EVERY file ->
+// "Skipping N file(s) that don't exist yet" -> "No existing files to fix", even though the files were right
+// there and the diagnosis was correct. Always resolve against the active project root (same resolver Run/
+// Preview/Map use), falling back to the raw workspace root only if no active project is resolvable.
+function _projectRoot(): string {
+  return getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+}
 
 // [Redivivus] Architect review text store — keyed by reviewId, used by action handlers
 export const _architectReviews = new Map<string, string>();
@@ -31,7 +42,7 @@ export async function handleArchitectActionConfirm(msg: any, conversation: ChatM
   const actions = _architectActions.get(msg.reviewId || '');
   const act = actions?.[msg.actionIndex];
   if (!act) { return; }
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+  const root = _projectRoot();
   if (act.action === 'delete') {
     const absPath = path.join(root, act.file);
     try {
@@ -69,7 +80,7 @@ export async function handleArchitectExplain(msg: any, routing: RoutingService, 
 export function handleArchitectAddTodos(msg: any, conversation: ChatMessage[], refresh: () => void): void {
   const reviewText = _architectReviews.get(msg.reviewId || '');
   if (!reviewText) { return; }
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = _projectRoot();
   if (!root) { conversation.push({ role: 'assistant', content: '⚠️ No project folder is open. Open a project first, then try again.', timestamp: Date.now() }); refresh(); return; }
   const bpPath = path.join(root, '.redivivus', 'blueprint.md');
   const dateStr = new Date().toISOString().slice(0, 10);
@@ -101,9 +112,14 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
     conversation.push({ role: 'assistant', content: 'No specific files identified in the review. Use **Fix One at a Time** to step through issues manually.', timestamp: Date.now() });
     refresh(); return;
   }
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+  const root = _projectRoot();
   const existingFiles = files.filter(f => fs.existsSync(path.join(root, f)));
-  const missingFiles = files.filter(f => !fs.existsSync(path.join(root, f)));
+  // [FIX] A review often names the same file two ways (e.g. `src/ai.js` AND a bare `ai.js`). After resolving
+  // against the real project root the prefixed path exists; the bare duplicate would otherwise show up as a
+  // bogus "doesn't exist yet" skip and risk a double-fix. Drop any missing entry whose basename is already
+  // covered by an existing file.
+  const existingBasenames = new Set(existingFiles.map(f => path.basename(f)));
+  const missingFiles = files.filter(f => !fs.existsSync(path.join(root, f)) && !existingBasenames.has(path.basename(f)));
   if (missingFiles.length > 0) {
     conversation.push({ role: 'assistant', content: `Skipping ${missingFiles.length} file(s) that don't exist yet: \`${missingFiles.join('`, `')}\``, timestamp: Date.now() });
     refresh();
@@ -136,9 +152,10 @@ export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[
     const seen = new Set<string>();
     const allFiles: string[] = [];
     for (const m of fileMatches) { const f = m[1]; if (!seen.has(f)) { seen.add(f); allFiles.push(f); } }
-    const rootDir = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+    const rootDir = _projectRoot();
     const files = allFiles.filter(f => fs.existsSync(path.join(rootDir, f)));
-    const skipped = allFiles.filter(f => !fs.existsSync(path.join(rootDir, f)));
+    const existingBasenames = new Set(files.map(f => path.basename(f)));
+    const skipped = allFiles.filter(f => !fs.existsSync(path.join(rootDir, f)) && !existingBasenames.has(path.basename(f)));
     if (skipped.length > 0) {
       conversation.push({ role: 'assistant', content: `Skipping \`${skipped.join('`, `')}\` -- file(s) don't exist yet.`, timestamp: Date.now() });
       refresh();

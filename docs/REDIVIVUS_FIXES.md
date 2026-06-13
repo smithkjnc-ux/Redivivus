@@ -3,6 +3,45 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 12, 2026: Architect "Fix All" — "No existing files to fix" (Model A path bug, write-side)
+
+**Symptom (live fix-pipeline test on the broken tic-tac-toe fixture):** the ARCHITECT REVIEW diagnosed correctly (duplicate `makeMove`, missing exports, truncated `renderer.js`), but clicking **Fix All** printed *"Skipping 10 file(s) that don't exist yet: `src/ai.js, logic.js, src/controller.js, …`"* then *"No existing files to fix. The review only suggested new files to create."* — and did nothing. PapaJoe thought it hallucinated; it didn't. The files genuinely exist at `~/projects/tic-tac-toe-game/src/*.js`.
+
+**Cause:** same Model A root-resolution bug as Run/Preview/Map, in the architect fix path. The workspace folder under Model A is the projects CONTAINER (`~/projects`), not the active subfolder. The review's relative paths (`src/ai.js`) were joined against the container → `~/projects/src/ai.js` → `fs.existsSync` false for every file → all "missing" → "nothing to fix." The 10-vs-5 count was the review naming each file two ways (`src/ai.js` AND bare `ai.js`).
+
+- **`src/ui/panels/chat/chatPanelMsgArchitect.ts`** (existence-check side): added `_projectRoot()` = `getActiveProjectRoot() || workspaceFolders[0]`; replaced the raw-workspace-root resolution in all four handlers (Fix All, Fix One, per-action confirm, add-todos). Added **basename de-dupe**: a "missing" entry whose basename already matches an existing file (bare `ai.js` vs `src/ai.js`) is dropped — no bogus skip line, no double-fix.
+- **`src/ui/panels/chat/chatPanelEditHandler.ts`** (write side — the half that actually matters): `handleEditRequest` set `ctx.root` from the raw workspace folder, and `chatPanelEditBuild.ts:18` does `path.join(root, filePath)`. So even past the existence check, the real read/write hit `~/projects/src/ai.js`. Now resolves via `getActiveProjectRoot()`. Without this, Fix All would find the files but edit the wrong (nonexistent) path.
+- **Why:** the diagnose/read step already had the right root (the review read real file content); only the fix-apply path used the container. Aligns the architect fix path with the Run/Preview/Map resolver fixed earlier this session.
+- **Risk:** low. `tsc` clean; deployed (`out/` confirms `getActiveProjectRoot` wired into both files). `runEditFix` guard (`extensionInlineCommands.ts:101`) left as-is — it only checks "is anything open," not resolution. **Reload the extension host** to load the new code, then re-run Fix All. **Note:** `renderer.js` is truncated, so its fix requires the Worker to GENERATE missing code — that's the genuine pipeline test now that the path bug is out of the way.
+
+---
+
+## Session — Jun 12, 2026: rigops admin — four feature requests (logged here; rigops has no own fix log)
+
+**Context:** Four PapaJoe-requested features for the rigops admin TUI (`rigops/rigops/panels/admin/`), done in order, each tested before moving on. (rigops is a separate repo with no docs/ fix log — recorded here to keep the session history intact.) All four were finally **smoke-tested together** via Textual's headless pilot (`run_test`): AdminScreen activated and **all 17 nav panes mounted clean** with a live Supabase key, including every changed area.
+
+**(1) Users tab auto-refresh** — `users.py`. Added `self.set_interval(30.0, self.load_users)` in `on_mount` so the user list stays live (new users / last-active) like the SysOp tab, without a manual Refresh. `_apply_filter` now remembers the selected user (`prev_id` → `tbl.move_cursor`) so an auto-refresh rebuild doesn't jump the cursor to the top. (Also the earlier IDE-Version capture fix lives here: latest `ide_version` per user from `activity_logs.metadata`.)
+
+**(2) Activity Logs show email, not raw User ID** — `activity.py`. Column header "User ID" → "User". `load_logs` now fetches the `get_all_users` RPC (same identity source the Users tab trusts), builds a `user_id → email` map, and resolves each row via a new static `_who()`: known user → email, unknown id (deleted user) → raw id, anonymous/system row → "—". The resolve query is wrapped so the table still loads (raw ids) if the RPC ever fails (soft-fail / never cry wolf). Verified `_who` for all three cases.
+
+**(3) Notifications → proper email editor, Announcements folded in** — `notifications.py` rewritten into four classes (mirrors the `UsersWaitlistTab` pattern); `screen.py` updated. PapaJoe chose "one tab, three sub-tabs."
+- `ComposeTab` — the proper editor: Recipient (one email or `all`), Subject, **multi-line `TextArea` body** (was a cramped single-line Input), and three channels — 📨 In-App / ✉ Email / 📤 Both. In-app → `notifications` insert; email → branded Resend via `mailer.plain_html()`. Live progress + plain-English result ("✅ Sent: 12 in-app, 11/12 email (1 failed)").
+- `SentNotificationsTab` — the old notifications table/delete, compose inputs removed; its **User** column now resolves to email too (same as #2).
+- `AnnouncementsTab` — unchanged, moved under the combined tab.
+- `NotificationsTab` — wrapper with inner tabs **Compose / Sent / Announcements**.
+- `screen.py` — removed the separate **Announcements** nav entry (now folded in), updated the Notifications description, trimmed the now-unused import.
+- Guardrails: any `all` send confirms first (`ConfirmScreen` names the channel); `all` email targets **confirmed users only** (a single typed address is always allowed — never spam unconfirmed on a broadcast).
+
+**(4) Showcase — add programs** — `showcase.py`. Previously only the website could add demos.
+- New `AddDemoScreen` modal — full add form matching the web `/admin/showcase` action field-for-field: Title*, Kind toggle (playable⇄code), Description, Tags (comma-split), Prompt, Language (code only), Start key (playable only), Embed height (640 default), and **Content via `TextArea` OR a file path on disk** (file path wins — handy for whole HTML files). Inserts with `published: true`.
+- New `_slugify()` — derives the slug using the **same ASCII `[^a-z0-9]+` rule the web app uses**, so a demo added from the TUI gets the identical slug it would on the website (verified, incl. the non-ASCII edge case).
+- `ShowcaseTab` — added **➕ Add Program** button → opens the modal, reloads on success.
+- Friendly errors: missing title, unreadable file, and a duplicate-slug DB error translated to "A demo with that title already exists — change the title."
+
+**Risk:** low. All Python imports clean; static helpers (`_who`, `_channel_label`, `_slugify`) unit-checked; live-app pilot smoke-test passed (17/17 panes, all three Notifications sub-tabs mounted, Showcase Add button present). **Not** verified headlessly (yours to click through): real email delivery, notification-row insert, and a new showcase demo appearing on the public `/showcase` page. File sizes follow rigops's per-area convention (`notifications.py` 431, `showcase.py` 249, like `users.py` 488 — rigops groups related tabs per file rather than the redivivus 200-line split rule).
+
+---
+
 ## Session — Jun 12, 2026: home screen — container shows the launcher, not a project dashboard
 
 **Symptom:** the `~/projects` home screen rendered a project **dashboard** — "🚀 projects", "Blueprint: No blueprint yet — create one", and a **Close Project** button — implying a project was open, even though `isInitialized/hasProject=false`.

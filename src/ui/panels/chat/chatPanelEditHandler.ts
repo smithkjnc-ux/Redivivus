@@ -7,9 +7,14 @@ import type { EditBuildContext } from '../../../core/build/chatPanelEditBuild';
 import { runEditFileBuild } from '../../../core/build/chatPanelEditBuild';
 import { autoCommitIfEnabled } from '../../../services/gitAutoCommitService';
 import { refreshSetupProgressIfOpen } from '../../../services/project/setupProgressPanel';
+import { getActiveProjectRoot } from '../../../services/project/activeProjectRoot.js';
 
 export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, 'pendingTask' | 'setPendingTask' | 'setActiveBuildCtx'>): Promise<void> {
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  // [FIX] Resolve the edit against the ACTIVE project root, not the raw workspace folder. Under Model A the
+  // workspace is the projects CONTAINER (~/projects) and the project is a subfolder, so chatPanelEditBuild's
+  // `path.join(root, filePath)` was reading/writing ~/projects/src/ai.js (nonexistent) instead of the real
+  // ~/projects/<project>/src/ai.js. This is the write-side half of the architect Fix-All path bug.
+  const root = getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) { return; }
   deps.conversation.push({ role: 'user', content: `Fix \`${msg.filePath}\`: ${msg.task}`, timestamp: Date.now() });
   deps.refresh();
