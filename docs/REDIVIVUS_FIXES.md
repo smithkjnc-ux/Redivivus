@@ -3,6 +3,33 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 13, 2026: "Could not apply the fix" on a clean HTML surgical edit (frogger collision)
+
+**Symptom:** User asked to fix the frog dying on logs. Supervisor (Gemini, after Claude/OpenAI key failover) diagnosed it correctly (collision box not updated to the interpolated hop position), Worker wrote a clean `<edit>/<search>/<replace>` for `index.html`, Verify passed, Guardian approved — then `[!] Could not apply the fix`. The retry ran the Worker a second time, same result.
+
+**Root cause — NOT the matcher; a logic gap in `chatPanelMsgFixApply.ts`.** The fix-pipeline log was decisive:
+```
+Apply: Response format detected -> "format": "surgical"
+Apply: Falling back to legacy full-file parsing -> "usedSurgical": false
+[PARSE] XML regex found 0 matches, 0 valid fixes
+```
+The `hasHtmlTarget` guard (added May 29 as a defensive measure) **skips the surgical path whenever any target file is `.html`**, on the assumption the Worker will emit a full-file `<content>` rewrite that `parseFixResponse` handles. But here the Worker emitted a **surgical-only** `<edit>` with **no `<content>`**. So surgical was skipped AND `parseFixResponse` (which looks for `<content>` / `// === FILE:`, not `<search>/<replace>`) found nothing → 0 files written → the fix silently evaporated. Every surgical HTML edit with no full-file alternative was unappliable.
+
+**Proof the edit was good:** reconstructed the Worker's exact `<search>` block (matches `index.html` lines 767–772 at 12-space indent) and ran `applySurgicalEdits` against a copy of the real file — it applied via Strategy 2 (normalized line-range, line 767), `changed:true, has currentFrogX:true`. The matcher was fine all along; it just never ran.
+
+**Fix — `chatPanelMsgFixApply.ts`:** `hasHtmlTarget` now ALSO requires a real full-file fallback to exist before skipping surgical:
+```ts
+const hasFullFileFallback = /<content>[\s\S]*?<\/content>/i.test(finalResponse) || /(?:^|\n)\/\/\s*===\s*FILE:/.test(finalResponse);
+const hasHtmlTarget = responseFormat === 'surgical' && hasFullFileFallback && parseSurgicalEdits(...).some(e => e.filePath.endsWith('.html'));
+```
+So the original intent (prefer full-file rewrites for HTML *when one is present*) is preserved, but a surgical-only HTML edit now runs through `applySurgicalEdits`. The existing post-surgical legacy fallback (line 69) still catches a genuine miss, so this is strictly safer than dropping the edit.
+
+**Risk:** low — only widens when surgical actually runs for HTML; the 4-strategy matcher (trimmed-line is exact-per-line) plus the legacy fallback bound the downside. Re-run the same frogger fix to confirm end-to-end.
+
+**Compile:** 0 errors, deployed.
+
+---
+
 ## Fix — Jun 13, 2026: Cost shown on fix-pipeline FAILURE messages too
 
 **Follow-up to the chat-cost change.** The fix pipeline's **success** result already printed a full `Pipeline Usage` block with per-AI cost + `Total Session Cost` (`chatPanelMsgFixOutput.ts`). But the three **failure / early-return** exits in `chatPanelMsgFix.ts` returned *before* that block, so a fix that burned the Supervisor (and maybe Worker) calls and then failed showed **no cost at all** — violating "every AI call has a cost, on the bottom of every response."

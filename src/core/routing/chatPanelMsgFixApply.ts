@@ -20,9 +20,15 @@ export async function applyFixContent(finalResponse: string, root: string, allow
   let written: string[] = []; let failed: string[] = []; let skipped: string[] = []; let fixSnapId: string | undefined;
   let usedSurgical = false;
 
-  // [FIX] Skip surgical for HTML files — text matching is unreliable on large HTML/JS files.
-  // Falls through to parseFixResponse which handles <content> full-file output.
-  const hasHtmlTarget = responseFormat === 'surgical' && parseSurgicalEdits(finalResponse).some((e: any) => e.filePath.endsWith('.html'));
+  // [FIX] Prefer full-file rewrites for HTML (surgical text-matching is less reliable on large inline-JS files).
+  // BUT only skip the surgical path when the response ACTUALLY contains a full-file <content> (or `// === FILE:`)
+  // to fall back to. If the Worker emitted ONLY a surgical <edit> for an HTML file — no full-file alternative —
+  // skipping surgical silently DROPS the fix: parseFixResponse has nothing to parse (it looks for <content> /
+  // `// === FILE:`, not <search>/<replace>), so 0 files are written. In that case we MUST run surgical; the
+  // matcher's 4 strategies handle indentation drift, and the legacy fallback below still catches a true miss.
+  // (Caused "Could not apply the fix" on a clean, Guardian-approved frogger collision edit — Jun 13, 2026.)
+  const hasFullFileFallback = /<content>[\s\S]*?<\/content>/i.test(finalResponse) || /(?:^|\n)\/\/\s*===\s*FILE:/.test(finalResponse);
+  const hasHtmlTarget = responseFormat === 'surgical' && hasFullFileFallback && parseSurgicalEdits(finalResponse).some((e: any) => e.filePath.endsWith('.html'));
 
   if (responseFormat === 'surgical' && !hasHtmlTarget) {
     const edits = parseSurgicalEdits(finalResponse);
