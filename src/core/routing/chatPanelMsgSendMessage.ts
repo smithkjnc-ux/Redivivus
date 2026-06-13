@@ -109,9 +109,21 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     preferred: (msg.manualProvider as string | undefined) || undefined,
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
-  // [ADAPTIVE-PILL] If cloudChat fails AND user has manually locked a provider, fall through to
-  // handleAIChat with manualProvider set — it will enforce single-provider mode (no failover).
-  if (!chatResult) { await handleAIChat(msg, userText, deps, conversation, refresh, { manualProvider: (msg.manualProvider as string) || undefined }); return; }
+  // [FIX] cloudChat returned null — backend unavailable or all providers capped (e.g. Claude billing).
+  // Smart local fallback: if workspace is open and text has clear fix signals, route to handleFixRequest
+  // (which uses routing.prompt() with full failover). Otherwise Q&A via handleAIChat.
+  // [WARN] Do NOT go to handleAIChat for fix requests — it uses promptCheap which silently fails for code.
+  if (!chatResult) {
+    const _hasWs = !!vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const _looksLikeFix = _hasWs && /\b(cannot|can't|cant|won't|wont|doesn't|doesnt|not working|broken|fails|failing|stuck|wrong|missing|error|crash|freeze|hang|glitch|bug|issue|problem|blank|empty)\b/i.test(userText);
+    if (_looksLikeFix) {
+      fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null + fix signals → fix pipeline`);
+      await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
+      return;
+    }
+    await handleAIChat(msg, userText, deps, conversation, refresh, { manualProvider: (msg.manualProvider as string) || undefined });
+    return;
+  }
   // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it on all non-build paths.
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }

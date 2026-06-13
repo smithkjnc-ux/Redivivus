@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-13 — Adaptive AI Pill: Vault+roster pills removed; new `#adaptive-pill` shows neutral until user types, then live-evaluates prompt and shows cheapest capable provider (⚡ Groq·flash / ◆ DeepSeek·pro / ✶ Opus·ultra). Click → manual-picker popover; manual mode locks ONE provider (no failover, purple border). `manualProvider` threads from webview → postMessage → cloudChat(preferred) → promptWithProvider(). Supervisor/worker cap preserved. Compile clean, deployed.
+*Last updated:* 2026-06-13 — Fix tier assessment bug: 'game' keyword no longer forces ultra for fix requests; now requires build verb ('build a game'). Fix silent failure: cloudChat=null + fix signals → fix pipeline (full failover), not Q&A promptCheap (which silently returned nothing). Root cause: Claude billing cap → ultra tier → no fallback → silence.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

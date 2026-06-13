@@ -3,6 +3,24 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Fix tier assessment + silent fallback bug (frog cannot jump on logs)
+
+**Symptom:** User sent "in the river part of the game, the frog cannot jump on the logs." No response appeared. Status returned to "ready" with nothing in chat.
+
+**Root cause A — `assessTier` over-triggered on "game" keyword:** The adaptive pill's `assessTier()` contained a flat regex that forced `ultra` for ANY message containing the word "game" (also chess, frogger, etc.) regardless of intent. "The frog cannot jump on the logs" → contained "game" context → `tier='ultra'` → Claude Opus picked as cheapest ultra provider → Claude billing capped → backend returned error → `cloudChat` returned null.
+
+**Root cause B — `cloudChat` null fallback always went to Q&A:** When `cloudChat` returns null, the code fell through to `handleAIChat(...)` which uses `routing.promptCheap()` — the Q&A path. A fix/code request going through `promptCheap` (flash tier, 4 attempts) with Claude capped → no providers succeeded → `aiResponse.success = false` → error pushed to conversation BUT `setInputBusy` was already released by a previous path → the error message was never rendered. Visually: silence.
+
+**Fix A — `chatPanelScriptTier.ts`:** Rewrote ultra escalation logic. Fix/bug verbs now take priority and immediately return `'pro'` before any game-keyword checks run. Game names (chess/tetris/snake/frogger etc.) only escalate to ultra when combined with an explicit build verb ("build a game", "make a snake game", "create from scratch"). `"game"` alone only escalates with a build verb — never on its own.
+
+**Fix B — `chatPanelMsgSendMessage.ts`:** Replaced the single-line null fallback with a smarter router. When `cloudChat` returns null AND the workspace is open AND the message contains fix-signal words (cannot/broken/fails/stuck/wrong/error/etc.) → routes directly to `handleFixRequest` (which uses `routing.prompt()` with full ranked-provider failover). Only falls through to `handleAIChat` Q&A when there are no fix signals.
+
+**Result:** "in the river part of the game, the frog cannot jump on the logs" → pill shows `◆ DeepSeek · pro` (fix intent detected, not ultra) → backend tries DeepSeek → fix pipeline runs → result delivered.
+
+**Deploy:** Compiled 0 errors, deployed to baked IDE.
+
+---
+
 ## Session — Jun 13, 2026: Adaptive AI Pill — live prompt-aware provider selector
 
 **Context (PapaJoe):** "remove the vault pill, remove the AI pill, move the adaptive AI pill to the left. It should show nothing until the user starts typing, then evaluate the prompt and show the AI. Also support manual mode to lock a single provider."

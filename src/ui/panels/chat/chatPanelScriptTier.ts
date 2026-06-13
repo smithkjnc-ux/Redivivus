@@ -61,8 +61,18 @@ export function buildTierScript(): string {
 
         if (n > 60) return 'ultra';
 
-        // Ultra: game keywords (always need strong model), architecture words, long comparisons
-        if (/\\b(game|chess|tetris|snake|pacman|centipede|puzzle|platformer|shooter|rpg|arcade|pong|breakout|minesweeper|solitaire|2048|wordle|frogger|asteroids|breakout)\\b/.test(lower)) return 'ultra';
+        // Detect intent FIRST before escalating on keywords.
+        // Fix/bug verbs: these are PRO requests, NOT ultra, even if they mention game names.
+        var isFixIntent = /\\b(fix|debug|repair|broken|doesn't|doesn\'t|cant|can't|cannot|won't|wont|not working|fails|failing|stuck|wrong|missing|broke|error|crash|freeze|hang|glitch|bug|issue|problem)\\b/.test(lower);
+        if (isFixIntent) return 'pro'; // Repair work = pro; supervisor handles it fine
+
+        // Ultra: game BUILD keywords — only when paired with a build verb.
+        // [WARN] Do NOT trigger on 'game' alone — 'the frog cannot jump' mentions game but is a fix, not a build.
+        var GAME_WORDS = /\\b(chess|tetris|snake|pacman|centipede|puzzle|platformer|shooter|rpg|arcade|pong|breakout|minesweeper|solitaire|2048|wordle|frogger|asteroids)\\b/;
+        var BUILD_VERBS = /\\b(build|make|create|generate|write|implement|code up|start|new game|from scratch)\\b/;
+        if (GAME_WORDS.test(lower) && BUILD_VERBS.test(lower)) return 'ultra';
+        // 'game' alone only escalates with explicit build verb — e.g. 'build a game', 'make me a game'
+        if (/\\bgame\\b/.test(lower) && BUILD_VERBS.test(lower)) return 'ultra';
 
         var ULTRA_STEMS = ['implicat','architect','comprehens','tradeoff','strateg','evaluat','scalab','microserv','monolith','distribut'];
         var ULTRA_FUZZY = ['implications','architecture','tradeoffs','comprehensive','evaluate'];
@@ -136,40 +146,43 @@ export function buildTierScript(): string {
         var text = (inp && inp.value) ? inp.value : '';
 
         if (_manualProvider) {
-          // MANUAL MODE — locked to a specific provider
-          // Show provider name + tier for the current prompt (so user knows which model they're getting)
+          // MANUAL MODE — format: "Manual · [AI Name]"
           var lockedTier = assessTier(text) || 'pro';
-          // For manual mode: builds always get at least pro (never flash for code generation supervisor)
-          var isCodeWork = lockedTier === 'ultra' || lockedTier === 'pro';
-          var displayTier = isCodeWork ? lockedTier : lockedTier;
-          var modelLabel = (PROVIDER_TIER_LABEL[_manualProvider.id] || {})[displayTier] || _manualProvider.label;
-          pill.innerHTML = '\\uD83D\\uDD12 ' + modelLabel + ' <span style="font-size:9px;opacity:0.75;margin-left:2px;">&middot; manual</span>';
+          var modelLabel = (PROVIDER_TIER_LABEL[_manualProvider.id] || {})[lockedTier] || _manualProvider.label;
+          pill.innerHTML =
+            '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;opacity:0.9;">Manual</span>' +
+            '<span style="opacity:0.4;margin:0 4px;">\u00B7</span>' +
+            _manualProvider.emoji + '\u202F' + modelLabel;
           pill.style.color = '#a78bfa';
           pill.style.borderColor = '#7c3aed';
           pill.style.background = '#7c3aed22';
-          pill.title = 'Manual: locked to ' + _manualProvider.label + '. Click to switch provider or return to Adaptive.';
+          pill.title = 'Manual: locked to ' + _manualProvider.label + ' \u2014 no failover. Click to change or return to Adaptive.';
           return;
         }
 
         // ADAPTIVE MODE
         var tier = assessTier(text);
         if (!tier) {
-          // Blank input — neutral placeholder, no provider committed
-          pill.innerHTML = '\\u26A1 AI';
-          pill.style.color = '#555';
+          // Blank input — show "Adaptive" label only, no AI committed yet
+          pill.innerHTML = '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;opacity:0.6;">Adaptive</span>';
+          pill.style.color = '#666';
           pill.style.borderColor = '#3d3d3d';
           pill.style.background = 'transparent';
           pill.title = 'Adaptive: picks the right AI as you type. Click to lock a specific provider.';
           return;
         }
 
+        // Typing — show "Adaptive · [AI]"
         var provider = pickProvider(tier);
-        var icon  = TIER_ICON[tier]  || '\\u25C6';
         var color = TIER_COLOR[tier] || '#818cf8';
         var provLabel = provider ? ((PROVIDER_TIER_LABEL[provider.id] || {})[tier] || provider.label) : tier;
-        pill.innerHTML = icon + ' ' + provLabel + ' <span style="font-size:9px;opacity:0.7;margin-left:2px;">&middot; ' + tier + '</span>';
+        var provEmoji = provider ? provider.emoji : '';
+        pill.innerHTML =
+          '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">Adaptive</span>' +
+          '<span style="opacity:0.35;margin:0 4px;">\u00B7</span>' +
+          provEmoji + '\u202F' + provLabel;
         pill.style.color = color;
-        pill.style.borderColor = '#4caf5066'; // green tint = adaptive
+        pill.style.borderColor = color + '55';
         pill.style.background = color + '18';
         pill.title = 'Adaptive: ' + (provider ? provider.label : '') + ' (' + tier + ') for this message. Click to lock a provider.';
       }
