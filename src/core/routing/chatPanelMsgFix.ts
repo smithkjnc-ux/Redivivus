@@ -8,6 +8,8 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
+import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { parseFixResponse, takeSnapshot, readProjectRules, writeProjectRoadmapEntry, modelLabel } from './chatPanelMsgFixUtils';
 import { collectSourceFiles } from './chatPanelMsgFixContext';
@@ -25,7 +27,11 @@ import { runFixFinalize } from './chatPanelMsgFixFinalize';
 
 export async function handleFixRequest(userText: string, deps: MessageHandlerDeps, imageBase64?: string, imageType?: string): Promise<void> {
   const { routing, conversation, refresh } = deps;
-  const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  // [FIX] Resolve the ACTIVE project root, not the raw workspace folder. Under Model A the workspace is the
+  // projects CONTAINER (~/projects); using it made the fix scan the container, find no top-level source, then
+  // (see the fallback below) reach into the FIRST sibling project alphabetically — it "fixed" `breakout` inside
+  // a `frogger` project. getActiveProjectRoot() returns the active subfolder so the fix stays in this project.
+  const root = getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   // [FIX] No workspace open means no code to fix — treat as a new build request so autoCreateProject runs.
   if (!root) { await deps.handleBuildRequest(userText, true); return; }
 
@@ -42,7 +48,10 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
 
   // [FIX] After auto-open, workspace root may be set but point to a wrapper or multi-root.
   // Scan one level deep for a subfolder containing source files as fallback.
-  if (sourceFiles.length === 0) {
+  // [WARN] PARADOX GUARD: NEVER run this one-level-deep scan when root is the projects CONTAINER — its
+  // subfolders are OTHER projects, and this loop would grab the first one (alphabetically) and edit a sibling
+  // project's files. Only allowed when root is a real project (its subfolders are src/, lib/, etc.).
+  if (sourceFiles.length === 0 && !isProjectsContainer(root)) {
     try {
       const entries = fs.readdirSync(root);
       diagLog(`root entries: ${entries.join(', ')}`);

@@ -3,6 +3,22 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Session — Jun 13, 2026: Natural-language fix edited a SIBLING project (`breakout` inside `frogger`) — paradox-guard breach
+
+**Symptom (live test):** built a Frogger game (in `frogger-arcade-game`); it was blank; the natural-language fix ("game has a blank window…") kept referencing and ultimately **editing `breakout/src/ui/menuRenderer.js`** — a *different* project. Confirmed it modified the live file (`~/projects/breakout/src/ui/menuRenderer.js`: 3186 bytes vs 3262 in the pre-edit snapshot).
+
+**Cause (two compounding bugs in `chatPanelMsgFix.handleFixRequest`):**
+1. `const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath` — under Model A that's the projects CONTAINER (`~/projects`), not the active `frogger-arcade-game`. (Same Model A root bug fixed elsewhere; this path was still raw.)
+2. The "scan one level deep for a subfolder with source files" **fallback** (added for wrapper/multi-root workspaces) then iterated the container's subfolders — i.e. **every sibling project** — and took the FIRST one with source files: `breakout` (alphabetical, b < f < t). So it loaded Breakout's files, diagnosed them, and wrote to them. The pre-edit snapshot even landed at container level: `~/projects/.redivivus/snapshots/…/breakout/src/ui/menuRenderer.js`.
+
+- **File changed:** `src/core/routing/chatPanelMsgFix.ts` (+2 imports).
+- **What changed:** (a) `root` now resolves via `getActiveProjectRoot()` (active subfolder) with the raw workspace folder only as last resort; (b) the one-level-deep fallback is now **guarded with `!isProjectsContainer(root)`** — a PARADOX GUARD so it can NEVER scan the container's subfolders (sibling projects). When root is the container (no active project), the fix falls through to the build path instead of guessing a sibling.
+- **Why:** a fix must operate ONLY on the active project; reaching into a sibling both produces nonsense fixes AND silently corrupts unrelated projects (it did — breakout's menuRenderer.js was overwritten). Defense in depth: `allowedRels`/`applyFixContent` already constrain writes to the scanned file set, but the wrong files were scanned in the first place.
+- **Risk:** low. `tsc` clean; deployed. **Reload the extension host**, then re-test a fix on Frogger — it should stay inside `frogger-arcade-game`. **Cleanup owed:** `~/projects/breakout/src/ui/menuRenderer.js` was modified by the bad fix; restore from `~/projects/.redivivus/snapshots/1781325160639/breakout/src/ui/menuRenderer.js` (pending user OK).
+- **Still open (separate, backend):** (1) `make a X game` → answer not build (classifier prompt already covers it; needs Fly deploy / few-shot); (2) build produced only `index.html` though the Supervisor prescribed a multi-file architecture (Worker dropped files — `/build` handoff). See [[build-pipeline-open-issues]].
+
+---
+
 ## Session — Jun 13, 2026: Map panel auto-refreshes on file change (FileSystemWatcher)
 
 **Feature (PapaJoe request, follow-up to the stale-map fix):** the architect review already rebuilds topology fresh, but the *visual* Architecture Map only updated on manual Refresh / reopen — so after a build it showed a stale graph. Added a `FileSystemWatcher` to `MapPanel`.
