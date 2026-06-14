@@ -3,6 +3,22 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026: "Cost way off + fix didn't apply" — surgical edits dropped + Worker input cost counted as $0
+
+**Request:** "AI cost way off and still did not make the edit... something is wrong with using claude too many calls and the wrong model?" — "make the frog more detailed and lifelike" cost a reported $0.34 (actual Claude bill ~$0.63), didn't apply (Retry shown), and made ~8 Claude calls.
+
+**Causation-first (fix-pipeline log, Rule 17):** The Worker emitted a MIXED reply — valid surgical `<edit>` blocks PLUS a stray truncated `<content>` block. Apply detected `format: surgical` but then `usedSurgical: false` -> fell back to legacy full-file parsing, which read the partial `<content>` (1380 chars « the 24KB file), and the truncation safety guard BLOCKED the write. 0 files written -> the escalation loop retried (re-prescribe + `[TRUNCATION DETECTED]` forced-surgical), driving ~8 Claude calls each carrying the full 24KB file. Not a model/suspended-model problem; not a search mismatch.
+
+**Two root causes, two fixes:**
+- `chatPanelMsgFixApply.ts` — **[DEAD]** removed the `hasFullFileFallback`/`hasHtmlTarget` skip. It preferred a full-file `<content>` for HTML whenever the response merely CONTAINED a `<content>` substring, which dropped the good surgical edits on a mixed/truncated reply. Surgical is now the PRIMARY path (`if (responseFormat === 'surgical')`); the legacy full-file fallback below still catches a genuine surgical miss. Matches the deployed Worker rule (surgical for small changes even in .html).
+- `chatPanelMsgFixPhases.ts` — Worker `recordUsage` had `inputTokens: 0` HARDCODED. The streamed Worker reply carries no token frame, so the 24KB file context (the biggest cost) was billed as $0, making the reported total a fraction of the real provider charge. Now estimates input from `diagnosis + every file's content` (~4 chars/token) + a 600-token system-prompt allowance; output from the streamed text length.
+
+**Risk:** Apply change — if a Worker's surgical search blocks genuinely don't match AND it also emitted a truncated `<content>`, it still fails (correctly: nothing safe to write), but now valid surgical edits apply first. Cost estimate is an approximation (no real token frame on the stream), but far closer than $0 input.
+
+**Deploy:** client-only (`npm run compile` auto-deploys). No Fly deploy needed — backend Worker format rule already live.
+
+---
+
 ## Feature — Jun 14, 2026: Blueprint shows REQUEST HISTORY (the user prompts that built/changed it)
 
 **Request:** "add to the blueprint the prompts from the user as well that make the build or edit/fix it."

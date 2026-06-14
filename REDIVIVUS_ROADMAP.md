@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — (5) Full pipeline working: routing stall fixed (IMPERATIVE-RECOVERY unified guard for answer/clarify/isBuildSpec inside open project), supervisor 401 fixed (gemini-2.5-pro→flash, Groq skipped when files>30KB). Verified: Supervisor (Claude) → Worker (Claude) → Guardian (Gemini) end-to-end.
+*Last updated:* 2026-06-14 — Fixed "cost way off + fix didn't apply": apply was dropping valid surgical edits when a mixed/truncated `<content>` was present (removed hasHtmlTarget skip; surgical is now primary), and the Worker billed its 24KB input context as $0 (hardcoded inputTokens:0 → now estimated). Root cause of the ~8-call retry storm. See REDIVIVUS_FIXES.md.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

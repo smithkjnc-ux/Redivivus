@@ -20,17 +20,15 @@ export async function applyFixContent(finalResponse: string, root: string, allow
   let written: string[] = []; let failed: string[] = []; let skipped: string[] = []; let fixSnapId: string | undefined;
   let usedSurgical = false;
 
-  // [FIX] Prefer full-file rewrites for HTML (surgical text-matching is less reliable on large inline-JS files).
-  // BUT only skip the surgical path when the response ACTUALLY contains a full-file <content> (or `// === FILE:`)
-  // to fall back to. If the Worker emitted ONLY a surgical <edit> for an HTML file — no full-file alternative —
-  // skipping surgical silently DROPS the fix: parseFixResponse has nothing to parse (it looks for <content> /
-  // `// === FILE:`, not <search>/<replace>), so 0 files are written. In that case we MUST run surgical; the
-  // matcher's 4 strategies handle indentation drift, and the legacy fallback below still catches a true miss.
-  // (Caused "Could not apply the fix" on a clean, Guardian-approved frogger collision edit — Jun 13, 2026.)
-  const hasFullFileFallback = /<content>[\s\S]*?<\/content>/i.test(finalResponse) || /(?:^|\n)\/\/\s*===\s*FILE:/.test(finalResponse);
-  const hasHtmlTarget = responseFormat === 'surgical' && hasFullFileFallback && parseSurgicalEdits(finalResponse).some((e: any) => e.filePath.endsWith('.html'));
-
-  if (responseFormat === 'surgical' && !hasHtmlTarget) {
+  // [FIX] Surgical is the PRIMARY apply path — always run it when the Worker emits <edit> blocks, even for .html.
+  // [DEAD] Removed the old hasFullFileFallback/hasHtmlTarget skip. It preferred a full-file <content> for HTML
+  // whenever the response merely CONTAINED a <content> substring. On a mixed/truncated Worker reply (valid
+  // surgical <edit> blocks PLUS a partial <content>), that skip dropped the good surgical edits, then the
+  // truncated <content> tripped the safety guard -> 0 files written, "fix didn't apply cleanly", and a retry
+  // storm of ~8 Claude calls (frogger "make the frog more detailed", Jun 14, 2026). The deployed Worker rule now
+  // uses surgical for small changes EVEN in HTML, so surgical must lead. If surgical genuinely writes nothing,
+  // the legacy full-file fallback below still runs and catches a true miss.
+  if (responseFormat === 'surgical') {
     const edits = parseSurgicalEdits(finalResponse);
     const editFiles = [...new Set(edits.map(e => e.filePath))];
     // Validate all edited files exist in project
