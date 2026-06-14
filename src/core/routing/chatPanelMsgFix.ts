@@ -175,6 +175,9 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // diagnosis -> Worker fix -> Guardian verdict), not just a vague chat bubble. Best-effort; never blocks.
   fixActStart(userText, sourceFiles.length);
 
+  // [RULE 18] Size the Supervisor by UNDERSTANDING the request (tiny AI classifier), not regex. Offline-safe.
+  await (await import('../../services/ai/routeClassifier.js')).applyRouteTier(userText, true, deps);
+
   // Phase 1: Supervisor diagnoses ALL bugs
   conversation.push({ role: 'assistant', content: `Scanning ${sourceFiles.length} file${sourceFiles.length !== 1 ? 's' : ''}...`, timestamp: Date.now() });
   refresh();

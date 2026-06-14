@@ -2,8 +2,9 @@
 // Replaces the old tier-badge (right side) with a smarter pill on the LEFT side (#adaptive-pill).
 // Behaviour:
 //   - Blank input  → neutral/faded "⚡ AI" (no provider named, no cost implied)
-//   - Typing       → debounced 400ms → assessTier(text) → pick cheapest configured provider
-//                    for that tier → pill shows "⚡ Groq · flash", "◆ DeepSeek · pro", etc.
+//   - Typing       → debounced 400ms → AI classifier (extension) sizes the tier → pick cheapest configured
+//                    provider for that tier → pill shows "⚡ Groq · flash", "◆ DeepSeek · pro", etc.
+//                    Shows "Adaptive · sizing…" until the classifier responds. No regex/keyword matching (Rule 18).
 //   - Click pill   → manual-picker popover: all configured providers + "Adaptive (auto)" top row
 //   - Manual mode  → pill shows "🔒 Gemini · pro" (purple border) — ONLY that provider used,
 //                    no failover to others. Worker tier ≤ supervisor tier enforced on send.
@@ -39,82 +40,47 @@ export function buildTierScript(): string {
       var TIER_ICON  = { flash: '\\u26A1', pro: '\\u25C6', ultra: '\\u2736' };
       var TIER_COLOR = { flash: '#14B8A6', pro: '#818cf8', ultra: '#f59e0b' };
 
-      // ── Tiny Levenshtein for typo-tolerant tier assessment ──────────────────
-      function lev(a, b) {
-        if (Math.abs(a.length - b.length) > 3) return 99;
-        var d = [], i, j;
-        for (i = 0; i <= a.length; i++) { d[i] = [i]; }
-        for (j = 0; j <= b.length; j++) { d[0][j] = j; }
-        for (i = 1; i <= a.length; i++)
-          for (j = 1; j <= b.length; j++)
-            d[i][j] = a[i-1] === b[j-1] ? d[i-1][j-1] : 1 + Math.min(d[i-1][j], d[i][j-1], d[i-1][j-1]);
-        return d[a.length][b.length];
+      // ── AI tier (Rule 18: understanding, not regex) ─────────────────────────
+      // The tier is decided by the backend AI classifier, NEVER keyword/regex matching. We cache the last result
+      // for the current input text and show 'sizing...' until it returns. The binding decision is re-confirmed
+      // server-side at fix time, so a momentary stale/blank pill is harmless. The old keyword assessTier() and its
+      // Levenshtein helper were removed -- they mis-sized requests with no fix/build verb (Rule 18 violation).
+      // State lives on window (not IIFE-local) so the once-registered message listener and any closures created
+      // by a panel HTML rebuild all share the same cache — no stale-closure drift.
+      if (window._rtTier === undefined) { window._rtTier = null; window._rtText = ''; }
+
+      // Tier for the CURRENT input, or null if not yet classified.
+      function currentTier() {
+        var el0 = document.getElementById('message-input');
+        var text = (el0 && el0.value ? el0.value : '').trim();
+        if (!text) return null;
+        return text === window._rtText ? window._rtTier : null;
       }
 
-      // ── Tier assessment (pure client-side, zero tokens) ─────────────────────
-      function assessTier(text) {
-        var t = (text || '').trim();
-        var lower = t.toLowerCase();
-        var words = lower.split(/\\s+/).filter(Boolean);
-        var n = words.length;
-        if (n === 0) return null; // blank input = no tier shown
+      // Ask the extension to AI-classify the current input. Skips too-short or already-known text.
+      function requestClassify() {
+        var el0 = document.getElementById('message-input');
+        var text = (el0 && el0.value ? el0.value : '').trim();
+        if (text.length < 3) { window._rtTier = null; window._rtText = ''; renderPill(); return; }
+        if (text === window._rtText) { renderPill(); return; }
+        renderPill();
+        vscode.postMessage({ type: 'classify-route', text: text });
+      }
 
-        if (n > 60) return 'ultra';
-
-        // Detect intent FIRST before escalating on keywords.
-        // Fix/bug verbs: these are PRO requests, NOT ultra, even if they mention game names.
-        var isFixIntent = /\\b(fix|debug|repair|broken|doesn't|doesn\'t|cant|can't|cannot|won't|wont|not working|fails|failing|stuck|wrong|missing|broke|error|crash|freeze|hang|glitch|bug|issue|problem)\\b/.test(lower);
-        if (isFixIntent) return 'pro'; // Repair work = pro; supervisor handles it fine
-
-        // Ultra: game BUILD keywords — only when paired with a build verb.
-        // [WARN] Do NOT trigger on 'game' alone — 'the frog cannot jump' mentions game but is a fix, not a build.
-        var GAME_WORDS = /\\b(chess|tetris|snake|pacman|centipede|puzzle|platformer|shooter|rpg|arcade|pong|breakout|minesweeper|solitaire|2048|wordle|frogger|asteroids)\\b/;
-        var BUILD_VERBS = /\\b(build|make|create|generate|write|implement|code up|start|new game|from scratch)\\b/;
-        if (GAME_WORDS.test(lower) && BUILD_VERBS.test(lower)) return 'ultra';
-        // 'game' alone only escalates with explicit build verb — e.g. 'build a game', 'make me a game'
-        if (/\\bgame\\b/.test(lower) && BUILD_VERBS.test(lower)) return 'ultra';
-
-        var ULTRA_STEMS = ['implicat','architect','comprehens','tradeoff','strateg','evaluat','scalab','microserv','monolith','distribut'];
-        var ULTRA_FUZZY = ['implications','architecture','tradeoffs','comprehensive','evaluate'];
-        function isUltraWord(w) {
-          if (w.length < 4) return false;
-          for (var s = 0; s < ULTRA_STEMS.length; s++) if (w.indexOf(ULTRA_STEMS[s]) !== -1) return true;
-          if (w.length >= 7) for (var f = 0; f < ULTRA_FUZZY.length; f++) if (lev(w, ULTRA_FUZZY[f]) <= 2) return true;
-          return false;
-        }
-        if (words.some(isUltraWord)) return 'ultra';
-
-        var hasThink   = words.some(function(w) { return lev(w, 'think') <= 1; });
-        var hasThrough = words.some(function(w) { return ['through','thru','deeply','carefully','bout','over'].indexOf(w) !== -1; });
-        if (hasThink && hasThrough && n > 4) return 'ultra';
-
-        var hasCompare = words.some(function(w) { return lev(w,'compare')<=1 || w==='vs' || w==='versus'; });
-        var hasPros    = words.some(function(w) { return lev(w,'pros')<=1 || w==='benefits' || w==='advantage'; });
-        var hasCons    = words.some(function(w) { return (lev(w,'cons')<=1 && w!=='consider') || w==='downside'; });
-        if (hasPros && hasCons && n > 4) return 'ultra';
-        if (hasCompare && n > 8) return 'ultra';
-        if (/\\bdesign\\b/.test(lower) && n > 8) return 'ultra';
-
-        // Build / fix / code — pro tier (but NOT if it's just a question about the project)
-        // Imperative build verbs = always at least pro
-        if (/\\b(build|make|create|generate|write|add|implement|code)\\b/.test(lower) && n > 3) return 'pro';
-        if (/\\b(fix|debug|repair|refactor|update|change|improve|edit|modify)\\b/.test(lower)) return 'pro';
-
-        var PRO_STEMS = ['review','debug','refactor','analyz','improv','structur','optim'];
-        if (PRO_STEMS.some(function(s) { return lower.indexOf(s) !== -1; })) return 'pro';
-        if (/\\bmy (project|code|app|game|file|codebase|api|service|component|class)\\b/.test(lower)) return 'pro';
-
-        // Flash: simple question (needs 2 signals)
-        var Q_WORDS = ['what','how','why','when','where','define','explain','whats','wut','wat','who','is','can'];
-        var startsQ = words.length > 0 && Q_WORDS.some(function(q) { return lev(words[0], q) <= 1; });
-        var flashScore = 0;
-        if (n <= 15) flashScore++;
-        if (startsQ)  flashScore++;
-        if (/\\b(meaning|syntax|example|difference|simple|quick|time|date|hello|hi)\\b/.test(lower)) flashScore++;
-        if (!/\\b(my|our|this|the project|the code|the file|the app|the game)\\b/.test(lower)) flashScore += 0.5;
-        if (flashScore >= 2) return 'flash';
-
-        return 'pro'; // safe default
+      // Receive the classifier result. Ignore if the input changed since the request (stale). Registered once
+      // (idempotent) so a panel HTML rebuild that re-runs this IIFE does not stack duplicate listeners.
+      if (!window._routeTierListener) {
+        window._routeTierListener = true;
+        window.addEventListener('message', function(ev) {
+          var m = ev.data;
+          if (!m || m.type !== 'route-tier') return;
+          var el0 = document.getElementById('message-input');
+          var cur = (el0 && el0.value ? el0.value : '').trim();
+          if ((m.text || '') !== cur) return;
+          window._rtTier = (m.tier === 'flash' || m.tier === 'pro' || m.tier === 'ultra') ? m.tier : 'pro';
+          window._rtText = cur;
+          if (window._renderAdaptivePill) { window._renderAdaptivePill(); }
+        });
       }
 
       // ── Provider resolution ─────────────────────────────────────────────────
@@ -151,7 +117,7 @@ export function buildTierScript(): string {
 
         if (_manualProvider) {
           // MANUAL MODE — purple. Format: "Manual · [AI Name]"
-          var lockedTier = assessTier(text) || 'pro';
+          var lockedTier = currentTier() || 'pro';
           var modelLabel = (PROVIDER_TIER_LABEL[_manualProvider.id] || {})[lockedTier] || _manualProvider.label;
           pill.innerHTML =
             '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">' + 'Manual' + '</span>' +
@@ -165,18 +131,31 @@ export function buildTierScript(): string {
         }
 
         // ADAPTIVE MODE — always green border
-        var tier = assessTier(text);
-        if (!tier) {
+        if (!text.trim()) {
           // Blank input — green but dimmed
           pill.innerHTML = '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">Adaptive</span>';
           pill.style.color = GREEN;
           pill.style.borderColor = GREEN + '55';
           pill.style.background = GREEN + '0e';
-          pill.title = 'Adaptive: picks the right AI as you type. Click to lock a specific provider.';
+          pill.title = 'Adaptive: the AI sizes each request as you type. Click to lock a specific provider.';
           return;
         }
 
-        // Typing — green label + provider name. "Adaptive · Groq"
+        var tier = currentTier();
+        if (!tier) {
+          // AI is still sizing this request — neutral 'sizing' state, never a keyword guess.
+          pill.innerHTML =
+            '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">Adaptive</span>' +
+            '<span style="opacity:0.35;margin:0 5px;">\\u00B7</span>' +
+            '<span style="opacity:0.6;">sizing\\u2026</span>';
+          pill.style.color = GREEN;
+          pill.style.borderColor = GREEN + '55';
+          pill.style.background = GREEN + '0e';
+          pill.title = 'Adaptive: the AI is reading your request to pick the right model.';
+          return;
+        }
+
+        // Sized — green label + provider name. "Adaptive · Groq"
         var provider = pickProvider(tier);
         var provLabel = provider ? ((PROVIDER_TIER_LABEL[provider.id] || {})[tier] || provider.label) : tier;
         var provEmoji = provider ? (provider.emoji ? provider.emoji + '\u202F' : '') : '';
@@ -195,9 +174,9 @@ export function buildTierScript(): string {
       var inp = document.getElementById('message-input');
       if (inp) {
         inp.addEventListener('input', function() {
-          if (_manualProvider) return; // manual lock — no re-assessment needed
+          // Classify in BOTH modes — manual locks the PROVIDER, but the tier still labels the model.
           clearTimeout(_debounce);
-          _debounce = setTimeout(renderPill, 400);
+          _debounce = setTimeout(requestClassify, 400);
         });
       }
 
@@ -288,19 +267,12 @@ export function buildTierScript(): string {
       // so the manual lock state is visually reflected in the fresh pill element.
       window._renderAdaptivePill = function() { renderPill(); };
 
-      // Returns the assessed tier for the current input (backward compat with doSend tier param).
-      window._getActiveTier = function() {
-        if (_manualProvider) {
-          // In manual mode: assess tier normally — the PROVIDER is locked, not the tier.
-          var inp2 = document.getElementById('message-input');
-          return assessTier((inp2 && inp2.value) ? inp2.value : '') || 'pro';
-        }
-        var inp3 = document.getElementById('message-input');
-        return assessTier((inp3 && inp3.value) ? inp3.value : '') || 'pro';
-      };
+      // Returns the AI-assessed tier for the current input (read by doSend; server re-confirms at fix time).
+      window._getActiveTier = function() { return currentTier() || 'pro'; };
 
       // ── Routing-panel primitives (read by chatPanelScriptRouting.ts) ─────────
-      window._assessTier = function(text) { return assessTier(text || '') || 'pro'; };
+      // AI-cached tier for the current input. Returns 'pro' until the classifier responds (no keyword guess).
+      window._assessTier = function() { return currentTier() || 'pro'; };
       window._tierModelLabel = function(provId, tier) { return (PROVIDER_TIER_LABEL[provId] || {})[tier] || provId; };
       window._pickProviderForTier = function(tier) { var p = pickProvider(tier); return p ? p.id : null; };
       window._getProviders = function() {

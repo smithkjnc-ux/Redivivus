@@ -22,6 +22,19 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     return;
   }
 
+  // [RULE 18] AI-size the live tier pill — the webview asks, we classify with the AI (never regex), post back.
+  if (msg.type === 'classify-route') {
+    let tier = 'pro';
+    try {
+      const { classifyRoute } = await import('../../services/ai/routeClassifier.js');
+      const hasProject = !!require('vscode').workspace.workspaceFolders?.length;
+      const cls = await classifyRoute(msg.text || '', hasProject, { routing: (panel as any).routing } as any);
+      if (cls) { tier = cls.tier; }
+    } catch { /* fall through to the safe 'pro' default */ }
+    try { _panel?.webview?.postMessage({ type: 'route-tier', text: msg.text, tier }); } catch { /* webview gone */ }
+    return;
+  }
+
   if (await handleEarlyExits(panel, msg)) { return; }
 
   // Pre-load buildMode from VS Code setting on first message if the user hasn't chosen yet this session.

@@ -3,6 +3,21 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 14, 2026: AI route classifier replaces regex tier sizing (Rule 18, Phase A)
+
+**Why:** The Supervisor's tier (flash/pro/ultra) was sized by `assessTier()` — pure regex/keyword matching in the webview (`chatPanelScriptTier.ts`). That violates Rule 18 ("never regex to simulate understanding; use a 50-token AI classifier"). It also mis-sized real requests: "make the frog more detailed and lifelike" has no fix/build verb, so it fell through to the default `pro` by accident, not by judgment. PapaJoe: "no regex... the prompt needs to be AI evaluated."
+
+**Changes:**
+- `classify-route/route.ts` (backend, new) — tiny endpoint: `{prompt, hasProject, classifier, classifierModel, keys}` -> `{tier, reason}`. System prompt judges the WORK implied (flash=trivial one-value/question, pro=normal edit/fix/feature on existing code, ultra=from-scratch build / full visual system / deep reasoning), `maxTokens: 60`, `temperature: 0`. Parses the model's JSON, defaults to `pro` on any parse miss.
+- `routeClassifier.ts` (client, new) — `classifyRoute()` calls it on the **Supervisor provider's cheapest FLASH model** (guaranteed configured, ~$0.0001); `applyRouteTier()` sets `deps.supervisorTierHint`. Returns null / no-ops on any failure so the legacy heuristic remains an offline fallback (single-model/no-network safe).
+- `chatPanelMsgFix.ts` — one-line call to `applyRouteTier()` before Phase 1 (net zero line growth — logic lives in the service, respecting the file's pre-existing >200 size).
+
+**Risk:** Adds one cheap flash call + ~1s latency before each fix (runs ahead of the Supervisor; negligible vs the fix itself). Offline/keyless falls back to the old heuristic.
+
+**Phase B (DONE — same day):** retired the webview regex entirely. `chatPanelScriptTier.ts` — deleted `assessTier()` (the keyword/regex ladder) and its Levenshtein helper (file 324->292 lines); the 400ms debounce now posts `classify-route` to the extension, caches the AI result per input text, and renders "Adaptive - sizing..." until it returns. `currentTier()` (AI-cached) replaces every `assessTier()` call site (`renderPill`, `_getActiveTier`, `_assessTier`). `chatPanelMessageRouter.ts` — new `classify-route` handler calls `classifyRoute()` and posts `route-tier` back. The binding decision is still re-confirmed server-side at fix time, so a momentary stale/blank pill is harmless. Zero regex/keyword matching remains in tier sizing.
+
+---
+
 ## Feature — Jun 14, 2026: Region Map (phases 1-3, 5) — navigable files so fixes localize like a repair manual
 
 **Why:** AIs drift and "improve" things no one asked for; a 24KB game gets a full rewrite to tint one window. The cure is to make scope explicit and navigable. Canonical design: `docs/REDIVIVUS_REGION_MAP.md`. Model: blueprint = understand, index = locate, region = load (eventually, only the target region — so huge files never fully enter context).

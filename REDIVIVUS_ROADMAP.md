@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — Fixed "cost way off + fix didn't apply": apply was dropping valid surgical edits when a mixed/truncated `<content>` was present (removed hasHtmlTarget skip; surgical is now primary), and the Worker billed its 24KB input context as $0 (hardcoded inputTokens:0 → now estimated). Root cause of the ~8-call retry storm. See REDIVIVUS_FIXES.md.
+*Last updated:* 2026-06-14 — Region Map (phases 1-5) live on backend+client: [REGION:] markers + auto index + line-numbered files + Supervisor localize-first contract + Guardian boundary enforcement + retrofit emits markers; frogger hand-chaptered as the test bed. Plus AI route classifier (Rule 18) replacing regex tier sizing (Phase A). Pending Fly deploy + Extension Host restart, then test. See REDIVIVUS_FIXES.md + REDIVIVUS_REGION_MAP.md.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
