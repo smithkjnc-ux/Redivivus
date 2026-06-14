@@ -3,6 +3,21 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 14, 2026 (rigops): Add Showcase form auto-fills from a project folder
+
+**Request:** in the rigops admin "Add Showcase Program" form, auto-fill the fields when pointing at a project folder.
+
+**Implementation:**
+- New `rigops/panels/admin/showcase_autofill.py` — `scan_project(folder)` reads a Redivivus project folder (read-only) and suggests: Title (`config.json` projectName / folder name, title-cased), Description (blueprint `WHAT`, README fallback), Prompt (first non-`[FIX]` task in `build_history.json`, with the engineered blueprint/contract boilerplate stripped — keeps just the human request), Language + Kind (`index.html` -> playable/html; else dominant source extension -> code + that language), content file (`index.html` or largest source file), Tags (name keywords + language).
+- `showcase.py` — added a "Project folder -> Enter to auto-fill" Input + **Browse** button at the top of `AddDemoScreen`. `on_input_submitted` (Enter) and the Browse picker both run `scan_project` in a worker thread and fill each field ONLY if empty (`_fill_if_empty` — never clobbers manual edits); set content path + Kind toggle; status "Auto-filled from <folder> -- review/edit, then Add".
+- New `rigops/panels/admin/folder_picker.py` — reusable `FolderPickerScreen` modal (Textual `DirectoryTree` rooted at `~/projects`): browse, "Use Folder" dismisses with the chosen path, Cancel returns None. Verified against Textual 8.2.4 (`DirectorySelected.path`).
+
+**Verified:** frogger -> "Frogger Arcade Game", playable/html, prompt "build a frogger arcade game", content = index.html; rigops -> code/python. Both files compile.
+
+**Risk:** none — read-only; fills empty fields only; admin reviews before saving.
+
+---
+
 ## Fix — Jun 14, 2026 (5): Fix pipeline working end-to-end — routing stall + supervisor 401 resolved
 
 **Final outcome:** "add sounds to the vehicles ...honking horns when they get close to the frog" inside `frogger-arcade-game` now routes correctly through the full pipeline: Supervisor (Claude/Gemini) → Worker (Claude) → Guardian (Gemini). Honking sounds added successfully.
