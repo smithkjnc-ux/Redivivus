@@ -3,6 +3,17 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026: Install + release pipeline bugs (cross-repo — blocking real users)
+
+Son hit install failures on two machines; release log revealed a third bug. All real, all blocking distribution.
+
+- **Windows installer** (`redivivus-web/public/install-redivivus.ps1`) — "Could not create SSL/TLS secure channel": PowerShell 5.1 defaults to TLS 1.0/SSL3, GitHub needs TLS 1.2+. Added `ServicePointManager.SecurityProtocol` Tls12/Tls13 at the top. Also fixed the latent next bug: after a fresh silent VSCodium install, `codium` isn't on PATH this session — added `Get-CodiumCmd` to resolve the CLI path (+ `--force`).
+- **Linux installer** (`install-redivivus.sh`) — "Incompatible: 'papajoe.redivivus' is a built-in extension, not allowed to update in 'stable'": a baked/built-in copy in `resources/app/extensions` blocks the user-extension update. Added `rm -rf .../extensions/redivivus .../papajoe.redivivus` before install so it's a normal updatable user extension. (Son's specific case was an old manual `redivivus-0.3.56` in Downloads — re-run the current installer.)
+- **Release tool** (`rigops/panels/admin/sysop.py` "Finding VSIX") — the **v0.4.10 GitHub release shipped the v0.4.9 vsix.** Cause: `sorted(glob("*.vsix"))[-1]` uses LEXICAL sort, where `"0.4.9" > "0.4.10"` ('9' > '1'), so the stale vsix won. Result: users on 0.4.9 download a 0.4.9 vsix from the 0.4.10 release -> perpetual "update available" loop AND today's fixes never ship. Fixed to attach the exact `redivivus-{ver}.vsix`, with a semantic-version (tuple) fallback. **Action: re-run the release so v0.4.10 gets the correct vsix.**
+- **VSIX bloat 2MB -> 123MB** (`.vscodeignore`) — `vsce package` was bundling `pwa-host/node_modules` (the standalone Cloudflare Worker built this session: `workerd` x3 @102MB, sharp, esbuild, wrangler, typescript = 395MB uncompressed). `.vscodeignore`'s `node_modules/**` only matches the ROOT node_modules, not the nested one. Added `pwa-host/**` (extension talks to the deployed Worker over HTTP, needs none of its source). Verified: `vsce ls` now 825 files, 0 from pwa-host (was 1993). Next vsix is back to ~2MB. The release re-run rebuilds the vsix, so it picks this up automatically.
+
+---
+
 ## Fix — Jun 14, 2026: Stuck send spinner + companion-region flaw (region test, run 2)
 
 Second frog re-run (post-deploy) surfaced two bugs. Causation-first from `fix-pipeline-2026-06-14T23-13-11.log`.

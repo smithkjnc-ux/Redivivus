@@ -32,6 +32,9 @@ REORGANIZATION_REPORT.md
 test_map.js
 docs/**
 node_modules/**
+# [FIX] pwa-host is a standalone Cloudflare Worker (deployed separately, talked to over HTTP). Its nested
+# node_modules (workerd x3 @102MB, sharp, esbuild...) was bloating the vsix from ~2MB to 123MB. Exclude it all.
+pwa-host/**
 releases/**
 *.vsix
 .wrangler/**
