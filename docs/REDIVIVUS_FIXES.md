@@ -3,6 +3,22 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 13, 2026: "add sounds to the vehicles" silently dropped (cloudChat-null fallback too narrow)
+
+**Symptom:** "add sounds to the vehicles...make them honk when they are close to the frog" produced NO response at all — status returned to ready, nothing rendered.
+
+**Diagnosis (causation-first):** no fix-pipeline log was created and `/tmp/redivivus_debug.log` was untouched at the request time → `handleFixRequest` never ran → the request dropped BEFORE the fix pipeline (so the capability-aware/roster changes were NOT involved). The context guard was verified to pass this input through (not a confident new build). That left the cloudChat-null fallback in `chatPanelMsgSendMessage.ts`: when `cloudChat` returns null (backend hiccup / all providers capped), it only routed to the fix pipeline when the text contained explicit failure words (cannot/broken/fails/...). A FEATURE request ("add sounds", "make them honk") has none, so it fell to `handleAIChat` — which the code's own comment admits "silently fails for code." Silent drop.
+
+**Fix — `chatPanelMsgSendMessage.ts`:** broadened the fallback. On `cloudChat` null, route to the fix pipeline when EITHER a failure-signal word is present OR (a real project is open AND the message is not a question AND it contains an imperative-change verb: add/make/change/update/remove/set/move/replace/style/color/...). Only genuine Q&A falls to `handleAIChat`. The fix pipeline fails HONESTLY (visible error + Retry button + cost line) if the backend is truly down — never silently.
+
+**Verified:** "add sounds...make them honk" -> FIX PIPELINE; "make the frog bigger" -> FIX PIPELINE; "how do sounds work?" / "what is frogger" -> Q&A.
+
+**Note on root trigger:** cloudChat returned null for this request (a backend hiccup or transient). The client is now robust to that; if `/chat` keeps returning null, the backend itself needs a look — but the user no longer gets silence.
+
+**Compile:** 0 errors, deployed.
+
+---
+
 ## Feature — Jun 13, 2026: Capability-aware Supervisor — knows its crew, and the top worker is no longer unreachable
 
 **PapaJoe's insight:** "Gemini Pro could do the work itself — the Supervisor needs to know who its workers are and their abilities and limitations." Investigation found something worse than a blind guess: **the strongest model was literally unreachable.**

@@ -141,13 +141,22 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // (which uses routing.prompt() with full failover). Otherwise Q&A via handleAIChat.
   // [WARN] Do NOT go to handleAIChat for fix requests — it uses promptCheap which silently fails for code.
   if (!chatResult) {
-    const _hasWs = !!vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const _looksLikeFix = _hasWs && /\b(cannot|can't|cant|won't|wont|doesn't|doesnt|not working|broken|fails|failing|stuck|wrong|missing|error|crash|freeze|hang|glitch|bug|issue|problem|blank|empty)\b/i.test(userText);
-    if (_looksLikeFix) {
-      fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null + fix signals → fix pipeline`);
+    const _ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const _hasProject = !!_ws && !isProjectsContainer(getActiveProjectRoot() || _ws);
+    const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
+    const _hasFixSignal = /\b(cannot|can't|cant|won't|wont|doesn't|doesnt|not working|broken|fails|failing|stuck|wrong|missing|error|crash|freeze|hang|glitch|bug|issue|problem|blank|empty)\b/i.test(userText);
+    // [FIX] Inside an OPEN project, a non-question imperative ("add sounds...", "make them honk", "change the
+    // color") is almost always a fix/modification — route it to the fix pipeline (full failover + an HONEST,
+    // visible error with a Retry button if the backend is down). The old heuristic only caught "broken/fails"
+    // wording, so a FEATURE request with no failure words fell to handleAIChat (Q&A), which the comment below
+    // admits "silently fails for code" — that was the silent drop on "add sounds to the vehicles". (Jun 13, 2026)
+    const _isImperativeChange = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
+    if (_hasFixSignal || (_hasProject && !_isQuestion && _isImperativeChange)) {
+      fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null -> fix pipeline (project=${_hasProject}, fixSignal=${_hasFixSignal}, imperative=${_isImperativeChange})`);
       await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
       return;
     }
+    // [WARN] Do NOT route fix/feature requests here — handleAIChat uses promptCheap which silently fails for code.
     await handleAIChat(msg, userText, deps, conversation, refresh, { manualProvider: (msg.manualProvider as string) || undefined });
     return;
   }
