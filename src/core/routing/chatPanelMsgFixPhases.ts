@@ -90,6 +90,12 @@ export async function runPhase1Supervisor(
   for (const provider of supProviderOrder) {
     // [SUPERVISOR_TIER] Was hardcoded 'pro' — now sized to the request's complexity (see supervisorTier above).
     const pModel = bestModelForRole(provider, supervisorTier)?.modelId || provider;
+    // [FIX] Groq has a 12K TPM limit — skip it when file context is too large to avoid 413.
+    if (provider === 'groq' && totalSize > 30_000) {
+      require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
+        `[SUP-SKIP] groq skipped: totalSize=${totalSize} > 30KB limit\n`);
+      continue;
+    }
     try {
       const res = await fetchFn(`${base}/fix-supervisor`, {
         method: 'POST',
@@ -119,7 +125,11 @@ export async function runPhase1Supervisor(
       require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
         `[SUP-ATTEMPT] provider=${provider} model=${pModel} status=${res.status} ok=${res.ok} err=${data?.error||''}\n`);
       if (!res.ok) { supLastError = (data && data.error) || `Supervisor API ${res.status}`; continue; }
-      if (!data || !data.diagnosis) { supLastError = 'no diagnosis returned'; continue; }
+      if (!data || !data.diagnosis) {
+        require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
+          `[SUP-NO-DIAG] provider=${provider} keys=${Object.keys(data||{}).join(',')} success=${data?.success} diagnosis=${JSON.stringify(data?.diagnosis||'').slice(0,120)}\n`);
+        supLastError = 'no diagnosis returned'; continue;
+      }
       diagRes = data; supProviderUsed = provider; break; // success — this provider is the Supervisor for this fix
     } catch (err: any) {
       require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',

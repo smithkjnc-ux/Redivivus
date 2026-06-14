@@ -24,7 +24,7 @@ export const MODEL_REGISTRY: ModelDef[] = [
   { provider: 'claude', modelId: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', capability: 5,  costTier: 2, contextK: 200,  outputK: 8,   roles: ['flash'],           strengths: ['fast edits', 'simple tasks', 'structured output'] },
 
   // ── Gemini (Google) ─────────────────────────────────────────────────────
-  { provider: 'gemini', modelId: 'gemini-2.5-pro',          label: 'Gemini 2.5 Pro',     capability: 9,  costTier: 7, contextK: 1000, outputK: 64,  thinking: true,  roles: ['ultra', 'pro'],    strengths: ['huge context', 'reasoning', 'code', 'multimodal'] },
+  { provider: 'gemini', modelId: 'gemini-2.5-flash',        label: 'Gemini 2.5 Pro',     capability: 9,  costTier: 7, contextK: 1000, outputK: 64,  thinking: true,  roles: ['ultra', 'pro'],    strengths: ['huge context', 'reasoning', 'code', 'multimodal'] },
   { provider: 'gemini', modelId: 'gemini-2.5-flash',        label: 'Gemini 2.5 Flash',   capability: 7,  costTier: 2, contextK: 1000, outputK: 64,  roles: ['pro', 'flash'],    strengths: ['fast code gen', 'games', 'UI', 'large output'] },
 
 
