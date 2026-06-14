@@ -19,7 +19,9 @@
 
 **Risk:** Numbered lines add ~modest tokens to the Supervisor context (offset later by region-scoped loading). Retrofit re-processes previously-annotated files once (cost), opt-in with backup. Marker quality on retrofit depends on the AI; hand-authored markers are the reference.
 
-**Next:** Phase 4 (Guardian rejects out-of-region edits), Phase 7 (region-scoped loading — the scaling payoff), Phase 8 (visual context).
+**Phase 4 (added same day — backend, pending Fly deploy):** `guardianAIPrompt.ts` — new `regionBoundarySection` (gated to targeted fixes). When the Supervisor's task names `TARGET REGION(S):`/`DO NOT TOUCH:`, the Guardian verifies every Worker change sits inside a target region (anchored on its `[REGION:]` markers), fails any out-of-region edit ("changed X but the fix was scoped to Y"), and fails any deleted/moved `[REGION:]` marker. Skips the check when no regions are named (project not region-mapped). Wired into the prompt after the scope section.
+
+**Next:** Phase 6 (build validation), Phase 7 (region-scoped loading — the scaling payoff), Phase 8 (visual context).
 
 ---
 

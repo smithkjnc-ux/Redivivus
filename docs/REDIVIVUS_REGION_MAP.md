@@ -147,5 +147,7 @@ new files get chapters automatically.
 ## Status (Jun 14, 2026)
 - Phase 1 (shared [REGION:] rule), Phase 2 (region index + line-numbered files), Phase 3 (Supervisor localize-first
   contract + removed the contradicting "3+ regions -> FULL FILE" rule): DONE on the backend (pending Fly deploy).
+- Phase 4 (Guardian rejects out-of-region edits + deleted/moved markers, gated to targeted fixes): DONE on the
+  backend (pending Fly deploy). `guardianAIPrompt.ts` regionBoundarySection.
 - Phase 5 (retrofit emits [REGION:]; [SCOPE]-only files re-process): DONE on the client (pending compile/deploy).
-- Phases 4 (Guardian boundary enforcement), 6, 7 (scaling), 8 (visual): NEXT.
+- Phases 6 (build validation), 7 (region-scoped loading — the scaling payoff), 8 (visual context): NEXT.
