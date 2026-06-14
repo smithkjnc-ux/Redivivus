@@ -3,6 +3,32 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 13, 2026: Capability-aware Supervisor — knows its crew, and the top worker is no longer unreachable
+
+**PapaJoe's insight:** "Gemini Pro could do the work itself — the Supervisor needs to know who its workers are and their abilities and limitations." Investigation found something worse than a blind guess: **the strongest model was literally unreachable.**
+
+**Two root causes:**
+1. **Top model unreachable (`chatPanelMsgFixPhases.ts`).** The worker-tier parse capped at pro: `(_wt==='pro'||_wt==='ultra')?'pro':'flash'` — comment even said "ultra is supervisor-only, Worker capped at pro." But for Gemini, `bestModelForRole('gemini','pro')` resolves to **Gemini 2.5 Flash (capability 7)** via the cost-balanced formula; **Gemini 2.5 Pro (capability 9) is only reachable via the 'ultra' role.** So the Worker could NEVER use Gemini 2.5 Pro — every fix ran on the 7-capability model, which couldn't carry hard visual/generation work. (The Supervisor itself also runs on Gemini 2.5 Flash, so Gemini 2.5 Pro was entirely unused.)
+   - **Fix:** uncapped — `workerTier: 'flash'|'pro'|'ultra'`, `_wt==='ultra'?'ultra':...`. `bestModelForRole(provider,'ultra')` now reaches the top model when the Supervisor asks for it.
+
+2. **Supervisor sized the Worker blind.** It chose flash/pro from effort guidance with zero knowledge of which models exist or their capability.
+   - **Fix:** new `buildCrewRoster(provider, supervisorModelId)` in `modelRegistry.ts` assembles a roster from the registry's real `capability` + `strengths`, grouped by model (so it's clear flash & pro are the SAME model and only ultra reaches the strongest), and marks the Supervisor's own model `[THIS IS YOU]`. Client (`chatPanelMsgFixPhases.ts`) builds it and sends `context.workerRoster`; backend (`fix-supervisor/route.ts`) injects it as a `YOUR CREW` block and the WORKER TIER instruction now offers flash/pro/**ultra**, telling the Supervisor to read the crew and "not under-power the Worker to save a little cost when the result would fail."
+
+**Verified roster (Gemini, Claude capped):**
+```
+- Gemini 2.5 Flash (capability 7/10; ...) -> WORKER_TIER flash or pro [THIS IS YOU, the Supervisor]
+- Gemini 2.5 Pro   (capability 9/10; ...) -> WORKER_TIER ultra
+```
+So the Supervisor now knows it's a 7/10, that a 9/10 worker exists, and how to summon it.
+
+**Cost note:** ultra (Gemini 2.5 Pro, costTier 7) costs more than flash/pro — but it's the Supervisor's call, reserved for genuinely hard jobs ("aces in their places"). Most fixes stay flash.
+
+**Deploy:** client compiled + deployed; **backend needs a Fly deploy.** Client compiles 0 errors; backend tsc clean; roster output verified.
+
+**Follow-up (not done):** the build `/plan` path has the same tier mechanism — apply the roster + uncap there too. Also worth considering: the SUPERVISOR itself runs on Gemini 2.5 Flash (7) — a stronger diagnosis model is a separate lever.
+
+---
+
 ## Fix — Jun 13, 2026: Guardian failed targeted fixes for build-quality features the user never asked for + WORKER_TIER not emitted
 
 Two root causes behind "make the vehicles look more real" failing after 3 attempts (the guard correctly routed it to the fix pipeline this time — that part worked).

@@ -66,6 +66,12 @@ export async function runPhase1Supervisor(
     .map(([ai]: any) => ai);
   const supProviderOrder = [supervisor, ..._rankedSup.filter((p) => p !== supervisor)];
 
+  // [CAPABILITY-AWARE SUPERVISOR] Tell the Supervisor who its workers ACTUALLY are and what they can do, so it
+  // sizes WORKER_TIER to real capability instead of guessing at an abstract label. Built from the model registry.
+  const { buildCrewRoster } = require('../../services/ai/modelRegistry.js');
+  const _supModelId = bestModelForRole(supervisor, 'pro')?.modelId;
+  const workerRoster = buildCrewRoster(supervisor, _supModelId) || undefined;
+
   let diagRes: any; let supProviderUsed = supervisor; let supLastError = '';
   for (const provider of supProviderOrder) {
     const pModel = bestModelForRole(provider, 'pro')?.modelId || provider;
@@ -78,6 +84,8 @@ export async function runPhase1Supervisor(
           files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
           context: {
             blueprint: _bp || undefined,
+            // [CAPABILITY-AWARE SUPERVISOR] The real crew (models + capabilities) the Supervisor can assign work to.
+            workerRoster,
             // [LIVING BLUEPRINT Phase 3] The trail of accepted changes (how the project got to its present state),
             // so the Supervisor can reason about recent history, not just the current HEAD contract.
             revisions: (() => { try { return require('../../services/blueprint/livingBlueprintService.js').recentRevisionsBlock(root) || undefined; } catch { return undefined; } })(),
@@ -165,12 +173,13 @@ export async function runPhase2Worker(
   let providerUsed = workerAI;
   let lastError = '';
   // [FIX] The Supervisor SIZES the Worker to the job — it emits WORKER_TIER in its diagnosis (flash for a
-  // trivial/moderate fix, pro for substantial GENERATION like a full game-loop rebuild). Honour it instead of
-  // the old hardcoded 'flash', which made EVERY fix use the small/cheap model (e.g. Claude Haiku) -> thin,
-  // blocky output on big rebuilds. (PapaJoe: the Supervisor should pick the Worker like the chat bar's adaptive
-  // model selector picks for a prompt.) ultra is supervisor-only, so the Worker is capped at pro.
+  // trivial/moderate fix, pro/ultra for substantial GENERATION like a full sprite/render rebuild). Honour it.
+  // [CAPABILITY-AWARE] ultra is NO LONGER capped to pro. For many providers (e.g. Gemini) the 'pro' role resolves
+  // to the cheaper mid model (Gemini 2.5 Flash) and only 'ultra' reaches the strongest (Gemini 2.5 Pro). Capping
+  // the Worker at pro made the top model UNREACHABLE — so hard visual/generation work ran on a capability-7 model
+  // it couldn't carry. The Supervisor now sees the real crew (workerRoster) and can assign ultra when warranted.
   const _wt = diagnosis.match(/WORKER_TIER:\s*(flash|pro|ultra)/i)?.[1]?.toLowerCase();
-  const workerTier: 'flash' | 'pro' = (_wt === 'pro' || _wt === 'ultra') ? 'pro' : 'flash';
+  const workerTier: 'flash' | 'pro' | 'ultra' = _wt === 'ultra' ? 'ultra' : _wt === 'pro' ? 'pro' : 'flash';
   for (const provider of providerOrder) {
     const pModel = bestModelForRole(provider, workerTier)?.modelId || provider;
     let attempt = '';

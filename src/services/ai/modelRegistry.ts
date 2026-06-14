@@ -77,3 +77,27 @@ export function tierToRole(tier?: 'flash' | 'pro' | 'ultra'): ModelRole {
   if (tier === 'pro') return 'pro';
   return 'flash';
 }
+
+// [CAPABILITY-AWARE SUPERVISOR] Describe the REAL crew the Supervisor can assign work to — the actual models each
+// WORKER_TIER resolves to, with their true capability + strengths, grouped so the Supervisor sees (e.g.) that
+// flash and pro may be the SAME model and only ultra reaches the strongest. Marks the Supervisor's own model so it
+// knows whether a more capable worker than itself exists. See memory: capability-aware-supervisor.
+export function buildCrewRoster(provider: string, supervisorModelId?: string): string {
+  const tiers: Array<'flash' | 'pro' | 'ultra'> = ['flash', 'pro', 'ultra'];
+  const byModel = new Map<string, { def: ModelDef; tiers: string[] }>();
+  for (const tier of tiers) {
+    const m = bestModelForRole(provider, tier);
+    if (!m) { continue; }
+    const e = byModel.get(m.modelId) || { def: m, tiers: [] };
+    e.tiers.push(tier);
+    byModel.set(m.modelId, e);
+  }
+  if (byModel.size === 0) { return ''; }
+  const lines = [...byModel.values()]
+    .sort((a, b) => a.def.capability - b.def.capability)
+    .map(({ def, tiers: ts }) => {
+      const self = supervisorModelId && def.modelId === supervisorModelId ? ' [THIS IS YOU, the Supervisor]' : '';
+      return `- ${def.label} (capability ${def.capability}/10; strengths: ${(def.strengths || []).join(', ')}) -> assign with WORKER_TIER ${ts.join(' or ')}${self}`;
+    });
+  return `YOUR CREW -- the REAL models that will implement your plan, and their true capabilities/limits. Size the job to ACTUAL capability, not an abstract label. Pick the LOWEST tier that can do the job WELL; reserve the strongest for hard generation (full rewrites, rendering/sprite/visual systems, complex creative logic). If the job needs a worker MORE capable than you, assign that tier:\n${lines.join('\n')}`;
+}
