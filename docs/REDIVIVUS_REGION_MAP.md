@@ -94,9 +94,12 @@ file-level to within-file region-level.
 ## Three touchpoints
 
 ### 1. Build generator (new projects are born navigable)
-The build Worker lays down `[REGION:]` markers as it writes code. Mechanism: the shared annotation rule in
-`redivivusWorkerRules.ts` (backend) — already injected into every Worker — gains a `[REGION:]` clause, so
-new files get chapters automatically.
+The build Worker should lay down `[REGION:]` markers as it writes code. **STATUS: NOT WIRED YET.** The
+`[REGION:]` clause lives in `redivivusWorkerRules.ts`, but the BUILD route (`build/route.ts` -> `BuildPipeline`)
+builds its own prompt and does NOT import the shared rules — so the region clause reaches the FIX worker +
+Guardian only, not the build worker. Fresh builds get `[SCOPE]` (build enforces it) but no chapters. To finish
+this: add the REGION guidance to the build worker prompt in `BuildPipeline`/`build/route.ts`. Until then,
+existing/new projects get chaptered via the RETROFIT path (touchpoint 2).
 
 ### 2. Retrofit (existing/imported "books" printed without chapters)
 `retrofitService.ts` already adds `[SCOPE]/[TODO]/[WARN]` via AI with backup + opt-in. Extend its prompt
