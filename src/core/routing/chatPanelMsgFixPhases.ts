@@ -256,9 +256,15 @@ export async function runPhase2Worker(
   if (!workerResponse.trim()) {
     throw new Error(`Every available AI failed. Last error: ${lastError || 'unknown'}`);
   }
+  // [COST] The streamed Worker response carries no token frame, so estimate from the ACTUAL bytes. The INPUT (the
+  // whole file context — often the biggest cost on a large game) was hardcoded to 0, zeroing the input cost and
+  // making the reported total a fraction of the real provider bill. Estimate input from diagnosis + every file's
+  // content (~4 chars/token) + a system-prompt allowance; output from the streamed text.
+  const _wkInTok = Math.ceil((diagnosis.length + files.reduce((s, f) => s + (f.content?.length || 0), 0)) / 4) + 600;
+  const _wkOutTok = Math.ceil(workerResponse.length / 4);
   deps.usageTracker?.recordUsage(
-    Math.ceil((diagnosis.length + workerResponse.length) / 4), 0, providerUsed,
-    0, Math.ceil(workerResponse.length / 4), 'worker', path.basename(root)
+    _wkInTok + _wkOutTok, 0, providerUsed,
+    _wkInTok, _wkOutTok, 'worker', path.basename(root)
   );
   return { workerResponse: workerResponse.trim(), workerLabel: modelLabel(providerUsed) };
 }
