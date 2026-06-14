@@ -27,6 +27,16 @@ So the blueprint now carries BOTH the MECHANICS (what it does) and the REQUEST H
 
 ---
 
+## Fix — Jun 14, 2026: PWA wrapper — in-page install prompt + tap-to-start (novice-friendly)
+
+The served PWA opened on a phone but gave novices no way to install or start it. Added to the Phase 0 injected wrapper (`pwaTemplates.ts`):
+- **Install banner** (`installBanner()`): a top bar shown on first load. Android/desktop Chrome captures `beforeinstallprompt` and shows a real **Install** button (one tap to install). iOS Safari (no auto-prompt) shows *"tap Share -> Add to Home Screen"*. Hidden when already installed (`display-mode: standalone`/`navigator.standalone`) or dismissed; clears on `appinstalled`.
+- **Tap-to-start bridge** (`tapToStartBridge()`): phones have no Enter key, but many games gate start/restart on Enter/Space. On `pointerup` in non-control areas it fires synthetic Enter + Space (with `keyCode`/`which` shimmed for legacy games) so "Press ENTER to start" works by tapping. Ignores taps on `button,a,input,select,textarea,[role=button]` so it never double-handles the game's own touch controls. Best-effort — proper long-term fix is generating touch-native games at build time.
+
+**Verified:** injected into the generated index.html (install banner + iOS instructions + tap-to-start all present); compiles clean; pwaTemplates.ts 142 lines. Live test URL published.
+
+---
+
 ## Fix — Jun 14, 2026: Chat input glow removed; send-button spinner actually spins
 
 - **Removed the input "chat window animation":** deleted the `#input-card:focus-within` glow (border-color + `box-shadow: 0 0 0 3px` ring) and its transition in `chatPanelStylesInput.ts`. The input stays static — no focus animation.

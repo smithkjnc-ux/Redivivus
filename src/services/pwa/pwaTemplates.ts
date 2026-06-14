@@ -81,6 +81,45 @@ export function madeWithBadge(): string {
             opacity:.75;pointer-events:auto">Made with Redivivus</a>`;
 }
 
+// In-page install prompt — novices won't know the browser's hidden "Add to Home Screen" menu. Android/desktop
+// Chrome: capture beforeinstallprompt and show a real Install button. iOS Safari (no auto-prompt): show the
+// Share -> Add to Home Screen instruction. Hidden once installed (display-mode: standalone) or dismissed.
+function installBanner(): string {
+  return `
+  <div id="rdv-install" style="display:none;position:fixed;left:0;right:0;top:0;z-index:2147483646;align-items:center;gap:10px;background:#0ea5e9;color:#fff;font:600 14px system-ui,sans-serif;padding:11px 12px;box-shadow:0 2px 14px rgba(0,0,0,.35)">
+    <span id="rdv-install-text" style="flex:1">Install this app on your device</span>
+    <button id="rdv-install-btn" style="background:#fff;color:#0369a1;border:0;border-radius:8px;padding:8px 16px;font:700 14px system-ui,sans-serif">Install</button>
+    <button id="rdv-install-x" aria-label="Dismiss" style="background:transparent;color:#fff;border:0;font-size:22px;line-height:1;padding:0 6px">&times;</button>
+  </div>
+  <script>(function(){
+    var bar=document.getElementById('rdv-install'),btn=document.getElementById('rdv-install-btn'),
+        txt=document.getElementById('rdv-install-text'),x=document.getElementById('rdv-install-x'),dp=null;
+    function standalone(){return window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;}
+    if(standalone())return;
+    x.onclick=function(){bar.style.display='none';};
+    window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();dp=e;btn.style.display='';bar.style.display='flex';});
+    btn.onclick=function(){if(dp){dp.prompt();dp.userChoice.then(function(){bar.style.display='none';dp=null;});}};
+    window.addEventListener('appinstalled',function(){bar.style.display='none';});
+    var ua=navigator.userAgent||'';
+    if(/iphone|ipad|ipod/i.test(ua)&&/safari/i.test(ua)&&!/crios|fxios|edgios|android/i.test(ua)){
+      txt.innerHTML='To install: tap <b>Share</b> &#8593; then <b>Add to Home Screen</b>';btn.style.display='none';bar.style.display='flex';}
+  })();</script>`;
+}
+
+// Tap-to-start bridge — phones have no Enter key, but many games gate start/restart on Enter or Space. Fire those
+// keys on a tap in empty (non-control) areas, so "Press ENTER to start" works by tapping. Best-effort: ignores taps
+// on the game's own buttons/inputs so it never double-handles real controls. (Long-term, builds should be touch-native.)
+function tapToStartBridge(): string {
+  return `
+  <script>(function(){
+    function fire(t,key,code,kc){var e;try{e=new KeyboardEvent(t,{key:key,code:code,bubbles:true,cancelable:true});}catch(_){e=document.createEvent('Event');e.initEvent(t,true,true);e.key=key;}
+      try{Object.defineProperty(e,'keyCode',{get:function(){return kc;}});Object.defineProperty(e,'which',{get:function(){return kc;}});}catch(_){}
+      document.dispatchEvent(e);window.dispatchEvent(e);}
+    function start(){fire('keydown','Enter','Enter',13);fire('keyup','Enter','Enter',13);fire('keydown',' ','Space',32);fire('keyup',' ','Space',32);}
+    document.addEventListener('pointerup',function(ev){var t=ev.target;if(t&&t.closest&&t.closest('button,a,input,select,textarea,[role=button]'))return;start();},true);
+  })();</script>`;
+}
+
 // Inject the PWA wiring into the entry HTML: manifest, theme-color, Apple meta, the SW registration, and the badge.
 export function injectPwaIntoHtml(html: string, o: { title: string; themeColor: string; includeBadge: boolean }): string {
   const head = `
@@ -96,7 +135,7 @@ export function injectPwaIntoHtml(html: string, o: { title: string; themeColor: 
       navigator.serviceWorker.register('sw.js').catch(function () {});
     }
   </script>`;
-  const tail = reg + (o.includeBadge ? madeWithBadge() : '');
+  const tail = reg + installBanner() + tapToStartBridge() + (o.includeBadge ? madeWithBadge() : '');
   html = html.includes('</head>') ? html.replace('</head>', `${head}\n</head>`) : head + '\n' + html;
   html = html.includes('</body>') ? html.replace('</body>', `${tail}\n</body>`) : html + tail;
   return html;
