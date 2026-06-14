@@ -3,6 +3,16 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 14, 2026: Supervisor "preserve established properties" principle (invariant discipline)
+
+**Why:** The region test worked — "make the frog more detailed and lifelike" applied cleanly, kept the game intact, cost $0.18 (vs $0.63 retry-storm before). BUT the new sprite grew to 10x8 cells while `FROG_PX_SIZE` stayed 8 -> 80x64px in a 32px tile (~2.5x too big). The Worker added detail correctly but broke an established invariant (frog fits one tile) the user never asked to change. PapaJoe flagged that a sprite-specific rule ("detail = more cells at smaller px") would be a narrow hardcoded special-case — the same brittle smell as the regex we removed (Rule 18), treating the symptom not the cause.
+
+**Fix (the general, understanding-driven principle, not a sprite rule):** `fix-supervisor/route.ts` `SUPERVISOR_SYSTEM` — added `PRESERVE ESTABLISHED PROPERTIES` right after the LOCALIZE FIRST block. Before prescribing, the Supervisor identifies the properties the thing already has that the request did NOT name (size/footprint, position, scale, timing, speed, layout, behavior), reads the code for the relationships that hold them (cells x pixel-size ~ tile; width relative to container; interval = speed), and prescribes so those are conserved. "More detailed" is not "bigger" (raise resolution, lower unit size, same footprint); "faster" is not "recolored". Domain-agnostic — sprites, SVG, UI, audio, physics. Same discipline as the region boundary, applied to invariants instead of code regions. This hardcodes the *thinking move* (find + preserve invariants), not the *answer* for one case.
+
+**Risk:** none (prompt-only). Backend, pending Fly deploy. Longer term: invariants like "frog occupies one tile" belong in the Living Blueprint mechanics so the Supervisor diffs against them automatically.
+
+---
+
 ## Fix — Jun 14, 2026: Region-Map test observability (logs)
 
 Pre-test audit of the fix-pipeline log for the frogger region test. Two gaps closed:
