@@ -3,6 +3,18 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026 (4): BUILD-SPEC-IN-PROJECT — embedded build JSON inside open project → now routes to fix
+
+**Root cause revealed by `[CLOUD-RESULT]` log:** The backend was returning `action='answer'` with the text containing an embedded JSON blob: `` ```json\n{"action":"build","text":"Okay, I'll add a feature where vehicle..."} `` `` — NOT `action='clarify'`. So the CLARIFY-RECOVERY guard (which checked `chatResult.action === 'clarify'`) never fired. The `isBuildSpec` regex caught the embedded JSON, extracted it, and set `chatResult.action = 'build'`, falling through to the build wizard. Inside an open project this showed the 5W interview card instead of running the fix pipeline.
+
+**Also discovered:** `fixLog` was always a silent no-op for PostCloud messages because `initFixLogger()` only gets called from inside `handleFixRequest` — meaning all `[CLOUD-RESULT]` / `[CLARIFY-RECOVERY]` entries were being dropped. Fixed by switching to direct `appendFileSync` to `~/redivivus_debug.log` for the critical diagnostic lines.
+
+**Fix:** In `chatPanelMsgSendPostCloud.ts` `isBuildSpec` branch: after extracting the task from the embedded JSON, if `hasProjectOpen` → call `handleFixRequest(task || userText)` immediately and return. The build path is only taken when no project is open.
+
+**Files:** `chatPanelMsgSendPostCloud.ts` (+8 lines). **Compile:** exit 0. Deployed.
+
+---
+
 ## Fix — Jun 14, 2026 (3): `clarify` response on imperative inside open project → routes to fix now
 
 **Symptom:** User sent "add sounds to the vehicles...honking horns when they get close to the frog" inside `frogger-arcade-game`. cloudChat (Gemini) classified as `action: 'clarify'` with text "I can help with that — could you give me a bit more detail about what you'd like me to do?" (↓0 tok — backend guard injected it). PostCloud saw non-empty text, rendered the clarify bubble, released input. Fix pipeline never ran.

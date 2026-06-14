@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — (3) CLARIFY-RECOVERY: action='clarify' on imperative inside open project now routes to fix pipeline instead of rendering the "could you give me more detail?" bubble. This was the actual "add sounds to the vehicles" stall root cause.
+*Last updated:* 2026-06-14 — (4) BUILD-SPEC-IN-PROJECT: backend returning action='answer' with embedded {"action":"build"} JSON → isBuildSpec rescue now routes to fix when hasProject=true. Root cause trace: [CLOUD-RESULT] direct debug log revealed the actual action/text being returned.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

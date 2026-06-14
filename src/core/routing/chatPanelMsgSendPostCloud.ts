@@ -82,6 +82,14 @@ export async function routeCloudChatResult(
         const _m2 = chatResult.text.match(/\{[\s\S]*\}/);
         if (_m2) { const _spec = JSON.parse(_m2[0]); if (_spec && typeof _spec.task === 'string' && _spec.task.trim()) { chatResult.task = _spec.task.trim(); } }
       } catch { /* keep userText as the task */ }
+      // [FIX] BUILD spec inside an open project → fix, not build.
+      // The backend embedded a "build" action in answer text, but we're already inside a project.
+      // Route straight to fix so the Supervisor applies the change rather than launching a new build wizard.
+      if (hasProjectOpen) {
+        _dbg(`[BUILD-SPEC-IN-PROJECT] isBuildSpec + hasProject → routing to fix directly\n`);
+        await handleFixRequest(chatResult.task || userText, deps, msg.imageBase64, msg.imageType);
+        return;
+      }
       chatResult.action = 'build';
       // fall through to build routing below — do NOT return
     } else {
