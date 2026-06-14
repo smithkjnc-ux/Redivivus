@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — (4) BUILD-SPEC-IN-PROJECT: backend returning action='answer' with embedded {"action":"build"} JSON → isBuildSpec rescue now routes to fix when hasProject=true. Root cause trace: [CLOUD-RESULT] direct debug log revealed the actual action/text being returned.
+*Last updated:* 2026-06-14 — (5) Full pipeline working: routing stall fixed (IMPERATIVE-RECOVERY unified guard for answer/clarify/isBuildSpec inside open project), supervisor 401 fixed (gemini-2.5-pro→flash, Groq skipped when files>30KB). Verified: Supervisor (Claude) → Worker (Claude) → Guardian (Gemini) end-to-end.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

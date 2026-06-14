@@ -3,6 +3,35 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026 (5): Fix pipeline working end-to-end — routing stall + supervisor 401 resolved
+
+**Final outcome:** "add sounds to the vehicles ...honking horns when they get close to the frog" inside `frogger-arcade-game` now routes correctly through the full pipeline: Supervisor (Claude/Gemini) → Worker (Claude) → Guardian (Gemini). Honking sounds added successfully.
+
+### Root Cause Chain — Routing Stall (fixes 3–4):
+
+The backend AI classifier returned the SAME "needs more detail" intent through THREE different response shapes:
+1. `action='clarify'` + empty text (backend guard injected holding text → `SILENT-DROP`)
+2. `action='answer'` + embedded `{"action":"build",...}` JSON (`isBuildSpec` rescue → build wizard triggered inside open project)
+3. `action='answer'` + plain "I can help with that..." text (no guard matched)
+
+**Fix:** Unified `IMPERATIVE-RECOVERY` guard — when `hasProject=true` AND imperative verb AND not a question → skip the AI's answer/clarify entirely and go directly to `handleFixRequest`. Action value is irrelevant. Also added `BUILD-SPEC-IN-PROJECT` guard for the `isBuildSpec` branch.
+
+**Also fixed:** `fixLog` is a no-op until `initFixLogger` is called (inside `handleFixRequest`). All routing-layer diagnostic `fixLog` calls were dropped silently. Replaced with direct `appendFileSync` to `~/redivivus_debug.log` for `[CLOUD-RESULT]`, `[IMPERATIVE-RECOVERY]`, etc.
+
+### Root Cause Chain — Supervisor 401 (from earlier session + fix 5):
+
+`[SUP-ATTEMPT]` log revealed the actual per-provider failures:
+- Claude: monthly API cap exhausted (resets 2026-07-01) — not a bug, expected
+- Gemini: `gemini-2.5-pro` model returned 200 OK but empty `diagnosis` (model ID resolves but returns blank) → **fixed by using `gemini-2.5-flash` in `modelRegistry.ts`** (same ID that works for `/chat`)
+- OpenAI: key rotated/invalid  
+- Groq: 413 context too large (37KB `index.html` > 12K TPM limit) → **fixed by skipping Groq when `totalSize > 30KB`**
+- xAI: no credits
+- Kimi: key invalid
+
+**Files changed:** `modelRegistry.ts` (gemini-2.5-pro → gemini-2.5-flash for pro/ultra roles), `chatPanelMsgFixPhases.ts` (Groq size skip), `chatPanelMsgSendPostCloud.ts` (IMPERATIVE-RECOVERY unified guard + direct debug logging). **Compile:** exit 0. Deployed.
+
+---
+
 ## Fix — Jun 14, 2026 (4): BUILD-SPEC-IN-PROJECT — embedded build JSON inside open project → now routes to fix
 
 **Root cause revealed by `[CLOUD-RESULT]` log:** The backend was returning `action='answer'` with the text containing an embedded JSON blob: `` ```json\n{"action":"build","text":"Okay, I'll add a feature where vehicle..."} `` `` — NOT `action='clarify'`. So the CLARIFY-RECOVERY guard (which checked `chatResult.action === 'clarify'`) never fired. The `isBuildSpec` regex caught the embedded JSON, extracted it, and set `chatResult.action = 'build'`, falling through to the build wizard. Inside an open project this showed the 5W interview card instead of running the fix pipeline.
