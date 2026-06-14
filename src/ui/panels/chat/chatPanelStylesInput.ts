@@ -6,9 +6,8 @@ export function buildChatCssInput(): string {
     #input-area { padding: 10px 14px 13px; background: var(--c-bg); border-top: 1px solid var(--c-border); flex-shrink: 0; }
     #input-card {
       background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px; overflow: hidden;
-      transition: border-color 0.2s, box-shadow 0.2s;
     }
-    #input-card:focus-within { border-color: var(--c-accent); box-shadow: 0 0 0 3px var(--c-accent-lo); }
+    /* [UI] Static input — no focus glow/animation. The active animation lives on the send button (busy spinner). */
     #input-top { padding: 11px 15px 4px; }
     #message-input {
       width: 100%; background: transparent; color: var(--c-text);

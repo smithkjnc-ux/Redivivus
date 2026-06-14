@@ -27,6 +27,15 @@ So the blueprint now carries BOTH the MECHANICS (what it does) and the REQUEST H
 
 ---
 
+## Fix — Jun 14, 2026: Chat input glow removed; send-button spinner actually spins
+
+- **Removed the input "chat window animation":** deleted the `#input-card:focus-within` glow (border-color + `box-shadow: 0 0 0 3px` ring) and its transition in `chatPanelStylesInput.ts`. The input stays static — no focus animation.
+- **Send-button spinning spiral now works:** the busy state (`setInputBusy` in `chatPanelScript.ts`) swapped the send icon for a circular-arc SVG with `animation: redivivusSpin` — but that keyframe was never defined (the real one is `redivivus-spin`), so it never spun. Fixed the reference to `redivivus-spin 0.8s linear infinite`, kept the busy button fully opaque (`opacity:1`, `cursor:wait`) and a touch thicker stroke so the spinning spiral is clearly visible while sending.
+
+**Compile:** 0 errors, deployed.
+
+---
+
 ## Feature — Jun 14, 2026: "Add to Phone" Phase 3 — build-card button + PNG icons
 
 - **Build-card button:** modified the `__PREVIEW_BROWSER__` renderer (`chatPanelRenderer.ts`) to show a **📱 Add to Phone** button next to "Preview in Browser" — one change covers all web-result cards (build/fix/agent/chunked/vault). Click handling: `chatPanelScriptActions.ts` (`.add-to-phone-btn` -> postMessage `add-to-phone`) -> `chatPanelMessages.ts` runs `redivivus.addToPhone`. So the feature is now a one-click button, not just the Command Palette.
