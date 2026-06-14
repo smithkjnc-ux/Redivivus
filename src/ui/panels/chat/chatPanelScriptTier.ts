@@ -284,6 +284,10 @@ export function buildTierScript(): string {
         return _manualProvider ? _manualProvider.id : null;
       };
 
+      // [FIX] Called by chatPanelScriptListener.ts after update-header replaces #input-left innerHTML,
+      // so the manual lock state is visually reflected in the fresh pill element.
+      window._renderAdaptivePill = function() { renderPill(); };
+
       // Returns the assessed tier for the current input (backward compat with doSend tier param).
       window._getActiveTier = function() {
         if (_manualProvider) {

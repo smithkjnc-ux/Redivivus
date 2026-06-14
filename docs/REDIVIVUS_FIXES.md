@@ -3,6 +3,28 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026 (2): Adaptive pill not switching to Manual + Supervisor 401 all-fail diagnostic
+
+**Bug A — Pill not switching to Manual:**
+
+**Root cause:** `chatPanelScriptListener.ts` `update-header` handler (line 69) sets `il.innerHTML = msg.inputLeft`, replacing the pill DOM element. The `_manualProvider` closure state in `chatPanelScriptTier.ts` survives the swap, but the new `<button id="adaptive-pill">` shows the static "Adaptive" text baked into `renderInputLeftInner()` — `renderPill()` is never re-called after the replacement. User clicks pill → picks a provider → `_manualProvider` is set → a `panelRefresh` fires (e.g. on message send) → `update-header` replaces `#input-left` → new pill shows "Adaptive" again. User sees the pill apparently rejecting their choice.
+
+**Fix:** Exported `window._renderAdaptivePill = function() { renderPill(); }` in `chatPanelScriptTier.ts`. In `chatPanelScriptListener.ts` `update-header` block: after `il.innerHTML = msg.inputLeft`, call `window._renderAdaptivePill()` so the fresh pill immediately reflects the manual lock state.
+
+**Files:** `chatPanelScriptTier.ts` (+4 lines), `chatPanelScriptListener.ts` (+5 lines).
+
+**Bug B — Supervisor "Every available AI failed to diagnose: 401 Invalid Authentication":**
+
+**Status:** Diagnostic added — root cause still unconfirmed. Groq works for Q&A chat (`/chat` endpoint, same client keys via X-Provider-Keys header), but fails for fix-supervisor (`/fix-supervisor` endpoint, same keys via JSON body). Both endpoints read the same `collectKeys()` object — no code difference that should cause 401.
+
+**Diagnostic added:** `[SUP-KEYS]` log before the supervisor loop prints provider order, masked key prefix + length for each provider. `[SUP-ATTEMPT]` log after each provider attempt prints provider, model, HTTP status, and error. `[SUP-CATCH]` logs exceptions. These entries appear in `~/redivivus_debug.log` — inspect after next failed fix attempt to see exactly which provider fails, with which model, and what HTTP status + error body the backend returns.
+
+**Files:** `chatPanelMsgFixPhases.ts` (+8 lines diagnostic).
+
+**Compile:** exit 0. Deployed to baked IDE.
+
+---
+
 ## Fix — Jun 14, 2026: Silent drop when cloudChat returns empty answer/clarify ("add sounds to the vehicles" stall)
 
 **Symptom:** User typed "add sounds to the vehicles...make them honk when they are close to the frog" inside the open frogger project. The chat froze — user bubble appeared, status returned to ready, no assistant response was rendered.

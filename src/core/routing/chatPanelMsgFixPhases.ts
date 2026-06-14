@@ -80,6 +80,13 @@ export async function runPhase1Supervisor(
   const workerRoster = buildCrewRoster(supervisor, _supModelId) || undefined;
 
   let diagRes: any; let supProviderUsed = supervisor; let supLastError = '';
+  // [DIAG] Log provider order + key presence (masked) before the loop — exposes why all-fail 401.
+  const _keyDiag = supProviderOrder.map(p => {
+    const k = keysPayload[p];
+    return `${p}=${k ? k.slice(0,4)+'…('+k.length+'ch)' : 'MISSING'}`;
+  }).join(', ');
+  require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
+    `[SUP-KEYS] order=[${supProviderOrder.join(',')}] keys=${_keyDiag} tier=${supervisorTier}\n`);
   for (const provider of supProviderOrder) {
     // [SUPERVISOR_TIER] Was hardcoded 'pro' — now sized to the request's complexity (see supervisorTier above).
     const pModel = bestModelForRole(provider, supervisorTier)?.modelId || provider;
@@ -109,10 +116,16 @@ export async function runPhase1Supervisor(
         })
       }, 120_000);
       const data = await res.json().catch(() => ({}));
+      require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
+        `[SUP-ATTEMPT] provider=${provider} model=${pModel} status=${res.status} ok=${res.ok} err=${data?.error||''}\n`);
       if (!res.ok) { supLastError = (data && data.error) || `Supervisor API ${res.status}`; continue; }
       if (!data || !data.diagnosis) { supLastError = 'no diagnosis returned'; continue; }
       diagRes = data; supProviderUsed = provider; break; // success — this provider is the Supervisor for this fix
-    } catch (err: any) { supLastError = err?.message || 'unknown'; continue; }
+    } catch (err: any) {
+      require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
+        `[SUP-CATCH] provider=${provider} err=${err?.message||'unknown'}\n`);
+      supLastError = err?.message || 'unknown'; continue;
+    }
   }
   if (!diagRes) { throw new Error(`Every available AI failed to diagnose. Last error: ${supLastError || 'unknown'}`); }
 

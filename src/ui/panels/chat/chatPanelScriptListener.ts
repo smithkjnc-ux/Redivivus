@@ -66,7 +66,13 @@ export function buildListenerScript(): string {
       }
       if (msg.type === 'update-header') {
         var hr = document.querySelector('.header-right'); if (hr && msg.headerRight !== undefined) { hr.innerHTML = msg.headerRight; }
-        var il = document.getElementById('input-left'); if (il && msg.inputLeft !== undefined) { il.innerHTML = msg.inputLeft; }
+        var il = document.getElementById('input-left'); if (il && msg.inputLeft !== undefined) {
+          il.innerHTML = msg.inputLeft;
+          // [FIX] Re-apply manual-lock state to the fresh pill — the closure _manualProvider survives
+          // the innerHTML swap but the new button shows static 'Adaptive' until renderPill() runs.
+          // _renderAdaptivePill is exported by chatPanelScriptTier.ts buildTierScript().
+          if (typeof window._renderAdaptivePill === 'function') { window._renderAdaptivePill(); }
+        }
         return;
       }
       if (msg.type === 'bi-start') showBlueprintInterview();

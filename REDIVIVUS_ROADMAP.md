@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — Silent-drop fix: cloudChat returning empty answer/clarify text inside an open project now recovers to fix pipeline instead of silently discarding the turn. Diagnostic [CLOUD-RESULT] log added on every chat turn. Rule 9 split: chatPanelMsgSendMessage.ts (345 lines) → chatPanelMsgSendMessage.ts (71) + chatPanelMsgSendPreCloud.ts (125) + chatPanelMsgSendPostCloud.ts (173). Backend guard added to chat/route.ts to prevent empty text from ever being returned for answer/clarify (needs Fly deploy).
+*Last updated:* 2026-06-14 — (2) Pill not switching to Manual fixed: window._renderAdaptivePill() exported and called after update-header replaces #input-left DOM. Supervisor 401 all-fail: diagnostic [SUP-KEYS]/[SUP-ATTEMPT]/[SUP-CATCH] logs added to chatPanelMsgFixPhases.ts; root cause still unconfirmed — inspect ~/redivivus_debug.log after next failed fix.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
