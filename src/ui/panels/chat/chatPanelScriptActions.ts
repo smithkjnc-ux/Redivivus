@@ -167,6 +167,8 @@ export function buildActionsScript(): string {
         }
         return;
       }
+      var phoneBtn = target.closest ? target.closest('.add-to-phone-btn') : (target.classList&&target.classList.contains('add-to-phone-btn')?target:null);
+      if (phoneBtn) { try { vscode.postMessage({ type: 'add-to-phone' }); } catch(e) {} return; }
       const undoEl = target.closest ? target.closest('[data-undo-build]') : (target.getAttribute&&target.getAttribute('data-undo-build')?target:null);
       if (undoEl) {
         const snapshotId=undoEl.getAttribute('data-undo-build');

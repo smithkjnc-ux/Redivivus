@@ -234,6 +234,12 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.openChatPanel', () => ChatPanel.show(redivivusService, routingService, usageTracker, vaultService)));
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.refreshChat', () => ChatPanel.currentPanel?.refresh()));
 
+  // ── Add to Phone (installable PWA) ──
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.addToPhone', async () => {
+    const { handleAddToPhone } = await import('./core/commands/addToPhoneCommand.js');
+    await handleAddToPhone();
+  }));
+
   // ── WebviewPanelSerializer — lets VS Code hand back orphaned 'redivivusChat' tabs on re-activation ──
   // Without this, re-activation (triggered by updateWorkspaceFolders removing all folders) leaves the
   // old tab visible but _instance=undefined → auto-open timer sees currentPanel=false → opens a 2nd tab.

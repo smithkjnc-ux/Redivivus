@@ -13,5 +13,9 @@
 		// "noImplicitReturns": true, /* Report error when not all code paths in function return a value. */
 		// "noFallthroughCasesInSwitch": true, /* Report errors for fallthrough cases in switch statement. */
 		// "noUnusedParameters": true,  /* Report errors on unused parameters. */
-	}
+	},
+	/* Compile only the extension source. pwa-host/ is a separate Cloudflare Worker project with its own tsconfig
+	   (Worker runtime types) and is deployed via wrangler — never part of the extension build. */
+	"include": ["src/**/*.ts"],
+	"exclude": ["node_modules", "out", "pwa-host"]
 }

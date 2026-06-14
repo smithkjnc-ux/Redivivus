@@ -3,6 +3,106 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 14, 2026: Blueprint shows REQUEST HISTORY (the user prompts that built/changed it)
+
+**Request:** "add to the blueprint the prompts from the user as well that make the build or edit/fix it."
+
+**State:** the revision ledger (`blueprint_revisions.jsonl`) already stored a `request` per change, but it wasn't surfaced in the human-readable `blueprint.md`, and builds stored the engineered build task rather than the raw user prompt.
+
+**Changes:**
+- `blueprintWriter.ts` — new `_requestHistorySection(blueprintPath)` reads the sibling `blueprint_revisions.jsonl` and renders a `## REQUEST HISTORY` section (last 20, oldest-to-newest): `- **kind** (rev N): "the user's prompt"`. Self-maintaining (regenerated on every blueprint write); empty if no ledger.
+- `cloudBuildResultProcessor.ts` (build seed) — records the RAW user prompt, not the engineered task: strips `Build:` and everything from the first blank line / `Project Blueprint:` / `SUPERVISOR` marker, so REQUEST HISTORY shows what the user actually typed.
+- `chatPanelMsgFixFinalize.ts` — bumped the recorded fix prompt from 200 -> 400 chars so longer requests aren't clipped.
+
+**Result (frogger, regenerated):**
+```
+## REQUEST HISTORY
+- **fix** (rev 1): "make the vehicles look more real"
+- **fix** (rev 2): "add sounds to the vehicles ...honking horns when they get close to the frog"
+- **fix** (rev 3): "add sounds to the vehicles ...honking horns ..."
+```
+So the blueprint now carries BOTH the MECHANICS (what it does) and the REQUEST HISTORY (what was asked) — a complete record. Existing projects backfill from their ledger on the next blueprint write; frogger regenerated immediately to confirm.
+
+**Deploy:** client-only (blueprint.md is rendered locally). Compile 0 errors.
+
+---
+
+## Feature — Jun 14, 2026: "Add to Phone" Phase 3 — build-card button + PNG icons
+
+- **Build-card button:** modified the `__PREVIEW_BROWSER__` renderer (`chatPanelRenderer.ts`) to show a **📱 Add to Phone** button next to "Preview in Browser" — one change covers all web-result cards (build/fix/agent/chunked/vault). Click handling: `chatPanelScriptActions.ts` (`.add-to-phone-btn` -> postMessage `add-to-phone`) -> `chatPanelMessages.ts` runs `redivivus.addToPhone`. So the feature is now a one-click button, not just the Command Palette.
+- **PNG icons:** new `src/services/pwa/pngIcon.ts` — dependency-free PNG encoder (Node `zlib` + CRC32, no native deps) renders a full-bleed diagonal-gradient tile. `generatePwa` now emits `icon-192.png` + `icon-512.png` (verified valid via `file`: 192x192 / 512x512 RGBA), wired into `manifest.json` icons + the iOS `apple-touch-icon`. The initials `icon.svg` stays for Android/manifest. **Note:** text/initials ON the PNG needs a font rasterizer (canvas/bitmap font) — deferred; the gradient PNG gives iOS a clean home-screen icon now.
+
+**Verified:** compiles clean; button renders + wires end-to-end; PNGs are real (file-confirmed dimensions); manifest + apple-touch-icon reference them.
+
+**Remaining (post-v1):** initials-on-PNG (font), real app-token verification + paid-tier badge removal, optional screenshot icons.
+
+---
+
+## Feature — Jun 14, 2026: "Add to Phone" Phase 2 — publish client + button/panel (URL + QR)
+
+End-to-end installable-PWA feature, wired into the extension.
+
+- **Publish client** `src/services/pwa/pwaPublish.ts` — `publishPwa(srcDir, opts)`: runs the Phase 0 generator, base64-encodes the bundle, POSTs to the Phase 1 host `/publish` (with a real `User-Agent` — Cloudflare 403s bare/Node UAs on workers.dev), returns `{url, token, expiresAt, warnings}`. **Verified LIVE** against the deployed Worker: generate frogger -> publish -> the host serves the real PWA (manifest/sw/badge/content-types).
+- **Panel** `src/ui/panels/pwa/addToPhonePanel.ts` + `addToPhonePanelHtml.ts` — the finished preview shows **both the install URL and a QR code** (QR generated server-side via the vendored MIT `qrcode-generator`, inlined as SVG — no webview script), plus a live countdown, Copy/Open actions, and Android/iPhone/Desktop install steps. Vendored lib at `src/ui/panels/pwa/vendor/qrcode.js`, copied to `out/` by the compile step.
+- **Command** `redivivus.addToPhone` ("Redivivus: Add to Phone (Install as App)") — `src/core/commands/addToPhoneCommand.ts`: resolves the active project, publishes, opens the panel; progress + error toasts; warns on un-bundled refs. Registered in `extension.ts`.
+- **Settings**: `redivivus.pwaHostUrl` (default the deployed Worker) + `redivivus.pwaInstallWindowMinutes` (15/60/240, default 60).
+- **Build**: `tsconfig` excludes `pwa-host/` (separate Worker project); compile script copies the vendored QR lib to `out/`.
+
+**Verified:** package.json valid, compile clean, vendor present in out/, panel HTML renders with URL + QR `<svg>` + countdown + steps. Live publish round-trip confirmed (frogger installable URL generated + served).
+
+**Remaining:** Phase 3 polish (PNG icons / screenshot icons, a button on the build-result card instead of only the command palette, real app-token verification + paid-tier badge removal).
+
+---
+
+## Feature — Jun 14, 2026: "Add to Phone" Phase 1 — ephemeral Cloudflare Worker host built
+
+The hosting layer for installable PWAs. New deployable Worker project in `pwa-host/` (separate from the extension; deploy with wrangler).
+
+- `src/index.ts` (router/Env), `src/publish.ts`, `src/serve.ts`, `src/util.ts` — all < 75 lines.
+- **`POST /publish`** — `{ttlMinutes:15|60|240, entry, title, files:{path:base64}}` + `X-Redivivus-App` token. App-token-gated, rate-limited (30/h per token, KV counter), 10 MB size cap, stores each file under `b:<token>:<path>` + meta `m:<token>` in KV with `expirationTtl` (self-cleaning, no cron). **Free tier re-stamps the "Made with Redivivus" badge server-side** (tamper-resistant). Returns `{token, url, expiresAt}`.
+- **`GET /p/<token>/<path>`** — serves from KV (root -> entry HTML; unknown sub-path -> entry for SPA/SW routing; missing token -> friendly 410 expired page). Content-type by extension; `Service-Worker-Allowed` for sw.js.
+- Config: `wrangler.toml` (KV namespace placeholder + optional `apps.redivivus.dev` route), `package.json`, `tsconfig`, `README` (deploy steps).
+
+**Verified:** esbuild bundles clean (6.6 KB, 0 errors); round-trip tested with a mock KV — publish 200, serve root 200 with badge injected, icon correct content-type, bad token -> 410, missing app-token -> 401.
+
+**TODO before paid-tier works:** real app-token verification + derive free/paid TIER from the verified token (never trust client). v1 stub = always free (badge stays).
+
+**Deploy (user):** `cd pwa-host && npm i && npx wrangler login && npx wrangler kv namespace create PWA_KV` (paste id into wrangler.toml) `&& npm run deploy`. Next: Phase 2 = "Add to Phone" button in the extension (Phase 0 generate -> POST to this Worker -> QR + countdown).
+
+---
+
+## Feature — Jun 14, 2026: "Add to Phone" Phase 0 — PWA generator built
+
+First code slice of `docs/REDIVIVUS_ADD_TO_PHONE.md` (one-click installable PWA). Pure, offline, no hosting/AI.
+
+- New `src/services/pwa/pwaTemplates.ts` (99 lines) — string builders: `manifestJson`, `serviceWorkerJs` (precache + cache-first), `iconSvg` (title-initials on a theme gradient), `madeWithBadge` ("Made with Redivivus" corner chip), `injectPwaIntoHtml` (manifest link + theme-color + Apple meta + SW registration + badge).
+- New `src/services/pwa/pwaGenerator.ts` (97 lines) — `generatePwa(srcDir, opts)`: enumerates the folder (skips junk dirs + non-runtime files like README/.gitignore), finds the HTML entry, injects PWA wiring, generates manifest/sw/icon, returns the full augmented file map + warnings + precache list. `writePwaBundle()` test helper. Language/framework-agnostic — wraps the OUTPUT bundle (HTML/JS/WASM/assets), not the source.
+- **Warning logic** flags only local refs NOT present in the bundle (genuine 404s / runtime fetches of un-bundled assets); bundled multi-file refs (e.g. `game.js`) correctly do NOT warn — the SW precaches them.
+
+**Verified:** frogger (single-file -> manifest/sw/icon/badge injected, SW precaches index.html, icon initials "FA", 0 warnings); chess (multi-file -> bundles game.js/style.css/12 SVGs, precaches all, 0 warnings). Compiles clean; both files < 200 lines.
+
+**Scope note added to the doc** ("What apps fit"): not limited to simple games — any static web build (incl. framework `dist/` and WASM). Two boundaries for the ephemeral one-click model: live-backend apps aren't offline-self-contained; Capacitor native-plugin features don't run in a browser PWA (only the web-capable subset).
+
+**Not yet:** PNG-rasterized icons (Phase 3); Phase 1 = Cloudflare Worker + KV ephemeral host; Phase 2 = "Add to Phone" button + QR.
+
+---
+
+## Fix — Jun 14, 2026 (rigops): Multi-file showcase demos were blank on the site (CSS/JS not inlined)
+
+**Symptom:** Chess AI Game showed/played fine in the app but was a blank board on redivivus.dev/showcase (only the New Game button + difficulty dropdown rendered).
+
+**Root cause:** the showcase stores a SINGLE HTML blob served standalone on the website. Chess is multi-file — `index.html` references `style.css` and `game.js` via `<link>`/`<script src>`. Locally the whole folder is served so they load; on the site only `index.html` exists, so the game logic (`game.js`) and styles never load -> blank. (`game.js` itself is self-contained — Unicode pieces `♔♕♖`, no external fetch — so inlining is sufficient.)
+
+**Fix — `showcase_autofill.py` + `showcase.py`:** new `inline_html_assets(html, base_dir)` inlines same-folder `<link rel=stylesheet href=local.css>` -> `<style>` and `<script src=local.js>` -> `<script>` (LOCAL relative refs only; http/absolute left alone). `AddDemoScreen._save` calls it whenever the content file is `.html/.htm`, so the stored demo is self-contained. Verified on chess: `index.html` 970 B -> 21 KB with `<style>` + Unicode pieces inlined, no remaining external refs.
+
+**Existing chess entry:** stored before the fix, so still broken on the site -> **Delete it and re-Add** (Browse -> `chess-ai-game` -> Add); the new content inlines automatically. All future multi-file HTML demos self-contain on add.
+
+**Won't-bundle warning (follow-up):** `find_uninlinable_refs(html)` runs on the POST-inline content and flags local refs the standalone site won't have — leftover `<script src>`/`<link>`/`<img>` (missing/un-inlinable) and runtime `fetch("local.svg/json/png/...")` (e.g. chess pieces fetched at runtime). External http(s)/CDN refs are NOT flagged. Surfaced two ways: the autofill status shows "[!] May be blank on the site -- N local file(s) can't be bundled: ..." when you Browse/scan a folder, and `_save` raises an app `notify()` warning toast (persists after the modal closes) listing the refs. Verified: chess (game.js inlined, Unicode pieces) -> no warning; a game with `fetch('pieces/wk.svg')` / missing `<script src>` / local `<img>` -> all flagged; external-only -> clean.
+
+**Risk:** low — inlining only touches local same-folder refs; the warning is advisory (never blocks the add).
+
+---
+
 ## Feature — Jun 14, 2026 (rigops): Add Showcase form auto-fills from a project folder
 
 **Request:** in the rigops admin "Add Showcase Program" form, auto-fill the fields when pointing at a project folder.

@@ -125,7 +125,7 @@ export async function runFixFinalize(params: {
         const { appendRevision, nextRev, setMechanics } = await import('../../services/blueprint/livingBlueprintService.js');
         const d = await distillFixRevision(deps.routing, deps, userText, diagnosis);
         if (d) {
-          appendRevision(root, { rev: nextRev(root), ts: new Date().toISOString(), kind: 'fix', request: userText.slice(0, 200), summary: d.summary, mechanics_delta: d.delta, files: written, by: workerLabel, snapshotId: fixSnapId });
+          appendRevision(root, { rev: nextRev(root), ts: new Date().toISOString(), kind: 'fix', request: userText.slice(0, 400), summary: d.summary, mechanics_delta: d.delta, files: written, by: workerLabel, snapshotId: fixSnapId });
           setMechanics(deps, d.mechanics);
           fixLog('[LIVING BLUEPRINT] Revision recorded', { rev: nextRev(root) - 1, summary: d.summary });
         }

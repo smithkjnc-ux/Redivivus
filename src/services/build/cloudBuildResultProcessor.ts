@@ -221,15 +221,19 @@ export async function processBuildResults(
       try {
         const lb = await import('../blueprint/livingBlueprintService.js');
         const relFiles = writtenPaths.map(p => path.relative(root, p).replace(/\\/g, '/'));
+        // [LIVING BLUEPRINT] Record the USER's prompt, not the engineered build instruction. The build pipeline
+        // appends a blueprint/contract block to the task; keep only the human request (before the first blank line
+        // or "Project Blueprint:"/"SUPERVISOR" marker) so REQUEST HISTORY shows what the user actually asked.
+        const userPrompt = String(task).replace(/^Build:\s*/, '').split(/\n\s*\n|\n\s*Project Blueprint:|\n\s*SUPERVISOR/)[0].trim().slice(0, 400);
         if (!lb.getMechanics(deps)) {
           const { distillBuildMechanics } = await import('../blueprint/livingBlueprintDistill.js');
           const mech = await distillBuildMechanics(routing, task, relFiles);
           if (mech) {
             lb.setMechanics(deps, mech);
-            lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: task.slice(0, 200), summary: 'Initial build — behavioral contract seeded.', files: relFiles, by: data.model || 'AI' });
+            lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: userPrompt, summary: 'Initial build — behavioral contract seeded.', files: relFiles, by: data.model || 'AI' });
           }
         } else {
-          lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: task.slice(0, 200), summary: 'Rebuild / additional build.', files: relFiles, by: data.model || 'AI' });
+          lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: userPrompt, summary: 'Rebuild / additional build.', files: relFiles, by: data.model || 'AI' });
         }
       } catch { /* living-blueprint seeding is best-effort — never affect the build outcome */ }
     })();

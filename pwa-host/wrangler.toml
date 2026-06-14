@@ -1,0 +1,14 @@
+name = "redivivus-pwa-host"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+
+# Ephemeral PWA bundle store. Create the namespace, then paste its id below:
+#   wrangler kv namespace create PWA_KV
+[[kv_namespaces]]
+binding = "PWA_KV"
+id = "279c02e3033e4b4c9a9c662467f03c30"
+
+# Optional: serve from a dedicated subdomain (recommended for origin isolation), e.g. apps.redivivus.dev
+# [[routes]]
+# pattern = "apps.redivivus.dev/*"
+# zone_name = "redivivus.dev"

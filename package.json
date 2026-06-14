@@ -50,6 +50,10 @@
     },
     "commands": [
       {
+        "command": "redivivus.addToPhone",
+        "title": "Redivivus: Add to Phone (Install as App)"
+      },
+      {
         "command": "redivivus.openAsProject",
         "title": "Open as Redivivus Project"
       },
@@ -550,6 +554,17 @@
           "default": "",
           "description": "Override the Redivivus cloud API base URL (leave blank for production). Example: http://localhost:3001/api/v1"
         },
+        "redivivus.pwaHostUrl": {
+          "type": "string",
+          "default": "https://redivivus-pwa-host.smithkjnc.workers.dev",
+          "description": "Ephemeral host for the 'Add to Phone' feature — where installable PWAs are published (Cloudflare Worker)."
+        },
+        "redivivus.pwaInstallWindowMinutes": {
+          "type": "number",
+          "enum": [15, 60, 240],
+          "default": 60,
+          "description": "How long an 'Add to Phone' install link stays live before it auto-expires (the installed app keeps working offline regardless)."
+        },
         "redivivus.buildActivity.expandSteps": {
           "type": "boolean",
           "default": true,
@@ -728,7 +743,7 @@
   },
   "scripts": {
     "vscode:prepublish": "tsc -p ./ && node scripts/postcompile-deploy.js",
-    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
+    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && mkdir -p out/ui/panels/pwa/vendor && cp src/ui/panels/pwa/vendor/qrcode.js out/ui/panels/pwa/vendor/qrcode.js && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
     "package": "npm run compile && vsce package --no-dependencies",
     "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
     "watch": "tsc -watch -p ./",

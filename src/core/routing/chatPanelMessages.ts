@@ -58,6 +58,9 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   } else if (msg.type === 'preview-browser') {
     await handlePreviewBrowser(msg);
 
+  } else if (msg.type === 'add-to-phone') {
+    await (require('vscode') as typeof import('vscode')).commands.executeCommand('redivivus.addToPhone');
+
   } else if (msg.type === 'open-html-by-name') {
     await handleOpenHtmlByName(msg);
 
