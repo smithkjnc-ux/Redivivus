@@ -85,15 +85,28 @@ export async function routeCloudChatResult(
       chatResult.action = 'build';
       // fall through to build routing below — do NOT return
     } else {
+      const _isImperative = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
+      const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
+      const _isRecoverableToFix = hasProjectOpen && _isImperative && !_isQuestion;
+
+      // [FIX] 'clarify' on an imperative inside an open project → always route to fix.
+      // The AI asking "could you give me more detail?" is wrong here — the Supervisor has full
+      // project context and can infer the intent. This was the "add sounds to the vehicles"
+      // stall (Jun 14, 2026): cloudChat returned 'clarify' with text "I can help with that —
+      // could you give me a bit more detail" and the old code rendered it instead of fixing.
+      if (chatResult.action === 'clarify' && _isRecoverableToFix) {
+        fixLog(`[CLARIFY-RECOVERY] clarify on imperative inside open project → routing to fix (text="${(chatResult.text ?? '').slice(0, 60)}")`);
+        await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
+        return;
+      }
+
       // [FIX][SILENT-DROP] Empty text inside an open project with an imperative message →
       // the old code called releaseInput() and returned silently, showing NOTHING to the user.
       // This was the "add sounds to the vehicles" stall (Jun 14, 2026).
       // Recovery: treat it as a modification and route to the fix pipeline.
       if (!chatResult.text) {
-        const _isImperative = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
-        const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
-        if (hasProjectOpen && _isImperative && !_isQuestion) {
-          fixLog(`[SILENT-DROP-RECOVERY] answer/clarify with empty text + open project + imperative -> routing to fix`);
+        if (_isRecoverableToFix) {
+          fixLog(`[SILENT-DROP-RECOVERY] answer/clarify with empty text + open project + imperative → routing to fix`);
           await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
           return;
         }
@@ -102,7 +115,7 @@ export async function routeCloudChatResult(
         releaseInput();
         return;
       }
-      // Normal answer/clarify with non-empty text
+      // Normal answer/clarify with non-empty text (genuine Q&A)
       conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
       refresh();
       releaseInput();

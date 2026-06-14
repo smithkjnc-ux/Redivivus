@@ -3,6 +3,22 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026 (3): `clarify` response on imperative inside open project → routes to fix now
+
+**Symptom:** User sent "add sounds to the vehicles...honking horns when they get close to the frog" inside `frogger-arcade-game`. cloudChat (Gemini) classified as `action: 'clarify'` with text "I can help with that — could you give me a bit more detail about what you'd like me to do?" (↓0 tok — backend guard injected it). PostCloud saw non-empty text, rendered the clarify bubble, released input. Fix pipeline never ran.
+
+**Root cause — `chatPanelMsgSendPostCloud.ts` line 104:** The `SILENT-DROP-RECOVERY` path only triggered on `!chatResult.text`. The new `CLARIFY-RECOVERY` path handles the more common case: `action === 'clarify'` AND text IS non-empty but it's a clarification ask on an imperative inside an open project.
+
+**Fix:** Extracted the imperative/question detection before the text check so it's reused by both guards. Added `CLARIFY-RECOVERY` branch: when `action === 'clarify'` AND project is open AND message is imperative AND not a question → override to fix immediately (ignoring text). The clarify text is dropped. Log: `[CLARIFY-RECOVERY] clarify on imperative inside open project → routing to fix (text="...")`.
+
+**Why this is safe:** Genuine clarification needs (like "how do I do X?") get `action: 'answer'`, not 'clarify'. `action: 'clarify'` is the classifier's way of saying "I need more info to do a code task" — which is never appropriate when we have a full-context Supervisor available.
+
+**Files:** `chatPanelMsgSendPostCloud.ts` (+15 lines, refactored recovery block).
+
+**Compile:** exit 0. Deployed to baked IDE.
+
+---
+
 ## Fix — Jun 14, 2026 (2): Adaptive pill not switching to Manual + Supervisor 401 all-fail diagnostic
 
 **Bug A — Pill not switching to Manual:**

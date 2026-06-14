@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — (2) Pill not switching to Manual fixed: window._renderAdaptivePill() exported and called after update-header replaces #input-left DOM. Supervisor 401 all-fail: diagnostic [SUP-KEYS]/[SUP-ATTEMPT]/[SUP-CATCH] logs added to chatPanelMsgFixPhases.ts; root cause still unconfirmed — inspect ~/redivivus_debug.log after next failed fix.
+*Last updated:* 2026-06-14 — (3) CLARIFY-RECOVERY: action='clarify' on imperative inside open project now routes to fix pipeline instead of rendering the "could you give me more detail?" bubble. This was the actual "add sounds to the vehicles" stall root cause.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
