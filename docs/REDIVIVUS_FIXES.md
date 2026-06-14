@@ -27,6 +27,22 @@ So the blueprint now carries BOTH the MECHANICS (what it does) and the REQUEST H
 
 ---
 
+## Fix — Jun 14, 2026: "make the frog bigger" rewrote the whole game and broke it (HTML always-full-file rule)
+
+**Symptom:** "make the frog bigger" produced a blank screen / dead render loop. The Supervisor diagnosed it correctly and TRIVIALLY ("increase `PX_SIZE` to 5" — a one-constant change), but the fix broke the entire game. Cost $0.24; ran on Claude.
+
+**Root cause (causation-first, from the fix log):** Worker `format=fullfile`, `responseLength=24039` — for a single-value change the Worker **rewrote the entire 24 KB game from scratch**, and Claude's regenerate introduced a new bug (render loop never starts). The trigger was `fix-worker/route.ts`: *"For any .html file, ALWAYS use FULL FILE format — never surgical edits."* So EVERY html change, however trivial, forced a full regenerate. That rule predates the hardened surgical matcher (the chess HTML surgical edit now applies fine; the client `hasHtmlTarget` was fixed Jun 13 to run surgical for HTML).
+
+**Fix — `fix-worker/route.ts`:** choose format by **change size, not file type**. A small/localized change (a value, color, constant, or a few adjacent lines — e.g. "make the frog bigger") now uses a SURGICAL `<edit>` SEARCH/REPLACE block EVEN in .html (safest possible edit — touches only those lines, can't break the rest of a working file). FULL FILE reserved for true structural rewrites or many-region changes (>30%). Explicitly: "NEVER rewrite an entire working file for a one-value change — it regenerates the whole program and routinely introduces a blank screen / dead render loop."
+
+**Effect:** "make the frog bigger" becomes a 1-line surgical edit (`PX_SIZE = 2` -> `5`) that cannot touch the render loop, AND costs a fraction (no 24 KB regenerate).
+
+**Deploy:** backend — **needs a Fly deploy.** Backend tsc clean.
+
+**Side note (Claude vs Gemini / cost):** with Claude keys re-enabled, the Worker defaulted to Claude (highest rank) and the full rewrite cost $0.24. The surgical fix slashes that. For trivial work a cheaper model is ideal — the new chat **Routing panel** lets the user override the Worker (e.g. to Gemini) per request; tightening the auto "aces in their places" worker-cost pick is a separate follow-up.
+
+---
+
 ## Feature — Jun 14, 2026: Showcase demos installable as PWAs + "Add to Phone" -> "Convert to PWA" rename
 
 **Showcase PWA (rigops + redivivus-web):** site visitors can now install a showcase game/app to their device.
