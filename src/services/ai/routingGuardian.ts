@@ -95,10 +95,11 @@ export async function guardianReviewImpl(
   originalTask: string,
   workerResponse: string,
   workerAI: string,
-  blueprintContext: string
+  blueprintContext: string,
+  forceProvider?: string,
 ): Promise<GuardianReviewResult> {
   const keyMap = svc.getKeyMap();
-  const preferred = selectGuardianAI(workerAI, keyMap);
+  const preferred = forceProvider || selectGuardianAI(workerAI, keyMap);
   if (!preferred) {
     return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
   }
@@ -111,7 +112,8 @@ export async function guardianReviewImpl(
     .filter(([ai]: any) => keyMap[ai]?.())
     .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
     .map(([ai]: any) => ai);
-  const order = [preferred, ...ranked.filter((p) => p !== preferred)];
+  // [ROUTING PANEL] A user-forced Guardian uses ONLY that provider (no failover, like the manual pill).
+  const order = forceProvider ? [forceProvider] : [preferred, ...ranked.filter((p) => p !== preferred)];
 
   const fetchFn = (svc as any).fetchWithTimeout.bind(svc);
   const { getApiBase, getAccountToken } = require('../api/apiClient.js');

@@ -299,6 +299,15 @@ export function buildTierScript(): string {
         return assessTier((inp3 && inp3.value) ? inp3.value : '') || 'pro';
       };
 
+      // ── Routing-panel primitives (read by chatPanelScriptRouting.ts) ─────────
+      window._assessTier = function(text) { return assessTier(text || '') || 'pro'; };
+      window._tierModelLabel = function(provId, tier) { return (PROVIDER_TIER_LABEL[provId] || {})[tier] || provId; };
+      window._pickProviderForTier = function(tier) { var p = pickProvider(tier); return p ? p.id : null; };
+      window._getProviders = function() {
+        try { var el = document.getElementById('adaptive-pill'); return el ? JSON.parse(el.getAttribute('data-providers') || '[]') : []; }
+        catch (e) { return []; }
+      };
+
       // Easter egg: Konami code
       var _k = ['ArrowUp','ArrowUp','ArrowDown','ArrowDown','ArrowLeft','ArrowRight','ArrowLeft','ArrowRight','b','a'];
       var _ki = 0;

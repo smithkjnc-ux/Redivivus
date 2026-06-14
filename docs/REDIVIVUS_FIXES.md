@@ -27,6 +27,20 @@ So the blueprint now carries BOTH the MECHANICS (what it does) and the REQUEST H
 
 ---
 
+## Feature — Jun 14, 2026: Chat routing panel — per-role AI suggestion + override (progressive disclosure)
+
+The "split chat" idea: surface who handles a request (Supervisor / Worker / Guardian) with a reason, and let the user override each role's AI. Built as **progressive disclosure** (auto by default; expand to see/override) so novices aren't taxed.
+
+- **Panel** `chatPanelScriptRouting.ts` (new) — a "Routing v" toggle next to the Adaptive pill expands a panel under the input showing the 3 roles, each with the suggested model (from the client tier heuristic `window._assessTier` + `_pickProviderForTier` + `_tierModelLabel`, all newly exposed from `chatPanelScriptTier.ts`), a one-line reason, and an **override `<select>`** (Auto + every configured provider). Live-updates while typing (debounced). Collapsed by default. The toggle lives in `#input-left` (replaced on header refresh) so it's recreated idempotently via `window._ensureRoutingToggle()`, called from `chatPanelScriptListener.ts` after `update-header` (mirrors the pill).
+- **Capture:** `window._getRoutingOverrides()` -> doSend payload `routingOverrides {supervisor?, worker?, guardian?}` (provider ids; absent = auto).
+- **Honoring (client-side — NO backend deploy):** `handleSendMessage` stashes `deps.routingOverrides`. The FIX pipeline forces the chosen provider per role with NO failover (like the manual pill): `runPhase1Supervisor` (supervisor order), `runPhase2Worker` (worker order), and `guardianReview`/`guardianReviewImpl` (new `forceProvider` param -> order `[forced]`). This works because the fix pipeline selects all three providers client-side.
+
+**Verified:** compiles clean; injected script is valid JS + ASCII-only (Rule 13); exposes the globals; toggle survives header refresh.
+
+**Scope (honest):** overrides are honored in the FIX pipeline (the genuine 3-role case). Chat Q&A answers (backend-decided supervisor) and the build `/plan` pipeline don't honor per-role overrides yet — follow-up (needs backend). The panel's suggestion is a client-side estimate; the Supervisor may still adjust the Worker tier at diagnosis (the result card's Pipeline Usage shows the actual per-role breakdown + cost).
+
+---
+
 ## Fix — Jun 14, 2026: PWA wrapper — in-page install prompt + tap-to-start (novice-friendly)
 
 The served PWA opened on a phone but gave novices no way to install or start it. Added to the Phase 0 injected wrapper (`pwaTemplates.ts`):

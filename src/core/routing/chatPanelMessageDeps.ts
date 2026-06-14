@@ -28,4 +28,7 @@ export interface MessageHandlerDeps {
   // [SUPERVISOR_TIER] Per-turn hint of the complexity tier (from the chat pre-pass) used to size the fix
   // Supervisor's own diagnosis model. Set after cloudChat; read in runPhase1Supervisor. Absent -> default 'pro'.
   supervisorTierHint?: 'flash' | 'pro' | 'ultra';
+  // [ROUTING PANEL] Per-role manual provider overrides from the chat routing panel. Each is a provider id that
+  // FORCES that role's AI (no failover, like the manual pill). Honored client-side in the fix pipeline.
+  routingOverrides?: { supervisor?: string; worker?: string; guardian?: string };
 }

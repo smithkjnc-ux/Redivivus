@@ -116,7 +116,9 @@ function tapToStartBridge(): string {
       try{Object.defineProperty(e,'keyCode',{get:function(){return kc;}});Object.defineProperty(e,'which',{get:function(){return kc;}});}catch(_){}
       document.dispatchEvent(e);window.dispatchEvent(e);}
     function start(){fire('keydown','Enter','Enter',13);fire('keyup','Enter','Enter',13);fire('keydown',' ','Space',32);fire('keyup',' ','Space',32);}
-    document.addEventListener('pointerup',function(ev){var t=ev.target;if(t&&t.closest&&t.closest('button,a,input,select,textarea,[role=button]'))return;start();},true);
+    document.addEventListener('pointerup',function(ev){
+      if(ev.pointerType&&ev.pointerType!=='touch')return; /* only touch devices — mouse/pen users have real keys */
+      var t=ev.target;if(t&&t.closest&&t.closest('button,a,input,select,textarea,[role=button]'))return;start();},true);
   })();</script>`;
 }
 

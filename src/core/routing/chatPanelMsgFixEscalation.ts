@@ -150,7 +150,8 @@ export async function runEscalationLoop(params: {
       const guardianContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${diagnosis}`;
       fixLog(`Guardian review (attempt ${attempt + 1}): Starting...`);
       fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
-      const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), '');
+      // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
+      const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), '', deps.routingOverrides?.guardian);
       fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
       // [FIX] The Guardian's model must never be empty -> "none". guardianReview sometimes doesn't echo the model
       // it used; fall back to the Supervisor's provider (the Guardian IS the Supervisor-tier model — Workshop

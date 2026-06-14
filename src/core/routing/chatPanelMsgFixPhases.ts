@@ -64,7 +64,9 @@ export async function runPhase1Supervisor(
     .filter(([ai]: any) => _supKeyMap[ai]?.())
     .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
     .map(([ai]: any) => ai);
-  const supProviderOrder = [supervisor, ..._rankedSup.filter((p) => p !== supervisor)];
+  // [ROUTING PANEL] If the user manually chose a Supervisor AI, force it (no failover); else adaptive order.
+  const _supOverride = deps.routingOverrides?.supervisor;
+  const supProviderOrder = _supOverride ? [_supOverride] : [supervisor, ..._rankedSup.filter((p) => p !== supervisor)];
 
   // [SUPERVISOR_TIER] Size the Supervisor's OWN diagnosis model to the request (symmetric to WORKER_TIER). The
   // tier was already classified by the chat pre-pass and stashed on deps — no extra call. Hard/architectural
@@ -197,7 +199,9 @@ export async function runPhase2Worker(
     .filter(([ai]: any) => _keyMap[ai]?.())
     .sort((a: any, b: any) => b[1] - a[1])
     .map(([ai]: any) => ai);
-  const providerOrder = [workerAI, ..._ranked.filter((p) => p !== workerAI)];
+  // [ROUTING PANEL] If the user manually chose a Worker AI, force it (no failover); else adaptive order.
+  const _wkOverride = deps.routingOverrides?.worker;
+  const providerOrder = _wkOverride ? [_wkOverride] : [workerAI, ..._ranked.filter((p) => p !== workerAI)];
 
   const _ErrTail = /\[ERROR:\s*([^\]]+)\]\s*$/;
   let workerResponse = '';

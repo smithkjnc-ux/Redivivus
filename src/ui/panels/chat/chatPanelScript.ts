@@ -9,6 +9,7 @@ import { buildActionsScript } from './chatPanelScriptActions';
 import { buildActionsScriptB } from './chatPanelScriptActionsB';
 import { buildGatesScript } from './chatPanelScriptGates';
 import { buildTierScript } from './chatPanelScriptTier';
+import { buildRoutingScript } from './chatPanelScriptRouting';
 import { buildExpandedInterviewScript } from './chatPanelScriptExpandedInterview';
 import { buildImageScript } from './chatPanelScriptImage';
 import { buildListenerScript } from './chatPanelScriptListener';
@@ -46,7 +47,7 @@ export function buildChatScript(): string {
       if (window.__redivivusPreviewHide) { window.__redivivusPreviewHide(); }
       var _tier = (window._getActiveTier && window._getActiveTier()) || undefined;
       var _manual = (window._getManualProvider && window._getManualProvider()) || undefined;
-      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier, manualProvider: _manual || undefined });
+      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier, manualProvider: _manual || undefined, routingOverrides: (window._getRoutingOverrides ? window._getRoutingOverrides() : undefined) });
       input.value = ''; input.style.height = 'auto'; window._pendingImage = null; window._pendingImageType = null;
       const _ip = document.getElementById('img-prev'); if (_ip) _ip.remove();
       const _ipc = document.getElementById('img-preview-container'); if (_ipc) _ipc.remove();
@@ -198,5 +199,6 @@ export function buildChatScript(): string {
     ${buildExpandedInterviewScript()}
     ${buildImageScript()}
     ${buildTierScript()}
+    ${buildRoutingScript()}
   `;
 }

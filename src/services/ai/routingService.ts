@@ -181,8 +181,8 @@ export class RoutingService {
     return Object.values(this.getKeyMap()).some(fn => fn());
   }
 
-  async guardianReview(originalTask: string, workerResponse: string, workerAI: string, blueprintContext: string) {
-    return guardianReviewImpl(this, originalTask, workerResponse, workerAI, blueprintContext);
+  async guardianReview(originalTask: string, workerResponse: string, workerAI: string, blueprintContext: string, forceProvider?: string) {
+    return guardianReviewImpl(this, originalTask, workerResponse, workerAI, blueprintContext, forceProvider);
   }
   isGuardianActive(): boolean {
     const { guardianEnabled } = require('./guardianAI.js');

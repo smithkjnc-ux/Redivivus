@@ -72,6 +72,8 @@ export function buildListenerScript(): string {
           // the innerHTML swap but the new button shows static 'Adaptive' until renderPill() runs.
           // _renderAdaptivePill is exported by chatPanelScriptTier.ts buildTierScript().
           if (typeof window._renderAdaptivePill === 'function') { window._renderAdaptivePill(); }
+          // [ROUTING PANEL] the toggle lives in #input-left too — re-add it after the innerHTML swap.
+          if (typeof window._ensureRoutingToggle === 'function') { window._ensureRoutingToggle(); }
         }
         return;
       }
