@@ -3,6 +3,16 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026: Region-Map test observability (logs)
+
+Pre-test audit of the fix-pipeline log for the frogger region test. Two gaps closed:
+- `routeClassifier.ts` — the `Route classifier` log line `require`d `chatPanelMsgFixUtils` (no `fixLog` export there) so it was a **silent no-op**; fixed to `../logging/fixPipelineLogger.js`. The AI tier decision now actually appears in the log as `Route classifier (AI tier) {tier, reason}`.
+- `chatPanelMsgFix.ts` — added `Phase 1: Region localization` line that extracts the `TARGET REGION / DO NOT TOUCH / WORKER_TIER / FULL FILE` lines from the diagnosis wherever they sit (the 500-char diagnosis preview routinely truncates the PRESCRIPTION). (+5 lines on an already >200 file — pre-existing debt.)
+
+Already covered (verified): Supervisor diagnosis preview, Worker model label (`workerLabel`), apply format + written/failed + `[PARSE]`/truncation, Guardian `passed`/issues (region-boundary violations surface here), Supervisor model+tier in `~/redivivus_debug.log` (`[SUP-KEYS] tier=`, `[SUP-ATTEMPT] model=`). Per-role + total cost is in the result card (accurate after the input-token fix).
+
+---
+
 ## Feature — Jun 14, 2026: AI route classifier replaces regex tier sizing (Rule 18, Phase A)
 
 **Why:** The Supervisor's tier (flash/pro/ultra) was sized by `assessTier()` — pure regex/keyword matching in the webview (`chatPanelScriptTier.ts`). That violates Rule 18 ("never regex to simulate understanding; use a 50-token AI classifier"). It also mis-sized real requests: "make the frog more detailed and lifelike" has no fix/build verb, so it fell through to the default `pro` by accident, not by judgment. PapaJoe: "no regex... the prompt needs to be AI evaluated."

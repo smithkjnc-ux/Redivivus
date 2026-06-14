@@ -52,7 +52,7 @@ export async function applyRouteTier(userText: string, hasProject: boolean, deps
     const cls = await classifyRoute(userText, hasProject, deps);
     if (cls) {
       deps.supervisorTierHint = cls.tier;
-      try { require('../../core/routing/chatPanelMsgFixUtils.js').fixLog?.('Route classifier', { tier: cls.tier, reason: cls.reason }); } catch { /* logging is best-effort */ }
+      try { require('../logging/fixPipelineLogger.js').fixLog?.('Route classifier (AI tier)', { tier: cls.tier, reason: cls.reason }); } catch { /* logging is best-effort */ }
     }
   } catch { /* keep whatever hint was already set (offline-safe) */ }
 }

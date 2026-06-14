@@ -201,6 +201,10 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       fixLog('Phase 1: Supervisor expanded context', { newFileCount: allowedRels.size });
     }
     fixLog('Phase 1: Supervisor diagnosis received', { diagnosisPreview: diagnosis.substring(0, 500) });
+    // [REGION MAP] Surface the localization decision explicitly — the 500-char preview above often truncates the
+    // PRESCRIPTION, so pull the scope lines (TARGET REGION / DO NOT TOUCH / WORKER_TIER / FULL FILE) wherever they sit.
+    const _locLines = (diagnosis.match(/^.*\b(TARGET REGION|DO NOT TOUCH|WORKER_TIER|FULL FILE)\b.*$/gim) || []).map(l => l.trim()).slice(0, 8);
+    if (_locLines.length) { fixLog('Phase 1: Region localization', { lines: _locLines }); }
     supervisorLabel = p1.supervisorLabel;
     // [FIX-ACTIVITY] Show the Supervisor's verdict in the panel — a plain "Found: …" line plus the full
     // diagnosis as expandable detail, so the user can read exactly what it found.
