@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-13 — Context-aware routing guard: project-open/closed rules enforced before cloudChat. Advisory client tier: pre-pass always runs, AI wins for fix/build. Pill format: Adaptive·Groq / Manual·Gemini. projectOpen field flows client→backend→AI classifier. Compound commands (open X then do Y) always bypass guard.
+*Last updated:* 2026-06-14 — Silent-drop fix: cloudChat returning empty answer/clarify text inside an open project now recovers to fix pipeline instead of silently discarding the turn. Diagnostic [CLOUD-RESULT] log added on every chat turn. Rule 9 split: chatPanelMsgSendMessage.ts (345 lines) → chatPanelMsgSendMessage.ts (71) + chatPanelMsgSendPreCloud.ts (125) + chatPanelMsgSendPostCloud.ts (173). Backend guard added to chat/route.ts to prevent empty text from ever being returned for answer/clarify (needs Fly deploy).
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 

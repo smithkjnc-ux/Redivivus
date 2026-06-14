@@ -3,7 +3,36 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 13, 2026: Build started INSIDE an open project (should be a fix/add/edit)
+## Fix — Jun 14, 2026: Silent drop when cloudChat returns empty answer/clarify ("add sounds to the vehicles" stall)
+
+**Symptom:** User typed "add sounds to the vehicles...make them honk when they are close to the frog" inside the open frogger project. The chat froze — user bubble appeared, status returned to ready, no assistant response was rendered.
+
+**Diagnosis (causation-first):** The fix-pipeline log for frogger-arcade-game ended at 19:53 (last confirmed fix). The "add sounds" message at ~20:21 produced NO fix pipeline log — meaning `handleFixRequest` was never called. `cloudChat` returned `action: 'answer'` or `action: 'clarify'` with an **empty `text` field**. The gate at line 216 `if (chatResult.text)` was false → nothing pushed to conversation → `releaseInput()` called → silent return. Claude Code's exact diagnosis: "cloudChat returned something other than build/fix (an answer/clarify with empty text renders nothing → silent)."
+
+**Root cause — `chatPanelMsgSendMessage.ts` (pre-split, lines 201–224):**
+The `answer/clarify` branch checked `if (chatResult.text)` before rendering. When text was empty the branch called `releaseInput()` and returned silently. No message was pushed, no error shown.
+
+**Three fixes applied:**
+
+**Fix 1 — Diagnostic log (`chatPanelMsgSendPostCloud.ts`):** added `fixLog('[CLOUD-RESULT]')` that records the raw `action`, `confidence`, `tier`, `text` (80-char truncated), and `task` the moment `cloudChat` returns — before any flip logic. Every chat turn is now traceable in the fix-pipeline log even if it never reaches `handleFixRequest`.
+
+**Fix 2 — Empty-text recovery (`chatPanelMsgSendPostCloud.ts`):** When `action === 'answer' || 'clarify'` AND `text` is empty AND a project is open AND the message contains an imperative verb (add/make/change/update/remove/etc.) AND is NOT a question → route to `handleFixRequest` instead of returning silently. Genuinely empty Q&A with no project context still calls `releaseInput()` and returns (correct: nothing actionable to do). Log: `[SILENT-DROP-RECOVERY]` or `[SILENT-DROP]` to distinguish.
+
+**Fix 3 — Backend guard (`redivivus-backend/src/app/api/v1/chat/route.ts`):** after parsing the AI result, if `action === 'answer' || 'clarify'` and `text` is empty/blank, inject a neutral holding response ("I can help with that — could you give me a bit more detail...") before returning. Eliminates the empty-text condition at source.
+
+**Rule 9 split — `chatPanelMsgSendMessage.ts` (345 lines → 3 files):**
+Per the 200-line hard stop: split into:
+- `chatPanelMsgSendMessage.ts` — thin orchestrator (71 lines): auth, user-bubble, TurnContext, blueprintCard fast path
+- `chatPanelMsgSendPreCloud.ts` — pre-cloudChat routing (125 lines): keyword shortcuts, URL read, web search, bug-report pre-classifier, project context guard, cloudChat call, null-fallback
+- `chatPanelMsgSendPostCloud.ts` — post-cloudChat routing (173 lines): flips, answer/clarify dispatch (with the fix), command/run/convert/build/fix dispatch
+
+**Compile:** 0 errors. Deployed to baked IDE (out/ + package.json). Backend `chat/route.ts` change needs a Fly deploy.
+
+**Risk:** Low. The silent-drop recovery is guarded by 3 conditions (open project + imperative verb + not a question) — only fires in the exact failing case. The diagnostic log is read-only. The split is behaviour-preserving.
+
+---
+
+
 
 **Symptom:** Inside open frogger, "add sounds to the vehicles...make them honk" showed a NEW-project build card ("Building: Frog Proximity Honk System" with a Build it button). PapaJoe: "should not start a build inside a project — only fix/add/edit."
 
