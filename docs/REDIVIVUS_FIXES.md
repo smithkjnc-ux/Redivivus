@@ -3,6 +3,34 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 13, 2026: Build started INSIDE an open project (should be a fix/add/edit)
+
+**Symptom:** Inside open frogger, "add sounds to the vehicles...make them honk" showed a NEW-project build card ("Building: Frog Proximity Honk System" with a Build it button). PapaJoe: "should not start a build inside a project — only fix/add/edit."
+
+**Root cause:** the project context guard only blocks CONFIDENT new builds before cloudChat; "add sounds..." isn't a confident new build, so it passed through, and cloudChat (backend) returned `action='build'` anyway (the `projectOpen` context isn't fully preventing it server-side). The client then ran the build path.
+
+**Fix — `chatPanelMsgSendMessage.ts`:** hard client-side rule, symmetric to the existing low-confidence-fix→build flip. When `chatResult.action==='build'` AND a real project is open (`_hasProjectOpen && !isProjectsContainer(effectiveRoot)`), flip to `'fix'` (and seed `task` from the message). Confident "build me a NEW X / close this and build" is still handled earlier by the guard (with options); anything reaching here as build with a project open is a misclassified modification. Deploy-free (pure client).
+
+**Compile:** 0 errors, deployed.
+
+---
+
+## Feature — Jun 13, 2026: SUPERVISOR_TIER — the diagnosis model is now sized to the request (symmetric to WORKER_TIER)
+
+**PapaJoe's idea:** "the plan could be made by a lower AI but better applied by a higher AI" — and the Supervisor was pinned to one model (Gemini 2.5 Flash, capability 7) regardless of how hard the diagnosis was.
+
+**Design — reuse, don't add a call.** The Supervisor can't size itself before it runs (chicken-and-egg), so SOMETHING must pick its tier first. Rather than a new triage call per fix, reuse the tier the **chat pre-pass already classified** (`resolvedTier`, flash/pro/ultra) — zero extra AI call.
+- `apiClientChat.ts`: surfaced `resolvedTier` on `ChatResult` (backend already returned it).
+- `chatPanelMessageDeps.ts`: added `supervisorTierHint` to deps (per-turn).
+- `chatPanelMsgSendMessage.ts`: after cloudChat, `deps.supervisorTierHint = chatResult.resolvedTier`.
+- `chatPanelMsgFixPhases.ts` (`runPhase1Supervisor`): `supervisorTier = deps.supervisorTierHint || 'pro'`; the Supervisor's own model is now `bestModelForRole(provider, supervisorTier)` (was hardcoded `'pro'`), and the crew roster's `[THIS IS YOU]` marker uses the real supervisor model.
+
+**Effect (Gemini, Claude capped):** `flash`/`pro` → Gemini 2.5 Flash (7); `ultra` → Gemini 2.5 Pro (9). So a hard/architectural request (pre-pass = ultra) now gets the strongest reasoning model for DIAGNOSIS, while normal fixes stay mid (default `'pro'` = no regression/extra cost). Combined with the capability-aware WORKER_TIER, the pipeline now sizes BOTH roles independently — cheap planner + strong builder, or strong planner + right-sized builder, per the task.
+
+**Deploy:** client-only — the client already sends `supervisorModel`, so **no backend deploy needed.** Compile 0 errors; tier→model resolution verified.
+
+---
+
 ## Fix — Jun 13, 2026: "add sounds to the vehicles" silently dropped (cloudChat-null fallback too narrow)
 
 **Symptom:** "add sounds to the vehicles...make them honk when they are close to the frog" produced NO response at all — status returned to ready, nothing rendered.

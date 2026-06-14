@@ -163,6 +163,9 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // [FIX] doSend() calls setInputBusy(true); only set-status:ready releases it on all non-build paths.
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
+  // [SUPERVISOR_TIER] Reuse the chat pre-pass's complexity tier to size the fix Supervisor's diagnosis model (no
+  // extra AI call). A hard/architectural request (ultra) gets the strongest reasoning model; a normal fix stays mid.
+  if (chatResult.resolvedTier) { deps.supervisorTierHint = chatResult.resolvedTier; }
   // [PHASE 1] Record the classifier's decision + confidence as the turn hint — now READ (just below). In
   // Phase 3 the Supervisor, not this hint, will decide build-vs-fix for code requests.
   turnCtx.hint = { action: chatResult.action, task: chatResult.task, confidence: chatResult.confidence, model: chatResult.model, provider: chatResult.provider };
@@ -174,6 +177,17 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
     fixLog(`[PHASE1] low-confidence fix (conf=${chatResult.confidence}) with no active project -> routing as build`);
     chatResult.action = 'build';
     if (turnCtx.hint) { turnCtx.hint.action = 'build'; }
+  }
+  // [FIX] Hard rule: you cannot BUILD a new project from INSIDE an open one. If the classifier returns 'build'
+  // while a real project is open, the user is modifying THIS project -> treat it as a fix/add/edit. Confident
+  // "build me a NEW X" / "close this and build" requests are caught earlier by the project context guard (which
+  // offers options); anything that still arrives here as 'build' with a project open is a misclassified
+  // modification (e.g. "add sounds to the vehicles"). PapaJoe: "should not start a build inside a project."
+  if (chatResult.action === 'build' && _hasProjectOpen && !isProjectsContainer(effectiveRoot || '')) {
+    fixLog(`[BUILD-IN-PROJECT] classifier returned build inside an open project -> routing as fix`);
+    chatResult.action = 'fix';
+    chatResult.task = chatResult.task || userText;
+    if (turnCtx.hint) { turnCtx.hint.action = 'fix'; }
   }
 
   const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };

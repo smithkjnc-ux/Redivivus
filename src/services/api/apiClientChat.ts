@@ -13,6 +13,9 @@ export interface ChatResult {
   inputTokens: number;
   outputTokens: number;
   confidence?: number; // [PHASE 1] 0..1 — classifier's certainty about `action`. undefined = treat as confident.
+  // [SUPERVISOR_TIER] The complexity tier the chat pre-pass already classified for this request. Reused to size
+  // the fix Supervisor (diagnosis) model — no extra AI call. ultra -> strongest reasoning model for hard requests.
+  resolvedTier?: 'flash' | 'pro' | 'ultra';
 }
 
 export interface ChatContext {

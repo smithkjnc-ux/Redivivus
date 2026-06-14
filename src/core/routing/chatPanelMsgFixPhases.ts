@@ -66,15 +66,23 @@ export async function runPhase1Supervisor(
     .map(([ai]: any) => ai);
   const supProviderOrder = [supervisor, ..._rankedSup.filter((p) => p !== supervisor)];
 
+  // [SUPERVISOR_TIER] Size the Supervisor's OWN diagnosis model to the request (symmetric to WORKER_TIER). The
+  // tier was already classified by the chat pre-pass and stashed on deps — no extra call. Hard/architectural
+  // requests (ultra) get the strongest reasoning model (e.g. Gemini 2.5 Pro); normal fixes stay mid. Default 'pro'
+  // preserves prior behavior. (PapaJoe: "the plan could be made by a lower AI but better applied by a higher AI" —
+  // diagnosis and execution are sized independently.)
+  const supervisorTier: 'flash' | 'pro' | 'ultra' = deps.supervisorTierHint || 'pro';
+
   // [CAPABILITY-AWARE SUPERVISOR] Tell the Supervisor who its workers ACTUALLY are and what they can do, so it
   // sizes WORKER_TIER to real capability instead of guessing at an abstract label. Built from the model registry.
   const { buildCrewRoster } = require('../../services/ai/modelRegistry.js');
-  const _supModelId = bestModelForRole(supervisor, 'pro')?.modelId;
+  const _supModelId = bestModelForRole(supervisor, supervisorTier)?.modelId;
   const workerRoster = buildCrewRoster(supervisor, _supModelId) || undefined;
 
   let diagRes: any; let supProviderUsed = supervisor; let supLastError = '';
   for (const provider of supProviderOrder) {
-    const pModel = bestModelForRole(provider, 'pro')?.modelId || provider;
+    // [SUPERVISOR_TIER] Was hardcoded 'pro' — now sized to the request's complexity (see supervisorTier above).
+    const pModel = bestModelForRole(provider, supervisorTier)?.modelId || provider;
     try {
       const res = await fetchFn(`${base}/fix-supervisor`, {
         method: 'POST',
