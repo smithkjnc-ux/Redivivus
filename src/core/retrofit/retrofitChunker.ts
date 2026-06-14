@@ -48,11 +48,17 @@ export async function processInChunks(
     const isFirst = c === 0;
     const styleWarning = '\nCRITICAL: This is a ' + ext.toUpperCase() + ' file. Use ONLY ' + commentChar +
       ' for comments. NEVER use ' + (commentChar === '#' ? '//' : '#') + ' comments.';
-    const instruction = isFirst
+    // REGION MAP applies to every chunk: each chunk wraps whatever distinct entities/concepts it contains in
+    // paired markers, so the whole file ends up chaptered. Granularity is entity-level, not per-function.
+    const regionNote = ' ALSO add a REGION MAP: wrap each distinct entity/concept this chunk contains (e.g. FROG, ' +
+      'VEHICLES, WATER, HUD, INPUT, GAME_LOOP, COLORS) in PAIRED markers -- "' + commentChar +
+      ' [REGION: NAME] one-line description" before the block and "' + commentChar +
+      ' [/REGION: NAME]" after it. Only ADD comment markers; change no code.';
+    const instruction = (isFirst
       ? 'Add a ' + commentChar + ' [SCOPE] comment at the very top explaining what this file does. Convert TODOs to ' +
-        commentChar + ' [TODO], add ' + commentChar + ' [WARN] to fragile code. Keep ALL code as-is.' + styleWarning
+        commentChar + ' [TODO], add ' + commentChar + ' [WARN] to fragile code. Keep ALL code as-is.'
       : 'This is part ' + (c + 1) + ' of a large file. Convert TODOs to ' + commentChar +
-        ' [TODO], add ' + commentChar + ' [WARN] to fragile code. Do NOT add [SCOPE]. Keep ALL code as-is.' + styleWarning;
+        ' [TODO], add ' + commentChar + ' [WARN] to fragile code. Do NOT add [SCOPE]. Keep ALL code as-is.') + regionNote + styleWarning;
 
     const result = await routing.analyzeFile(
       filePath + ' (chunk ' + (c + 1) + '/' + chunks.length + ')',

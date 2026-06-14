@@ -3,6 +3,26 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature — Jun 14, 2026: Region Map (phases 1-3, 5) — navigable files so fixes localize like a repair manual
+
+**Why:** AIs drift and "improve" things no one asked for; a 24KB game gets a full rewrite to tint one window. The cure is to make scope explicit and navigable. Canonical design: `docs/REDIVIVUS_REGION_MAP.md`. Model: blueprint = understand, index = locate, region = load (eventually, only the target region — so huge files never fully enter context).
+
+**Convention:** paired `// [REGION: NAME] desc` ... `// [/REGION: NAME]` markers, entity/concept granularity, language-correct syntax (Rule 7).
+
+**Changes (backend — pending Fly deploy):**
+- `redivivusWorkerRules.ts` — added Rule 13 (REGION MAP): emit paired markers when writing files, ANCHOR surgical `<search>` blocks on the nearest `[REGION:]` line (stable text -> reliable match), stay inside the named region. Added `[REGION]`/`[/REGION]` to the rule-4 preserve list. Hits BOTH build + fix workers (shared file).
+- `regionIndex.ts` (new) — `buildRegionIndex(files)` scans `[REGION:]`/`[/REGION:]` into a table of contents (`NAME L<start>-<end> desc`); `numberFileLines()` adds reference line numbers. Pure scan, self-maintaining. Tested on mixed HTML/JS/unclosed markers.
+- `fix-supervisor/route.ts` — number the Supervisor's file lines ("page numbers", reference-only — never reach the Worker); build + inject the REGION INDEX (extends the file-level `[SCOPE]` skeleton to within-file); added the **localize-first contract** to `SUPERVISOR_SYSTEM` (name TARGET REGION(S), declare DO NOT TOUCH, surgical-default, full-file = basket-case-only-with-reason); **rewrote** the old "3+ regions of a file -> FULL FILE" PRESCRIPTION rule that had been forcing rewrites (the root push behind the frog full-rewrite).
+
+**Changes (client — compiled/deployed):**
+- `retrofitService.ts` + `retrofitChunker.ts` — retrofit annotation prompts (inline + chunk) now also add `[REGION:]` markers; skip guard re-processes `[SCOPE]`-only files (annotated before the Region Map existed) so existing projects get chaptered.
+
+**Risk:** Numbered lines add ~modest tokens to the Supervisor context (offset later by region-scoped loading). Retrofit re-processes previously-annotated files once (cost), opt-in with backup. Marker quality on retrofit depends on the AI; hand-authored markers are the reference.
+
+**Next:** Phase 4 (Guardian rejects out-of-region edits), Phase 7 (region-scoped loading — the scaling payoff), Phase 8 (visual context).
+
+---
+
 ## Fix — Jun 14, 2026: "Cost way off + fix didn't apply" — surgical edits dropped + Worker input cost counted as $0
 
 **Request:** "AI cost way off and still did not make the edit... something is wrong with using claude too many calls and the wrong model?" — "make the frog more detailed and lifelike" cost a reported $0.34 (actual Claude bill ~$0.63), didn't apply (Retry shown), and made ~8 Claude calls.

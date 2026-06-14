@@ -109,7 +109,9 @@ export class RetrofitService {
         try {
           const content = fs.readFileSync(filePath, 'utf-8');
           if (content.split('\n').length < 5) { results.push({ file: relPath, status: 'SKIPPED (too small)' }); continue; }
-          if (content.includes('[SCOPE]')) { results.push({ file: relPath, status: 'SKIPPED (already annotated)' }); continue; }
+          // Skip only when BOTH the file-level [SCOPE] AND region chapters already exist. A file annotated
+          // before the Region Map existed still needs a region pass, so [SCOPE]-only files re-process.
+          if (content.includes('[SCOPE]') && content.includes('[REGION:')) { results.push({ file: relPath, status: 'SKIPPED (already annotated)' }); continue; }
 
           let result;
           if (content.split('\n').length > 500) {
@@ -118,7 +120,7 @@ export class RetrofitService {
           } else {
             result = await this.routing.analyzeFile(
               relPath, content,
-              'Add Redivivus annotations to this file. Add a [SCOPE] comment at the very top explaining what this file does. Convert any TODO/FIXME/HACK to [TODO]/[WARN]/[DEAD]. Add [WARN] to fragile code. Keep ALL existing code exactly as-is.',
+              'Add Redivivus annotations to this file. Add a [SCOPE] comment at the very top explaining what this file does. Convert any TODO/FIXME/HACK to [TODO]/[WARN]/[DEAD]. Add [WARN] to fragile code. ALSO add a REGION MAP: wrap each distinct entity/concept (e.g. a game has FROG, VEHICLES, WATER, HUD, INPUT, GAME_LOOP, COLORS) in PAIRED markers in the correct comment syntax -- "// [REGION: NAME] one-line description" before the block and "// [/REGION: NAME]" after it (use <!-- --> in HTML, /* */ in CSS, # in Python). Granularity is entity/concept level, not per-function. Keep ALL existing code exactly as-is -- only ADD comment markers.',
               token
             );
           }
