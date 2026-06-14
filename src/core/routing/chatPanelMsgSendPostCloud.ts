@@ -32,10 +32,10 @@ export async function routeCloudChatResult(
   hasProjectOpen: boolean,
 ): Promise<void> {
 
-  // [DIAG] Log the raw cloudChat result so we can always see what the backend returned for this turn.
-  // This is the diagnostic fixLog Claude Code said was needed — frozen-at-19:51 means the result was
-  // never visible. With this log, every chat turn has a traceable backend decision.
-  fixLog(`[CLOUD-RESULT] action=${chatResult.action} conf=${chatResult.confidence ?? 'n/a'} tier=${chatResult.resolvedTier ?? '?'} text=${JSON.stringify((chatResult.text ?? '').slice(0, 80))} task=${JSON.stringify((chatResult.task ?? '').slice(0, 80))}`);
+  // [DIAG] Direct write — fixLog is silent until initFixLogger() is called (only happens inside handleFixRequest).
+  // Use appendFileSync so this ALWAYS appears in ~/redivivus_debug.log regardless of pipeline state.
+  const _dbg = require('fs').appendFileSync.bind(null, require('os').homedir() + '/redivivus_debug.log');
+  _dbg(`[CLOUD-RESULT] action=${chatResult.action} conf=${chatResult.confidence ?? 'n/a'} text="${(chatResult.text ?? '').slice(0, 80)}" hasProject=${hasProjectOpen}\n`);
 
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }
@@ -95,6 +95,7 @@ export async function routeCloudChatResult(
       // stall (Jun 14, 2026): cloudChat returned 'clarify' with text "I can help with that —
       // could you give me a bit more detail" and the old code rendered it instead of fixing.
       if (chatResult.action === 'clarify' && _isRecoverableToFix) {
+        _dbg(`[CLARIFY-RECOVERY] clarify + open project + imperative → routing to fix\n`);
         fixLog(`[CLARIFY-RECOVERY] clarify on imperative inside open project → routing to fix (text="${(chatResult.text ?? '').slice(0, 60)}")`);
         await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
         return;
@@ -106,11 +107,12 @@ export async function routeCloudChatResult(
       // Recovery: treat it as a modification and route to the fix pipeline.
       if (!chatResult.text) {
         if (_isRecoverableToFix) {
+          _dbg(`[SILENT-DROP-RECOVERY] empty text + open project + imperative → fix\n`);
           fixLog(`[SILENT-DROP-RECOVERY] answer/clarify with empty text + open project + imperative → routing to fix`);
           await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
           return;
         }
-        // Truly empty with no recovery context — release and return
+        _dbg(`[SILENT-DROP] no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})\n`);
         fixLog(`[SILENT-DROP] answer/clarify empty text, no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})`);
         releaseInput();
         return;
