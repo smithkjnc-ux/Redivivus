@@ -19,7 +19,7 @@ function qrSvg(url: string): string {
 export function showAddToPhonePanel(result: PublishResult, title: string): void {
   const panel = vscode.window.createWebviewPanel(
     'rdvAddToPhone',
-    `Add to Phone: ${title}`,
+    `Convert to PWA: ${title}`,
     vscode.ViewColumn.Active,
     { enableScripts: true, retainContextWhenHidden: true },
   );

@@ -15,8 +15,9 @@ export function addToPhoneHtml(r: PublishResult, title: string, svg: string): st
   return `<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><style>${CSS}</style></head>
 <body>
-  <h2>Add <span class="hl">${esc(title)}</span> to your phone</h2>
-  <p class="sub">Scan the code with your phone camera, or open the link. This install link expires in
+  <h2>Install <span class="hl">${esc(title)}</span> as an app</h2>
+  <p class="sub">Works on phone, tablet, or computer. Scan the QR with a phone, or open the link on this machine.
+     This install link expires in
      <b id="cd">--:--</b> &mdash; once installed, the app stays on the device, offline.</p>
   <div class="card">
     <div class="qr">${svg}</div>

@@ -27,6 +27,22 @@ So the blueprint now carries BOTH the MECHANICS (what it does) and the REQUEST H
 
 ---
 
+## Feature — Jun 14, 2026: Showcase demos installable as PWAs + "Add to Phone" -> "Convert to PWA" rename
+
+**Showcase PWA (rigops + redivivus-web):** site visitors can now install a showcase game/app to their device.
+- `redivivus-web/src/lib/pwa.ts` (new) — server-side PWA wrapper (manifest, precache SW, icon, install banner, tap-to-start touch bridge, "Made with Redivivus" badge linking to redivivus.dev) using absolute `/play/<slug>/` paths for unambiguous SW scope. Mirrors the extension's generator.
+- `redivivus-web/src/app/play/[slug]/` (new) — `route.ts` serves the demo HTML wrapped as a PWA; `sw.js/`, `manifest.json/`, `icon.svg/` sub-routes; `_fetch.ts` loads the published demo content by slug.
+- `DemoCard.tsx` — shows an **"Install app"** link to `/play/<slug>/` for playable demos tagged `pwa`.
+- **Opt-in via the `pwa` tag** (no DB migration — reuses the existing `tags` column). `rigops` `AddDemoScreen` gains an **"Installable PWA: on/off"** toggle that appends the `pwa` tag on save.
+
+**Rename (extension):** "Add to Phone" -> **"Convert to PWA"** everywhere user-facing (toolbar pill, result-card button [📦], panel title + heading "Install … as an app — works on phone, tablet, or computer", command title, progress/error toasts) because "phone" implied phone-only. Internal command id `redivivus.addToPhone` unchanged. The "Made with Redivivus" PWA badge already links to redivivus.dev (confirmed).
+
+**Verified:** rigops `py_compile` clean; redivivus-web `tsc --noEmit` clean on the new lib/routes/DemoCard; extension compiles.
+
+**Needs deploy + test:** redivivus-web must be deployed (Cloudflare) for `/play/<slug>/` to go live; verify install + SW scope on the deployed site (Next.js trailing-slash handling for the `/play/<slug>/` scope). No DB migration required.
+
+---
+
 ## Feature — Jun 14, 2026: Chat routing panel — per-role AI suggestion + override (progressive disclosure)
 
 The "split chat" idea: surface who handles a request (Supervisor / Worker / Guardian) with a reason, and let the user override each role's AI. Built as **progressive disclosure** (auto by default; expand to see/override) so novices aren't taxed.

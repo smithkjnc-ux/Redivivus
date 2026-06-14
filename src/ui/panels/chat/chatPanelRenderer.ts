@@ -74,7 +74,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
     html = html.replace(/__PREVIEW_BROWSER__([^|]+)\|\|\|END_PREVIEW_BROWSER__/g, (_m, filepath) => {
       const b64path = encodeBase64(filepath);
       // [ADD TO PHONE] Any previewable web result is an installable-PWA candidate — show the button next to Preview.
-      return `<div class="build-result" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"><button class="preview-browser-btn" data-path="${b64path}">🌐 Preview in Browser</button><button class="add-to-phone-btn" data-path="${b64path}" style="background:linear-gradient(135deg,#0ea5e9,#0369a1);">&#128241; Add to Phone</button></div>`;
+      return `<div class="build-result" style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;"><button class="preview-browser-btn" data-path="${b64path}">🌐 Preview in Browser</button><button class="add-to-phone-btn" data-path="${b64path}" style="background:linear-gradient(135deg,#0ea5e9,#0369a1);" title="Make this an installable app (phone, tablet, or computer)">&#128230; Convert to PWA</button></div>`;
     });
     // [Redivivus] Run Project button for non-HTML builds
     html = html.replace(/__RUN_PROJECT__([^|]+)\|\|\|END_RUN__/g, (_m, rootPath) => {

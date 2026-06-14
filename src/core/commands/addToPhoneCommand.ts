@@ -17,7 +17,7 @@ function titleFromName(name: string): string {
 export async function handleAddToPhone(): Promise<void> {
   const root = getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode.window.showWarningMessage('Open a project first — "Add to Phone" turns the current project into an installable app.');
+    vscode.window.showWarningMessage('Open a project first — "Convert to PWA" turns the current project into an installable app.');
     return;
   }
 
@@ -29,7 +29,7 @@ export async function handleAddToPhone(): Promise<void> {
   const appToken = `rdv-${vscode.env.machineId}`;
 
   await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `Add to Phone: packaging ${title}...`, cancellable: false },
+    { location: vscode.ProgressLocation.Notification, title: `Convert to PWA: packaging ${title}...`, cancellable: false },
     async () => {
       try {
         const result = await publishPwa(root, { title, hostUrl, appToken, ttlMinutes });
@@ -40,7 +40,7 @@ export async function handleAddToPhone(): Promise<void> {
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        vscode.window.showErrorMessage(`Add to Phone failed: ${msg}`);
+        vscode.window.showErrorMessage(`Convert to PWA failed: ${msg}`);
       }
     },
   );
