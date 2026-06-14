@@ -97,35 +97,25 @@ export async function routeCloudChatResult(
       const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
       const _isRecoverableToFix = hasProjectOpen && _isImperative && !_isQuestion;
 
-      // [FIX] 'clarify' on an imperative inside an open project → always route to fix.
-      // The AI asking "could you give me more detail?" is wrong here — the Supervisor has full
-      // project context and can infer the intent. This was the "add sounds to the vehicles"
-      // stall (Jun 14, 2026): cloudChat returned 'clarify' with text "I can help with that —
-      // could you give me a bit more detail" and the old code rendered it instead of fixing.
-      if (chatResult.action === 'clarify' && _isRecoverableToFix) {
-        _dbg(`[CLARIFY-RECOVERY] clarify + open project + imperative → routing to fix\n`);
-        fixLog(`[CLARIFY-RECOVERY] clarify on imperative inside open project → routing to fix (text="${(chatResult.text ?? '').slice(0, 60)}")`);
+      // [FIX] answer OR clarify on an imperative inside an open project → always route to fix.
+      // The backend returns this response under 'clarify' sometimes and 'answer' other times —
+      // both are wrong for an imperative inside an open project. The Supervisor has full context.
+      // [RULE] _isQuestion guards against catching genuine Q&A (e.g. "how does X work?").
+      if (_isRecoverableToFix) {
+        _dbg(`[IMPERATIVE-RECOVERY] action=${chatResult.action} + open project + imperative → routing to fix\n`);
+        fixLog(`[IMPERATIVE-RECOVERY] ${chatResult.action} on imperative inside open project → routing to fix`);
         await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
         return;
       }
 
-      // [FIX][SILENT-DROP] Empty text inside an open project with an imperative message →
-      // the old code called releaseInput() and returned silently, showing NOTHING to the user.
-      // This was the "add sounds to the vehicles" stall (Jun 14, 2026).
-      // Recovery: treat it as a modification and route to the fix pipeline.
+      // [FIX][SILENT-DROP] Empty text with no imperative/project context — release and return.
       if (!chatResult.text) {
-        if (_isRecoverableToFix) {
-          _dbg(`[SILENT-DROP-RECOVERY] empty text + open project + imperative → fix\n`);
-          fixLog(`[SILENT-DROP-RECOVERY] answer/clarify with empty text + open project + imperative → routing to fix`);
-          await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
-          return;
-        }
         _dbg(`[SILENT-DROP] no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})\n`);
         fixLog(`[SILENT-DROP] answer/clarify empty text, no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})`);
         releaseInput();
         return;
       }
-      // Normal answer/clarify with non-empty text (genuine Q&A)
+      // Normal answer/clarify with non-empty text — genuine Q&A (question detected or no project open)
       conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
       refresh();
       releaseInput();
@@ -133,6 +123,7 @@ export async function routeCloudChatResult(
       return;
     }
   }
+
 
   // ── command ──
   if (chatResult.action === 'command' && chatResult.task) {
