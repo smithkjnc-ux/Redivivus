@@ -3,6 +3,21 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 14, 2026: Stuck send spinner + companion-region flaw (region test, run 2)
+
+Second frog re-run (post-deploy) surfaced two bugs. Causation-first from `fix-pipeline-2026-06-14T23-13-11.log`.
+
+**Bug A — send button spins forever.** `chatPanelScript.ts` `setInputBusy(true)` ran on send but `setInputBusy(false)` was **never called** — the webview was never told the turn finished. Fix: `chatPanelMessageRouter.ts` posts `{type:'turn-done'}` in a `finally` (success OR error) for turn-starting message types; `chatPanelScript.ts` listens and calls `setInputBusy(false)`. Spinner now stops when the result card lands.
+
+**Bug B — Supervisor forbade the regions the fix needed (root cause of the tiny/undetailed frog).** Log showed `DO NOT TOUCH: ...CONFIG, COLORS` — but the detailed sprite's new colors live in COLORS and `FROG_PX_SIZE` (size) lives in CONFIG. So the new color indices had no palette entry (rendered blank/sparse) and the size shrank in isolation -> tiny, undetailed frog. My own localize contract was self-contradictory ("TARGET plus a new color it needs" vs "DO NOT TOUCH everything else"). Fix introduces a **COMPANION REGION(S)** tier across all three prompts that must agree:
+- `fix-supervisor/route.ts` — prescription now lists TARGET / COMPANION (regions holding a directly-required property — palette, size constant — edit only the exact lines) / DO NOT TOUCH (genuinely unrelated only).
+- `guardianAIPrompt.ts` — boundary check ALLOWS edits in TARGET or COMPANION; only flags DO-NOT-TOUCH / unnamed regions. (Otherwise the Guardian would reject the correct COLORS/CONFIG edits.)
+- `redivivusWorkerRules.ts` rule 13 STAY IN BOUNDS — edit inside TARGET or COMPANION; forbidden/un-named regions only are violations.
+
+**Deploy:** Bug A client (compiled). Bug B backend (Fly). Re-run after deploy: the frog should come out detailed AND tile-sized, with the prescription naming COLORS + CONFIG as companions.
+
+---
+
 ## Feature — Jun 14, 2026: Supervisor "preserve established properties" principle (invariant discipline)
 
 **Why:** The region test worked — "make the frog more detailed and lifelike" applied cleanly, kept the game intact, cost $0.18 (vs $0.63 retry-storm before). BUT the new sprite grew to 10x8 cells while `FROG_PX_SIZE` stayed 8 -> 80x64px in a 32px tile (~2.5x too big). The Worker added detail correctly but broke an established invariant (frog fits one tile) the user never asked to change. PapaJoe flagged that a sprite-specific rule ("detail = more cells at smaller px") would be a narrow hardcoded special-case — the same brittle smell as the regex we removed (Rule 18), treating the symptom not the cause.

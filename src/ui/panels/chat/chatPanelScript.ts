@@ -58,6 +58,8 @@ export function buildChatScript(): string {
       if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
     });
     if (sendBtn) sendBtn.addEventListener('click', doSend);
+    // [FIX] Stop the send-button spinner when the extension reports the turn finished (success or error).
+    window.addEventListener('message', (e) => { if (e && e.data && e.data.type === 'turn-done') { setInputBusy(false); } });
 
     function showModePopover(pendingText) {
       const existing = document.getElementById('mode-popover'); if (existing) existing.remove();
