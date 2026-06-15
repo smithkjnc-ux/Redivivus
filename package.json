@@ -90,6 +90,10 @@
         "title": "Redivivus: Open Dead End Log"
       },
       {
+        "command": "redivivus.showBuildRecord",
+        "title": "Redivivus: Show Build Record"
+      },
+      {
         "command": "redivivus.openBlueprint",
         "title": "Redivivus: Open Blueprint"
       },

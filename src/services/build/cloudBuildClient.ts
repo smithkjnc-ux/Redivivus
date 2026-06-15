@@ -285,24 +285,12 @@ export async function callCloudBuild(
         // below creates each file's parent dir (path.dirname) on demand. NO EMPTY FOLDERS.
         // [DEAD] Removed: standalone mkdir of skeleton.foldersToCreate.
 
-        // Create empty files (will be filled in by code processor)
-        if (skeleton.filesToCreate && skeleton.filesToCreate.length > 0) {
-          for (const filePath of skeleton.filesToCreate) {
-            const fullPath = path.join(root, filePath);
-            try {
-              const dir = path.dirname(fullPath);
-              if (!fs.existsSync(dir)) {
-                fs.mkdirSync(dir, { recursive: true });
-              }
-              if (!fs.existsSync(fullPath)) {
-                fs.writeFileSync(fullPath, '', 'utf-8');
-              }
-            } catch (e) {
-              console.warn(`[Redivivus] Could not create file ${filePath}:`, e);
-            }
-          }
-        }
-        
+        // [BUILD CONTRACT] Do NOT pre-create empty placeholder files. A planned path can be slug-prefixed
+        // (digital-clock/index.html) while the real file lands slug-stripped (index.html) -> the placeholder is
+        // orphaned as a stray 0-byte file (same hollow-shell bug as the empty folders, for FILES). The code
+        // processor writes each real file (with content, parent dir on demand). A file exists only when it has
+        // content. [DEAD] Removed: writeFileSync('') placeholder loop over skeleton.filesToCreate.
+
         // Refresh explorer to show skeleton
         await vscode.commands.executeCommand('redivivus.refreshProjectMap');
         opts.onProgress?.('Project structure created. Generating code...');

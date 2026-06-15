@@ -35,6 +35,10 @@ export async function classifyRoute(
 
     if (!res.ok) { return null; }
     const data = await res.json().catch(() => null);
+    // [COST] Count this classifier call too — small (flash, ~50 tokens) but real; it was uncounted.
+    if (data && (data.inputTokens || data.outputTokens)) {
+      try { deps.usageTracker?.recordUsage((data.inputTokens || 0) + (data.outputTokens || 0), 0, model, data.inputTokens, data.outputTokens, 'supervisor', undefined); } catch { /* best-effort */ }
+    }
     const t = data && String(data.tier || '').toLowerCase();
     if (t === 'flash' || t === 'pro' || t === 'ultra') {
       return { tier: t, reason: String(data.reason || '') };

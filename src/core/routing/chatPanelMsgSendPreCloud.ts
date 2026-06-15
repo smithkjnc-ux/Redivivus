@@ -104,6 +104,19 @@ export async function runPreCloudRouting(
     projectOpen: hasProjectOpen,
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
+  // [COST] Record the cloudChat intent pre-pass usage. It runs a REAL model on EVERY message (classify + route),
+  // returns input/output tokens, but the caller never recorded them — so every build/fix under-reported its cost
+  // by this hidden call (PapaJoe: "costs are still not correct"). Now counted in the session/lifetime totals.
+  if (chatResult && (chatResult.inputTokens || chatResult.outputTokens)) {
+    try {
+      deps.usageTracker?.recordUsage(
+        (chatResult.inputTokens || 0) + (chatResult.outputTokens || 0), 0, chatResult.model,
+        chatResult.inputTokens, chatResult.outputTokens, 'supervisor',
+        effectiveRoot ? require('path').basename(effectiveRoot) : undefined,
+      );
+    } catch { /* usage recording is best-effort */ }
+  }
+
   // ── cloudChat null: backend unavailable / all providers capped ──
   // [WARN] Do NOT go to handleAIChat for fix/feature requests — it uses promptCheap which silently fails for code.
   if (!chatResult) {

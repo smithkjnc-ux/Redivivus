@@ -17,5 +17,22 @@ export function registerSavePointCommand(context: vscode.ExtensionContext) {
       showBuildHistoryPanel(context);
     })
   );
+  // [BUILD RECORD] redivivus.showBuildRecord — reassemble the full build/fix timeline from saved data into
+  // docs/REDIVIVUS_RECORD.md and open it. No new data stored; it stitches revisions + logs + build_log.
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redivivus.showBuildRecord', async () => {
+      try {
+        const { getActiveProjectRoot } = await import('../services/project/activeProjectRoot.js');
+        const root = getActiveProjectRoot();
+        if (!root) { vscode.window.showWarningMessage('Open a Redivivus project to see its build record.'); return; }
+        const { writeBuildRecord } = await import('../services/build/buildRecordService.js');
+        const out = writeBuildRecord(root);
+        const doc = await vscode.workspace.openTextDocument(out);
+        await vscode.window.showTextDocument(doc, { preview: false });
+      } catch (e) {
+        vscode.window.showErrorMessage('Could not reassemble the build record: ' + (e instanceof Error ? e.message : String(e)));
+      }
+    })
+  );
 }
 

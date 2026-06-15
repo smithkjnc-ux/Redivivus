@@ -21,6 +21,35 @@ Beta provider-validation pass. PapaJoe was installing every provider to confirm 
 
 ---
 
+## Fix — Jun 15, 2026: Decompose simple apps too (basic modules) + kill empty placeholder files
+
+PapaJoe: digital-clock `index.html` was 251 lines (over 200) — "could it have been split into modules? at least the basic." Right: the decomposition + 200-line rules only injected for GAMES (`GAME_RULES`); a clock got the weak general rules and crammed HTML+CSS+JS into one file.
+- `buildPipeline.ts` STRUCTURE_RULES (applies to ALL builds) — added: SEPARATE CONCERNS into the basic modules (every web app = at least `index.html` + `css/style.css` + `js/main.js`, each its own file via `<link>`/`<script src>`, never all-inline); and the 200-line limit with plan-time splitting. (Also dropped the "Tailwind CSS" line — it needs a build step and fought the plain-CSS-file rule.)
+- `cloudBuildClient.ts` — **removed empty placeholder-FILE creation.** The skeleton pre-created empty files; a slug-prefixed planned path (`digital-clock/index.html`) vs the slug-stripped real path (`index.html`) orphaned the placeholder as a stray 0-byte file (the hollow-shell bug, for files). Files now exist only when the code processor writes them with content. Cleaned the existing stray.
+
+**Deploy:** backend (Fly) for the structure rules; client compiled. After deploy, even a simple app should come out as 3 files (html/css/js), each under 200 lines.
+
+---
+
+## Feature — Jun 15, 2026: Docs recorded in the scaffold (build contract pillar 3, first slice)
+
+PapaJoe: "we need to have docs as well." The digital-clock build had no `docs/`. Added a deterministic doc generator in `cloudBuildResultProcessor.ts`: after a build, scan every written code file for its `[SCOPE]` line and write `docs/ARCHITECTURE.md` — a one-glance file map (+ the blueprint "what"). No AI call, free, regenerated each build. Fills `docs/` with real content so it's never an empty shell (consistent with the no-empty-folders rule: the folder exists only because it has a file). Best-effort; never affects the build.
+
+**Diagnosed (pending deploy to fully fix):** digital-clock blueprint had NO `## MECHANICS` and NO `## REQUEST HISTORY` in blueprint.md — root cause: distillation didn't seed mechanics, so `setMechanics`->`syncBlueprintMd` never ran, so the .md stayed the 5-W stub (the revision ledger DID record the prompt). My distillation logging+retry + worker-rulebook(REGION) fixes are pending Fly deploy. Also found a stray 0-byte `digital-clock/digital-clock/index.html` — a skeleton placeholder file that never got filled (same hollow-shell smell, for FILES this time).
+
+---
+
+## Fix — Jun 15, 2026: Cost under-report — hidden AI calls were never counted
+
+Digital-clock build ran clean, but the card showed Supervisor $0.0185 while Claude billing moved ~$0.04. Cause: a build/fix flow has MORE AI calls than the Supervisor+Worker the card shows, and several recorded NO usage:
+- **`cloudChat`** — the intent pre-pass that runs a real model on EVERY message (classify + route). It returns input/output tokens but `chatPanelMsgSendPreCloud.ts` never recorded them. The biggest hidden call. **Fixed:** record it into usageTracker.
+- **`routeClassifier`** (my own addition) — a Claude-flash call per fix; tokens discarded. **Fixed:** record it.
+- (Still minor/uncounted: blueprint distillation — one worker call per first build.)
+
+**Effect:** session/lifetime usage totals now include the intent pre-pass (the bulk of the gap). The per-build card still shows Supervisor+Worker; the full picture lives in the Usage panel. **Deploy:** client compile (done).
+
+---
+
 ## Fix — Jun 15, 2026: WHY it kept writing one big file — the plan schema was self-defeating
 
 PapaJoe: "I still think it is writing one big file... output hit the token cap." Right — and the root cause was structural, not just a prompt. The plan schema (`routingServicePrompts.ts`) makes the Supervisor return `filesToCreate` PLUS verbose `components.exactInstructions` (full impl spec per file) PLUS `contracts`. For a multi-file game that JSON is huge -> **the MORE it decomposes, the BIGGER the plan, the more it TRUNCATES -> JSON.parse throws -> files=0 -> single-file path -> the Worker writes one giant file** (which `build/route.ts:97` then happily continues past the token cap across passes). Decomposition was self-defeating; the 200-line push would've made truncation worse.
