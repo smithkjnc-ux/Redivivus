@@ -67,13 +67,16 @@ export function checkInitState(redivivus: any): DiagResult {
 
 // ── AI PROVIDERS ──
 
-export function checkApiKey(providerName: string, configKey: string): DiagResult {
-  const key = vscode.workspace.getConfiguration().get<string>(configKey, '');
+export async function checkApiKey(providerName: string, configKey: string): Promise<DiagResult> {
+  // Read from SecretStorage (where keys are actually stored) instead of old settings
+  const { getKeyCached } = await import('../../services/ai/secretKeyStore.js');
+  const key = getKeyCached(providerName.toLowerCase());
+  
   if (key && key.length > 8) {
     return { name: `${providerName} API key`, category: 'AI Providers', status: 'pass', message: `Set (${key.slice(0, 4)}...${key.slice(-4)})` };
   }
   if (key && key.length > 0) { return { name: `${providerName} API key`, category: 'AI Providers', status: 'warn', message: 'Key seems too short -- may be invalid' }; }
-  return { name: `${providerName} API key`, category: 'AI Providers', status: 'fail', message: `No API key configured. Set '${configKey}' in settings.` };
+  return { name: `${providerName} API key`, category: 'AI Providers', status: 'fail', message: `No API key configured. Use Redivivus: Open Settings to add keys.` };
 }
 
 // Provider ping config: config key + model-list URL (cheap, auth-only, no tokens consumed)
@@ -90,7 +93,11 @@ const PROVIDER_PING: Record<string, { configKey: string; url: (k: string) => str
 export async function checkProviderReachable(providerName: string): Promise<DiagResult> {
   const cfg = PROVIDER_PING[providerName];
   if (!cfg) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'Unknown provider' }; }
-  const key = vscode.workspace.getConfiguration().get<string>(cfg.configKey, '');
+  
+  // Read from SecretStorage (where keys are actually stored) instead of old settings
+  const { getKeyCached } = await import('../../services/ai/secretKeyStore.js');
+  const key = getKeyCached(providerName.toLowerCase());
+  
   if (!key) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'No API key -- skipping ping' }; }
   try {
     const controller = new AbortController();
