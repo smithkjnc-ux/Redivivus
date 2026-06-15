@@ -83,7 +83,9 @@ class ApiSetupPanel {
 
   private constructor(panel: vscode.WebviewPanel, private context: vscode.ExtensionContext) {
     this._panel = panel;
-    this._panel.webview.html = getApiSetupHtml();
+    // Force webview refresh by adding timestamp to break cache
+    const html = getApiSetupHtml();
+    this._panel.webview.html = html.replace('<head>', '<head>\n<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">\n<meta http-equiv="Pragma" content="no-cache">\n<meta http-equiv="Expires" content="0">');
     this._panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'save-keys') {
         const { storeKey, deleteKey } = await import('../services/ai/secretKeyStore.js');
