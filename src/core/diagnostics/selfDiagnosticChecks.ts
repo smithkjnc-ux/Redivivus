@@ -92,6 +92,25 @@ const PROVIDER_PING: Record<string, { configKey: string; url: (k: string) => str
   DeepSeek:{ configKey: 'redivivus.deepseekApiKey',url: () => 'https://api.deepseek.com/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
 };
 
+// Extract a human-readable error message from a provider's JSON error body. Formats vary:
+//   xAI:       { "code": "...", "error": "message string" }
+//   OpenAI:    { "error": { "message": "...", "type": "..." } }
+//   Anthropic: { "error": { "type": "...", "message": "..." } }
+//   Groq:      { "error": { "message": "..." } }
+// Returns a trimmed message (max 160 chars) or null if nothing useful could be parsed.
+function extractProviderError(body?: string): string | null {
+  if (!body) { return null; }
+  try {
+    const j = JSON.parse(body);
+    const msg = (typeof j?.error === 'string' ? j.error : null)
+      || j?.error?.message
+      || j?.message
+      || null;
+    if (typeof msg === 'string' && msg.trim()) { return msg.trim().substring(0, 160); }
+  } catch { /* not JSON — fall through */ }
+  return null;
+}
+
 export async function checkProviderReachable(providerName: string): Promise<DiagResult> {
   const cfg = PROVIDER_PING[providerName];
   if (!cfg) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'Unknown provider' }; }
@@ -138,12 +157,14 @@ export async function checkProviderReachable(providerName: string): Promise<Diag
       return { name: `${providerName} reachable`, category: 'AI Providers', status: 'pass', message: `Reachable (${result.status})` }; 
     }
     if (result.status === 401 || result.status === 403) { 
-      return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Auth error ${result.status} -- API key invalid or missing permissions` }; 
+      const detail = extractProviderError(result.data);
+      const suffix = detail ? ` -- ${detail}` : ' -- API key invalid or missing permissions';
+      return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Auth error ${result.status}${suffix}` }; 
     }
     // Try to get more error details for 400
     if (result.status === 400) {
-      const errorText = result.data || 'No error details';
-      return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Bad request (400) - ${errorText.substring(0, 100)}` };
+      const detail = extractProviderError(result.data) || (result.data || 'Invalid request').substring(0, 120);
+      return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Bad request (400) - ${detail}` };
     }
     return { name: `${providerName} reachable`, category: 'AI Providers', status: 'warn', message: `Unexpected HTTP ${result.status} from ${providerName}` };
   } catch (e: any) {
