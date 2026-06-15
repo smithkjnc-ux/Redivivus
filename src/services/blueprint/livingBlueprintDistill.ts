@@ -20,12 +20,18 @@ RULES: behavioral only — NEVER name files, functions, or variables. Keep the c
 
 /** Build seed: produce the initial behavioral contract from the build instruction + file list. */
 export async function distillBuildMechanics(routing: any, task: string, fileList: string[]): Promise<string | null> {
+  // [DIAGNOSE] This is client-side and used to swallow every failure (catch -> null), so a hollow blueprint had
+  // no signal. Log the outcome to ~/redivivus_debug.log so we can see WHY mechanics never seed.
+  const _dbg = (m: string) => { try { require('fs').appendFileSync(require('os').homedir() + '/redivivus_debug.log', '[LIVING BLUEPRINT] distill ' + m + '\n'); } catch { /* best-effort */ } };
   try {
     const prompt = `The project was just built from this instruction:\n"${task}"\n\nFiles produced: ${fileList.join(', ') || '(unknown)'}\n\nWrite the behavioral contract (observable rules only).`;
     const res = await routing.prompt(prompt, 45_000, undefined, undefined, BUILD_SYS, 'worker');
     const text = (res?.text || '').trim();
-    return res?.success !== false && text.length > 20 ? text : null;
-  } catch { return null; }
+    if (res?.success === false) { _dbg(`FAILED: routing.prompt success=false err=${res?.error || '?'}`); return null; }
+    if (text.length <= 20) { _dbg(`EMPTY: returned ${text.length} chars`); return null; }
+    _dbg(`OK: ${text.length} chars`);
+    return text;
+  } catch (e) { _dbg(`THREW: ${e instanceof Error ? e.message : String(e)}`); return null; }
 }
 
 /** Fix revision: produce a behavioral summary + reconciled contract after an accepted fix. */

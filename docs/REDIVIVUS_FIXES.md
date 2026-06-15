@@ -21,6 +21,17 @@ Beta provider-validation pass. PapaJoe was installing every provider to confirm 
 
 ---
 
+## Fix — Jun 15, 2026: Size-judgment decomposition (single-file OK <=~250, split over) — Supervisor's call
+
+PapaJoe refined the policy: single-file is fine as long as it's near the 200-line limit; once a file would exceed ~25% over (=~250 lines) it must be split — and this is the SUPERVISOR's judgment at plan time (it must estimate the resulting size and decide), plus split for structure when an app has distinct systems even if small. Replaced the rigid "every web app = 3 files" with size-estimate judgment:
+- `routingServicePrompts.ts` rule 1 — DECIDE filesToCreate by ESTIMATING size: a file stays single only if it lands UNDER ~250 lines; estimate over ~250 -> split in the PLAN (Worker can't split mid-build). Simple tool = 1 small file; complex app = 6-10 modules; also split distinct concerns for structure.
+- `buildPipeline.ts` STRUCTURE_RULES + GAME_RULES — same: target ~200, hard split ~250 (+25% headroom), Supervisor estimates + judges.
+- `build/route.ts` `[QualityGate]` — oversized flag moved 200 -> 250 (a 210-line single file is now acceptable; only >250 is flagged as "should have been split at plan time").
+
+**Deploy:** backend (Fly).
+
+---
+
 ## Feature — Jun 15, 2026: Build Record — reassemble the full build/fix history on request
 
 PapaJoe: "a way to pull up a build record and see exactly what it did during build/fix/edits... reassemble from saved data, don't duplicate." The data already exists (`blueprint_revisions.jsonl` = every build+fix with request/summary/files/by/snapshotId/mechanics_delta; `build_log.jsonl` = tokens; `fix-pipeline-*.log` = the Supervisor->Worker->Guardian detail; snapshots = revert points) — what was missing was the reassembly.
