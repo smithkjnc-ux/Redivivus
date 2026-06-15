@@ -6,6 +6,16 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Added
+- **Test All Keys** (`apiSetup.ts`, `apiSetupScript.ts`, `apiSetupHtml.ts`): API Setup panel now has a "🔍 Test All Keys" button that pings each configured provider's `/v1/models` endpoint (no tokens consumed) and shows per-provider ✓/✗ status in real time.
+- **Kimi endpoint auto-detection** (`services/ai/kimiEndpoint.ts`, new): Moonshot runs two non-interchangeable platforms — `api.moonshot.ai` (international) and `api.moonshot.cn` (China). New helper probes both, caches the working base per-key, and is used by chat, streaming, balance, validation, and diagnostics. Handles both key types with zero configuration.
+
+### Fixed
+- **OpenAI key truncation on re-entry**: the masked API-key field (shown as `••••`) was not cleared on focus, so re-typed keys appended to bullets and saved truncated → silent 401s. Added a focus-to-clear handler (`apiSetupScript.ts`) and `.trim()` on save.
+- **Key validation read source** (`core/diagnostics/selfDiagnosticChecks.ts`): `checkApiKey`/`checkProviderReachable` read from old `settings.json` instead of SecretStorage, so every provider falsely reported "No API key configured". Now reads from SecretStorage.
+- **Validation network layer**: switched the provider ping from `fetch` to Node's `https`/`http` module for reliable behaviour in the extension host.
+- **Provider error messages**: 401/403/400 results now surface the provider's actual JSON error (e.g. xAI "team has no credits") via a new `extractProviderError` parser, instead of a generic "API key invalid or missing permissions".
+
 ## [0.4.5] — 2026-06-10
 
 ### Fixed

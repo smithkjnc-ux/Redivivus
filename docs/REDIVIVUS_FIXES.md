@@ -3,6 +3,24 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Feature + Fixes — Jun 14, 2026: API key validation ("Test All Keys") + provider integration bugs
+
+Beta provider-validation pass. PapaJoe was installing every provider to confirm each works with Redivivus; the process surfaced several real integration bugs that would have hit beta users.
+
+**Feature — Test All Keys.** API Setup panel now has a "🔍 Test All Keys" button (`apiSetup.ts` `testAllKeys()`, `apiSetupScript.ts`, `apiSetupHtml.ts`, `apiSetupStyles.ts`). It pings each configured provider's `/v1/models` endpoint (auth-only, no tokens) and renders per-provider ✓/✗ status live. Backend uses Node `https`/`http` (not `fetch`) for reliable behaviour in the extension host.
+
+**Bug A — diagnostic/test read the wrong key source.** `checkApiKey`/`checkProviderReachable` (`core/diagnostics/selfDiagnosticChecks.ts`) read from `settings.json` via `vscode.workspace.getConfiguration()`, but keys live in **SecretStorage** since 0.4.4. Every provider falsely reported "No API key configured". Fixed to read via `getKeyCached()` from `secretKeyStore`.
+
+**Bug B — OpenAI key truncated on re-entry (silent 401).** The masked key field (rendered as `••••`, `apiSetupHtmlCards.ts`) was never cleared on focus. Re-typing/pasting appended the new key onto the bullets; the save logic then either rejected it (`v.includes('•')`) or stored a mangled value. PapaJoe's stored OpenAI key was 163 chars vs the real 164 — cut off after the `T3BlbkFJ` split marker → 401 despite a valid key (confirmed by length/suffix diff). Fix: focus-to-clear handler clears masked fields on first focus; `.trim()` applied on save (`apiSetupScript.ts`). `storeKey` already trimmed, so whitespace was not the cause — truncation was.
+
+**Bug C — Kimi hardcoded to the China endpoint.** Validation/balance pinged `api.moonshot.cn`, but Moonshot runs two independent platforms with non-interchangeable keys (`.cn` China, `.ai` international). PapaJoe's international key → 401 on `.cn` (confirmed: `.cn`=401, `.ai`=200 via curl). The codebase was also inconsistent — chat calls already used `.ai`. Fix: new `services/ai/kimiEndpoint.ts` `detectKimiBase(key)` probes both domains, caches the working base per-key, and is wired into chat (`kimiProvider.ts`), streaming (`streamingProviders.ts`), balance/validation (`chatPanelProviderBalance.ts`), and the diagnostic. Handles both key types with zero user config. "Get API key" links updated to `platform.moonshot.ai`.
+
+**Bug D — generic auth-error messages.** 401/403/400 always said "API key invalid or missing permissions", hiding useful provider detail (xAI's 403 actually returns "your team has no credits" with a billing URL). Added `extractProviderError()` to parse the varied JSON shapes (xAI `{error:"str"}`, OpenAI/Anthropic/Groq `{error:{message}}`) and surface the real message.
+
+**Validation outcome:** Gemini, Claude, OpenAI, Groq, Kimi → ✓ 200. xAI → key valid, team needs credits (not a bug; now reported clearly). DeepSeek → not yet keyed. All changes client-side (compiled); no backend/Fly deploy needed.
+
+---
+
 ## Fix — Jun 14, 2026: Install + release pipeline bugs (cross-repo — blocking real users)
 
 Son hit install failures on two machines; release log revealed a third bug. All real, all blocking distribution.
