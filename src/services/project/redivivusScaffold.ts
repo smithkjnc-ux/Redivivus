@@ -80,17 +80,10 @@ export async function scaffoldAt(targetPath: string, projectName: string, bluepr
     fs.writeFileSync(bpFilePath, bpMd);
   }
 
-  // scaffold basic project structure
-  const scaffoldDirs = [
-    path.join(targetPath, 'src'),
-    path.join(targetPath, 'tests'),
-    path.join(targetPath, 'docs'),
-  ];
-  for (const dir of scaffoldDirs) {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-  }
+  // [BUILD CONTRACT] Do NOT pre-create empty src/tests/docs — this is the SECOND copy of that code (the first was
+  // in redivivusInit.ts). scaffoldAt() is the path most builds actually use, which is why the folders were still
+  // empty after the init fix. The build now creates + fills real folders on demand. NO EMPTY FOLDERS.
+  // [DEAD] Removed: unconditional mkdir of src/, tests/, docs/.
 
   const readmePath = path.join(targetPath, 'README.md');
   if (!fs.existsSync(readmePath)) {

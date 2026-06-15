@@ -21,6 +21,47 @@ Beta provider-validation pass. PapaJoe was installing every provider to confirm 
 
 ---
 
+## Feature — Jun 15, 2026: Manual model picker — pick ANY model, that exact model runs
+
+PapaJoe: "all models should be available... give them access to any model if they choose (manual)." The Pac-Man failure (gemini-flash worker wrote broken TS-in-JS) was the proof: capability drives whether a build even runs, but the user couldn't choose it. Built end-to-end, truthful (model shown = model used):
+- `chatPanelHeader.ts` — each configured provider now carries its REAL models (`modelsForProvider()`: id + label + capability) in the pill data.
+- `chatPanelScriptTier.ts` — the manual popover lists each provider's models; picking one locks the EXACT model (`_manualProvider = {id, model, modelLabel}`). The pill shows that model's label (truthful). `window._getManualModel()`.
+- `chatPanelScript.ts` doSend — sends `manualModel`.
+- `chatPanelMessageDeps.ts` + `chatPanelMsgSendMessage.ts` — `deps.manualModel` threaded.
+- **Fix worker** (`chatPanelMsgFixPhases.ts`) — when `manualModel` is set, forces THAT model + its provider (derived from the registry), no failover.
+- **Build worker** (`cloudBuildClient.ts`) — sends `manualModel` as `workerModel` so a build runs the chosen model (e.g. put Opus on a game build).
+
+**Scope:** applies to the code-writing roles (build worker, fix worker) — the point of the picker. Pure chat stays provider-locked. **Deploy:** client compile (done). Now you can put a capable model on a build instead of getting silently routed to flash.
+
+---
+
+## Fix — Jun 14, 2026: "Looks good but doesn't run" — TypeScript shipped as browser JS (Pac-Man)
+
+Pac-Man built, the title screen rendered beautifully, but START GAME did nothing. Cause: `pacman/game.js` was full **TypeScript** (`function checkWallCollision(x: number, ...): boolean`, `let score: number;`) served as plain `.js`. `node --check` = `SyntaxError: Unexpected token ':'` — the browser can't parse it, the whole script dies, the HTML/CSS title screen shows but nothing runs.
+
+**Two root causes:**
+- **The prompt told it to:** `buildPipeline.ts` STRUCTURE_RULES said *"Add TypeScript types when applicable"* — contradicting the worker rule (browser = plain `.js`). The worker (gemini-2.5-flash) followed the wrong one. **Fixed:** replaced with an explicit rule — browser/vanilla = plain JS, NO type annotations (one annotation = whole script throws); TS only with a real compiler/bundler.
+- **The gate never checked "does it RUN":** `guardianCheck` enforced visuals/sound but not parseability — the most important check. **Fixed:** added `TYPESCRIPT_IN_BROWSER_JS` — detects TS type-annotation syntax in `.js/.html` (typed params, return types, `let x: number`, interfaces; JSDoc-safe, `.ts` exempt) and rejects → retry/escalate.
+
+**Also seen (not fixed here):** the WORKER was **gemini-2.5-flash** — under-powered for a full game build; a stronger worker wouldn't write TS-in-JS. Reinforces the manual model picker + capability-aware WORKER_TIER. And `src/tests/docs` were still empty (build wrote to its own `pacman/` folder) — folder-convention + no-empty-folders work still open.
+
+**Deploy:** backend (Fly). Then the build won't write TS-in-JS, and if it slips, the gate rejects it.
+
+---
+
+## Fix — Jun 14, 2026: Plan truncation -> silent files=0 -> single-file stall (the Pac-Man freeze)
+
+Pac-Man builds kept "freezing." `~/redivivus_debug.log` showed the truth: `[plan] ok files=0 -> single-file path`, while OTHER builds got `files=7`/`files=9` multi-file fine. Root cause in `plan/route.ts`: the Supervisor plan call used **`maxTokens: 8000`**. A complex Pac-Man plan (maze + 4 ghost AIs + per-file prescriptions across 7+ files) — made bigger by the new multi-file decomposition push — **truncated** at 8000, so `JSON.parse` threw, the `catch` was **silent**, `files=0`, and it fell back to a single giant single-file build that then stalled ("stopped at gameengine" / "building but no progress").
+
+**Fixed (`plan/route.ts`, backend):**
+- `maxTokens: 8000 -> 16000` so multi-file plans don't truncate.
+- Prefer a fenced ```json block, else bracket-scan (more robust extraction).
+- **Truncation detection + logging:** detect a plan that ends without its closing `]`/`}`; the parse `catch` now logs `prescription parse FAILED (TRUNCATED at maxTokens / malformed JSON)` with the tail, and a `0 files from Supervisor (...)` warning before the flash fallback. files=0 is never silent again.
+
+**Deploy:** backend (Fly). After deploy, `[plan] files=N` should be >1 for games; if ever 0, the log now says WHY.
+
+---
+
 ## Feature — Jun 14, 2026: Build Contract enforcement — Phase 1 (give the worker the rules + enforce + observe)
 
 Canonical: `docs/REDIVIVUS_BUILD_CONTRACT.md`. Triggered by 3 Flappy Bird builds (Claude rich, Gemini-flash a single-fillRect box-bird, Groq failed) all showing the hollow-shell disease. Root causes found and fixed:

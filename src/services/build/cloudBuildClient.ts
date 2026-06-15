@@ -158,7 +158,9 @@ export async function callCloudBuild(
     // Forward /plan's prescription + Supervisor token cost so /build reuses it instead of re-running
     // the Supervisor (Sonnet) a second time. Only set for single-file builds that ran /plan above.
     const requestBody = JSON.stringify({
-      task, context, preferred, workerModel: preferred, strategy,
+      // [MANUAL MODEL PICKER] When the user locked an exact model, send it as the worker model so the build
+      // runs THAT model (e.g. put Opus on a game build) — model shown = model used. Else the provider default.
+      task, context, preferred, workerModel: (deps as any).manualModel || preferred, strategy,
       ...(planPrescription ? {
         prescription: planPrescription,
         supervisorProvider: planSupervisor.provider,

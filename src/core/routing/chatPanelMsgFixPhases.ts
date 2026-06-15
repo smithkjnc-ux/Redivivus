@@ -202,6 +202,13 @@ export async function runPhase2Worker(
   // [ROUTING PANEL] If the user manually chose a Worker AI, force it (no failover); else adaptive order.
   const _wkOverride = deps.routingOverrides?.worker;
   const providerOrder = _wkOverride ? [_wkOverride] : [workerAI, ..._ranked.filter((p) => p !== workerAI)];
+  // [MANUAL MODEL PICKER] The user locked an EXACT model in the pill -> run THAT model and its provider, no
+  // failover. The model shown is the model used. Provider is derived from the model id via the registry.
+  const _manualModel = deps.manualModel;
+  const _manualModelProvider = _manualModel
+    ? (require('../../services/ai/modelRegistry.js').MODEL_REGISTRY.find((m: { modelId: string }) => m.modelId === _manualModel)?.provider)
+    : undefined;
+  const _effProviderOrder = (_manualModel && _manualModelProvider) ? [_manualModelProvider] : providerOrder;
 
   const _ErrTail = /\[ERROR:\s*([^\]]+)\]\s*$/;
   let workerResponse = '';
@@ -215,8 +222,8 @@ export async function runPhase2Worker(
   // it couldn't carry. The Supervisor now sees the real crew (workerRoster) and can assign ultra when warranted.
   const _wt = diagnosis.match(/WORKER_TIER:\s*(flash|pro|ultra)/i)?.[1]?.toLowerCase();
   const workerTier: 'flash' | 'pro' | 'ultra' = _wt === 'ultra' ? 'ultra' : _wt === 'pro' ? 'pro' : 'flash';
-  for (const provider of providerOrder) {
-    const pModel = bestModelForRole(provider, workerTier)?.modelId || provider;
+  for (const provider of _effProviderOrder) {
+    const pModel = (_manualModel && provider === _manualModelProvider) ? _manualModel : (bestModelForRole(provider, workerTier)?.modelId || provider);
     let attempt = '';
     try {
       const res = await fetch(`${base}/fix-worker`, {

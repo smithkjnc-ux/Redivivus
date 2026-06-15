@@ -204,7 +204,13 @@ export function buildHeaderInfo(
         { id: 'xai',      label: 'Grok',     emoji: '\u2736', key: () => { try { const { getXAIKey }      = require('../../../services/ai/routingKeys.js'); return getXAIKey(); }      catch { return null; } } },
         { id: 'kimi',     label: 'Kimi',     emoji: '\uD83C\uDF19', key: () => { try { const { getKimiKey }     = require('../../../services/ai/routingKeys.js'); return getKimiKey(); }     catch { return null; } } },
       ];
-      return PROVIDER_META.filter(p => !!p.key()).map(({ id, label, emoji }) => ({ id, label, emoji }));
+      // [MANUAL MODEL PICKER] Carry each provider's REAL models (truthful: id + label straight from the registry)
+      // so the manual popover can let the user pick ANY specific model and the pipeline runs EXACTLY that one.
+      const { modelsForProvider } = require('../../../services/ai/modelRegistry.js');
+      return PROVIDER_META.filter(p => !!p.key()).map(({ id, label, emoji }) => ({
+        id, label, emoji,
+        models: (modelsForProvider(id) || []).map((m: { modelId: string; label: string; capability: number }) => ({ id: m.modelId, label: m.label, cap: m.capability })),
+      }));
     })(),
   };
 }

@@ -47,7 +47,8 @@ export function buildChatScript(): string {
       if (window.__redivivusPreviewHide) { window.__redivivusPreviewHide(); }
       var _tier = (window._getActiveTier && window._getActiveTier()) || undefined;
       var _manual = (window._getManualProvider && window._getManualProvider()) || undefined;
-      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier, manualProvider: _manual || undefined, routingOverrides: (window._getRoutingOverrides ? window._getRoutingOverrides() : undefined) });
+      var _manualModel = (window._getManualModel && window._getManualModel()) || undefined;
+      vscode.postMessage({ type: 'send-message', text, mode: window._buildMode || undefined, imageBase64: window._pendingImage || undefined, imageType: window._pendingImageType || undefined, tier: _tier, manualProvider: _manual || undefined, manualModel: _manualModel, routingOverrides: (window._getRoutingOverrides ? window._getRoutingOverrides() : undefined) });
       input.value = ''; input.style.height = 'auto'; window._pendingImage = null; window._pendingImageType = null;
       const _ip = document.getElementById('img-prev'); if (_ip) _ip.remove();
       const _ipc = document.getElementById('img-preview-container'); if (_ipc) _ipc.remove();

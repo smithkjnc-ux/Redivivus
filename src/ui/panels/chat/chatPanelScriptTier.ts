@@ -118,7 +118,8 @@ export function buildTierScript(): string {
         if (_manualProvider) {
           // MANUAL MODE — purple. Format: "Manual · [AI Name]"
           var lockedTier = currentTier() || 'pro';
-          var modelLabel = (PROVIDER_TIER_LABEL[_manualProvider.id] || {})[lockedTier] || _manualProvider.label;
+          // Prefer the EXACT model the user picked (truthful: shown = what runs); fall back to the tier label.
+          var modelLabel = _manualProvider.modelLabel || (PROVIDER_TIER_LABEL[_manualProvider.id] || {})[lockedTier] || _manualProvider.label;
           pill.innerHTML =
             '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">' + 'Manual' + '</span>' +
             '<span style="opacity:0.45;margin:0 5px;">\u00B7</span>' +
@@ -216,28 +217,34 @@ export function buildTierScript(): string {
         sep.style.cssText = 'height:1px;background:#2d2d4e;margin:4px 6px;';
         pop.appendChild(sep);
 
-        // One row per configured provider
+        // One block per configured provider: a header + a row per REAL model from the registry. Picking a model
+        // locks that EXACT model (provider + modelId). Manual = no failover, and the model SHOWN is the model RUN.
         configured.forEach(function(p) {
-          var isActive = _manualProvider && _manualProvider.id === p.id;
-          var row = document.createElement('button');
-          row.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border:none;border-radius:7px;background:' + (isActive ? '#7c3aed22' : 'transparent') + ';cursor:pointer;font-size:12px;color:' + (isActive ? '#a78bfa' : '#ccc') + ';font-family:inherit;text-align:left;transition:background 0.1s;';
-          row.addEventListener('mouseover', function() { if (!isActive) row.style.background = '#ffffff0a'; });
-          row.addEventListener('mouseout',  function() { if (!isActive) row.style.background = 'transparent'; });
-          // Show the pro-tier model name as the "headline" (most common for builds)
-          var proLabel = (PROVIDER_TIER_LABEL[p.id] || {}).pro || p.label;
-          row.innerHTML = p.emoji + ' <span style="flex:1;">' + p.label + ' <span style="font-size:10px;opacity:0.55;">' + proLabel + '</span></span>' + (isActive ? ' \\uD83D\\uDD12' : '');
-          row.addEventListener('click', function() {
-            _manualProvider = { id: p.id, label: p.label, emoji: p.emoji };
-            pop.remove();
-            renderPill();
+          var hdr = document.createElement('div');
+          hdr.style.cssText = 'display:flex;align-items:center;gap:6px;padding:7px 10px 2px;font-size:11px;font-weight:700;color:#8888aa;';
+          hdr.innerHTML = (p.emoji || '') + ' ' + p.label;
+          pop.appendChild(hdr);
+          var models = (p.models && p.models.length) ? p.models : [{ id: p.id, label: (PROVIDER_TIER_LABEL[p.id] || {}).pro || p.label, cap: 0 }];
+          models.forEach(function(m) {
+            var isActive = _manualProvider && _manualProvider.id === p.id && _manualProvider.model === m.id;
+            var row = document.createElement('button');
+            row.style.cssText = 'display:flex;align-items:center;gap:8px;width:100%;padding:5px 10px 5px 24px;border:none;border-radius:7px;background:' + (isActive ? '#7c3aed22' : 'transparent') + ';cursor:pointer;font-size:12px;color:' + (isActive ? '#a78bfa' : '#ccc') + ';font-family:inherit;text-align:left;transition:background 0.1s;';
+            row.addEventListener('mouseover', function() { if (!isActive) row.style.background = '#ffffff0a'; });
+            row.addEventListener('mouseout',  function() { if (!isActive) row.style.background = 'transparent'; });
+            row.innerHTML = '<span style="flex:1;">' + m.label + (m.cap ? ' <span style="font-size:10px;opacity:0.4;">cap ' + m.cap + '</span>' : '') + '</span>' + (isActive ? ' \\uD83D\\uDD12' : '');
+            row.addEventListener('click', function() {
+              _manualProvider = { id: p.id, label: p.label, emoji: p.emoji, model: m.id, modelLabel: m.label };
+              pop.remove();
+              renderPill();
+            });
+            pop.appendChild(row);
           });
-          pop.appendChild(row);
         });
 
         // Hint line
         var hint = document.createElement('div');
         hint.style.cssText = 'font-size:10px;color:#555;padding:6px 10px 2px;';
-        hint.textContent = 'Manual = only this AI, no failover.';
+        hint.textContent = 'Manual = only this exact model, no failover.';
         pop.appendChild(hint);
 
         document.body.appendChild(pop);
@@ -261,6 +268,11 @@ export function buildTierScript(): string {
       // Returns the manual provider id string, or null for adaptive.
       window._getManualProvider = function() {
         return _manualProvider ? _manualProvider.id : null;
+      };
+
+      // The EXACT model id the user locked (or null for adaptive / provider-only). Read by doSend -> pipeline.
+      window._getManualModel = function() {
+        return _manualProvider && _manualProvider.model ? _manualProvider.model : null;
       };
 
       // [FIX] Called by chatPanelScriptListener.ts after update-header replaces #input-left innerHTML,

@@ -31,4 +31,7 @@ export interface MessageHandlerDeps {
   // [ROUTING PANEL] Per-role manual provider overrides from the chat routing panel. Each is a provider id that
   // FORCES that role's AI (no failover, like the manual pill). Honored client-side in the fix pipeline.
   routingOverrides?: { supervisor?: string; worker?: string; guardian?: string };
+  // [MANUAL MODEL PICKER] The exact model id the user locked in the pill (e.g. 'claude-opus-4-8'). When set, the
+  // code-writing roles (build worker, fix worker) run EXACTLY this model — the model shown is the model used.
+  manualModel?: string;
 }

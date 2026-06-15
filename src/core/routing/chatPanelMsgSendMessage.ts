@@ -20,6 +20,8 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   if (!userText) { return; }
   // [ROUTING PANEL] Stash per-role AI overrides for this turn so the fix pipeline can force the chosen providers.
   deps.routingOverrides = msg.routingOverrides || undefined;
+  // [MANUAL MODEL PICKER] Stash the exact model the user locked, so the build/fix worker runs THAT model.
+  deps.manualModel = (msg.manualModel as string) || undefined;
 
   // ── Auth gate ──
   const { getAccountToken } = await import('../../services/api/apiClient.js');
