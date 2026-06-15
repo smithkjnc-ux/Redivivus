@@ -144,6 +144,8 @@ class ApiSetupPanel {
         this._panel.webview.html = getApiSetupHtml();
         await refreshChatPanelForKeyChange(); // [FIX] enabling/disabling a provider changes the active AI set
         vscode.window.showInformationMessage(`Redivivus: ${msg.providerId.toUpperCase()} has been ${index > -1 ? 'enabled' : 'disabled'}!`);
+      } else if (msg.type === 'test-all-keys') {
+        await this.testAllKeys();
       } else if (msg.type === 'open-vscode-settings') {
         await vscode.commands.executeCommand('workbench.action.openSettings', 'redivivus');
       } else if (msg.type === 'export-all-keys') {
@@ -175,6 +177,57 @@ class ApiSetupPanel {
     );
     ApiSetupPanel.currentPanel = new ApiSetupPanel(panel, context);
     if (providerHint) { setTimeout(() => panel.webview.postMessage({ type: 'highlight-provider', provider: providerHint }), 600); }
+  }
+
+  private async testAllKeys(): Promise<void> {
+    const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../services/ai/secretKeyStore.js');
+    const providers = [
+      { id: 'gemini', name: 'Gemini' },
+      { id: 'claude', name: 'Claude' },
+      { id: 'openai', name: 'OpenAI' },
+      { id: 'groq', name: 'Groq' },
+      { id: 'xai', name: 'xAI' },
+      { id: 'kimi', name: 'Kimi' },
+      { id: 'deepseek', name: 'DeepSeek' }
+    ];
+
+    // Test each provider independently and send results as they complete
+    for (const provider of providers) {
+      try {
+        const key = getKeyCached(provider.id);
+        if (!key || key.length < 8) {
+          this._panel.webview.postMessage({
+            type: 'test-result',
+            result: {
+              provider: provider.id,
+              success: false,
+              error: 'No API key configured'
+            }
+          });
+          continue;
+        }
+
+        const result = await checkProviderReachable(provider.name);
+        this._panel.webview.postMessage({
+          type: 'test-result',
+          result: {
+            provider: provider.id,
+            success: result.status === 'pass',
+            message: result.message,
+            error: result.status === 'fail' || result.status === 'warn' ? result.message : undefined
+          }
+        });
+      } catch (error: any) {
+        this._panel.webview.postMessage({
+          type: 'test-result',
+          result: {
+            provider: provider.id,
+            success: false,
+            error: error.message || 'Test failed'
+          }
+        });
+      }
+    }
   }
 
   public dispose(): void {

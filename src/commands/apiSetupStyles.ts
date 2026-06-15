@@ -88,5 +88,14 @@ export const API_SETUP_CSS = `
     .quality-note { margin-top:10px; padding:7px 10px; background:rgba(79,193,89,0.08); border-left:3px solid rgba(79,193,89,0.5); border-radius:0 4px 4px 0; font-size:11px; color:var(--vscode-descriptionForeground); line-height:1.5; }
     .quality-note strong { color:#4ec959; }
 
+    .test-feedback { margin-top:12px; padding:12px; background:rgba(0,0,0,0.2); border:1px solid rgba(255,255,255,0.1); border-radius:6px; }
+    .test-result { display:flex; align-items:center; gap:8px; padding:6px 0; font-size:12px; }
+    .test-status { width:20px; height:20px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:12px; flex-shrink:0; }
+    .test-status.testing { background:rgba(255,165,0,0.2); color:ffa500; }
+    .test-status.success { background:rgba(79,193,89,0.2); color:#4ec959; }
+    .test-status.error { background:rgba(239,68,68,0.2); color:#ef4444; }
+    .test-provider { font-weight:600; min-width:90px; }
+    .test-message { color:var(--vscode-descriptionForeground); }
+
     @media (max-width:480px) { .how-grid { grid-template-columns:1fr; } }
 `;

@@ -126,6 +126,7 @@ export function getApiSetupHtml(): string {
   ${providerCards}
   <div class="actions">
     <button id="apply-btn">&#x2705; Apply Changes</button>
+    <button id="test-all-btn" class="secondary">&#x1F50D; Test All Keys</button>
     <button id="export-all-btn" class="secondary">&#x1F510; Export Keys (encrypted)</button>
     <button id="import-keys-btn" class="secondary">&#x1F4E5; Import Keys</button>
     <button id="vscode-settings-btn" class="secondary">&#x2699;&#xFE0F; Open VS Code Settings</button>
@@ -133,6 +134,9 @@ export function getApiSetupHtml(): string {
   <div id="apply-feedback" class="apply-feedback">
     &#x2705; <strong>Keys applied!</strong> Redivivus will use your configured provider automatically.<br>
     <span id="apply-time" style="font-size:11px;opacity:0.7;"></span>
+  </div>
+  <div id="test-feedback" class="test-feedback" style="display:none;">
+    <div id="test-results"></div>
   </div>
   <div class="tip">
     &#x1F4A1; You can also set keys via environment variables: <code>GEMINI_API_KEY</code>, <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>GROQ_API_KEY</code>, <code>XAI_API_KEY</code>, <code>MOONSHOT_API_KEY</code>
