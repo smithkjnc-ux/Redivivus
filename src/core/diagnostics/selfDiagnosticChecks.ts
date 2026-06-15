@@ -102,8 +102,13 @@ export async function checkProviderReachable(providerName: string): Promise<Diag
   
   if (!key) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'No API key -- skipping ping' }; }
   try {
-    const url = cfg.url(key);
+    let url = cfg.url(key);
     const headers = cfg.headers(key);
+    // Kimi/Moonshot: auto-detect international (.ai) vs China (.cn) platform for this key.
+    if (providerName === 'Kimi') {
+      const { detectKimiBase } = await import('../../services/ai/kimiEndpoint.js');
+      url = (await detectKimiBase(key)) + '/v1/models';
+    }
     
     // Use Node's https/http module instead of fetch for better compatibility
     const result = await new Promise<{ status: number; data?: string }>((resolve, reject) => {

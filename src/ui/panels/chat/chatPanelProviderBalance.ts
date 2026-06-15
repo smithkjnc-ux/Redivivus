@@ -2,6 +2,8 @@
 // Balance APIs are mostly unavailable publicly; key validation is the reliable fallback.
 // Called from collectHealthData() in chatPanelHealthCheck.ts.
 
+import { detectKimiBase } from '../../../services/ai/kimiEndpoint.js';
+
 export interface ProviderBalance {
   provider: string;
   label: string;
@@ -33,8 +35,9 @@ async function validateKey(
 // when available, else falls back to key validation.
 async function fetchKimiBalance(key: string): Promise<ProviderBalance> {
   const headers = { 'Authorization': `Bearer ${key}` };
+  const base = await detectKimiBase(key);
   try {
-    const res = await fetch('https://api.moonshot.ai/v1/users/me/balance', { headers, signal: AbortSignal.timeout(6000) });
+    const res = await fetch(`${base}/v1/users/me/balance`, { headers, signal: AbortSignal.timeout(6000) });
     if (res.status === 401) { return { provider: 'kimi', label: 'Kimi', status: 'error', detail: 'invalid key' }; }
     if (res.ok) {
       const j = await res.json() as { data?: { available_balance?: number } };
@@ -44,7 +47,7 @@ async function fetchKimiBalance(key: string): Promise<ProviderBalance> {
       }
     }
   } catch { /* fall through to key validation */ }
-  return validateKey('kimi', 'Kimi', 'https://api.moonshot.ai/v1/models', headers);
+  return validateKey('kimi', 'Kimi', `${base}/v1/models`, headers);
 }
 
 export async function checkProviderBalances(keys: Record<string,string>): Promise<ProviderBalance[]> {

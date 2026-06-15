@@ -4,6 +4,7 @@
 
 import type { AIResponse } from './routingTypes.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
+import { detectKimiBase } from './kimiEndpoint.js';
 
 type KeyGetter = () => string | null;
 type ChunkFn = (text: string) => void;
@@ -99,6 +100,8 @@ export async function streamProvider(
     const p = providerMap[ai];
     if (!p) {throw new Error(`Unknown AI: ${ai}`);}
     const key = p.key(); if (!key) {throw new Error(`No key for ${ai}`);}
+    // Kimi/Moonshot: route to the correct platform (.ai international vs .cn China) for this key.
+    if (ai === 'kimi') { p.url = (await detectKimiBase(key)) + '/v1/chat/completions'; }
     const _msgs: any[] = systemMessage ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }] : [{ role: 'user', content: text }];
     // [FIX] max_tokens set to provider maximum — Worker needs full output for large files
     const maxTokens = (ai === 'groq' || ai === 'deepseek') ? 8000 : 16000;

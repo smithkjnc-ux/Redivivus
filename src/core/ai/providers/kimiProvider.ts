@@ -2,6 +2,7 @@
 
 import type { AIResponse } from '../../../services/ai/routingTypes.js';
 import { getKimiKey } from '../../../services/ai/routingKeys.js';
+import { detectKimiBase } from '../../../services/ai/kimiEndpoint.js';
 import { classifyError } from './providerUtils.js';
 
 export async function executeKimi(
@@ -14,7 +15,7 @@ export async function executeKimi(
   const { bestModelForRole, tierToRole } = await import('../../../services/ai/modelRegistry.js');
   const model = bestModelForRole('kimi', tierToRole(tier))?.modelId ?? 'moonshot-v1-32k';
   try {
-    const url = 'https://api.moonshot.ai/v1/chat/completions';
+    const url = (await detectKimiBase(key)) + '/v1/chat/completions';
     const _msgs: any[] = systemMessage
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }]
         : [{ role: 'user', content: text }];
