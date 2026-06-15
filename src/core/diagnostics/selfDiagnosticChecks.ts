@@ -104,7 +104,6 @@ export async function checkProviderReachable(providerName: string): Promise<Diag
   try {
     const url = cfg.url(key);
     const headers = cfg.headers(key);
-    console.log(`[DEBUG] Testing ${providerName}: URL=${url}, Headers=${JSON.stringify(headers).substring(0, 100)}...`);
     
     // Use Node's https/http module instead of fetch for better compatibility
     const result = await new Promise<{ status: number; data?: string }>((resolve, reject) => {
