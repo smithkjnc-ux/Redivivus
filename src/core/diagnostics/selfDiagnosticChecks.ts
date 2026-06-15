@@ -98,7 +98,7 @@ export async function checkProviderReachable(providerName: string): Promise<Diag
   
   // Read from SecretStorage (where keys are actually stored) instead of old settings
   const { getKeyCached } = await import('../../services/ai/secretKeyStore.js');
-  const key = getKeyCached(providerName.toLowerCase());
+  const key = (getKeyCached(providerName.toLowerCase()) || '').trim();
   
   if (!key) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'No API key -- skipping ping' }; }
   try {
