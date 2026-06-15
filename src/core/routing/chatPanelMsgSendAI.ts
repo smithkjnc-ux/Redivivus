@@ -88,7 +88,7 @@ export async function handleAIChat(
         lastResponseModel = aiResponse.model;
         estimatedTokens = Math.ceil(aiResponse.text.length / 4);
         estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
-        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, lastResponseModel || routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
+        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, (lastResponseModel && lastResponseModel !== 'none') ? lastResponseModel : routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
         finalText = aiResponse.text || '';
       }
     } else {
@@ -108,7 +108,7 @@ export async function handleAIChat(
       lastResponseModel = aiResponse.model;
       estimatedTokens = Math.ceil(aiResponse.text.length / 4);
       estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
-      await usageTracker?.recordUsage(estimatedTokens, estimatedCost, lastResponseModel || routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
+      await usageTracker?.recordUsage(estimatedTokens, estimatedCost, (lastResponseModel && lastResponseModel !== 'none') ? lastResponseModel : routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
       finalText = aiResponse.text || '';
     }
 

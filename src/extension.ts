@@ -104,6 +104,9 @@ export function activate(context: vscode.ExtensionContext) {
   const retrofitService = new RetrofitService(redivivusService, routingService, measureTwice, changeTracker, analyzerService);
   const wizardService = new WizardService(redivivusService, sessionService);
   const usageTracker = new UsageTracker(context);
+  // One-time cleanup of legacy unattributed ('none') usage rows; going forward such rows are
+  // labeled 'unknown' so any missed attribution is visible. Guarded by a globalState flag.
+  void usageTracker.runOneTimeNonePurge();
   const guardianService = new GuardianService(redivivusService);
   const statusBar = new StatusBar(redivivusService, sessionService, usageTracker);
 

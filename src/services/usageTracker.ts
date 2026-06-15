@@ -114,6 +114,38 @@ export class UsageTracker {
     await this.context.globalState.update(LIFETIME_KEY, lifetime);
   }
 
+  // One-time cleanup of legacy unattributed rows (stored as 'none' before the 'unknown' labeling fix).
+  // Removes matching entries from history AND decrements the lifetime aggregate by the removed amounts
+  // so the headline Total tokens/cost stay consistent. Returns the number of rows removed.
+  async purgeUnattributedUsage(labels: string[] = ['none']): Promise<number> {
+    const set = new Set(labels.map(l => l.toLowerCase()));
+    const history = this.getHistory();
+    let rmTokens = 0, rmCost = 0, rmMsgs = 0, rmCount = 0;
+    const kept = history.filter(e => {
+      if (set.has((e.aiProvider || '').toLowerCase())) {
+        rmTokens += e.tokens; rmCost += e.cost; rmMsgs += e.messageCount; rmCount++;
+        return false;
+      }
+      return true;
+    });
+    if (rmCount === 0) { return 0; }
+    await this.context.globalState.update(STORAGE_KEY, kept);
+    const lifetime = this.getLifetimeTotal();
+    lifetime.tokens = Math.max(0, lifetime.tokens - rmTokens);
+    lifetime.cost = Math.max(0, lifetime.cost - rmCost);
+    lifetime.messages = Math.max(0, lifetime.messages - rmMsgs);
+    await this.context.globalState.update(LIFETIME_KEY, lifetime);
+    return rmCount;
+  }
+
+  // Runs purgeUnattributedUsage once per install (guarded by a globalState flag). Call at activation.
+  async runOneTimeNonePurge(): Promise<void> {
+    const FLAG = 'redivivus_usage_none_purged_v1';
+    if (this.context.globalState.get<boolean>(FLAG)) { return; }
+    try { await this.purgeUnattributedUsage(['none']); } catch { /* non-fatal */ }
+    await this.context.globalState.update(FLAG, true);
+  }
+
   // Get all usage history
   getHistory(): UsageEntry[] {
     return this.context.globalState.get<UsageEntry[]>(STORAGE_KEY, []);
@@ -170,6 +202,10 @@ function normalizeAI(ai: string): string {
   if (m.includes('groq') || m.includes('llama'))  { return 'groq'; }
   if (m.includes('grok') || m.includes('xai'))    { return 'xai'; }
   if (m.includes('kimi') || m.includes('moonshot')) { return 'kimi'; }
+  // Unattributed: caller couldn't resolve who ran (empty or the 'none' sentinel). Surface as
+  // 'unknown' — a deliberate, visible signal that a call site failed to record its provider, so
+  // the gap can be found and fixed. Never silently bucket it as a real-looking 'none'.
+  if (!m || m === 'none') { return 'unknown'; }
   return ai;
 }
 

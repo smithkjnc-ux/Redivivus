@@ -42,7 +42,7 @@ Does this fix LOGICALLY achieve what you diagnosed? Does the code change actuall
       // Verification failed to run — pass through (don't block the pipeline)
       return { passed: true, issues: [] };
     }
-    deps.usageTracker?.recordUsage(Math.ceil((verifyPrompt.length + (res.text?.length || 0)) / 4), 0, res.model || 'claude', res.inputTokens, res.outputTokens, 'supervisor', require('path').basename(root));
+    deps.usageTracker?.recordUsage(Math.ceil((verifyPrompt.length + (res.text?.length || 0)) / 4), 0, (res.model && res.model !== 'none') ? res.model : 'claude', res.inputTokens, res.outputTokens, 'supervisor', require('path').basename(root));
 
     const answer = res.text.trim();
     if (answer.startsWith('PASS') || answer.toLowerCase().startsWith('pass')) {

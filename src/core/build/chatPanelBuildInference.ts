@@ -29,7 +29,7 @@ export async function isModificationRequest(taskLow: string, routing: RoutingSer
     const prompt = `Is this a request to MODIFY an existing file, or BUILD something new?\nTask: "${taskLow.slice(0, 200)}"\nReply with exactly one word: modify or new`;
     const res = await routing.prompt(prompt, 12_000);
     if (usageTracker && res.inputTokens) {
-      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, res.model || routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
+      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, (res.model && res.model !== 'none') ? res.model : routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
     }
     if (res.success && res.text) { return res.text.trim().toLowerCase().startsWith('modify'); }
   } catch { /* fall through to safe default */ }
@@ -59,7 +59,7 @@ export async function isConversationalQuestion(taskLow: string, routing: Routing
     const prompt = `Analyze this user message: "${taskLow.slice(0, 200)}"\nIs the user asking a conversational question (e.g., asking about your capabilities, asking "can you do X?"), or are they giving an explicit command to take action right now? Reply with exactly one word: question or command`;
     const res = await routing.prompt(prompt, 10000);
     if (usageTracker && res.inputTokens) {
-      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, res.model || routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
+      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, (res.model && res.model !== 'none') ? res.model : routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
     }
     if (res.success && res.text) { return res.text.trim().toLowerCase().startsWith('question'); }
   } catch { /* fall through */ }
@@ -140,7 +140,7 @@ export async function deriveFileBase(task: string, routing: RoutingService, usag
     const prompt = `Task: "${task.slice(0, 200)}"\n\nReply with ONLY a snake_case filename base (no extension, no path, 1-3 words) that describes what this code does — its PURPOSE, not the request verbs. Example: profit_calculator, todo_app, file_sorter. Reply with nothing else.`;
     const res = await routing.prompt(prompt, 12_000);
     if (usageTracker && res.inputTokens) {
-      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, res.model || routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
+      usageTracker.recordUsage(Math.ceil((res.inputTokens + (res.outputTokens || 0)) / 4), 0, (res.model && res.model !== 'none') ? res.model : routing.getAvailableAI().ai, res.inputTokens, res.outputTokens, 'supervisor');
     }
     if (res.success && res.text) {
       const cleaned = res.text.trim().toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_{2,}/g, '_').replace(/^_|_$/g, '');
