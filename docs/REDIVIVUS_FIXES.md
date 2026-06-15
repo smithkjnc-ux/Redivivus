@@ -21,6 +21,18 @@ Beta provider-validation pass. PapaJoe was installing every provider to confirm 
 
 ---
 
+## Fix — Jun 15, 2026: WHY it kept writing one big file — the plan schema was self-defeating
+
+PapaJoe: "I still think it is writing one big file... output hit the token cap." Right — and the root cause was structural, not just a prompt. The plan schema (`routingServicePrompts.ts`) makes the Supervisor return `filesToCreate` PLUS verbose `components.exactInstructions` (full impl spec per file) PLUS `contracts`. For a multi-file game that JSON is huge -> **the MORE it decomposes, the BIGGER the plan, the more it TRUNCATES -> JSON.parse throws -> files=0 -> single-file path -> the Worker writes one giant file** (which `build/route.ts:97` then happily continues past the token cap across passes). Decomposition was self-defeating; the 200-line push would've made truncation worse.
+
+**Two fixes:**
+- `plan/route.ts` — **recover `filesToCreate` from a truncated/malformed plan** via regex on the array directly (it usually survives at the top before `components` blew the budget). Logs `[plan] recovered N files from a truncated plan`. Keeps complex games on the MULTI-FILE path.
+- `routingServicePrompts.ts` — **rebalanced the schema**: `filesToCreate` must be complete + decomposed (6-10 small <200-line modules); `exactInstructions` is a TIGHT 2-4 line spec, NOT a full implementation (the Worker expands it + reads siblings). A short complete plan beats a long truncated one.
+
+**Deploy:** backend (Fly). Watch `[plan] ok ... files=N` (>1) and `[plan] recovered N files` — single-file path should stop firing for games.
+
+---
+
 ## Fix — Jun 15, 2026: Enforce the 200-line rule on builds (= the module-decomposition forcing function)
 
 PapaJoe caught it: `game.js` was 1349 lines — a 6.7x violation of Rule 9 (200-line limit) that Redivivus enforces on its OWN code. The 200-line limit and "build module-by-module" are the SAME idea: enforcing it forces a mega-`game.js` to become `ghosts.js`+`pacman.js`+`maze.js`+... built separately. The rule was told to the worker but never enforced on builds — and the worker CAN'T fix it (it builds one file per call, can't split mid-build), so the split must happen at PLAN time.

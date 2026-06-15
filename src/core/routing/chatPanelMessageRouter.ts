@@ -80,11 +80,13 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
   // [FIX] The send button spins via setInputBusy(true) on send but had NO stop — the webview was never told the
   // turn finished, so the spinner ran forever. Signal turn-done in a finally (covers success AND error) for the
   // message types that start a turn, so the webview can reset the send button.
-  const _isTurn = msg.type === 'send-message' || msg.type === 'fix-request' || msg.type === 'map-context';
   try {
     await handleChatMessage(msg, msgDeps);
   } finally {
-    if (_isTurn) { try { _panel?.webview?.postMessage({ type: 'turn-done' }); } catch { /* webview gone */ } }
+    // [FIX] Always signal turn-done so the send-button spinner resets no matter which message ran the work —
+    // chat send, fix, OR a build kicked off by the "Build it" confirm button (a different message type that the
+    // earlier gated version missed, leaving the spinner running after a build). setInputBusy(false) is idempotent.
+    try { _panel?.webview?.postMessage({ type: 'turn-done' }); } catch { /* webview gone */ }
   }
 
   // [FIX] Sync planInterview back to state — startPlanInterview sets it on msgDeps but state is separate
