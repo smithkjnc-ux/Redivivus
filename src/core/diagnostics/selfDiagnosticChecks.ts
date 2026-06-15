@@ -4,6 +4,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as https from 'https';
+import * as http from 'http';
 
 export interface DiagResult {
   name: string;
@@ -100,27 +102,48 @@ export async function checkProviderReachable(providerName: string): Promise<Diag
   
   if (!key) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'No API key -- skipping ping' }; }
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 5000);
     const url = cfg.url(key);
     const headers = cfg.headers(key);
     console.log(`[DEBUG] Testing ${providerName}: URL=${url}, Headers=${JSON.stringify(headers).substring(0, 100)}...`);
-    const resp = await fetch(url, { headers, signal: controller.signal });
-    clearTimeout(timer);
-    if (resp.status === 200) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'pass', message: `Reachable (${resp.status})` }; }
-    if (resp.status === 401 || resp.status === 403) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Auth error ${resp.status} -- API key invalid or missing permissions` }; }
-    // Try to get more error details for 400
-    if (resp.status === 400) {
-      try {
-        const errorText = await resp.text();
-        return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Bad request (400) - ${errorText.substring(0, 100)}` };
-      } catch {
-        return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Bad request (400) - Invalid request format` };
-      }
+    
+    // Use Node's https/http module instead of fetch for better compatibility
+    const result = await new Promise<{ status: number; data?: string }>((resolve, reject) => {
+      const urlObj = new URL(url);
+      const client = urlObj.protocol === 'https:' ? https : http;
+      
+      const req = client.request(url, {
+        method: 'GET',
+        headers: headers,
+        timeout: 5000
+      }, (res) => {
+        let data = '';
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve({ status: res.statusCode || 0, data }));
+      });
+      
+      req.on('error', reject);
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Timeout'));
+      });
+      
+      req.end();
+    });
+    
+    if (result.status === 200) { 
+      return { name: `${providerName} reachable`, category: 'AI Providers', status: 'pass', message: `Reachable (${result.status})` }; 
     }
-    return { name: `${providerName} reachable`, category: 'AI Providers', status: 'warn', message: `Unexpected HTTP ${resp.status} from ${providerName}` };
+    if (result.status === 401 || result.status === 403) { 
+      return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Auth error ${result.status} -- API key invalid or missing permissions` }; 
+    }
+    // Try to get more error details for 400
+    if (result.status === 400) {
+      const errorText = result.data || 'No error details';
+      return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Bad request (400) - ${errorText.substring(0, 100)}` };
+    }
+    return { name: `${providerName} reachable`, category: 'AI Providers', status: 'warn', message: `Unexpected HTTP ${result.status} from ${providerName}` };
   } catch (e: any) {
-    if (e.name === 'AbortError') { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'warn', message: 'Ping timed out (5s) -- network may be slow or blocked' }; }
+    if (e.message === 'Timeout') { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'warn', message: 'Ping timed out (5s) -- network may be slow or blocked' }; }
     return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Network error: ${e.message}` };
   }
 }
