@@ -227,15 +227,26 @@ export async function processBuildResults(
         const userPrompt = String(task).replace(/^Build:\s*/, '').split(/\n\s*\n|\n\s*Project Blueprint:|\n\s*SUPERVISOR/)[0].trim().slice(0, 400);
         if (!lb.getMechanics(deps)) {
           const { distillBuildMechanics } = await import('../blueprint/livingBlueprintDistill.js');
-          const mech = await distillBuildMechanics(routing, task, relFiles);
+          // [BUILD CONTRACT] Distillation was silent fire-and-forget — when the AI call returned null the blueprint
+          // stayed hollow and nobody knew (every flappy build had NO mechanics). Now: log the attempt, RETRY once,
+          // and log success/failure so it is verifiable and a hollow blueprint becomes a visible failure.
+          console.log(`[LIVING BLUEPRINT] Distilling mechanics contract from build (${relFiles.length} files)...`);
+          let mech = await distillBuildMechanics(routing, task, relFiles);
+          if (!mech) {
+            console.warn('[LIVING BLUEPRINT] Distillation returned no mechanics — retrying once.');
+            mech = await distillBuildMechanics(routing, task, relFiles);
+          }
           if (mech) {
             lb.setMechanics(deps, mech);
             lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: userPrompt, summary: 'Initial build — behavioral contract seeded.', files: relFiles, by: data.model || 'AI' });
+            console.log(`[LIVING BLUEPRINT] Mechanics contract seeded (${mech.length} chars) -> config.json + blueprint.md`);
+          } else {
+            console.warn(`[LIVING BLUEPRINT] FAILED to distill mechanics after retry — blueprint left WITHOUT a behavioral contract for: "${userPrompt.slice(0, 80)}"`);
           }
         } else {
           lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: userPrompt, summary: 'Rebuild / additional build.', files: relFiles, by: data.model || 'AI' });
         }
-      } catch { /* living-blueprint seeding is best-effort — never affect the build outcome */ }
+      } catch (e) { console.warn('[LIVING BLUEPRINT] Mechanics seeding error (build unaffected):', e instanceof Error ? e.message : String(e)); }
     })();
   }
 

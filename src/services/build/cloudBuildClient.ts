@@ -276,22 +276,13 @@ export async function callCloudBuild(
         const fs = await import('fs');
         const path = await import('path');
         
-        opts.onProgress?.(`Creating project structure: ${skeleton.foldersToCreate?.length || 0} folders, ${skeleton.filesToCreate?.length || 0} files...`);
-        
-        // Create folders first
-        if (skeleton.foldersToCreate && skeleton.foldersToCreate.length > 0) {
-          for (const folderPath of skeleton.foldersToCreate) {
-            const fullPath = path.join(root, folderPath);
-            try {
-              if (!fs.existsSync(fullPath)) {
-                fs.mkdirSync(fullPath, { recursive: true });
-              }
-            } catch (e) {
-              console.warn(`[Redivivus] Could not create folder ${folderPath}:`, e);
-            }
-          }
-        }
-        
+        opts.onProgress?.(`Creating project structure: ${skeleton.filesToCreate?.length || 0} files...`);
+
+        // [BUILD CONTRACT] Do NOT pre-create standalone folders — that was a source of empty folders when a
+        // planned folder had no file in it. A folder must exist only because a file lives in it; the file loop
+        // below creates each file's parent dir (path.dirname) on demand. NO EMPTY FOLDERS.
+        // [DEAD] Removed: standalone mkdir of skeleton.foldersToCreate.
+
         // Create empty files (will be filled in by code processor)
         if (skeleton.filesToCreate && skeleton.filesToCreate.length > 0) {
           for (const filePath of skeleton.filesToCreate) {

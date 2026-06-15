@@ -9,7 +9,7 @@ import { estimateTokens, getInputBudget } from '../ai/tokenBudget.js';
 import { readFileSafe, buildProjectMap, buildGitContext, getRecentBuilds } from './buildContextHelpers.js';
 
 export interface CloudBuildContext {
-  blueprint?: { projectName?: string; what?: string; who?: string; where?: string; when?: string; why?: string }
+  blueprint?: { projectName?: string; what?: string; who?: string; where?: string; when?: string; why?: string; mechanics?: string }
   existingFiles?: Record<string, string>
   vaultItems?: Array<{ name: string; code: string; language?: string; tags?: string[] }>
   deadEnds?: string
@@ -35,8 +35,11 @@ export async function collectBuildContext(
   try {
     const cfg = JSON.parse(readFileSafe(path.join(root, '.redivivus', 'config.json')));
     if (cfg.blueprint || cfg.projectName) {
+      // [BUILD CONTRACT] Include MECHANICS (the behavioral/quality contract HEAD) — the collector used to drop it,
+      // so the worker only ever saw the 5 W's. Now whatever mechanics exist reach the build worker too.
       blueprint = { projectName: cfg.projectName, what: cfg.blueprint?.what, who: cfg.blueprint?.who,
-        where: cfg.blueprint?.where, when: cfg.blueprint?.when, why: cfg.blueprint?.why };
+        where: cfg.blueprint?.where, when: cfg.blueprint?.when, why: cfg.blueprint?.why,
+        mechanics: cfg.blueprint?.mechanics || undefined };
     }
   } catch {}
 

@@ -21,6 +21,42 @@ Beta provider-validation pass. PapaJoe was installing every provider to confirm 
 
 ---
 
+## Feature — Jun 14, 2026: Build Contract enforcement — Phase 1 (give the worker the rules + enforce + observe)
+
+Canonical: `docs/REDIVIVUS_BUILD_CONTRACT.md`. Triggered by 3 Flappy Bird builds (Claude rich, Gemini-flash a single-fillRect box-bird, Groq failed) all showing the hollow-shell disease. Root causes found and fixed:
+
+- **Build worker was never given the rulebook** (`build/route.ts` sysMsg said only "production-quality, complete files"). The build route didn't import `Redivivus_WORKER_RULES`, so the worker never got the quality bar (composite sprites, sound, gradients), annotations, `[REGION]`, or NO FLAT FILES. **Fixed:** import + append `Redivivus_WORKER_RULES` to the build worker sysMsg. (Backend.)
+- **No quality gate** — `guardianCheck()` enforced security/stubs/`[SCOPE]` but nothing visual/audio, so the box-bird passed clean. **Fixed:** added canvas-game checks — `FLAT_RENDERING` (only fillRect, no composite), `NO_SOUND` (no Web Audio anywhere), `FLAT_BACKGROUND` (no gradient). Sibling-aware (audio/render may be split), applies to single-file HTML games. Feeds the existing retry->escalate loop. (Backend.)
+- **Verification logs** — added `[QualityGate] <file>: PASS | FAIL -> CODES` per file (the old `[Guardian]` line only logged on failure). Visible in Fly logs. (Backend.)
+- **Worker couldn't see mechanics** — `buildContextCollector.ts` cherry-picked only the 5 W's and DROPPED `mechanics` before sending. **Fixed:** include `blueprint.mechanics`. (Client.)
+- **Blueprint distillation failed silently** — `cloudBuildResultProcessor.ts` distills mechanics after a build but was fire-and-forget with `catch {}`; the AI call returned null and the blueprint stayed hollow with no signal (every flappy build had no `mechanics` in config). **Fixed:** log the attempt, RETRY once, log success (chars seeded) or a visible FAILURE warning. (Client.)
+
+**Deploy:** backend (Fly) for worker rules + gate + logs; client compile for collector + distillation. **Watch:** `[QualityGate] PASS/FAIL` and `[LIVING BLUEPRINT] Mechanics contract seeded/FAILED` in the logs.
+
+**Phase 3 (same day) — kill the empty folders + flat files:**
+- **The contradiction that caused single-file builds:** `buildPipeline.ts` GAME_RULES said *"Self-contained single HTML file preferred"* — directly against NO FLAT FILES + the worker rules. That is why every build collapsed into one `index.html` and left folders empty. **Fixed:** now instructs DECOMPOSE into `index.html` + `js/` (game/render/input/audio) + `css/`, loaded with PLAIN `<script src>`/`<link>` (NOT ES modules) so it still runs from `file://`. NEVER leave a folder empty; single-file only for a trivially tiny tool. (Backend.)
+- **Empty folders had TWO sources, both killed:** (1) `redivivusInit.ts` unconditionally `mkdir`'d `src/ tests/ docs/` for EVERY project — removed. (2) `cloudBuildClient.ts` pre-created `skeleton.foldersToCreate` standalone, so a planned folder with no file in it stayed empty — removed; the file loop already creates each file's parent dir on demand, so a folder exists only because a file lives in it. (Client.)
+- **PWA verified compatible:** `pwaGenerator.ts` already bundles multi-file (`game.js` etc.) and the SW precaches them — multi-file builds run from `file://` AND install as PWAs. No change needed.
+
+**Next:** distill mechanics BEFORE the build (per-project contract drives the worker); project-level gate check for empty folders / single-file-when-should-be-multi; manual model picker.
+
+---
+
+## Feature — Jun 14, 2026: Install funnel analytics in rigops (download -> install -> use, by platform)
+
+**Request:** "how many times Redivivus is downloaded and installed (windows/mac/linux) daily/weekly/total" -> clarified: "see if anyone is downloading and not using it" (a funnel + drop-off question).
+
+**Design (no migration, no new endpoint):** the installers POST to the existing **anonymous-tolerant** `/telemetry` -> `activity_logs` (event + `metadata` jsonb). Two events with the platform in metadata: `install_download` (script start) and `install_complete` (script end). The gap between them = failed installs (e.g. the TLS/built-in bugs just fixed); downloads vs active users = "downloaded but idle." The "used" half already exists (usage telemetry + `_is_user_activity`).
+
+**Changes:**
+- `redivivus-web/public/install-redivivus.sh` — `PLATFORM` (linux/mac via uname), `track()` curls `/telemetry` (5s cap, fire-and-forget); `track install_download` at start, `track install_complete` at end.
+- `redivivus-web/public/install-redivivus.ps1` — `Track()` (platform=windows) at start + end.
+- `rigops/panels/admin/analytics.py` — new **Install Funnel** DataTable (per platform: DL/Inst x Today/Week/Total + Install %) and 4 metric cards: DOWNLOADS, INSTALLS, INSTALL RATE, "DOWNLOADED, IDLE" (downloads − active users). Queries `activity_logs` for the two install events, groups by `metadata.platform`.
+
+**Notes:** Anonymous (no user id on installs). Data flows only AFTER the web deploy + new installs (not retroactive). rigops needs `SUPABASE_SERVICE_ROLE_KEY` (already set — analytics panel already used it).
+
+---
+
 ## Fix — Jun 14, 2026: Install + release pipeline bugs (cross-repo — blocking real users)
 
 Son hit install failures on two machines; release log revealed a third bug. All real, all blocking distribution.

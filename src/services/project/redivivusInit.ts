@@ -58,17 +58,10 @@ export async function initProject(paths: RedivivusPaths, projectName: string): P
   // add .redivivus/ to .gitignore if it contains sessions (but keep blueprint and work_log)
   await updateGitignore(root);
 
-  // ── scaffold basic project structure ──
-  const scaffoldDirs = [
-    path.join(root, 'src'),
-    path.join(root, 'tests'),
-    path.join(root, 'docs'),
-  ];
-  for (const dir of scaffoldDirs) {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-  }
+  // [BUILD CONTRACT] Do NOT pre-create empty src/tests/docs folders. They shipped hollow on every project
+  // ("useless unless filled out properly") and were the visible face of the hollow-shell disease. The build now
+  // decomposes into REAL folders (js/, css/, src/, ...) and fills them; a folder exists only when it has content.
+  // [DEAD] Removed: unconditional mkdir of src/, tests/, docs/ at init.
 
   const readmePath = path.join(root, 'README.md');
   if (!fs.existsSync(readmePath)) {

@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — Region Map (phases 1-5) live on backend+client: [REGION:] markers + auto index + line-numbered files + Supervisor localize-first contract + Guardian boundary enforcement + retrofit emits markers; frogger hand-chaptered as the test bed. Plus AI route classifier (Rule 18) replacing regex tier sizing (Phase A). Pending Fly deploy + Extension Host restart, then test. See REDIVIVUS_FIXES.md + REDIVIVUS_REGION_MAP.md.
+*Last updated:* 2026-06-14 — Build Contract enforcement (PRIORITY) underway: build worker now gets the full rulebook, quality gate rejects flat-fillRect/silent/no-gradient games (`[QualityGate]` logs), blueprint distillation logged+retried (was silently leaving hollow blueprints), worker can see mechanics. Killed the "single HTML preferred" rule + init's empty src/tests/docs folders -> builds now decompose into real multi-file (file://-safe, PWA-compatible). Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md. Pending Fly + client deploy, then test-build a game.
 
 *Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
 
