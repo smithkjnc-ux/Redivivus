@@ -57,7 +57,7 @@ export const API_SETUP_SCRIPT = `
         document.getElementById(id + '-err').style.display = 'none'; // reset errors
         const el = document.getElementById(id + '-key');
         if (!el) return;
-        const v = el.value;
+        const v = el.value.trim();
         payload[id + 'Key'] = (v.includes('•') && el.dataset.original === 'set') ? undefined : v;
       });
       vscode.postMessage(payload);
