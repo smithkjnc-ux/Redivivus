@@ -47,7 +47,7 @@ export function getApiSetupHtml(): string {
       desc: 'Specialized in processing massive amounts of context.',
       abilities: 'Can ingest up to 200k tokens reliably. Ideal for reading entire framework documentation or huge monolithic files.',
       costDetails: 'No free tier. Paid: ~$0.02 per 1M input tokens.',
-      link: 'https://platform.moonshot.cn/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)' },
+      link: 'https://platform.moonshot.ai/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)' },
     { id: 'deepseek', icon: '🐋', name: 'DeepSeek',              badge: 'LOW COST',            badgeColor: '#1a7a3a',
       desc: 'Strong reasoning at a fraction of the cost of premium models.',
       abilities: 'DeepSeek R1 is a powerful chain-of-thought reasoner for math, algorithms, and step-by-step logic. DeepSeek V3 handles fast general coding.',

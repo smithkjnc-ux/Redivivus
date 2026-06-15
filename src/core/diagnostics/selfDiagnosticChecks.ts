@@ -88,7 +88,7 @@ const PROVIDER_PING: Record<string, { configKey: string; url: (k: string) => str
   Claude:  { configKey: 'redivivus.claudeApiKey',  url: () => 'https://api.anthropic.com/v1/models', headers: k => ({ 'x-api-key': k, 'anthropic-version': '2023-06-01' }) },
   Groq:    { configKey: 'redivivus.groqApiKey',    url: () => 'https://api.groq.com/openai/v1/models', headers: k => ({ Authorization: `Bearer ${k}` }) },
   xAI:     { configKey: 'redivivus.xaiApiKey',     url: () => 'https://api.x.ai/v1/models',          headers: k => ({ Authorization: `Bearer ${k}` }) },
-  Kimi:    { configKey: 'redivivus.kimiApiKey',    url: () => 'https://api.moonshot.cn/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
+  Kimi:    { configKey: 'redivivus.kimiApiKey',    url: () => 'https://api.moonshot.ai/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
   DeepSeek:{ configKey: 'redivivus.deepseekApiKey',url: () => 'https://api.deepseek.com/v1/models',   headers: k => ({ Authorization: `Bearer ${k}` }) },
 };
 

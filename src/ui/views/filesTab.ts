@@ -85,7 +85,7 @@ export function renderFilesTab(
       ${keyRow('claude', 'Claude 3.5 Haiku',  'Paid', 'sk-ant-...', 'https://console.anthropic.com/settings/keys', aiKeys?.claude)}
       ${keyRow('openai', 'OpenAI GPT-4o Mini','Paid', 'sk-...', 'https://platform.openai.com/api-keys', aiKeys?.openai)}
       ${keyRow('xai',    'xAI Grok 3 Mini',   'Paid', 'xai-...', 'https://console.x.ai', aiKeys?.xai)}
-      ${keyRow('kimi',   'Moonshot Kimi',      'Paid', 'sk-...', 'https://platform.moonshot.cn/console/api-keys', aiKeys?.kimi)}
+      ${keyRow('kimi',   'Moonshot Kimi',      'Paid', 'sk-...', 'https://platform.moonshot.ai/console/api-keys', aiKeys?.kimi)}
 
       <button id="api-keys-close-btn" style="padding:7px 18px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:12px; margin-top:4px;">Close</button>
     </div>`;
