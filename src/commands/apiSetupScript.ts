@@ -10,6 +10,15 @@ export const API_SETUP_SCRIPT = `
       vscode.postMessage({ type: 'toggle-provider', providerId: id });
     }
 
+    // Clear the masked placeholder on first focus so re-entered keys are never appended to bullets.
+    ['gemini','claude','openai','groq','xai','kimi','deepseek'].forEach(id => {
+      const el = document.getElementById(id + '-key');
+      if (!el) return;
+      el.addEventListener('focus', () => {
+        if (el.value.includes('•')) { el.value = ''; }
+      });
+    });
+
     document.getElementById('test-all-btn').addEventListener('click', () => {
       const btn = document.getElementById('test-all-btn');
       btn.innerHTML = '&#8987; Testing...';
