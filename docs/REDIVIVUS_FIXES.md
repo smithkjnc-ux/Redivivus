@@ -21,6 +21,16 @@ Beta provider-validation pass. PapaJoe was installing every provider to confirm 
 
 ---
 
+## Feature — Jun 15, 2026: Build Record — reassemble the full build/fix history on request
+
+PapaJoe: "a way to pull up a build record and see exactly what it did during build/fix/edits... reassemble from saved data, don't duplicate." The data already exists (`blueprint_revisions.jsonl` = every build+fix with request/summary/files/by/snapshotId/mechanics_delta; `build_log.jsonl` = tokens; `fix-pipeline-*.log` = the Supervisor->Worker->Guardian detail; snapshots = revert points) — what was missing was the reassembly.
+- `buildRecordService.ts` (new) — `reassembleBuildRecord(root)` stitches those sources into one newest-first markdown timeline (build AND fix); `writeBuildRecord(root)` -> `docs/REDIVIVUS_RECORD.md`. Stores no new data.
+- `savePoint.ts` + `package.json` — command `redivivus.showBuildRecord` ("Redivivus: Show Build Record") writes + opens the record.
+
+**Verified** on frogger (8 entries — every fix this session with request, what-it-did, files, behavior change, snapshot, and a pointer to the detailed fix log). Each entry: request, summary, files touched, behavior delta, tokens (builds), snapshot id (revert), fix-log pointer. **Deploy:** client compile (done).
+
+---
+
 ## Fix — Jun 15, 2026: Decompose simple apps too (basic modules) + kill empty placeholder files
 
 PapaJoe: digital-clock `index.html` was 251 lines (over 200) — "could it have been split into modules? at least the basic." Right: the decomposition + 200-line rules only injected for GAMES (`GAME_RULES`); a clock got the weak general rules and crammed HTML+CSS+JS into one file.
