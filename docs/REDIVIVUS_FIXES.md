@@ -21,6 +21,16 @@ Beta provider-validation pass. PapaJoe was installing every provider to confirm 
 
 ---
 
+## Fix — Jun 15, 2026: Enforce the 200-line rule on builds (= the module-decomposition forcing function)
+
+PapaJoe caught it: `game.js` was 1349 lines — a 6.7x violation of Rule 9 (200-line limit) that Redivivus enforces on its OWN code. The 200-line limit and "build module-by-module" are the SAME idea: enforcing it forces a mega-`game.js` to become `ghosts.js`+`pacman.js`+`maze.js`+... built separately. The rule was told to the worker but never enforced on builds — and the worker CAN'T fix it (it builds one file per call, can't split mid-build), so the split must happen at PLAN time.
+- `buildPipeline.ts` GAME_RULES — added a hard rule: EVERY file in `filesToCreate` must be implementable under 200 lines; plan ENOUGH modules (a game = 6-10 small files, not 2 huge ones); split big responsibilities across files in the PLAN (ghosts.js + ghostAI.js, etc.) since the Worker can't split.
+- `build/route.ts` — `[QualityGate]` log now reports each file's line count + `[OVER 200 -- should have been split at plan time]`, so violations are visible (flag, not retry — a Worker can't split one file, so the prevention is the plan rule).
+
+**Deploy:** backend (Fly). Watch `[QualityGate] <file>: PASS | N lines`.
+
+---
+
 ## Feature — Jun 15, 2026: Manual model picker — pick ANY model, that exact model runs
 
 PapaJoe: "all models should be available... give them access to any model if they choose (manual)." The Pac-Man failure (gemini-flash worker wrote broken TS-in-JS) was the proof: capability drives whether a build even runs, but the user couldn't choose it. Built end-to-end, truthful (model shown = model used):
