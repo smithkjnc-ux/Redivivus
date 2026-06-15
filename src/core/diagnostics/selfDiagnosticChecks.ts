@@ -102,10 +102,22 @@ export async function checkProviderReachable(providerName: string): Promise<Diag
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 5000);
-    const resp = await fetch(cfg.url(key), { headers: cfg.headers(key), signal: controller.signal });
+    const url = cfg.url(key);
+    const headers = cfg.headers(key);
+    console.log(`[DEBUG] Testing ${providerName}: URL=${url}, Headers=${JSON.stringify(headers).substring(0, 100)}...`);
+    const resp = await fetch(url, { headers, signal: controller.signal });
     clearTimeout(timer);
     if (resp.status === 200) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'pass', message: `Reachable (${resp.status})` }; }
     if (resp.status === 401 || resp.status === 403) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Auth error ${resp.status} -- API key invalid or missing permissions` }; }
+    // Try to get more error details for 400
+    if (resp.status === 400) {
+      try {
+        const errorText = await resp.text();
+        return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Bad request (400) - ${errorText.substring(0, 100)}` };
+      } catch {
+        return { name: `${providerName} reachable`, category: 'AI Providers', status: 'fail', message: `Bad request (400) - Invalid request format` };
+      }
+    }
     return { name: `${providerName} reachable`, category: 'AI Providers', status: 'warn', message: `Unexpected HTTP ${resp.status} from ${providerName}` };
   } catch (e: any) {
     if (e.name === 'AbortError') { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'warn', message: 'Ping timed out (5s) -- network may be slow or blocked' }; }
