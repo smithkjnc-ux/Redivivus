@@ -6,6 +6,7 @@ import { RoutingService } from '../services/ai/routingService.js';
 import { API_SETUP_CSS } from './apiSetupStyles.js';
 import { buildProviderCards } from './apiSetupHtmlCards.js';
 import { API_SETUP_SCRIPT } from './apiSetupScript.js';
+import { modelsForProvider } from '../services/ai/modelRegistry.js';
 
 export function getApiSetupHtml(): string {
   const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../services/ai/secretKeyStore.js');
@@ -22,37 +23,37 @@ export function getApiSetupHtml(): string {
       desc: 'Recommended for most users. Fast, capable, and extremely generous free tier.',
       abilities: 'Excels at general coding, high-speed UI generation, and large context windows.',
       costDetails: 'Free tier: 15 requests/minute. Paid: ~$1.25 per 1M tokens. As Supervisor, uses gemini-2.5-pro.',
-      link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey, model: 'gemini-2.5-pro', tier: '🚀 Fast + Capable (Free / Low Cost)' },
+      link: 'https://aistudio.google.com/apikey',              linkLabel: 'Get free key', val: geminiKey, model: 'gemini-2.5-pro', tier: '🚀 Fast + Capable (Free / Low Cost)', models: modelsForProvider('gemini') },
     { id: 'claude', icon: '🧠', name: 'Claude (Anthropic)',      badge: 'Paid',                badgeColor: '#b85c00',
       desc: 'The industry gold standard for complex coding tasks.',
       abilities: 'Best-in-class reasoning. Perfect for deep architectural refactoring, subtle bug hunting, and massive codebase analysis.',
       costDetails: 'No free tier. Paid: ~$3.00 per 1M input tokens (Sonnet). As Supervisor, uses claude-sonnet-4-6.',
-      link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey, model: 'claude-sonnet-4-6', tier: '🧠 Deep Reasoning (Premium Paid)' },
+      link: 'https://console.anthropic.com/settings/keys',     linkLabel: 'Get API key', val: claudeKey, model: 'claude-sonnet-4-6', tier: '🧠 Deep Reasoning (Premium Paid)', models: modelsForProvider('claude') },
     { id: 'openai', icon: '⚡', name: 'OpenAI (GPT-4o)',         badge: 'Paid',                badgeColor: '#b85c00',
       desc: 'Strong all-rounder for code, chat, and analysis.',
       abilities: 'Highly reliable and consistent formatting. Excellent at following strict system rules and JSON schema generation.',
       costDetails: 'No free tier. Paid: ~$2.50 per 1M input tokens (GPT-4o). As Supervisor, uses gpt-4o.',
-      link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey, model: 'gpt-4o', tier: '⚖️ Strong Generalist (Paid)' },
+      link: 'https://platform.openai.com/api-keys',            linkLabel: 'Get API key', val: openaiKey, model: 'gpt-4o', tier: '⚖️ Strong Generalist (Paid)', models: modelsForProvider('openai') },
     { id: 'groq',   icon: '🔥', name: 'Groq (Llama / Mixtral)',  badge: 'FREE tier available', badgeColor: '#1a7a3a', 
       desc: 'Extremely fast inference powered by LPU hardware.', 
       abilities: 'Near-instant responses. Best used as a secondary "Worker" AI for rapid, small-scope component generation.', 
       costDetails: 'Free tier available with rate limits. Paid: ~$0.59 per 1M tokens.',
-      link: 'https://console.groq.com/keys',                   linkLabel: 'Get free key', val: groqKey, model: 'llama-3.3-70b-versatile', tier: '⚡ Sub-second (Free Tier)' },
+      link: 'https://console.groq.com/keys',                   linkLabel: 'Get free key', val: groqKey, model: 'llama-3.3-70b-versatile', tier: '⚡ Sub-second (Free Tier)', models: modelsForProvider('groq') },
     { id: 'xai',    icon: '🚀', name: 'xAI Grok',                badge: 'Paid',                badgeColor: '#b85c00', 
       desc: 'Dynamic reasoning model with aggressive inference.', 
       abilities: 'Strong analytical capabilities. Will challenge assumptions and provide alternative architectural viewpoints.', 
       costDetails: 'No free tier. Paid: $2.00 per 1M input tokens.',
-      link: 'https://console.x.ai/',                           linkLabel: 'Get API key', val: xaiKey, model: 'grok-2-1212', tier: '💬 Smart & Dynamic (Paid)' },
+      link: 'https://console.x.ai/',                           linkLabel: 'Get API key', val: xaiKey, model: 'grok-2-1212', tier: '💬 Smart & Dynamic (Paid)', models: modelsForProvider('xai') },
     { id: 'kimi',   icon: '🔮', name: 'Kimi (Moonshot AI)',       badge: 'Paid',                badgeColor: '#b85c00',
       desc: 'Specialized in processing massive amounts of context.',
       abilities: 'Can ingest up to 200k tokens reliably. Ideal for reading entire framework documentation or huge monolithic files.',
       costDetails: 'No free tier. Paid: ~$0.02 per 1M input tokens.',
-      link: 'https://platform.moonshot.ai/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)' },
+      link: 'https://platform.moonshot.ai/',                   linkLabel: 'Get API key', val: kimiKey, model: 'moonshot-v1-32k', tier: '📂 Mass Context (Paid)', models: modelsForProvider('kimi') },
     { id: 'deepseek', icon: '🐋', name: 'DeepSeek',              badge: 'LOW COST',            badgeColor: '#1a7a3a',
       desc: 'Strong reasoning at a fraction of the cost of premium models.',
       abilities: 'DeepSeek R1 is a powerful chain-of-thought reasoner for math, algorithms, and step-by-step logic. DeepSeek V3 handles fast general coding.',
       costDetails: 'No free tier, but very cheap. Paid: ~$0.14-$0.55 per 1M input tokens. As Supervisor, uses deepseek-reasoner (R1).',
-      link: 'https://platform.deepseek.com/api_keys',          linkLabel: 'Get API key', val: deepseekKey, model: 'deepseek-reasoner', tier: '🐋 Deep Reasoning (Low Cost)' },
+      link: 'https://platform.deepseek.com/api_keys',          linkLabel: 'Get API key', val: deepseekKey, model: 'deepseek-reasoner', tier: '🐋 Deep Reasoning (Low Cost)', models: modelsForProvider('deepseek') },
   ];
 
   const getRank = (pId: string, val: string) => {
