@@ -3,6 +3,18 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 16, 2026: Classifier double-encodes build intent as an "answer" (root cause of the mis-route)
+
+The deeper cause behind the "build ran as a fix" bug. Backend `/chat` (`src/app/api/v1/chat/route.ts`) parses the model's `{action,text,task}` JSON. On `JSON.parse` failure it fell back to `{ action: 'answer', text: result.text }` — dumping the raw model output (a valid build spec) as an answer. The client then saw `action:"answer"` with stringified `{"action":"build",...}` in `.text` and mis-routed it.
+
+`JSON.parse` fails routinely on good intent because the model puts a **literal newline or unescaped quote inside the long `task` string**, or the response is **truncated mid-JSON** (answer model `maxTokens:1024`).
+
+**Fix.** Replaced the blind answer-fallback with field-level recovery: extract `action` (an early enum that survives truncation), then best-effort `text`/`task`/`confidence` via tolerant regex (`[^"\\]` matches literal newlines inside values). A field that can't be recovered (truncated `task`) is left undefined — the client already falls back to the user's original message as the task. Only when no `action` can be found does it demote to a genuine answer. Validated against truncated, literal-newline, valid, and answer shapes (all correct).
+
+**Risk:** low. Strict-parse path is unchanged; recovery only runs when the old code would have produced a wrong "answer" anyway. Logs `[chat] strict JSON.parse failed — recovered action=...` when it fires (watch this to gauge how often the model emits bad JSON). **Backend change — needs Fly deploy.** Pairs with the client-side container guard below.
+
+---
+
 ## Fix — Jun 16, 2026: New build silently routed to FIX (no blueprint) inside a projects container
 
 Surfaced testing a Breakout build. PapaJoe: "it acts like it was a fix... no project was open." The workspace root was `~/projects` (the container holding many apps), so `hasProjectOpen=true`. The build went straight to the fix pipeline with no 5-W blueprint card.
