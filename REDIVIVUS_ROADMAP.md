@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-16 (evening) — **Backend deployed to Fly v164** (was v162): classifier JSON-recovery + failover attribution now live. OPEN WORK -> `docs/REDIVIVUS_HANDOFF.md` (manual picker "shown≠used" at build/route.ts:261-263 is next priority).
+*Last updated:* 2026-06-16 (evening) — **v166 on Fly**: manual picker "shown≠used" fixed (`build/route.ts` — `resolveManualModel` + 3 code-path overrides). Backend now honours user-locked worker model over tier routing. OPEN WORK -> `docs/REDIVIVUS_HANDOFF.md`.
 
 *Prior:* 2026-06-14 — Build Contract enforcement (PRIORITY): worker gets full rulebook, quality gate rejects flat games, distillation logged+retried, multi-file decomposition. Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md.
 

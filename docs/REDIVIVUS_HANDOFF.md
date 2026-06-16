@@ -18,17 +18,16 @@ The **client** is deployed locally (auto) and committed (`redivivus` @ `970f365`
 
 ---
 
-## 1. Manual model picker — "shown ≠ used"  (HIGH — core promise)
+## 1. ✅ DONE — Manual model picker "shown ≠ used" (2026-06-16 evening, Fly v166)
 
-**Symptom:** picked Worker = **Gemini Pro**, build ran **Gemini 2.5 Flash**. The locked model is overridden by tier logic.
-**Where:** `redivivus-backend/src/app/api/v1/build/route.ts:261-263` —
-```
-workerProvider = rs2.getProviderForTier(...)
-workerModel    = rs2.getModelForTier(workerProvider, requestedWorkerTier...)
-```
-This derives the model from the TIER, ignoring a manually-locked worker model.
-**Fix:** when the client sent an explicit worker model (manual pick), use THAT instead of `getModelForTier`. Trace how the picked model arrives — `redivivus/src/services/build/cloudBuildClient.ts` sends `preferred`/worker model; confirm `build/route.ts` reads it and prefers it over the tier-derived model.
-**Verify:** lock Gemini Pro, build, confirm the "AI Used" card Worker row says Gemini Pro (and Build Activity worker model matches).
+**Root cause:** `build/route.ts` destructured the body but never read `workerModel`. Client sent it; backend ignored it; tier routing won every time.
+
+**Fix (commit b152d33):**
+- Added `resolveManualModel(modelId)` — scans `PROVIDER_MODELS` (from `routingTiers.ts`) to map a model ID → provider, checks the user has a key for it.
+- Applied in all 3 worker-selection paths: multi-file (`targetFile`), single-file pre-plan reuse, single-file fresh-supervisor.
+- Falls back gracefully to tier routing if the model ID is unknown or the key is missing.
+
+**Verify:** Lock Gemini Pro in the picker → run a build → confirm the "AI Used" card Worker row shows **Gemini Pro**, not Flash.
 
 ---
 
