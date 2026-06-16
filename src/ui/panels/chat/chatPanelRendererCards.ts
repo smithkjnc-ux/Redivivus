@@ -53,6 +53,9 @@ function friendlyAction(role: string, actions: string[]): string {
 }
 
 export function renderAIByline(raw: string): string {
+  // [FIX] Accumulate a grand total across every role (Supervisor + Worker + any failover) — the card
+  // listed each model but never summed them, so the user could not see the real total spend for the build.
+  let totTokens = 0, totCost = 0;
   const rows = raw.split('|||').filter(Boolean).map((entry: string) => {
     const parts = entry.split('~');
     const ai = parts[0] || 'unknown';
@@ -60,6 +63,7 @@ export function renderAIByline(raw: string): string {
     const actions = (parts[2] || '').split(',').filter(Boolean);
     const tokens = parseInt(parts[3] || '0', 10);
     const cost = parseFloat(parts[4] || '0');
+    totTokens += tokens; totCost += cost;
     const hasFallback = parts[5] === '1';
     const reason = parts[6] ? escapeHtml(parts[6].trim()) : '';
     const name = friendlyModelName(ai);
@@ -79,9 +83,15 @@ export function renderAIByline(raw: string): string {
       + `</div>`;
   });
   const id = 'ai-' + Math.random().toString(36).slice(2, 7);
+  // Grand-total row — always show the summed cost so the user sees the full spend at a glance, even when
+  // the per-row breakdown is collapsed. Cost under a tenth of a cent shows as <$0.0001 rather than $0.0000.
+  const totCostStr = totCost > 0.0001 ? `$${totCost.toFixed(4)}` : (totCost > 0 ? '<$0.0001' : '$0');
+  const totalRow = `<div style="padding:7px 0;border-top:2px solid var(--vscode-input-border);font-size:11px;">`
+    + `<strong style="color:var(--vscode-foreground);">Total</strong> `
+    + `<span style="color:var(--vscode-descriptionForeground);">&#8212; ${totTokens.toLocaleString()} tokens · ${totCostStr}</span></div>`;
   return `<div style="margin-top:8px;padding:8px;background:var(--vscode-input-background);border-radius:6px;border:1px solid var(--vscode-input-border);">`
     + `<div style="font-size:10px;font-weight:700;color:var(--vscode-descriptionForeground);cursor:pointer;letter-spacing:0.3px;" onclick="var d=document.getElementById('${id}');d.style.display=d.style.display==='none'?'block':'none';">AI Used [-]</div>`
-    + `<div id="${id}" style="margin-top:4px;">${rows.join('')}</div></div>`;
+    + `<div id="${id}" style="margin-top:4px;">${rows.join('')}${totalRow}</div></div>`;
 }
 
 export function renderActionCard(command: string, label: string): string {

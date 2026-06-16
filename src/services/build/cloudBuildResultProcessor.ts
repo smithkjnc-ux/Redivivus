@@ -301,5 +301,16 @@ export async function processBuildResults(
   }
 
   const normalizedFiles = data.files.map((f: any) => ({ ...f, path: stripSlug(f.path) }));
-  return { success: true, files: normalizedFiles, narration: data.narration, model: data.model, inputTokens: data.inputTokens, outputTokens: data.outputTokens, captureCount };
+  // [FIX] Carry two-phase attribution + cost through. The MULTI-FILE path (cloudBuildMultiFile) returns
+  // this result directly, so any supervisor/worker/cost field NOT echoed here is silently dropped — that
+  // is why multi-file builds showed a solo "primary builder" with no Supervisor row and an understated
+  // total (the Opus/Sonnet planning spend vanished). The single-file path adds these after the call, so it
+  // was unaffected. Echo them when present; undefined for single-file is harmless (it overwrites after).
+  return {
+    success: true, files: normalizedFiles, narration: data.narration, model: data.model,
+    inputTokens: data.inputTokens, outputTokens: data.outputTokens, captureCount,
+    supervisorRan: data.supervisorRan, supervisorModel: data.supervisorModel,
+    supervisorProvider: data.supervisorProvider, supervisorInputTokens: data.supervisorInputTokens,
+    supervisorOutputTokens: data.supervisorOutputTokens, workerProvider: data.workerProvider,
+  };
 }

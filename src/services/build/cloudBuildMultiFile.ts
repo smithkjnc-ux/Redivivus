@@ -29,8 +29,12 @@ export async function executeMultiFileBuild(
 ): Promise<CloudBuildResult> {
   const allFiles: Array<{ path: string; content: string; isNew: boolean }> = [];
   const siblings = planFiles.map(f => ({ path: f.path, description: f.description }));
-  let totalInputTokens = supervisorInputTokens;   // count Supervisor tokens from /plan
-  let totalOutputTokens = supervisorOutputTokens;
+  // [FIX] Worker tokens ONLY — do NOT seed with the Supervisor's. result.inputTokens/outputTokens must be
+  // worker-only (matching the single-file path), with the Supervisor reported separately via the supervisor*
+  // fields. Seeding here folded Supervisor tokens into the worker row, so once the card shows a Supervisor
+  // row too, the planning spend was counted twice (once at Opus rate, once at the cheap worker rate).
+  let workerInputTokens = 0;
+  let workerOutputTokens = 0;
   let lastModel = '';
   let lastWorkerProvider = '';
   const slug = path.basename(root);
@@ -98,8 +102,8 @@ export async function executeMultiFileBuild(
       }));
       allFiles.push(...normalised);
       builtSoFar.push(...normalised.map(f => ({ path: f.path, content: f.content })));
-      totalInputTokens += data.inputTokens ?? 0;
-      totalOutputTokens += data.outputTokens ?? 0;
+      workerInputTokens += data.inputTokens ?? 0;
+      workerOutputTokens += data.outputTokens ?? 0;
       lastModel = data.model ?? lastModel;
       lastWorkerProvider = data.workerProvider ?? lastWorkerProvider;
 
@@ -117,15 +121,14 @@ export async function executeMultiFileBuild(
   }
 
   const narration = `Built ${allFiles.length} files for: ${task.slice(0, 60)}${task.length > 60 ? '...' : ''}`;
-  const totalTokens = totalInputTokens + totalOutputTokens;
 
   return processBuildResults(
     {
       files: allFiles,
       narration,
       model: lastModel,
-      inputTokens: totalInputTokens,
-      outputTokens: totalOutputTokens,
+      inputTokens: workerInputTokens,     // worker-only — Supervisor reported via supervisor* fields
+      outputTokens: workerOutputTokens,
       // Supervisor attribution — shows [S] Supervisor + [W] Worker in the result card
       supervisorRan: !!supervisorModel,
       supervisorModel: supervisorModel ?? undefined,

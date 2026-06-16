@@ -3,6 +3,21 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 16, 2026: Multi-file build card hides the Supervisor + has no total cost
+
+Surfaced by the Breakout build (7 files, Opus/Sonnet supervisor). The "AI Used" card showed a single row — "Gemini 2.5 Flash — Planned + built the code — primary builder — 47,273 tokens · $0.1453" — with NO Supervisor row and NO total, even though Opus clearly planned it (and the Claude balance dropped ~$0.08). Cost was understated (the Opus planning spend was priced at the cheap worker's rate) and mislabeled as a solo build.
+
+**Root cause — three bugs in the multi-file path** (single-file path was unaffected, which masked it):
+1. `processBuildResults` (`cloudBuildResultProcessor.ts`) returned only `{success,files,narration,model,inputTokens,outputTokens,captureCount}` — it **dropped** `supervisorRan/supervisorModel/supervisor*Tokens/workerProvider`. The single-file path adds those AFTER the call, but the multi-file path (`cloudBuildMultiFile.ts`) returns `processBuildResults` directly, so they vanished → card fell back to `role:'solo'` → "primary builder". Fixed: echo those fields in the return.
+2. `cloudBuildMultiFile.ts` seeded the worker token counters with the Supervisor's tokens (`totalInputTokens = supervisorInputTokens`). Once (1) restored the separate Supervisor row, that spend would be counted twice. Fixed: worker counters start at 0 and count workers only; Supervisor reported via the `supervisor*` fields (matches the single-file path's worker-only convention).
+3. `renderAIByline` (`chatPanelRendererCards.ts`) listed each model but never summed them — no total line ever existed. Fixed: accumulate tokens + cost across all rows and render a bold **Total** row.
+
+**Result:** multi-file builds now show `[S] Supervisor` (real model + cost) + `[W] Worker` (worker-only) + `Total`. **Risk:** low, all client-side; single-file path behavior unchanged (its `data` lacks supervisor fields, so the echoed values are undefined and its post-call assignment still wins). Compiled + deployed.
+
+**[NEXT] still open from this build:** (a) manual picker showed Worker = "Gemini Pro" but it ran "Gemini 2.5 Flash" — tier override ignoring the locked model (shown != used); (b) the generated Breakout game does not hide its HTML title-screen overlay when play starts (output-quality bug, fix-pipeline candidate).
+
+---
+
 ## Fix — Jun 16, 2026: Classifier double-encodes build intent as an "answer" (root cause of the mis-route)
 
 The deeper cause behind the "build ran as a fix" bug. Backend `/chat` (`src/app/api/v1/chat/route.ts`) parses the model's `{action,text,task}` JSON. On `JSON.parse` failure it fell back to `{ action: 'answer', text: result.text }` — dumping the raw model output (a valid build spec) as an answer. The client then saw `action:"answer"` with stringified `{"action":"build",...}` in `.text` and mis-routed it.
