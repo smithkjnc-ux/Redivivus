@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 16, 2026: New build silently routed to FIX (no blueprint) inside a projects container
+
+Surfaced testing a Breakout build. PapaJoe: "it acts like it was a fix... no project was open." The workspace root was `~/projects` (the container holding many apps), so `hasProjectOpen=true`. The build went straight to the fix pipeline with no 5-W blueprint card.
+
+**Root cause — inconsistent container guard.** `chatPanelMsgSendPostCloud.ts` has two build-inside-project reroutes. The normal one (clean `action:"build"`, ~line 61) guards with `!isProjectsContainer(effectiveRoot)` — so a build spec in `~/projects` correctly stays a build (this is why the tip-calculator/digital-clock builds showed a blueprint and auto-created sub-projects). The SECOND path (the `[BUILD-SPEC-IN-PROJECT]` rescue for a build spec embedded in answer/clarify text — the malformed double-encoded response Breakout hit) used a bare `if (hasProjectOpen)` with NO container guard, so it routed to fix even in the container.
+
+The trigger was a malformed classifier response: `action="answer"` with the build intent JSON stringified inside `.text` (`{"action":"build",...}`), which is exactly what the rescue path catches — and then mis-routed.
+
+**Fix.** Added `&& !isProjectsContainer(effectiveRoot || '')` to the rescue path's `hasProjectOpen` check (`src/core/routing/chatPanelMsgSendPostCloud.ts`). In a projects container, an embedded build spec now falls through to `action='build'` (blueprint + own sub-project) instead of fix — consistent with line 61.
+
+**Risk:** low. Only changes routing when (a) the response is an answer-wrapped build spec AND (b) the root is a projects container — previously a silent fix, now a proper build. Inside a real single project, behavior is unchanged (still routes to fix). Client compiled + deployed. [NEXT] The deeper issue — the classifier returning a build intent double-encoded as answer text — is worth fixing at the source so the rescue path fires less often.
+
+---
+
 ## Fix — Jun 16, 2026: Build card credits/bills the model that FAILED, not the failover winner
 
 Surfaced by a tip-calculator validation build. The worker `gemini-2.5-flash` hit `[GoogleGenerativeAI Error]: Failed to parse stream`, the system correctly failed over to `xai (grok-3)`, and grok-3 produced the final file — but the "AI Used" card still credited **Gemini — 7,717 tokens · $0.0011**, applying Gemini's pricing to grok-3's token spend. Violates "model shown = model used."

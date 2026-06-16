@@ -85,7 +85,11 @@ export async function routeCloudChatResult(
       // [FIX] BUILD spec inside an open project → fix, not build.
       // The backend embedded a "build" action in answer text, but we're already inside a project.
       // Route straight to fix so the Supervisor applies the change rather than launching a new build wizard.
-      if (hasProjectOpen) {
+      // [FIX] ...UNLESS the root is a projects CONTAINER (e.g. ~/projects holding many apps). A new build
+      // spec there is a brand-new app, not a modification of the container — fall through to build so it
+      // gets a blueprint + its own sub-project, matching the clean-`action:"build"` path at line 61. Without
+      // this guard, a malformed (answer-wrapped) build response silently became a fix with no blueprint.
+      if (hasProjectOpen && !isProjectsContainer(effectiveRoot || '')) {
         _dbg(`[BUILD-SPEC-IN-PROJECT] isBuildSpec + hasProject → routing to fix directly\n`);
         await handleFixRequest(chatResult.task || userText, deps, msg.imageBase64, msg.imageType);
         return;
