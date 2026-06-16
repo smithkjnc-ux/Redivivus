@@ -16,6 +16,11 @@ export function buildRoutingScript(): string {
         if(ov.supervisor){o.supervisor=ov.supervisor;} if(ov.worker){o.worker=ov.worker;} if(ov.guardian){o.guardian=ov.guardian;}
         return Object.keys(o).length ? o : undefined;
       };
+      // [FIX] Expose a simple boolean so the adaptive pill knows to show 'Manual' when any routing
+      // override is active. The pill calls this in renderPill() -- no state duplication needed.
+      window._hasRoutingOverride = function(){
+        return !!(ov.supervisor || ov.worker || ov.guardian);
+      };
 
       // Panel lives in #input-card (survives header refresh). Created once.
       var panel = document.getElementById('routing-panel');
@@ -50,7 +55,12 @@ export function buildRoutingScript(): string {
         panel.innerHTML = '<div style="opacity:.55;margin-bottom:7px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;">Who handles this request</div>'+rows+
           '<div style="opacity:.45;font-size:10px;margin:2px 0 4px;">Auto = right-sized for you. Override any role for higher-quality or cheaper results.</div>';
         var sels = panel.querySelectorAll('select');
-        for(var i=0;i<sels.length;i++){ (function(s){ s.onchange=function(){ ov[s.getAttribute('data-role')]=s.value; render(); }; })(sels[i]); }
+        for(var i=0;i<sels.length;i++){ (function(s){ s.onchange=function(){
+          ov[s.getAttribute('data-role')]=s.value;
+          render();
+          // [FIX] Sync the adaptive pill so it shows 'Manual' when any override is active.
+          if (window._renderAdaptivePill) { window._renderAdaptivePill(); }
+        }; })(sels[i]); }
       }
 
       // Toggle lives in #input-left, which is REPLACED on every header refresh -> recreate it idempotently

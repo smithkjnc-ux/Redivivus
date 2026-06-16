@@ -115,6 +115,20 @@ export function buildTierScript(): string {
         var inp = document.getElementById('message-input');
         var text = (inp && inp.value) ? inp.value : '';
 
+        // [FIX] Routing-panel overrides (Supervisor/Worker/Guardian dropdowns) also put the session
+        // into manual mode -- show the purple Manual pill so the state is always honest.
+        if (window._hasRoutingOverride && window._hasRoutingOverride()) {
+          pill.innerHTML =
+            '<span style="font-size:10px;font-weight:700;letter-spacing:0.04em;">Manual</span>' +
+            '<span style="opacity:0.45;margin:0 5px;">\u00B7</span>' +
+            'routing override';
+          pill.style.color = PURPLE;
+          pill.style.borderColor = PURPLE_DARK;
+          pill.style.background = PURPLE_DARK + '22';
+          pill.title = 'Manual: Supervisor/Worker/Guardian overridden in Routing panel. Click Adaptive pill to reset, or open Routing to adjust.';
+          return;
+        }
+
         if (_manualProvider) {
           // MANUAL MODE — purple. Format: "Manual · [AI Name]"
           var lockedTier = currentTier() || 'pro';
