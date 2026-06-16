@@ -7,11 +7,11 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-14 — Build Contract enforcement (PRIORITY) underway: build worker now gets the full rulebook, quality gate rejects flat-fillRect/silent/no-gradient games (`[QualityGate]` logs), blueprint distillation logged+retried (was silently leaving hollow blueprints), worker can see mechanics. Killed the "single HTML preferred" rule + init's empty src/tests/docs folders -> builds now decompose into real multi-file (file://-safe, PWA-compatible). Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md. Pending Fly + client deploy, then test-build a game.
+*Last updated:* 2026-06-16 — Build-contract VALIDATED via test builds (tip calc = single-file; Breakout = 7-file multi-file). CONFIRMED working: region markers, decomposition, docs, distillation, cost accuracy, failover. FIXED this session: new-build-routed-to-fix inside a projects container (+ classifier double-encoding root cause), failover billing the failed model, multi-file card hiding the Supervisor + no Total, installer existing-VSCodium path, rigops logcat crash. **OPEN WORK + handoff -> `docs/REDIVIVUS_HANDOFF.md`.** ACTION NEEDED: deploy backend to Fly (classifier-recovery + failover-attribution un-deployed past v162).
 
-*Prior:* 2026-06-07 — failure message now shows prescription + green "Try this fix" button with specific suggested prompt
+*Prior:* 2026-06-14 — Build Contract enforcement (PRIORITY): worker gets full rulebook, quality gate rejects flat games, distillation logged+retried, multi-file decomposition. Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md.
 
-*Prior:* Jun 06, 2026 — FIXED: Agent Authentication Error (JSON.stringify dropping function-based API keys during payload construction) in agentService.ts and agentSupervisor.ts by using collectKeys().
+*Prior:* 2026-06-07 — failure message shows prescription + green "Try this fix" button with suggested prompt
 
 ---
 
@@ -20,6 +20,7 @@
 | File | What goes here | What does NOT go here |
 |---|---|---|
 | **`REDIVIVUS_ROADMAP.md`** | YOU ARE HERE — index, last 3 sessions summary, doc pointers | Session fix tables, backlog items, design rules |
+| **`docs/REDIVIVUS_HANDOFF.md`** | OPEN WORK — prioritized to-do with file pointers for continuing the work | Long fix history (lives in FIXES) |
 | **`docs/REDIVIVUS_FIXES.md`** | Every session entry — what changed, why, risk | Planned features, architecture specs |
 | **`docs/REDIVIVUS_FEATURES.md`** | Backlog, planned work, What's Working, Competitive Gap | Fix history, architecture details |
 | **`docs/REDIVIVUS_ARCHITECTURE.md`** | Design rules, project info, deployment steps, source file map | Fix history, planned features |
