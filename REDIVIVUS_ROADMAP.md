@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-16 — Build-contract VALIDATED via test builds (tip calc = single-file; Breakout = 7-file multi-file). CONFIRMED working: region markers, decomposition, docs, distillation, cost accuracy, failover. FIXED this session: new-build-routed-to-fix inside a projects container (+ classifier double-encoding root cause), failover billing the failed model, multi-file card hiding the Supervisor + no Total, installer existing-VSCodium path, rigops logcat crash. **OPEN WORK + handoff -> `docs/REDIVIVUS_HANDOFF.md`.** ACTION NEEDED: deploy backend to Fly (classifier-recovery + failover-attribution un-deployed past v162).
+*Last updated:* 2026-06-16 (evening) — **Backend deployed to Fly v164** (was v162): classifier JSON-recovery + failover attribution now live. OPEN WORK -> `docs/REDIVIVUS_HANDOFF.md` (manual picker "shown≠used" at build/route.ts:261-263 is next priority).
 
 *Prior:* 2026-06-14 — Build Contract enforcement (PRIORITY): worker gets full rulebook, quality gate rejects flat games, distillation logged+retried, multi-file decomposition. Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md.
 

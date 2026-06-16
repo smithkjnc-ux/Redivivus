@@ -6,13 +6,13 @@
 
 ---
 
-## 0. DO THIS FIRST — deploy the backend to Fly
+## 0. ✅ DONE — backend deployed to Fly v164 (2026-06-16 evening)
 
-The backend is COMMITTED (`redivivus-backend` @ `01351d3`+) but **NOT deployed**. Last live Fly version was **v162**; two fixes are sitting un-deployed:
-- **Classifier JSON recovery** — `src/app/api/v1/chat/route.ts` (recovers `action` from malformed/truncated model JSON instead of mislabeling a build as an "answer").
-- **Failover attribution on the `done` frame** — `src/app/api/v1/build/route.ts` (credits the model that actually finished after a failover, not the one that failed).
+Deployed commit `01351d3` → Fly release **v164** (was v162). Both fixes are now live:
+- ✅ **Classifier JSON recovery** — `src/app/api/v1/chat/route.ts`
+- ✅ **Failover attribution** — `src/app/api/v1/build/route.ts`
 
-**Action:** from `redivivus-backend/`, run the Fly deploy (`fly deploy`). **Verify:** rigops SysOp → Sync shows Fly version **> v162**.
+**Verify in IDE:** rigops SysOp → Sync → confirm version = 164. Then `Developer: Restart Extension Host`.
 
 The **client** is deployed locally (auto) and committed (`redivivus` @ `970f365`). To test, in the IDE: `Developer: Restart Extension Host`.
 
