@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 16, 2026: Build card credits/bills the model that FAILED, not the failover winner
+
+Surfaced by a tip-calculator validation build. The worker `gemini-2.5-flash` hit `[GoogleGenerativeAI Error]: Failed to parse stream`, the system correctly failed over to `xai (grok-3)`, and grok-3 produced the final file — but the "AI Used" card still credited **Gemini — 7,717 tokens · $0.0011**, applying Gemini's pricing to grok-3's token spend. Violates "model shown = model used."
+
+**Root cause — frozen header.** The client reads the worker model from the `X-Worker-Provider` response header (`cloudBuildClient.ts`). On the backend (`build/route.ts`), the worker generation + cascading-failover loop runs inside an async IIFE that is **fired but not awaited**; the `Response`/headers are constructed immediately afterward, capturing `instructions.workerInstructions.selectedProvider` while it is *still the originally-selected provider*. The failover loop reassigns `selectedProvider`/`model` to the winner (line 716), but the header was already sent. So `X-Worker-Provider` can never reflect a failover.
+
+**Fix.** Emit the true winner on the `done` frame, which fires *after* failover settles:
+- **Backend** (`src/app/api/v1/build/route.ts`): the final `emitStep({ phase:'done', ... })` now also sends `provider`/`model` = `instructions.workerInstructions.selectedProvider`/`.model` (the reassigned winner).
+- **Client** (`src/services/build/cloudBuildClient.ts`): `handleStep` captures `step.provider` from the done frame into `workerProviderFinal`; `workerProvider` now prefers it over the stale header. Since `result.model` drives BOTH the card label and `calcCost(...)`, this corrects the displayed model AND the cost attribution in one shot.
+
+**Risk:** low. Pure attribution/metadata; no change to which model runs or what code ships. If a build exhausts all providers, the done frame reports the last-tried provider (acceptable). Client compiled + deployed; backend typecheck passes (0 errors) — **needs Fly deploy to take effect** (header path still active until then).
+
+---
+
 ## Feature + Fixes — Jun 14, 2026: API key validation ("Test All Keys") + provider integration bugs
 
 Beta provider-validation pass. PapaJoe was installing every provider to confirm each works with Redivivus; the process surfaced several real integration bugs that would have hit beta users.

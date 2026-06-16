@@ -218,10 +218,15 @@ export async function callCloudBuild(
     // failover + retry). Capture it here so we report actual usage/cost instead of inputTokens:0.
     let workerInTok: number | undefined;
     let workerOutTok: number | undefined;
+    // [FIX] The done frame carries the ACTUAL winning worker provider/model (after any failover). The
+    // X-Worker-Provider header is frozen to the originally-selected provider, so on a failover it credits
+    // and bills the model that FAILED. Prefer this done-frame value for the card label + cost. (Jun 16, 2026.)
+    let workerProviderFinal: string | undefined;
     const handleStep = (step: any) => {
       if (step && step.phase === 'done') {
         if (typeof step.inputTokens === 'number') workerInTok = step.inputTokens;
         if (typeof step.outputTokens === 'number') workerOutTok = step.outputTokens;
+        if (typeof step.provider === 'string' && step.provider) workerProviderFinal = step.provider;
       }
       opts.onStep?.(step);
     };
@@ -256,7 +261,9 @@ export async function callCloudBuild(
     drain('', true);
 
     const supervisorMetaRaw = instructionRes.headers.get('X-Supervisor-Meta');
-    const workerProvider = instructionRes.headers.get('X-Worker-Provider') || preferred || 'claude';
+    // [FIX] Prefer the done-frame provider (the real failover winner) over the X-Worker-Provider header,
+    // which is frozen to the originally-selected provider before the worker body runs.
+    const workerProvider = workerProviderFinal || instructionRes.headers.get('X-Worker-Provider') || preferred || 'claude';
     const skeletonMetaRaw = instructionRes.headers.get('X-Skeleton-Meta');
     const modelDecisionRaw = instructionRes.headers.get('X-Model-Decision');
 
