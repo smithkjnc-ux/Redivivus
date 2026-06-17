@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* 2026-06-16 (evening) — **v166**: manual picker "shown≠used" fixed. Also: routing-panel overrides now show purple "Manual" pill (was stuck on "Adaptive"). OPEN WORK -> `docs/REDIVIVUS_HANDOFF.md`.
+*Last updated:* 2026-06-17 — **v167**: guardian cross-file contract checks (IMPORT_MISMATCH + ELEMENT_ID_MISMATCH + FILE_TOO_LARGE → retry). CSS split rule in Supervisor prompt. OPEN WORK → `docs/REDIVIVUS_HANDOFF.md`.
 
 *Prior:* 2026-06-14 — Build Contract enforcement (PRIORITY): worker gets full rulebook, quality gate rejects flat games, distillation logged+retried, multi-file decomposition. Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md.
 
