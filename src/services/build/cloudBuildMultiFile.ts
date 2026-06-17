@@ -119,12 +119,17 @@ export async function executeMultiFileBuild(
       lastWorkerProvider = data.workerProvider ?? lastWorkerProvider;
       // Mark this file done in the Build Activity panel with the ACTUAL model returned by the backend,
       // not the preference hint. This shows gemini-2.5-flash or whatever the backend actually used.
-      onStep?.({ label: `Worker: wrote ${file.path}`, model: lastModel, status: 'success', index: i, total: planFiles.length });
+      // If the Guardian split the file, normalised has 2+ entries — show a split step instead.
+      if ((data as any).guardianSplit && normalised.length >= 2) {
+        onStep?.({ label: `Guardian: split → ${normalised.map(f => f.path.split('/').pop()).join(', ')}`, model: lastModel, status: 'success', index: i, total: planFiles.length });
+      } else {
+        onStep?.({ label: `Worker: wrote ${file.path}`, model: lastModel, status: 'success', index: i, total: planFiles.length });
+      }
       // [FIX] Emit completed file content so the chat bubble can show it for review.
       // Multi-file builds use non-streaming JSON per file, so onChunk never fires — this is the hook
       // that lets the user see the code that was written without waiting for the full build to finish.
-      if (normalised.length > 0) {
-        onFileComplete?.(normalised[0].path, normalised[0].content);
+      for (const nf of normalised) {
+        onFileComplete?.(nf.path, nf.content);
       }
 
     } catch (e: any) {
