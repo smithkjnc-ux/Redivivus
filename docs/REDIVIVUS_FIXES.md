@@ -9693,3 +9693,7 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 - Raised the multi-file build timeout from 240 seconds to 600 seconds and added proper timeout clearing to prevent unhandled promise rejections. This fixes the issue where large multi-file projects (like typing-speed-test) would time out on the frontend while the backend Guardian was still processing oversized files through retries and split steps.
 
 - Combined the Supervisor planning step and Worker code output into a single step bubble in the Build Activity panel to reduce clutter. A 'Building...' bubble now dynamically updates to 'Built...' and displays the Worker's code payload when finished.
+
+- Updated the Build Activity panel's visual state management: successfully built files now display the green [OK] badge instead of a white asterisk. Implemented an auto-collapse (accordion) behavior that collapses the previous file's expanded code view as soon as the next file begins building, keeping the panel focused solely on the active task.
+
+- Fixed token and dollar cost aggregation for multi-file builds: Guardian escalation tokens are now correctly aggregated into the Supervisor's token pool, and the total dollar cost is calculated on the frontend using both the Worker and Supervisor token counts so the dashboard and build card accurately reflect real-world billing.

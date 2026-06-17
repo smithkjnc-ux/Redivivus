@@ -66,11 +66,11 @@ export function buildActivityHtml(task: string, expandByDefault = true): string 
       if (status === 'continue') return '[++]';
       if (status === 'failover') return '[>>]';
       if (status === 'fix') return '[!]';
-      if (status === 'pass' || status === 'done') return '[OK]';
+      if (status === 'pass' || status === 'done' || status === 'success') return '[OK]';
       return '[*]';
     }
     function cls(status) {
-      if (status === 'pass' || status === 'done') return 'done';
+      if (status === 'pass' || status === 'done' || status === 'success') return 'done';
       return status || 'running';
     }
     function esc(s) {
@@ -92,12 +92,19 @@ export function buildActivityHtml(task: string, expandByDefault = true): string 
     // the moment a later step arrives. Flip those lingering rows to done so nothing stays "running"
     // after the build completes.
     function settlePrior() {
+      // First flip any running markers to done
       var live = timeline.querySelectorAll('.row.running, .row.continue');
       for (var i = 0; i < live.length; i++) {
-        var wasOpen = live[i].classList.contains('open');
-        live[i].className = 'row done' + (wasOpen ? ' open' : '');  // keep an expanded detail expanded
+        live[i].className = 'row done';
         var mk = live[i].querySelector('.mark');
         if (mk) { mk.className = 'mark done'; mk.innerHTML = '[OK]'; }
+      }
+      // Then collapse all previously opened rows to act as an accordion
+      var allOpen = timeline.querySelectorAll('.row.open');
+      for (var j = 0; j < allOpen.length; j++) {
+        allOpen[j].classList.remove('open');
+        var hint = allOpen[j].querySelector('.hint');
+        if (hint) hint.textContent = '[+] view';
       }
     }
 

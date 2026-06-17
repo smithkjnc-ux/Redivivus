@@ -7,6 +7,7 @@
 import * as path from 'path';
 import { getApiBase } from '../api/apiClient.js';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
+import { calcCost } from '../../services/usageTracker.js';
 import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { CloudBuildResult } from './cloudBuildClient.js';
 
@@ -90,7 +91,7 @@ export async function executeMultiFileBuild(
           const err = await res.json().catch(() => ({ error: res.statusText })) as any;
           throw Object.assign(new Error(`Failed on ${file.path}: ${err.error || res.statusText}`), { _failureSource: 'cloud' });
         }
-        return res.json() as Promise<{ files: typeof allFiles; model: string; workerProvider?: string; supervisorProvider?: string; inputTokens: number; outputTokens: number; requiresClientExecution?: boolean }>;
+        return res.json() as Promise<{ files: typeof allFiles; model: string; workerProvider?: string; supervisorProvider?: string; inputTokens: number; outputTokens: number; requiresClientExecution?: boolean; guardianEscInputTokens?: number; guardianEscOutputTokens?: number }>;
       };
 
       // [FIX] Raised from 240s → 600s. Guardian retries and Supervisor splits on oversized files (like index.html
@@ -120,6 +121,8 @@ export async function executeMultiFileBuild(
       builtSoFar.push(...normalised.map(f => ({ path: f.path, content: f.content })));
       workerInputTokens += data.inputTokens ?? 0;
       workerOutputTokens += data.outputTokens ?? 0;
+      supervisorInputTokens += data.guardianEscInputTokens ?? 0;
+      supervisorOutputTokens += data.guardianEscOutputTokens ?? 0;
       lastModel = data.model ?? lastModel;
       lastWorkerProvider = data.workerProvider ?? lastWorkerProvider;
       // Mark this file done in the Build Activity panel with the ACTUAL model returned by the backend,
@@ -196,6 +199,10 @@ export async function executeMultiFileBuild(
 
   const narration = `Built ${allFiles.length} files for: ${task.slice(0, 60)}${task.length > 60 ? '...' : ''}`;
 
+  const wCost = calcCost(lastWorkerProvider || lastModel, workerInputTokens, workerOutputTokens);
+  const sCost = supervisorModel ? calcCost(supervisorModel, supervisorInputTokens, supervisorOutputTokens) : 0;
+  const totalCostUSD = wCost + sCost;
+
   return processBuildResults(
     {
       files: allFiles,
@@ -203,6 +210,7 @@ export async function executeMultiFileBuild(
       model: lastModel,
       inputTokens: workerInputTokens,     // worker-only — Supervisor reported via supervisor* fields
       outputTokens: workerOutputTokens,
+      costUSD: totalCostUSD,
       // Supervisor attribution — shows [S] Supervisor + [W] Worker in the result card
       supervisorRan: !!supervisorModel,
       supervisorModel: supervisorModel ?? undefined,
