@@ -586,7 +586,7 @@
         },
         "redivivus.pwaHostUrl": {
           "type": "string",
-          "default": "https://redivivus-pwa-host.smithkjnc.workers.dev",
+          "default": "https://redivivus-pwa-router-1017737301468.us-east4.run.app",
           "description": "Ephemeral host for the 'Add to Phone' feature \u2014 where installable PWAs are published (Cloudflare Worker)."
         },
         "redivivus.pwaInstallWindowMinutes": {

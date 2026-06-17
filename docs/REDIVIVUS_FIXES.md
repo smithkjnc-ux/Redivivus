@@ -3,6 +3,19 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 17, 2026: Migrate PWA Host from Cloudflare to Google Cloud Run / GCS
+
+**Symptom:** To consolidate infrastructure, the ephemeral "Add to Phone" PWA host needed to move from Cloudflare Workers to GCP.
+**Fix:**
+- Created GCS bucket `redivivus-pwa-host` with a 1-day hard-delete lifecycle rule.
+- Refactored `pwa-host` to replace Cloudflare dependencies with Node.js, Express, and `@google-cloud/storage`.
+- Rewrote routing logic into an Express app with `POST /publish` handling base64 bundle decoding and GCS uploads, and `GET /p/:token/*` handling 60-minute soft deletes and direct GCS readable streams.
+- Generated a multistage `Dockerfile` and deployed the router to Cloud Run (`redivivus-pwa-router-1017737301468.us-east4.run.app`).
+- Updated `redivivus.pwaHostUrl` setting default in `package.json` to point to the new Cloud Run URL.
+**Risk:** Medium. Re-architects the PWA sharing backend, though the interface to the extension remains identical. Soft-delete and streaming logic was carefully ported to preserve functionality.
+
+---
+
 ## Fix — Jun 17, 2026: Migrate backend from Fly.io to Google Cloud Run
 
 **Symptom:** The Fly.io edge proxy has a strict 60-second timeout that is killing long-running AI multi-file build processes (which take 2-3 minutes).
