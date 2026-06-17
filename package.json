@@ -94,6 +94,10 @@
         "title": "Redivivus: Show Build Record"
       },
       {
+        "command": "redivivus.showBuildActivity",
+        "title": "Redivivus: Show Build Activity"
+      },
+      {
         "command": "redivivus.openBlueprint",
         "title": "Redivivus: Open Blueprint"
       },

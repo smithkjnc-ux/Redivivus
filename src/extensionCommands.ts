@@ -181,6 +181,13 @@ export function registerAllCommands(
   try { registerCheckForUpdatesCommand(context); } catch (e) { console.error('Failed to register checkForUpdates command', e); }
   context.subscriptions.push(vscode.languages.registerCodeLensProvider({ scheme: 'file' }, new DelegationCodeLensProvider()));
 
+  // Build Activity panel — reopen on demand (Command Palette / button). Reveals a running build's panel,
+  // or replays the LAST build's timeline if the tab was closed. Lets the user review the pipeline anytime.
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.showBuildActivity', async () => {
+    const { BuildActivityPanel } = await import('./ui/panels/buildActivity/buildActivityPanel.js');
+    BuildActivityPanel.reveal();
+  }));
+
   // Blueprint Interview
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.blueprintInterview', () => {
     openBlueprintPanel(context, redivivusService, routingService);
