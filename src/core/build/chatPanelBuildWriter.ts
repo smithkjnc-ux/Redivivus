@@ -75,10 +75,10 @@ export function writeBuiltFile(absPath: string, code: string, options?: WriteOpt
   }
 }
 
-export function createSnapshot(root: string, task: string, relPath: string): string | undefined {
+export function createSnapshot(root: string, task: string, relPaths: string | string[]): string | undefined {
   try {
     const snap = new SnapshotService(root);
-    return snap.prepare(task, [relPath]);
+    return snap.prepare(task, Array.isArray(relPaths) ? relPaths : [relPaths]);
   } catch { return undefined; }
 }
 

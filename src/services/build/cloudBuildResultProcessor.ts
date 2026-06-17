@@ -111,6 +111,7 @@ export async function processBuildResults(
   }
 
   const writtenPaths: string[] = [];
+  const relPaths: string[] = [];
   // Track the "best" file to open: prefer .html, then .ts/.js, then first file.
   let primaryPath: string | undefined;
 
@@ -118,10 +119,18 @@ export async function processBuildResults(
   // Shared helper so write, history, log, and the returned paths all agree on the on-disk path.
   const slug = path.basename(root);
   const stripSlug = (p: string): string => p.startsWith(slug + '/') ? p.slice(slug.length + 1) : p;
+
+  // Gather all paths first to create a single unified snapshot for the entire build
+  for (const file of data.files) {
+    relPaths.push(stripSlug(file.path));
+  }
+
+  // Create a single snapshot for all files in this build BEFORE writing any new content
+  const snapshotId = relPaths.length > 0 ? createSnapshot(root, task, relPaths as any) : undefined;
+
   for (const file of data.files) {
     const relPath = stripSlug(file.path);
     const absPath = path.join(root, relPath);
-    const snapshotId = createSnapshot(root, task, relPath);
     // [FIX] Run static validator before writing — catches AI-generated runtime bugs (const reassignment, bad transform reset, etc.)
     let content = file.content;
     try {
@@ -136,27 +145,25 @@ export async function processBuildResults(
     const ext = path.extname(relPath).toLowerCase();
     const isDoc = ['.md', '.json', '.yaml', '.yml', '.toml', '.txt'].includes(ext);
     if (!isDoc && (!primaryPath || ext === '.html')) { primaryPath = absPath; }
-    if (snapshotId) {
-      try {
-        const { BuildHistoryService } = await import('../build/buildHistoryService.js');
-        new BuildHistoryService(root).record({
-          id: snapshotId,
-          timestamp: new Date().toISOString(),
-          task,
-          files: [relPath],
-          tokensUsed: (data.inputTokens ?? 0) + (data.outputTokens ?? 0),
-          costUSD: data.costUSD ?? 0,
-          source: 'ai',
-          // [FIX] These were inverted for two-phase builds — the worker's model was stored in the
-          // supervisor field and worker was always null. Now: two-phase -> supervisor = prescriber
-          // (e.g. Claude), worker = the model that wrote the code; solo -> single model in supervisor,
-          // worker null (matches how the history panel renders a single-AI build).
-          supervisor: meta.supervisor?.ran ? (meta.supervisor.model ?? meta.supervisor.provider ?? 'supervisor') : (data.model ?? 'unknown'),
-          worker: meta.supervisor?.ran ? (data.model ?? null) : null,
-          resultCardToken: '',  // [NEXT] resultCardToken is built in chatPanelBuildRunner after this returns — needs 2-phase record
-        });
-      } catch {}
-    }
+  }
+
+  // Record a single history entry containing all files for this build
+  if (snapshotId && relPaths.length > 0) {
+    try {
+      const { BuildHistoryService } = await import('../build/buildHistoryService.js');
+      new BuildHistoryService(root).record({
+        id: snapshotId,
+        timestamp: new Date().toISOString(),
+        task,
+        files: relPaths,
+        tokensUsed: (data.inputTokens ?? 0) + (data.outputTokens ?? 0),
+        costUSD: data.costUSD ?? 0,
+        source: 'ai',
+        supervisor: meta.supervisor?.ran ? (meta.supervisor.model ?? meta.supervisor.provider ?? 'supervisor') : (data.model ?? 'unknown'),
+        worker: meta.supervisor?.ran ? (data.model ?? null) : null,
+        resultCardToken: '',  // [NEXT] resultCardToken is built in chatPanelBuildRunner after this returns — needs 2-phase record
+      });
+    } catch {}
   }
 
   appendBuildLog(root, {
