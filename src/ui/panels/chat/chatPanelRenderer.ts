@@ -197,12 +197,12 @@ export function renderMessages(conversation: ChatMessage[]): string {
     const { stripRawTokens } = require('./chatPanelTokens');
     html = stripRawTokens(html);
 
-    const meta = isUser ? '' : `<div class="message-meta">${tokensStr ? tokensStr + ' &middot; ' : ''}${timeStr}</div>`;
     const fwdBar = isUser ? '' : (() => {
       const plain = msg.content.replace(/__\w+__[\s\S]*?__END_\w+__/g,'').replace(/__\w+__[^\n]*/g,'').trim();
       const b64 = encodeBase64(plain);
-      return `<div class="msg-fwd-bar"><button class="msg-fwd-btn" data-fwd="${b64}" title="Forward to input">↩</button><button class="msg-fwd-btn msg-copy-btn" data-copy="${b64}" title="Copy">📋</button></div>`;
+      return `<div style="display:flex;gap:4px;"><button class="msg-fwd-btn" data-fwd="${b64}" title="Forward to input">↩</button><button class="msg-fwd-btn msg-copy-btn" data-copy="${b64}" title="Copy">📋</button></div>`;
     })();
-    return `<div class="${bubbleClass}"><div class="message-content">${html}</div>${fwdBar}${meta}</div>`;
+    const meta = isUser ? '' : `<div class="message-meta" style="display:flex;justify-content:space-between;align-items:center;"><span>${tokensStr ? tokensStr + ' &middot; ' : ''}${timeStr}</span>${fwdBar}</div>`;
+    return `<div class="${bubbleClass}"><div class="message-content">${html}</div>${meta}</div>`;
   }).join('');
 }

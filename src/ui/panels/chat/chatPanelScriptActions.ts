@@ -12,7 +12,7 @@ export function buildActionsScript(): string {
         var suggestedName = target.getAttribute('data-suggested') || ('file.' + ext);
         // Fallback: if no data-suggested, try first-line comment detection in browser
         if (!target.getAttribute('data-suggested')) {
-          var rawCode = ''; try { rawCode = atob(c64); } catch(err){}
+          var rawCode = ''; try { rawCode = decodeURIComponent(escape(atob(c64))); } catch(err){}
           var lines = rawCode.split('\\n');
           if (lines.length > 0) {
             var firstLine = lines[0].trim();
@@ -41,7 +41,7 @@ export function buildActionsScript(): string {
         var siid=cfSave.getAttribute('data-cf-save'),sc64=cfSave.getAttribute('data-cf-code');
         var sinp=document.getElementById(siid); var sfname=sinp?sinp.value.trim():'';
         if(sfname&&sc64){
-          var rawCode = atob(sc64);
+          var rawCode = decodeURIComponent(escape(atob(sc64)));
           if (sfname.toLowerCase().endsWith('.json')) {
             rawCode = rawCode.split('\\n')
               .filter(line => !line.trim().startsWith('//'))
@@ -141,7 +141,7 @@ export function buildActionsScript(): string {
       const fixErrBtn = target.closest ? target.closest('.fix-terminal-error-btn') : (target.classList&&target.classList.contains('fix-terminal-error-btn')?target:null);
       if (fixErrBtn) {
         var b64ctx = fixErrBtn.getAttribute('data-ctx') || '';
-        var errorContext = ''; try { errorContext = atob(b64ctx); } catch(e){}
+        var errorContext = ''; try { errorContext = decodeURIComponent(escape(atob(b64ctx))); } catch(e){}
         if (errorContext) {
           fixErrBtn.textContent = 'Sending to Redivivus...';
           fixErrBtn.setAttribute('disabled','true');
@@ -214,12 +214,12 @@ export function buildActionsScript(): string {
       // [FIX] Forward / Copy message buttons on assistant bubbles
       const fwdBtn = target.closest ? target.closest('.msg-fwd-btn') : null;
       if (fwdBtn) {
-        var raw=''; try{raw=atob(fwdBtn.getAttribute('data-fwd')||fwdBtn.getAttribute('data-copy')||'');}catch(e){}
+        var raw=''; try{raw=decodeURIComponent(escape(atob(fwdBtn.getAttribute('data-fwd')||fwdBtn.getAttribute('data-copy')||'')));}catch(e){}
         if (fwdBtn.hasAttribute('data-copy')) {
           try{navigator.clipboard.writeText(raw);}catch(e){var t=document.createElement('textarea');t.value=raw;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);}
           var orig=fwdBtn.textContent; fwdBtn.textContent='✓'; setTimeout(function(){fwdBtn.textContent=orig;},1200);
         } else {
-          var inp=document.getElementById('user-input'); if(inp){inp.value=raw;inp.focus();inp.style.height='auto';inp.style.height=inp.scrollHeight+'px';}
+          var inp=document.getElementById('message-input'); if(inp){inp.value=raw;inp.focus();inp.style.height='auto';inp.style.height=inp.scrollHeight+'px';}
         }
         return;
       }

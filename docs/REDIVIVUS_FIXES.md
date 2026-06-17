@@ -9697,3 +9697,9 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 - Updated the Build Activity panel's visual state management: successfully built files now display the green [OK] badge instead of a white asterisk. Implemented an auto-collapse (accordion) behavior that collapses the previous file's expanded code view as soon as the next file begins building, keeping the panel focused solely on the active task.
 
 - Fixed token and dollar cost aggregation for multi-file builds: Guardian escalation tokens are now correctly aggregated into the Supervisor's token pool, and the total dollar cost is calculated on the frontend using both the Worker and Supervisor token counts so the dashboard and build card accurately reflect real-world billing.
+
+- Fixed AI non-determinism and code hallucination bugs in redivivus-backend: Restored Claude `temperature` support in `executor.ts` so the Supervisor is strictly deterministic at 0.0, and hardcoded the Worker's `selectTemperature` to 0.1 so it rigidly conforms to the API contracts (fixing the `getRandomPassage()` destructing bug).
+
+- Fixed 'forward to input' button by correcting the target textarea ID from 'user-input' to 'message-input', and moved it and the 'copy' button into the inline `.message-meta` row so they are always visible without hover.
+
+- Fixed chat panel 'Copy' and 'Forward to input' buttons silently failing when responses contained UTF-8 characters (like emojis or smart quotes). Replaced buggy `atob()` decoding with `decodeURIComponent(escape(atob()))`.
