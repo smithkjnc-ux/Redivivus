@@ -32,7 +32,6 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
       timestamp: Date.now(),
     });
     refresh();
-    vscode.commands.executeCommand('redivivus.signIn');
     return;
   }
 

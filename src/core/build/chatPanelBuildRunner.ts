@@ -191,7 +191,6 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
           timestamp: Date.now(),
         });
         deps.refresh();
-        vscode.commands.executeCommand('redivivus.signIn');
         return;
       }
       appendBuildLog(root, {

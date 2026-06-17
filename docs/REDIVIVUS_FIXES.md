@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 17, 2026: Fix Chat Spinner Freezing on Auth Expiry
+
+**Symptom:** When a build failed due to an expired session, the chat UI "send" button spinner would spin indefinitely, preventing the user from interacting further without a full refresh.
+**Fix:** The `setInputBusy(true)` function in `chatPanelScript.ts` was overwriting the send button's cached `dataset.icon` with the SVG spinner if it was called sequentially without first being toggled off. Fixed by wrapping the dataset assignment in a check to ensure `sendBtn` is not already disabled.
+
+---
+
+## Fix — Jun 17, 2026: Prevent Automatic Browser Popup on Auth Expiry
+
+**Symptom:** During a build, if the session expired, the system would print "Session expired — please sign in again" but immediately run `vscode.commands.executeCommand('redivivus.signIn')`. This forced VS Code to show a modal dialog asking for permission to open an external website (`https://redivivus.dev/auth/ide`), completely interrupting the user's flow and leaving the build panel stuck in a "Routing..." state.
+**Fix:** Removed the automatic `vscode.commands.executeCommand('redivivus.signIn')` call from unauthenticated error paths in `chatPanelBuildRunner.ts`, `chatPanelMsgSendConfirmedBuild.ts`, `chatPanelIntent.ts`, and `chatPanelMsgSendMessage.ts`. The extension will now gracefully display the sign-in prompt in the chat bubble and wait for the user to trigger the command manually from the palette or UI.
+
+---
+
 ## Fix — Jun 17, 2026: Migrate PWA Host from Cloudflare to Google Cloud Run / GCS
 
 **Symptom:** To consolidate infrastructure, the ephemeral "Add to Phone" PWA host needed to move from Cloudflare Workers to GCP.

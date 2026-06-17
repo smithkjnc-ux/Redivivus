@@ -33,7 +33,7 @@ export function buildChatScript(): string {
     function setInputBusy(busy) {
       if (busy) {
         input.disabled = true; input.style.opacity = '0.5';
-        if (sendBtn) { sendBtn.disabled = true; sendBtn.style.opacity = '1'; sendBtn.style.cursor = 'wait'; sendBtn.dataset.icon = sendBtn.innerHTML; sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="animation: redivivus-spin 0.8s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>'; }
+        if (sendBtn && !sendBtn.disabled) { sendBtn.disabled = true; sendBtn.style.opacity = '1'; sendBtn.style.cursor = 'wait'; sendBtn.dataset.icon = sendBtn.innerHTML; sendBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="animation: redivivus-spin 0.8s linear infinite;"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>'; }
       } else {
         input.disabled = false; input.style.opacity = '1'; input.focus();
         if (sendBtn) { sendBtn.disabled = false; sendBtn.style.opacity = '1'; sendBtn.style.cursor = 'pointer'; sendBtn.innerHTML = sendBtn.dataset.icon || '&#9654;'; }

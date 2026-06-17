@@ -20,7 +20,7 @@ export async function runConfirmedLocalBuild(
   const token = await getAccountToken();
   if (!token) {
     conversation.push({ role: 'assistant', content: '🔒 **Sign in to use Redivivus**\n\nRun **Redivivus: Sign In** from the command palette.', timestamp: Date.now() });
-    refresh(); vscode.commands.executeCommand('redivivus.signIn'); return;
+    refresh(); return;
   }
 
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });

@@ -69,7 +69,6 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
       timestamp: Date.now(),
     });
     deps.refresh();
-    vscode.commands.executeCommand('redivivus.signIn');
     return;
   }
 
