@@ -84,6 +84,14 @@ Return ONLY the classification string, nothing else.`;
     // default to multi-file app on failure
   }
 
+  // [FIX] Honor an explicit single-file request — otherwise the classifier may label a "typing test"
+  // as multi-file (planning css/js modules) while the Worker, seeing "single self-contained" in the
+  // task text, inlines everything into index.html. That left orphaned css/js files nothing links to.
+  // When the user explicitly asks for one self-contained HTML file, force single-file so plan + build agree.
+  if (/\b(single[\s-]?file|self[\s-]?contained|one\s+(?:single\s+)?html\s+file|single\s+html\s+(?:page|file))\b/i.test(task)) {
+    projectType = 'single-file tool';
+  }
+
   // [FIX] Inject workspace files & vault context into planner so supervisor knows what exists
   const wsCtx = await getWorkspaceContextService().getContext();
   const wsBlock = wsCtx?.files?.length ? `EXISTING WORKSPACE FILES:\n${wsCtx.files.map(f => `- ${f.relativePath}`).join('\n')}\n` : '';
@@ -131,7 +139,14 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
     const _s = raw.indexOf('['); if (_s !== -1) { let _d = 0; for (let _i = _s; _i < raw.length; _i++) { if (raw[_i]==='[') {_d++;} else if (raw[_i]===']' && --_d===0) { raw = raw.slice(_s, _i+1); break; } } }
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed) || parsed.length === 0) { throw new Error('AI returned empty plan'); }
-    filePlan = parsed.map((e: any) => ({ filename: e.filename || e.file || 'src/output.py', purpose: e.purpose || '' }));
+    // [FIX] Sanitize filenames — AIs sometimes embed list ordinals ("4. ") or markdown backticks
+    // inside the JSON value (e.g. "4. `index.html`"), which then become literal filenames on disk.
+    // Strip leading ordinals, backticks, and surrounding quotes before using the path.
+    const cleanFilename = (s: string) => (s || '')
+      .replace(/^\s*\d+[.)]\s*/, '')   // leading "4. " / "4) "
+      .replace(/[`'"]/g, '')            // stray markdown backticks / quotes
+      .trim();
+    filePlan = parsed.map((e: any) => ({ filename: cleanFilename(e.filename || e.file) || 'src/output.py', purpose: e.purpose || '' }));
     tracer.done(_planSid, 'success', Date.now() - _planT0, `${filePlan.length} files planned`, Math.ceil(planPrompt.length / 4), planTokens);
   } catch (err) {
     _stopTicker();
