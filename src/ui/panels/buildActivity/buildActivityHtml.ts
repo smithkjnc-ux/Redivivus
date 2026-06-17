@@ -106,15 +106,24 @@ export function buildActivityHtml(task: string, expandByDefault = true): string 
     function addRow(step) {
       var empty = document.getElementById('empty');
       if (empty) empty.remove();
-      settlePrior();
+      var isUpdate = step.updateLatest && timeline.lastElementChild;
+      if (!isUpdate) settlePrior();
+      
       var status = step.status || 'running';
       // step.live = the Worker's code will STREAM into this row (Phase 2). Give it an empty code block
       // and remember it so incoming code chunks append here.
       var hasDetail = (step.detail != null && String(step.detail).length > 0) || step.live === true;
-      var row = document.createElement('div');
-      row.className = 'row ' + cls(status) + (hasDetail && EXPAND_DEFAULT ? ' open' : '');
+      var row = isUpdate ? timeline.lastElementChild : document.createElement('div');
+      
+      var isOpen = isUpdate ? row.classList.contains('open') : (hasDetail && EXPAND_DEFAULT);
+      if (isUpdate && hasDetail && !row.classList.contains('open') && EXPAND_DEFAULT && !row.dataset.opened) {
+        isOpen = true;
+      }
+      row.className = 'row ' + cls(status) + (isOpen ? ' open' : '');
+      if (isOpen) row.dataset.opened = 'true';
+      
       var meta = metaLine(step);
-      var hintTxt = (hasDetail && EXPAND_DEFAULT) ? '[-] hide' : '[+] view';
+      var hintTxt = isOpen ? '[-] hide' : '[+] view';
       var head =
         '<div class="row-head' + (hasDetail ? ' clickable' : '') + '">' +
           '<div class="mark ' + cls(status) + '">' + markFor(step.phase, status) + '</div>' +
@@ -140,7 +149,7 @@ export function buildActivityHtml(task: string, expandByDefault = true): string 
           if (hint) hint.textContent = open ? '[-] hide' : '[+] view';
         });
       }
-      timeline.appendChild(row);
+      if (!isUpdate) timeline.appendChild(row);
       row.scrollIntoView({ block: 'end' });
     }
 

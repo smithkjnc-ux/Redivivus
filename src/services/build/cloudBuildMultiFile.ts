@@ -51,12 +51,10 @@ export async function executeMultiFileBuild(
   for (let i = 0; i < planFiles.length; i++) {
     const file = planFiles[i];
     onProgress?.(`Building ${file.path} (${i + 1}/${planFiles.length})...`);
-    // [FIX] This dispatch step runs BEFORE the worker — it's the Supervisor handing its prescription off
-    // for this file. It previously read "Worker: writing X" while showing the SUPERVISOR model (claude),
-    // which looked like claude was writing the file AND gemini wrote it (same file, two AIs). It is NOT a
-    // worker step. Label it as the Supervisor sending the plan and show the supervisor model. The matching
-    // "Worker: wrote X" completion step (below) shows the ACTUAL worker model the backend used.
-    onStep?.({ label: `Supervisor: sending plan for ${file.path} to Worker`, model: supervisorModel || supervisorProvider || preferred, status: 'running', index: i, total: planFiles.length });
+    // [FIX] Supervisor and Worker steps are now combined. Emits a single "Building..." step
+    // that updates to "Built..." when the worker finishes, reducing timeline clutter.
+    const supervisorName = supervisorModel || supervisorProvider || preferred || 'supervisor';
+    onStep?.({ label: `Building ${file.path}...`, model: `${supervisorName} → Worker`, status: 'running', index: i, total: planFiles.length });
 
     try {
       // Merge pre-existing files with files built so far in this session
@@ -95,16 +93,19 @@ export async function executeMultiFileBuild(
         return res.json() as Promise<{ files: typeof allFiles; model: string; workerProvider?: string; supervisorProvider?: string; inputTokens: number; outputTokens: number; requiresClientExecution?: boolean }>;
       };
 
-      // [FIX] Raised from 120s → 240s. Guardian retries (IMPORT_MISMATCH, ELEMENT_ID_MISMATCH,
-      // FILE_TOO_LARGE) can stack 2-3 additional API calls per file. index.html as the last file
-      // in a 9-file build was exceeding 120s when retries compounded.
-      const buildTimeout = new Promise<never>((_, reject) => setTimeout(() => {
-        const err = new Error(`Timed out on ${file.path} — try a simpler request.`);
-        err.name = 'TimeoutError';
-        reject(err);
-      }, 240_000));
+      // [FIX] Raised from 240s → 600s. Guardian retries and Supervisor splits on oversized files (like index.html
+      // generated as a flat 700-line monolith) can take up to 4 sequential AI calls, which easily exceeds 4 minutes.
+      // 10 minutes gives the backend plenty of headroom before the frontend unilaterally abandons the build.
+      let timeoutId: NodeJS.Timeout;
+      const buildTimeout = new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          const err = new Error(`Timed out on ${file.path} — try a simpler request.`);
+          err.name = 'TimeoutError';
+          reject(err);
+        }, 600_000);
+      });
 
-      const data = await Promise.race([buildOnce(), buildTimeout]);
+      const data = await Promise.race([buildOnce(), buildTimeout]).finally(() => clearTimeout(timeoutId));
 
       if (data.requiresClientExecution) {
         return { success: false, error: `Multi-file build needs client-side AI execution (${file.path}). Build files one at a time, or retry.`, failureSource: 'cloud' };
@@ -145,10 +146,10 @@ export async function executeMultiFileBuild(
       }
       if (_gd.guardianSplit && normalised.length >= 2) {
         const splitDetail = normalised.map(f => `// === ${f.path} ===\n${f.content}`).join('\n\n');
-        onStep?.({ label: `Guardian: split → ${normalised.map(f => f.path.split('/').pop()).join(', ')}`, model: lastModel, status: 'success', detail: splitDetail, kind: 'code', index: i, total: planFiles.length });
+        onStep?.({ label: `Guardian: split → ${normalised.map(f => f.path.split('/').pop()).join(', ')}`, model: `${supervisorName} → Guardian`, status: 'success', detail: splitDetail, kind: 'code', index: i, total: planFiles.length, updateLatest: true });
       } else {
         const workerCode = normalised.map(f => f.content).join('\n\n');
-        onStep?.({ label: `Worker: wrote ${file.path}`, model: lastModel, status: 'success', detail: workerCode, kind: 'code', index: i, total: planFiles.length });
+        onStep?.({ label: `Built ${file.path}`, model: `${supervisorName} → ${lastModel}`, status: 'success', detail: workerCode, kind: 'code', index: i, total: planFiles.length, updateLatest: true });
       }
       // [FIX] Emit completed file content so the chat bubble can show it for review.
       // Multi-file builds use non-streaming JSON per file, so onChunk never fires — this is the hook

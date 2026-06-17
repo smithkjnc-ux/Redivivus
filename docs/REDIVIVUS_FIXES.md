@@ -9689,3 +9689,7 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 | `src/services/build/cloudBuildMultiFile.ts` | **Labels**: Renamed "Building X / claude" → "Worker: writing X" and "Built X" → "Worker: wrote X" to clarify Supervisor planned vs Worker built distinction. Added synthetic "Guardian: validated N files" step after loop to surface Guardian visibility in Build Activity panel. | Low — cosmetic + additive |
 
 - Fixed the Run button showing 'No runnable entry point detected' for multi-file builds by unifying the per-file build history records into a single snapshot and record. This ensures the 'Run' detection logic sees the complete file list (including index.html) instead of just the last generated file.
+
+- Raised the multi-file build timeout from 240 seconds to 600 seconds and added proper timeout clearing to prevent unhandled promise rejections. This fixes the issue where large multi-file projects (like typing-speed-test) would time out on the frontend while the backend Guardian was still processing oversized files through retries and split steps.
+
+- Combined the Supervisor planning step and Worker code output into a single step bubble in the Build Activity panel to reduce clutter. A 'Building...' bubble now dynamically updates to 'Built...' and displays the Worker's code payload when finished.
