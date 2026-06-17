@@ -16,13 +16,20 @@ export function registerRestructureCommands(
   refreshAll: () => void
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('redivivus.cleanUpFile', async (pickedPath?: string) => {
+    vscode.commands.registerCommand('redivivus.cleanUpFile', async (arg?: string | vscode.Uri) => {
       let doc: vscode.TextDocument;
       let filePath: string;
-      if (pickedPath) {
-        filePath = pickedPath;
-        // [WARN] Assumes `vscode.workspace.workspaceFolders` is not empty. If there's no open folder, this will throw.
-        const uri = vscode.Uri.file(path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, pickedPath));
+      if (arg) {
+        let uri: vscode.Uri;
+        if (typeof arg === 'string') {
+          filePath = arg;
+          const ws = vscode.workspace.workspaceFolders?.[0];
+          if (!ws) { vscode.window.showErrorMessage('Open a workspace folder first.'); return; }
+          uri = vscode.Uri.file(path.join(ws.uri.fsPath, arg));
+        } else {
+          uri = arg;
+          filePath = vscode.workspace.asRelativePath(uri) || path.basename(uri.fsPath);
+        }
         doc = await vscode.workspace.openTextDocument(uri);
       } else {
         const editor = vscode.window.activeTextEditor;

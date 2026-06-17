@@ -542,6 +542,28 @@
           "command": "redivivus.saveToVault",
           "group": "redivivus@4"
         }
+      ],
+      "view/item/context": [
+        {
+          "command": "redivivus.openAsProject",
+          "when": "view == redivivusProjectFiles && viewItem == folder",
+          "group": "redivivus@0"
+        },
+        {
+          "command": "redivivus.reviewFile",
+          "when": "view == redivivusProjectFiles && viewItem == file",
+          "group": "redivivus@1"
+        },
+        {
+          "command": "redivivus.cleanUpFile",
+          "when": "view == redivivusProjectFiles && viewItem == file",
+          "group": "redivivus@2"
+        },
+        {
+          "command": "redivivus.checkFileHealth",
+          "when": "view == redivivusProjectFiles && viewItem == file",
+          "group": "redivivus@3"
+        }
       ]
     },
     "submenus": [

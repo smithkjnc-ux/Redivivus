@@ -93,7 +93,7 @@ export function registerCheckForUpdatesCommand(context: vscode.ExtensionContext)
       const pkg = require('../../package.json');
       const currentVersion: string = pkg.version;
       const cfg = vscode.workspace.getConfiguration('redivivus');
-      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev';
+      const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend-1017737301468.us-east4.run.app';
       const webBase = apiBase.replace('/api/v1', '');
       try {
         const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(20_000) });
@@ -137,7 +137,7 @@ export async function runStartupUpdateCheck(
     const pkg = require('../../package.json') as { version: string };
     const currentVersion = pkg.version;
     const cfg = vscode.workspace.getConfiguration('redivivus');
-    const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend.fly.dev';
+    const apiBase = cfg.get<string>('apiBase') || 'https://redivivus-backend-1017737301468.us-east4.run.app';
     const webBase = apiBase.replace('/api/v1', '');
     const res = await fetch(`${webBase}/api/version`, { signal: AbortSignal.timeout(20_000) });
     if (!res.ok) { return; }

@@ -14,14 +14,21 @@ export function registerReviewCommands(
   changeTracker: ChangeTracker
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand('redivivus.reviewFile', async (pickedPath?: string) => {
+    vscode.commands.registerCommand('redivivus.reviewFile', async (arg?: string | vscode.Uri) => {
       let doc: vscode.TextDocument;
       let filePath: string;
       let content: string;
-      if (pickedPath) {
-        filePath = pickedPath;
-        // [WARN] Accessing workspaceFolders[0] without null/undefined check can throw if no folder is open.
-        const uri = vscode.Uri.file(path.join(vscode.workspace.workspaceFolders![0].uri.fsPath, pickedPath));
+      if (arg) {
+        let uri: vscode.Uri;
+        if (typeof arg === 'string') {
+          filePath = arg;
+          const ws = vscode.workspace.workspaceFolders?.[0];
+          if (!ws) { vscode.window.showErrorMessage('Open a workspace folder first.'); return; }
+          uri = vscode.Uri.file(path.join(ws.uri.fsPath, arg));
+        } else {
+          uri = arg;
+          filePath = vscode.workspace.asRelativePath(uri) || path.basename(uri.fsPath);
+        }
         doc = await vscode.workspace.openTextDocument(uri);
         content = doc.getText();
       } else {

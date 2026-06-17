@@ -3,6 +3,17 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 17, 2026: Migrate backend from Fly.io to Google Cloud Run
+
+**Symptom:** The Fly.io edge proxy has a strict 60-second timeout that is killing long-running AI multi-file build processes (which take 2-3 minutes).
+**Fix:**
+- Installed Google Cloud CLI and authenticated.
+- Deployed the containerized backend directly to Cloud Run on `redivivus-core` with a 3600s timeout (`--timeout=3600 --region=us-east4 --allow-unauthenticated`).
+- Updated the Redivivus extension client codebase (`apiClient.ts`, `signIn.ts`, `checkForUpdates.ts`) to point to the new Cloud Run URL (`https://redivivus-backend-1017737301468.us-east4.run.app`) instead of `redivivus-backend.fly.dev`.
+**Risk:** Low. Direct URL swap. The backend handles the exact same container, just with extended timeouts.
+
+---
+
 ## Fix — Jun 16, 2026: Multi-file build card hides the Supervisor + has no total cost
 
 Surfaced by the Breakout build (7 files, Opus/Sonnet supervisor). The "AI Used" card showed a single row — "Gemini 2.5 Flash — Planned + built the code — primary builder — 47,273 tokens · $0.1453" — with NO Supervisor row and NO total, even though Opus clearly planned it (and the Claude balance dropped ~$0.08). Cost was understated (the Opus planning spend was priced at the cheap worker's rate) and mislabeled as a solo build.

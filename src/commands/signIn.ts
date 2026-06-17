@@ -60,7 +60,7 @@ export function registerSignInCommand(context: vscode.ExtensionContext, statusBa
 
       // Open browser to the IDE auth page.
       // Always use redivivus.dev for auth — GitHub OAuth is registered there.
-      // API calls use apiBase (redivivus-backend.fly.dev) separately.
+      // API calls use apiBase (redivivus-backend-1017737301468.us-east4.run.app) separately.
       const scheme = vscode.env.uriScheme;
       const authUrl = `https://redivivus.dev/auth/ide?port=${port}&scheme=${scheme}`;
       await vscode.env.openExternal(vscode.Uri.parse(authUrl));

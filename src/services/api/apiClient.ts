@@ -9,7 +9,7 @@ const SECRET_KEY = 'redivivus.account.token';
 // backend, not a local server. Pointing at localhost gave inaccurate tests (different code, latency,
 // cold-start behavior). To develop against a local backend, explicitly set `redivivus.apiBase` to
 // http://localhost:3000/api/v1 — it's now opt-IN, never the default.
-const API_BASE_DEFAULT = 'https://redivivus-backend.fly.dev/api/v1';
+const API_BASE_DEFAULT = 'https://redivivus-backend-1017737301468.us-east4.run.app/api/v1';
 export function getApiBase(): string {
   // [WARN] Never hardcode or rewrite to stale Cloudflare/legacy domains.
   // The extension hits the Fly.io backend directly — redivivus.dev is no longer the API origin.
