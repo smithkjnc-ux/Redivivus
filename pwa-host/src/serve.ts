@@ -1,41 +1,72 @@
-// [SCOPE] PWA host Worker — GET /p/<token>/<path>. Serves a published bundle from KV. Root -> the entry HTML;
-// unknown paths -> entry (so client routing + the installed service worker keep working). Missing token -> the
-// friendly expired page (its TTL evicted it). See REDIVIVUS_ADD_TO_PHONE.md.
-import type { Env } from './index';
-import { contentType, expiredPage } from './util';
+import { Request, Response } from 'express';
+import { Storage } from '@google-cloud/storage';
+import { contentType, expiredPageHtml } from './util';
+
+const storage = new Storage();
+const BUCKET_NAME = 'redivivus-pwa-host';
+const bucket = storage.bucket(BUCKET_NAME);
 
 interface Meta { entry: string; tier: string; title: string; expiresAt: number; }
 
-export async function handleServe(url: URL, env: Env): Promise<Response> {
-  const m = url.pathname.match(/^\/p\/([A-Za-z0-9]+)\/?(.*)$/);
-  if (!m) { return new Response('Not found', { status: 404 }); }
-  const token = m[1];
+export async function handleServe(req: Request, res: Response): Promise<void> {
+  const token = req.params.token;
+  if (!token) { res.status(404).send('Not found'); return; }
 
-  const metaRaw = await env.PWA_KV.get(`m:${token}`);
-  if (!metaRaw) { return expiredPage(); }
-  const meta = JSON.parse(metaRaw) as Meta;
+  try {
+    const metaFile = bucket.file(`m:${token}`);
+    const [exists] = await metaFile.exists();
+    
+    if (!exists) { 
+      res.status(410).type('html').send(expiredPageHtml()); 
+      return; 
+    }
 
-  let path = m[2];
-  if (!path || path.endsWith('/')) { path = meta.entry; } // root -> entry HTML
+    const [metaRaw] = await metaFile.download();
+    const meta = JSON.parse(metaRaw.toString('utf8')) as Meta;
 
-  let bytes = await env.PWA_KV.get(`b:${token}:${path}`, 'arrayBuffer');
-  let servedPath = path;
-  if (!bytes) {
-    // Unknown sub-path: fall back to the entry (SPA routing / SW navigations). If even the entry is gone, expired.
-    bytes = await env.PWA_KV.get(`b:${token}:${meta.entry}`, 'arrayBuffer');
-    servedPath = meta.entry;
-    if (!bytes) { return expiredPage(); }
+    if (Date.now() > meta.expiresAt) {
+      res.status(410).type('html').send(expiredPageHtml());
+      return;
+    }
+
+    let path = req.params[0] || '';
+    if (!path || path.endsWith('/')) { path = meta.entry; }
+
+    let fileToServe = bucket.file(`b:${token}:${path}`);
+    let [fileExists] = await fileToServe.exists();
+    let servedPath = path;
+
+    if (!fileExists) {
+      // Fallback to entry HTML for SPA routing
+      fileToServe = bucket.file(`b:${token}:${meta.entry}`);
+      [fileExists] = await fileToServe.exists();
+      servedPath = meta.entry;
+      
+      if (!fileExists) {
+        res.status(410).type('html').send(expiredPageHtml());
+        return;
+      }
+    }
+
+    res.set('Content-Type', contentType(servedPath));
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Cache-Control', 'public, max-age=600');
+    
+    if (servedPath.endsWith('sw.js')) {
+      res.set('Service-Worker-Allowed', '/');
+    }
+
+    fileToServe.createReadStream()
+      .on('error', (err) => {
+        console.error('Error serving file stream:', err);
+        if (!res.headersSent) {
+          res.status(500).send('Internal server error');
+        }
+      })
+      .pipe(res);
+
+  } catch (err) {
+    console.error('Serve error:', err);
+    res.status(500).send('Internal server error');
   }
-  return new Response(bytes, { headers: serveHeaders(servedPath) });
-}
-
-function serveHeaders(path: string): Record<string, string> {
-  const h: Record<string, string> = {
-    'content-type': contentType(path),
-    'x-content-type-options': 'nosniff',
-    'cache-control': 'public, max-age=600',
-  };
-  // Let the service worker control the whole token path scope.
-  if (path.endsWith('sw.js')) { h['service-worker-allowed'] = '/'; }
-  return h;
 }

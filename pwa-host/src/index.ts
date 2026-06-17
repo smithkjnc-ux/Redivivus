@@ -1,36 +1,34 @@
-// [SCOPE] Redivivus PWA host — Cloudflare Worker entry/router. Ephemeral hosting for "Add to Phone":
-//   POST /publish            -> store a PWA bundle in KV with a TTL, return {token, url, expiresAt}
-//   GET  /p/<token>/<path>   -> serve it; expired -> friendly page
-// Storage = Cloudflare KV (expirationTtl auto-evicts, self-cleaning, edge-served, near-free). Deploy with wrangler.
-// See docs/REDIVIVUS_ADD_TO_PHONE.md.
+import express from 'express';
+import cors from 'cors';
 import { handlePublish } from './publish';
 import { handleServe } from './serve';
 
-export interface Env {
-  PWA_KV: KVNamespace;
-}
+const app = express();
 
-export default {
-  async fetch(req: Request, env: Env): Promise<Response> {
-    const url = new URL(req.url);
-    if (req.method === 'OPTIONS') { return cors(); }
-    if (req.method === 'POST' && url.pathname === '/publish') { return handlePublish(req, env); }
-    if (req.method === 'GET' && url.pathname.startsWith('/p/')) { return handleServe(url, env); }
-    if (url.pathname === '/' || url.pathname === '/health') {
-      return new Response('Redivivus PWA host: OK', { status: 200, headers: { 'content-type': 'text/plain' } });
-    }
-    return new Response('Not found', { status: 404 });
-  },
-};
+// Increase JSON payload limit to accommodate the 10MB base64 PWA bundles
+app.use(express.json({ limit: '15mb' }));
 
-function cors(): Response {
-  return new Response(null, {
-    status: 204,
-    headers: {
-      'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'POST, GET, OPTIONS',
-      'access-control-allow-headers': 'content-type, x-redivivus-app',
-      'access-control-max-age': '86400',
-    },
-  });
-}
+// Apply CORS allowing any origin for both POST and GET
+app.use(cors({
+  origin: '*',
+  methods: ['POST', 'GET', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'x-redivivus-app'],
+  maxAge: 86400
+}));
+
+app.post('/publish', handlePublish);
+app.get('/p/:token/*', handleServe);
+app.get('/p/:token', handleServe); // Handle case without trailing slash
+
+app.get('/', (req, res) => {
+  res.status(200).type('text/plain').send('Redivivus PWA host: OK');
+});
+
+app.get('/health', (req, res) => {
+  res.status(200).type('text/plain').send('Redivivus PWA host: OK');
+});
+
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`PWA host listening on port ${PORT}`);
+});

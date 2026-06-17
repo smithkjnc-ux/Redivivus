@@ -1,15 +1,24 @@
 {
   "name": "redivivus-pwa-host",
   "private": true,
-  "description": "Ephemeral Cloudflare Worker host for Redivivus 'Add to Phone' PWAs.",
+  "description": "Ephemeral Node.js Cloud Run host for Redivivus 'Add to Phone' PWAs.",
+  "main": "dist/index.js",
   "scripts": {
-    "dev": "wrangler dev",
-    "deploy": "wrangler deploy",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@google-cloud/storage": "^7.15.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20241106.0",
-    "typescript": "^5.6.0",
-    "wrangler": "^3.84.0"
+    "@types/cors": "^2.8.17",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.2",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.2"
   }
 }
