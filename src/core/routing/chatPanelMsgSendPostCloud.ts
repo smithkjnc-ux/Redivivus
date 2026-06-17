@@ -49,9 +49,12 @@ export async function routeCloudChatResult(
     turnCtx.hint = { action: chatResult.action, task: chatResult.task, confidence: chatResult.confidence, model: chatResult.model, provider: chatResult.provider };
   }
 
-  // [PHASE 1] Low-confidence 'fix' with no project open → flip to build (nothing to fix).
-  if (chatResult.action === 'fix' && (chatResult.confidence ?? 1) < 0.5 && isProjectsContainer(getActiveProjectRoot() || '')) {
-    fixLog(`[PHASE1] low-confidence fix (conf=${chatResult.confidence}) with no active project -> routing as build`);
+  // [FIX] If the classifier returns 'fix' but no project is open, there is nothing to fix.
+  // Previously this only flipped when confidence < 0.5, but the AI can return high-confidence 'fix'
+  // if conversation history mentions a prior build of the same thing (e.g. "Build a typing speed test
+  // game" after a failed build → AI thinks it's a retry/fix). With no project open, flip unconditionally.
+  if (chatResult.action === 'fix' && !hasProjectOpen) {
+    fixLog(`[NO-PROJECT-FIX-FLIP] classifier returned fix (conf=${chatResult.confidence ?? 'n/a'}) but no project open → build`);
     chatResult.action = 'build';
     if (turnCtx?.hint) { turnCtx.hint.action = 'build'; }
   }
