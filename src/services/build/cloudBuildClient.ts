@@ -135,6 +135,7 @@ export async function callCloudBuild(
             plan.supervisorInputTokens ?? 0,
             plan.supervisorOutputTokens ?? 0,
             opts.onProgress,
+            opts.onStep,
           );
         }
         _planLog(`-> single-file path (plan returned <=1 file)`);

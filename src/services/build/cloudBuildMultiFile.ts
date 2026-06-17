@@ -26,6 +26,7 @@ export async function executeMultiFileBuild(
   supervisorInputTokens: number,
   supervisorOutputTokens: number,
   onProgress?: (msg: string) => void,
+  onStep?: (step: any) => void,
 ): Promise<CloudBuildResult> {
   const allFiles: Array<{ path: string; content: string; isNew: boolean }> = [];
   const siblings = planFiles.map(f => ({ path: f.path, description: f.description }));
@@ -45,6 +46,9 @@ export async function executeMultiFileBuild(
   for (let i = 0; i < planFiles.length; i++) {
     const file = planFiles[i];
     onProgress?.(`Building ${file.path} (${i + 1}/${planFiles.length})...`);
+    // [FIX] Emit a Build Activity step so the panel shows per-file progress (previously onStep was
+    // not passed here — the panel was frozen at "Supervisor planning" for the entire multi-file build).
+    onStep?.({ label: `Building ${file.path}`, model: preferred, status: 'running', index: i, total: planFiles.length });
 
     try {
       // Merge pre-existing files with files built so far in this session
@@ -83,11 +87,14 @@ export async function executeMultiFileBuild(
         return res.json() as Promise<{ files: typeof allFiles; model: string; workerProvider?: string; supervisorProvider?: string; inputTokens: number; outputTokens: number; requiresClientExecution?: boolean }>;
       };
 
+      // [FIX] Raised from 120s → 240s. Guardian retries (IMPORT_MISMATCH, ELEMENT_ID_MISMATCH,
+      // FILE_TOO_LARGE) can stack 2-3 additional API calls per file. index.html as the last file
+      // in a 9-file build was exceeding 120s when retries compounded.
       const buildTimeout = new Promise<never>((_, reject) => setTimeout(() => {
         const err = new Error(`Timed out on ${file.path} — try a simpler request.`);
         err.name = 'TimeoutError';
         reject(err);
-      }, 120_000));
+      }, 240_000));
 
       const data = await Promise.race([buildOnce(), buildTimeout]);
 
@@ -106,6 +113,8 @@ export async function executeMultiFileBuild(
       workerOutputTokens += data.outputTokens ?? 0;
       lastModel = data.model ?? lastModel;
       lastWorkerProvider = data.workerProvider ?? lastWorkerProvider;
+      // Mark this file done in the Build Activity panel
+      onStep?.({ label: `Built ${file.path}`, model: lastModel, status: 'success', index: i, total: planFiles.length });
 
     } catch (e: any) {
       if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
