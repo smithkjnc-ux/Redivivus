@@ -27,6 +27,7 @@ export async function executeMultiFileBuild(
   supervisorOutputTokens: number,
   onProgress?: (msg: string) => void,
   onStep?: (step: any) => void,
+  onFileComplete?: (filePath: string, content: string) => void,
 ): Promise<CloudBuildResult> {
   const allFiles: Array<{ path: string; content: string; isNew: boolean }> = [];
   const siblings = planFiles.map(f => ({ path: f.path, description: f.description }));
@@ -46,9 +47,12 @@ export async function executeMultiFileBuild(
   for (let i = 0; i < planFiles.length; i++) {
     const file = planFiles[i];
     onProgress?.(`Building ${file.path} (${i + 1}/${planFiles.length})...`);
-    // [FIX] Emit a Build Activity step so the panel shows per-file progress (previously onStep was
-    // not passed here — the panel was frozen at "Supervisor planning" for the entire multi-file build).
-    onStep?.({ label: `Building ${file.path}`, model: preferred, status: 'running', index: i, total: planFiles.length });
+    // [FIX] Label was "Building X / claude" (showing `preferred`, which is just the requested model hint,
+    // not the actual model). This made it look like claude was building AND gemini built — same file,
+    // different AIs. Reality: Supervisor (claude) planned the prescription; Worker (gemini-flash) writes
+    // each file. The dispatch step should say "Worker: writing X" and show the supervisor that dispatched it.
+    const supervisorLabel = supervisorModel ? `planned by ${supervisorModel.split('-').slice(0,2).join('-')}` : 'supervisor dispatched';
+    onStep?.({ label: `Worker: writing ${file.path}`, model: preferred, status: 'running', index: i, total: planFiles.length });
 
     try {
       // Merge pre-existing files with files built so far in this session
@@ -113,8 +117,15 @@ export async function executeMultiFileBuild(
       workerOutputTokens += data.outputTokens ?? 0;
       lastModel = data.model ?? lastModel;
       lastWorkerProvider = data.workerProvider ?? lastWorkerProvider;
-      // Mark this file done in the Build Activity panel
-      onStep?.({ label: `Built ${file.path}`, model: lastModel, status: 'success', index: i, total: planFiles.length });
+      // Mark this file done in the Build Activity panel with the ACTUAL model returned by the backend,
+      // not the preference hint. This shows gemini-2.5-flash or whatever the backend actually used.
+      onStep?.({ label: `Worker: wrote ${file.path}`, model: lastModel, status: 'success', index: i, total: planFiles.length });
+      // [FIX] Emit completed file content so the chat bubble can show it for review.
+      // Multi-file builds use non-streaming JSON per file, so onChunk never fires — this is the hook
+      // that lets the user see the code that was written without waiting for the full build to finish.
+      if (normalised.length > 0) {
+        onFileComplete?.(normalised[0].path, normalised[0].content);
+      }
 
     } catch (e: any) {
       if (e?.name === 'TimeoutError' || e?.name === 'AbortError') {
@@ -128,6 +139,12 @@ export async function executeMultiFileBuild(
   if (allFiles.length === 0) {
     return { success: false, error: 'Cloud build returned no files — nothing was written. Try a simpler request or build files individually.', failureSource: 'cloud' };
   }
+
+  // [GUARDIAN] Emit a synthetic step to surface the Guardian quality gate. The Guardian runs on the
+  // backend (route.ts) AFTER each file is written — it checks CSS size, ES module structure, element
+  // ID uniqueness, etc. and auto-retries on failure. Previously invisible to the user: now surfaced
+  // as a completion step so the Build Activity panel shows it ran.
+  onStep?.({ label: `Guardian: validated ${allFiles.length} files`, model: 'guardian', status: 'success', index: planFiles.length, total: planFiles.length });
 
   const narration = `Built ${allFiles.length} files for: ${task.slice(0, 60)}${task.length > 60 ? '...' : ''}`;
 

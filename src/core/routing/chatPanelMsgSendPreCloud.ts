@@ -17,6 +17,7 @@ import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.j
 import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
 import { checkProjectContextGuard } from './chatPanelProjectContextGuard.js';
 import { getEffectiveProjectRoot } from '../../ui/panels/chat/chatPanelHeaderUtils.js';
+import { recordRoutingCost } from '../../services/build/buildRoutingCostTracker.js';
 
 // Return shape from runPreCloudRouting — either a terminal 'done' (early exit) or
 // 'continue' with the cloudChat result + resolved workspace context for post-cloud routing.
@@ -104,11 +105,12 @@ export async function runPreCloudRouting(
     projectOpen: hasProjectOpen,
   }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
 
-  // [COST] Record the cloudChat intent pre-pass usage. It runs a REAL model on EVERY message (classify + route),
-  // returns input/output tokens, but the caller never recorded them — so every build/fix under-reported its cost
-  // by this hidden call (PapaJoe: "costs are still not correct"). Now counted in the session/lifetime totals.
+  // [COST] Record the cloudChat intent pre-pass usage — runs a real model on every message but is
+  // never returned by /build, so it was invisible in the build card and causing billing discrepancies.
+  // recordRoutingCost stores it for chatPanelBuildRunner to pick up and add a Routing row to the card.
   if (chatResult && (chatResult.inputTokens || chatResult.outputTokens)) {
     try {
+      recordRoutingCost(chatResult.inputTokens || 0, chatResult.outputTokens || 0, chatResult.model || '', chatResult.provider || '');
       deps.usageTracker?.recordUsage(
         (chatResult.inputTokens || 0) + (chatResult.outputTokens || 0), 0, chatResult.model,
         chatResult.inputTokens, chatResult.outputTokens, 'supervisor',

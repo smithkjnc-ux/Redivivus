@@ -161,10 +161,25 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
   try { activity = BuildActivityPanel.start(task); } catch { /* panel optional — never block a build */ }
   const onStep = (step: any) => { try { activity?.step(step); } catch {} };
   const onCode = (text: string) => { try { activity?.code(text); } catch {} };
+
+  // [FIX] Show each completed file's code in the working bubble for review.
+  // Multi-file builds don't stream per-token (onChunk never fires), so without this
+  // the bubble stays as "⚙️ Building..." with no code visible the entire build.
+  // Shows first 3000 chars — enough for any file under the 200-line Rule 9 limit.
+  const onFileComplete = (filePath: string, content: string) => {
+    const ext = filePath.split('.').pop() ?? 'js';
+    const preview = content.length > 3000 ? content.slice(0, 3000) + '\n// ...(truncated)' : content;
+    const idx = deps.conversation.findIndex(m => m.timestamp === workingTs && m.role === 'assistant');
+    if (idx >= 0) {
+      deps.conversation[idx] = { ...deps.conversation[idx], content: `⚙️ Building... __BUILD_WORKING__\n\`\`\`${ext}\n// ${filePath}\n${preview}\n\`\`\`` };
+      deps.refresh();
+    }
+  };
+
   let buildOk: boolean | undefined;
 
   try {
-    const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk, onStep, onCode });
+    const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk, onStep, onCode, onFileComplete });
     buildOk = !!result.success;
 
     if (!result.success) {

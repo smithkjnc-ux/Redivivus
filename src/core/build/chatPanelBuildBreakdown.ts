@@ -6,6 +6,7 @@
 
 import type { CloudBuildResult } from '../../services/build/cloudBuildClient';
 import { calcCost } from '../../services/usageTracker.js';
+import { consumeRoutingCost } from '../../services/build/buildRoutingCostTracker.js';
 
 // Field delimiter is '~' and row delimiter is '|||' — strip both from free text so a stray
 // character in a model name or error message can't corrupt the byline parsing.
@@ -16,6 +17,16 @@ function safeField(s: string): string {
 /** Build the `__AI_BREAKDOWN__...|||END_BREAKDOWN__` token from the real two-phase attribution. */
 export function buildBreakdownToken(result: CloudBuildResult, workerLabel: string, workerTokens: number): string {
   const rows: string[] = [];
+
+  // [COST] Routing row — the cloudChat intent pre-pass (Claude) that classified this message.
+  // These tokens are charged to the user's Claude account but never returned by /build, creating
+  // the gap between the build card total and actual billing. consumeRoutingCost() reads + clears
+  // the value recorded by chatPanelMsgSendPreCloud when cloudChat responded.
+  const routingCost = consumeRoutingCost();
+  if (routingCost && (routingCost.input + routingCost.output) > 0) {
+    const rCost = calcCost(routingCost.model, routingCost.input, routingCost.output).toFixed(8);
+    rows.push(`${safeField(routingCost.model)}~routing~classified~${routingCost.input + routingCost.output}~${rCost}~0~classified intent & routed request`);
+  }
 
   // Supervisor row — only when a Supervisor actually wrote the prescription.
   // [FIX #3] Cost field (5th) was hardcoded 0.00000000 so the card never showed a price. Compute it from

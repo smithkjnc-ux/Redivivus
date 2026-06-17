@@ -35,60 +35,62 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
     return;
   }
 
-  if (await handleEarlyExits(panel, msg)) { return; }
-
-  // Pre-load buildMode from VS Code setting on first message if the user hasn't chosen yet this session.
-  // Translates the public setting values ('auto'/'guided') to internal values ('direct'/'plan').
-  if (!state.buildMode) {
-    const saved = (require('vscode').workspace.getConfiguration('redivivus').get('buildMode', '') as string);
-    if (saved === 'auto') { state.buildMode = 'direct'; }
-    else if (saved === 'guided') { state.buildMode = 'plan'; }
-  }
-
-  // [FIX] start-new-project sets deps.buildMode/planInterview locally in handleChatMessage but never
-  // writes back to state. Pre-sync buildMode here; planInterview is synced after handleChatMessage.
-  if (msg.type === 'start-new-project') {
-    state.buildMode = msg.mode === 'plan' ? 'plan' : (msg.mode === 'direct' ? 'direct' : undefined);
-    if (msg.mode !== 'plan') { state.planInterview = undefined; }
-    if (msg.assistMode) {
-      state.assistMode = true;
-      const r = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (r) { try { require('fs').writeFileSync(require('path').join(r, '.redivivus-assist'), JSON.stringify({ mode: 'assist', addedAt: new Date().toISOString().slice(0, 10) })); } catch {} }
-    }
-  }
-
-  const msgDeps = {
-    redivivus: (panel as any).redivivus,
-    routing: (panel as any).routing,
-    usageTracker: (panel as any).usageTracker,
-    conversation: state.conversation,
-    panel: _panel,
-    isBuildRequest: async (t: string) => (panel as any)._isBuildRequest(t),
-    classifyIntent: async (t: string) => (panel as any)._classifyIntent(t),
-    handleBuildRequest: (t: string, skipComplex?: boolean, isFixRequest?: boolean) => (panel as any)._handleBuildRequest(t, skipComplex, isFixRequest),
-    buildFromVaultPrefill: () => (panel as any)._buildFromVaultPrefill(),
-    refresh: () => panel.refresh(),
-    onStartSession: ChatPanel.onStartSession,
-    onSwitchAI: ChatPanel.onSwitchAI,
-    onNewProject: ChatPanel.onNewProject,
-    setLastModel: (model: string) => { (panel as any).state.lastModel = model; },
-    setBlueprintContext: (ctx: string) => { state.blueprintContext = ctx; },
-    buildMode: state.buildMode, assistMode: state.assistMode, vault: (panel as any).vault,
-    planInterview: state.planInterview,
-  };
-
-  // [FIX] The send button spins via setInputBusy(true) on send but had NO stop — the webview was never told the
-  // turn finished, so the spinner ran forever. Signal turn-done in a finally (covers success AND error) for the
-  // message types that start a turn, so the webview can reset the send button.
+  // [FIX] The try/finally MUST wrap handleEarlyExits too, not just handleChatMessage.
+  // handleEarlyExits handles: build-task, fix-request, build-simple, open-workspace-btn, etc.
+  // All of these call _handleBuildRequest which sends set-status:working (spinner starts).
+  // Without try/finally here, the early-exit 'return' skips turn-done entirely — spinner runs forever.
+  // setInputBusy(false) is idempotent, so sending turn-done for non-turn messages is harmless.
+  let msgDeps: any;
   try {
+    if (await handleEarlyExits(panel, msg)) { return; }
+
+    // Pre-load buildMode from VS Code setting on first message if the user hasn't chosen yet this session.
+    // Translates the public setting values ('auto'/'guided') to internal values ('direct'/'plan').
+    if (!state.buildMode) {
+      const saved = (require('vscode').workspace.getConfiguration('redivivus').get('buildMode', '') as string);
+      if (saved === 'auto') { state.buildMode = 'direct'; }
+      else if (saved === 'guided') { state.buildMode = 'plan'; }
+    }
+
+    // [FIX] start-new-project sets deps.buildMode/planInterview locally in handleChatMessage but never
+    // writes back to state. Pre-sync buildMode here; planInterview is synced after handleChatMessage.
+    if (msg.type === 'start-new-project') {
+      state.buildMode = msg.mode === 'plan' ? 'plan' : (msg.mode === 'direct' ? 'direct' : undefined);
+      if (msg.mode !== 'plan') { state.planInterview = undefined; }
+      if (msg.assistMode) {
+        state.assistMode = true;
+        const r = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath;
+        if (r) { try { require('fs').writeFileSync(require('path').join(r, '.redivivus-assist'), JSON.stringify({ mode: 'assist', addedAt: new Date().toISOString().slice(0, 10) })); } catch {} }
+      }
+    }
+
+    msgDeps = {
+      redivivus: (panel as any).redivivus,
+      routing: (panel as any).routing,
+      usageTracker: (panel as any).usageTracker,
+      conversation: state.conversation,
+      panel: _panel,
+      isBuildRequest: async (t: string) => (panel as any)._isBuildRequest(t),
+      classifyIntent: async (t: string) => (panel as any)._classifyIntent(t),
+      handleBuildRequest: (t: string, skipComplex?: boolean, isFixRequest?: boolean) => (panel as any)._handleBuildRequest(t, skipComplex, isFixRequest),
+      buildFromVaultPrefill: () => (panel as any)._buildFromVaultPrefill(),
+      refresh: () => panel.refresh(),
+      onStartSession: ChatPanel.onStartSession,
+      onSwitchAI: ChatPanel.onSwitchAI,
+      onNewProject: ChatPanel.onNewProject,
+      setLastModel: (model: string) => { (panel as any).state.lastModel = model; },
+      setBlueprintContext: (ctx: string) => { state.blueprintContext = ctx; },
+      buildMode: state.buildMode, assistMode: state.assistMode, vault: (panel as any).vault,
+      planInterview: state.planInterview,
+    };
+
     await handleChatMessage(msg, msgDeps);
   } finally {
-    // [FIX] Always signal turn-done so the send-button spinner resets no matter which message ran the work —
-    // chat send, fix, OR a build kicked off by the "Build it" confirm button (a different message type that the
-    // earlier gated version missed, leaving the spinner running after a build). setInputBusy(false) is idempotent.
+    // Always signal turn-done — covers send-message, build-task, fix-request, build-simple, etc.
     try { _panel?.webview?.postMessage({ type: 'turn-done' }); } catch { /* webview gone */ }
   }
 
   // [FIX] Sync planInterview back to state — startPlanInterview sets it on msgDeps but state is separate
-  if (msgDeps.planInterview !== state.planInterview) { state.planInterview = msgDeps.planInterview; }
+  if (msgDeps?.planInterview !== state.planInterview) { state.planInterview = msgDeps?.planInterview; }
 }
+

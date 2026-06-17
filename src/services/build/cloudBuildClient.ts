@@ -48,7 +48,7 @@ export async function callCloudBuild(
   task: string,
   root: string,
   deps: BuildRequestDeps,
-  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void; onChunk?: (chunk: string) => void; onStep?: (step: any) => void; onCode?: (text: string) => void } = {},
+  opts: { targetFile?: string; isFix?: boolean; onProgress?: (msg: string) => void; onChunk?: (chunk: string) => void; onStep?: (step: any) => void; onCode?: (text: string) => void; onFileComplete?: (filePath: string, content: string) => void } = {},
 ): Promise<CloudBuildResult> {
   const token = await getAccountToken();
   if (!token) {
@@ -136,6 +136,7 @@ export async function callCloudBuild(
             plan.supervisorOutputTokens ?? 0,
             opts.onProgress,
             opts.onStep,
+            opts.onFileComplete,
           );
         }
         _planLog(`-> single-file path (plan returned <=1 file)`);

@@ -38,12 +38,13 @@ function friendlyModelName(modelId: string): string {
   return modelId;
 }
 
-const ROLE_EMOJI: Record<string, string> = { supervisor: '[S]', worker: '[W]', solo: '[B]' };
-const ROLE_LABEL: Record<string, string> = { supervisor: 'Supervisor', worker: 'Worker', solo: 'Builder' };
+const ROLE_EMOJI: Record<string, string> = { supervisor: '[S]', worker: '[W]', solo: '[B]', routing: '[R]' };
+const ROLE_LABEL: Record<string, string> = { supervisor: 'Supervisor', worker: 'Worker', solo: 'Builder', routing: 'Router' };
 
 /** Specific plain-English description of what this AI did, per action */
 function friendlyAction(role: string, actions: string[]): string {
   const parts: string[] = [];
+  if (actions.includes('classified')) { parts.push('Classified intent & routed request'); }
   if (actions.includes('planned'))   { parts.push('Wrote the build prescription'); }
   if (actions.includes('built'))     { parts.push(role === 'solo' ? 'Planned + built the code' : 'Wrote the code'); }
   if (actions.includes('reviewed'))  { parts.push('Reviewed code quality'); }
