@@ -136,6 +136,7 @@ export async function callCloudBuild(
             plan.supervisorOutputTokens ?? 0,
             opts.onProgress,
             opts.onStep,
+            opts.onCode,
             opts.onFileComplete,
           );
         }
