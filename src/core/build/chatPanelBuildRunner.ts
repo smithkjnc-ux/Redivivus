@@ -162,19 +162,12 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
   const onStep = (step: any) => { try { activity?.step(step); } catch {} };
   const onCode = (text: string) => { try { activity?.code(text); } catch {} };
 
-  // [FIX] Show each completed file's code in the working bubble for review.
-  // Multi-file builds don't stream per-token (onChunk never fires), so without this
-  // the bubble stays as "⚙️ Building..." with no code visible the entire build.
-  // Shows first 3000 chars — enough for any file under the 200-line Rule 9 limit.
+  // [FIX] Removed injecting file code into the chat bubble since the user watches the Build Activity Panel.
+  // Leaving the working message untouched prevents redundant code dumps in the chat UI.
   const onFileComplete = (filePath: string, content: string) => {
-    const ext = filePath.split('.').pop() ?? 'js';
-    const preview = content.length > 3000 ? content.slice(0, 3000) + '\n// ...(truncated)' : content;
-    const idx = deps.conversation.findIndex(m => m.timestamp === workingTs && m.role === 'assistant');
-    if (idx >= 0) {
-      deps.conversation[idx] = { ...deps.conversation[idx], content: `⚙️ Building... __BUILD_WORKING__\n\`\`\`${ext}\n// ${filePath}\n${preview}\n\`\`\`` };
-      deps.refresh();
-    }
+    // No-op: do not show code in the chat bubble during multi-file builds
   };
+
 
   let buildOk: boolean | undefined;
 
