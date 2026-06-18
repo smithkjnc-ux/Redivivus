@@ -55,7 +55,7 @@ export async function executeMultiFileBuild(
     // [FIX] Supervisor and Worker steps are now combined. Emits a single "Building..." step
     // that updates to "Built..." when the worker finishes, reducing timeline clutter.
     const supervisorName = supervisorModel || supervisorProvider || preferred || 'supervisor';
-    onStep?.({ label: `Building ${file.path}...`, model: `${supervisorName} → Worker`, status: 'running', index: i, total: planFiles.length, live: true });
+    onStep?.({ label: `Building ${file.path}...`, model: `${supervisorName} → Worker`, status: 'running', index: i, total: planFiles.length });
 
     try {
       // Merge pre-existing files with files built so far in this session
