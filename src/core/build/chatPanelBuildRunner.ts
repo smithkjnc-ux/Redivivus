@@ -114,8 +114,9 @@ export async function runBuildAfterGates(
         .map(f => { const lines = fs.readFileSync(path.join(root, f), 'utf-8').split('\n').length; return `\`${f}\` (${lines} lines)`; });
     } catch { return []; }
   })();
+  const hasBlueprint = !!deps.blueprintContext || !!deps.redivivus?.loadConfig?.()?.blueprint;
   const fileMsg = existingFileList.length > 0
-    ? `📂 Reading ${existingFileList.join(', ')} — reviewing current state...`
+    ? `📂 Reading ${hasBlueprint ? 'Blueprint and ' : ''}${existingFileList.join(', ')} — reviewing current state...`
     : `⚙️ Building...`;
 
   // Show working indicator — tag with __BUILD_WORKING__ so we can find it precisely on completion

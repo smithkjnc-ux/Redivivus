@@ -128,9 +128,11 @@ export async function processBuildResults(
   // Create a single snapshot for all files in this build BEFORE writing any new content
   const snapshotId = relPaths.length > 0 ? createSnapshot(root, task, relPaths as any) : undefined;
 
+  const newRelPaths: string[] = [];
   for (const file of data.files) {
     const relPath = stripSlug(file.path);
     const absPath = path.join(root, relPath);
+    const isNew = !fs.existsSync(absPath);
     // [FIX] Run static validator before writing — catches AI-generated runtime bugs (const reassignment, bad transform reset, etc.)
     let content = file.content;
     try {
@@ -139,12 +141,20 @@ export async function processBuildResults(
       const validation = validateCode(content, ext);
       if (validation.autoFixed) { content = validation.code; }
     } catch { /* non-fatal — write original if validator errors */ }
-    writeBuiltFile(absPath, content, { root, task });
+    writeBuiltFile(absPath, content, { root, task, skipInitialSnapshot: true });
+    if (isNew) newRelPaths.push(relPath);
     writtenPaths.push(absPath);
     // Pick the primary file to show — skip docs/config (md, json, toml, yaml)
     const ext = path.extname(relPath).toLowerCase();
     const isDoc = ['.md', '.json', '.yaml', '.yml', '.toml', '.txt'].includes(ext);
     if (!isDoc && (!primaryPath || ext === '.html')) { primaryPath = absPath; }
+  }
+
+  if (newRelPaths.length > 0) {
+    try {
+      const { SnapshotService } = await import('../../services/snapshotService.js');
+      new SnapshotService(root).captureInitial(`First build: ${task.slice(0, 60)}`, newRelPaths);
+    } catch {}
   }
 
   // Record a single history entry containing all files for this build

@@ -8,7 +8,7 @@ import { SnapshotService } from '../../services/snapshotService';
 import { autoCaptureFile } from '../../services/vault/vaultAutoCapture';
 import type { BuildContext } from './chatPanelBuild';
 
-export interface WriteOptions { root?: string; task?: string; }
+export interface WriteOptions { root?: string; task?: string; skipInitialSnapshot?: boolean; }
 
 /**
  * Detects when the AI wrote placeholder/skeleton code instead of real implementations.
@@ -67,7 +67,7 @@ export function writeBuiltFile(absPath: string, code: string, options?: WriteOpt
 
   // [FIX] Auto-capture initial state for brand-new files — permanent baseline, never pruned.
   // This is the save point the user can always revert to if future builds corrupt the file.
-  if (isNewFile && options?.root && options?.task) {
+  if (isNewFile && options?.root && options?.task && !options?.skipInitialSnapshot) {
     try {
       const relPath = path.relative(options.root, absPath);
       new SnapshotService(options.root).captureInitial(`First build: ${options.task.slice(0, 60)}`, [relPath]);

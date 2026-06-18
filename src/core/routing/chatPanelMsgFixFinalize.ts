@@ -94,7 +94,7 @@ export async function runFixFinalize(params: {
           BuildActivityPanel.current?.step({ phase: 'guardian', status: 'pass', label: 'Ran the preview - it works' });
         } else {
           BuildActivityPanel.current?.step({ phase: 'guardian', status: 'fix', label: 'Ran the preview - ' + v.summary });
-          conversation.push({ role: 'assistant', content: `Heads up: the file was changed and it passed review, but I ran the preview and it still has a problem -- ${v.summary}\n\nThat usually means it needs another pass. Click Fix again (or describe what you see) and I'll take another run at it.`, timestamp: Date.now() });
+          conversation.push({ role: 'assistant', content: `Heads up: the file was changed and it passed review, but my automated preview flagged a potential problem: ${v.summary}\n\nPlease try the game yourself to see if it's working. If it does not run or has problems, click Fix again (or describe what you see) and I'll take another run at it.`, timestamp: Date.now() });
           refresh();
         }
       }
