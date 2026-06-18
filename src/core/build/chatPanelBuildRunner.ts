@@ -67,6 +67,12 @@ export async function runBuildAfterGates(
       const created = await autoCreateProject(task, deps);
       root = created.dir;
       deps.blueprintContext = created.blueprintContext;
+      
+      // [FIX] Update the Redivivus service to point to the newly created project
+      // so downstream systems (like the Living Blueprint distiller) save to the right config
+      const { RedivivusService } = await import('../../services/redivivusService.js');
+      deps.redivivus = new RedivivusService(root);
+      
       autoCreated = true;
     } catch (e) {
       deps.postToWebview({ type: 'set-status', status: 'ready' });

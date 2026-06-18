@@ -147,6 +147,11 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
             const created = await autoCreateProject(task, deps);
             vaultRoot = created.dir;
             vaultBlueprintContext = created.blueprintContext;
+            
+            // [FIX] Update the Redivivus service to point to the newly created project
+            const { RedivivusService } = await import('../../services/redivivusService.js');
+            deps.redivivus = new RedivivusService(vaultRoot);
+            
             autoCreated = true;
           } catch (e) {
             deps.conversation.push({ role: 'assistant', content: `Could not create project folder: ${e instanceof Error ? e.message : String(e)}`, timestamp: Date.now() });
