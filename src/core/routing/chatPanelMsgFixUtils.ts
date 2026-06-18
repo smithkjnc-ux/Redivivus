@@ -115,8 +115,14 @@ export function parseFixResponse(
     }
   }
 
-  const fixes = all.filter(f => allowedRels.has(f.rel));
-  const skipped = all.filter(f => !allowedRels.has(f.rel)).map(f => f.rel);
+  // [FIX] Rule 9 Modularity: allow Worker to create NEW files (e.g. splitting a monolith), 
+  // but strictly block path traversal or absolute paths to prevent escaping the workspace.
+  const isSafeNewFile = (f: { rel: string; abs: string }) => {
+    return !f.rel.includes('..') && !path.isAbsolute(f.rel) && f.abs.startsWith(root);
+  };
+
+  const fixes = all.filter(f => allowedRels.has(f.rel) || isSafeNewFile(f));
+  const skipped = all.filter(f => !allowedRels.has(f.rel) && !isSafeNewFile(f)).map(f => f.rel);
   return { fixes, skipped };
 }
 
