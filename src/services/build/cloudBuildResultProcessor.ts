@@ -166,11 +166,11 @@ export async function processBuildResults(
         timestamp: new Date().toISOString(),
         task,
         files: relPaths,
-        tokensUsed: (data.inputTokens ?? 0) + (data.outputTokens ?? 0),
+        tokensUsed: (data.inputTokens ?? 0) + (data.outputTokens ?? 0) + (data.supervisorInputTokens ?? 0) + (data.supervisorOutputTokens ?? 0),
         costUSD: data.costUSD ?? 0,
         source: 'ai',
-        supervisor: meta.supervisor?.ran ? (meta.supervisor.model ?? meta.supervisor.provider ?? 'supervisor') : (data.model ?? 'unknown'),
-        worker: meta.supervisor?.ran ? (data.model ?? null) : null,
+        supervisor: data.supervisorRan ? (data.supervisorModel ?? data.supervisorProvider ?? 'supervisor') : (meta.supervisor?.ran ? (meta.supervisor.model ?? meta.supervisor.provider ?? 'supervisor') : (data.model ?? 'unknown')),
+        worker: data.supervisorRan ? (data.model ?? null) : (meta.supervisor?.ran ? (data.model ?? null) : null),
         resultCardToken: '',  // [NEXT] resultCardToken is built in chatPanelBuildRunner after this returns — needs 2-phase record
       });
     } catch {}
