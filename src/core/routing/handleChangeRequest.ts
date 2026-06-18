@@ -27,8 +27,24 @@ export async function handleChangeRequest(
   }
 
   if (opts.intent === 'fix') {
+    let fixImage = msg.imageBase64;
+    let fixImageType = msg.imageType;
+    if (!fixImage) {
+      try {
+        const { getRuntimeReports } = await import('../../ui/panels/chat/chatPanelPreview.js');
+        const reports = getRuntimeReports();
+        const latestSnapshot = [...reports].reverse().find(r => r.image);
+        if (latestSnapshot && latestSnapshot.image) {
+          const parts = latestSnapshot.image.split(',');
+          if (parts.length === 2) {
+            fixImageType = parts[0].match(/:(.*?);/)?.[1] || 'image/jpeg';
+            fixImage = parts[1];
+          }
+        }
+      } catch (e) {}
+    }
     // Pass the user's ORIGINAL words (not the AI-rewritten task) — they drive history/vault/dead-ends.
-    await handleFixRequest(ctx?.rawMessage ?? opts.routedText, deps, msg.imageBase64, msg.imageType);
+    await handleFixRequest(ctx?.rawMessage ?? opts.routedText, deps, fixImage, fixImageType);
     return;
   }
   await handleBuildIntent(opts.routedText || opts.claudeTask, opts.claudeTask, msg, deps, deps.conversation, deps.refresh);

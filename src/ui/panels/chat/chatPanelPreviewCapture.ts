@@ -14,9 +14,11 @@ export function getCaptureScript(): string {
   if(_raf){ window.requestAnimationFrame=function(){ loopSeen=true; return _raf.apply(window,arguments); }; }
   var _si=window.setInterval;
   window.setInterval=function(){ loopSeen=true; return _si.apply(window,arguments); };
-  function send(kind,msg){
+  function send(kind,msg,img){
     try{
-      var body=JSON.stringify({kind:kind,msg:String(msg).slice(0,400)});
+      var payload={kind:kind,msg:String(msg).slice(0,400)};
+      if(img) payload.image=img;
+      var body=JSON.stringify(payload);
       if(navigator.sendBeacon){ navigator.sendBeacon('/__rdv_runtime', body); }
       else { fetch('/__rdv_runtime',{method:'POST',body:body,keepalive:true}).catch(function(){}); }
     }catch(e){}
@@ -36,6 +38,8 @@ export function getCaptureScript(): string {
       var c=document.querySelector('canvas');
       if(c){
         var blank=false;
+        var b64=null;
+        try{ b64=c.toDataURL('image/jpeg',0.5); }catch(e){}
         try{
           var ctx=c.getContext&&c.getContext('2d');
           if(ctx){
@@ -46,8 +50,9 @@ export function getCaptureScript(): string {
             }
           }
         }catch(e){}
-        if(blank && !loopSeen){ send('probe','canvas is blank and no animation loop started - the game is not running'); }
-        else if(!loopSeen){ send('probe','no animation loop (requestAnimationFrame/setInterval) ever started'); }
+        if(blank && !loopSeen){ send('probe','canvas is blank and no animation loop started - the game is not running', b64); }
+        else if(!loopSeen){ send('probe','no animation loop (requestAnimationFrame/setInterval) ever started', b64); }
+        else if(b64){ send('snapshot','visual snapshot', b64); }
       }
     }catch(e){}
   }, 1500);

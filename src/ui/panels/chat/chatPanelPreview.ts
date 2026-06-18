@@ -14,9 +14,9 @@ import { getCaptureScript } from './chatPanelPreviewCapture';
 // [PREVIEW-AUTOFIX Phase 0] Runtime reports beaconed by the injected capture script (POST /__rdv_runtime).
 // Buffered here so the extension can read "did this preview actually run?" — uncaught errors, failed script
 // loads, console.error, and the blank-canvas / no-loop probe. See docs/REDIVIVUS_PREVIEW_AUTOFIX.md.
-let _runtimeReports: Array<{ kind: string; msg: string; t: number }> = [];
-export function getRuntimeReports(): Array<{ kind: string; msg: string }> {
-  return _runtimeReports.map(r => ({ kind: r.kind, msg: r.msg }));
+let _runtimeReports: Array<{ kind: string; msg: string; t: number; image?: string }> = [];
+export function getRuntimeReports(): Array<{ kind: string; msg: string; image?: string }> {
+  return _runtimeReports.map(r => ({ kind: r.kind, msg: r.msg, image: r.image }));
 }
 export function clearRuntimeReports(): void { _runtimeReports = []; }
 
@@ -204,7 +204,7 @@ function _buildStaticServer(root: string, port: number): http.Server {
         try {
           const r = JSON.parse(body);
           if (r && r.kind) {
-            _runtimeReports.push({ kind: String(r.kind), msg: String(r.msg || '').slice(0, 400), t: Date.now() });
+            _runtimeReports.push({ kind: String(r.kind), msg: String(r.msg || '').slice(0, 400), image: r.image ? String(r.image) : undefined, t: Date.now() });
             if (_runtimeReports.length > 200) { _runtimeReports.shift(); }
           }
         } catch { /* malformed beacon — ignore */ }

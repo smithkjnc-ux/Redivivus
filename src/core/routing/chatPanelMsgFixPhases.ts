@@ -121,6 +121,8 @@ export async function runPhase1Supervisor(
           supervisor: provider,
           supervisorModel: pModel,
           keys: keysPayload,
+          imageBase64: imageBase64 || undefined,
+          imageType: imageType || undefined,
         })
       }, 120_000);
       const data = await res.json().catch(() => ({}));
