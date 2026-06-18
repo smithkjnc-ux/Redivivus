@@ -101,8 +101,9 @@ export async function routeCloudChatResult(
       // fall through to build routing below — do NOT return
     } else {
       const _isImperative = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
+      const _isBugReport = /\b(broken|bug|doesn't work|not working|error|crash|fail|fails|glitch|stuck|missing|wrong|nothing happens|does nothing|won't start)\b/i.test(userText);
       const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
-      const _isRecoverableToFix = hasProjectOpen && _isImperative && !_isQuestion;
+      const _isRecoverableToFix = hasProjectOpen && (_isImperative || _isBugReport) && !_isQuestion;
 
       // [FIX] answer OR clarify on an imperative inside an open project → always route to fix.
       // The backend returns this response under 'clarify' sometimes and 'answer' other times —
