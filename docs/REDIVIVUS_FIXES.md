@@ -9703,3 +9703,5 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 - Fixed 'forward to input' button by correcting the target textarea ID from 'user-input' to 'message-input', and moved it and the 'copy' button into the inline `.message-meta` row so they are always visible without hover.
 
 - Fixed chat panel 'Copy' and 'Forward to input' buttons silently failing when responses contained UTF-8 characters (like emojis or smart quotes). Replaced buggy `atob()` decoding with `decodeURIComponent(escape(atob()))`.
+- Removed redundant chat bubble code injection in `chatPanelBuildRunner.ts` to keep the Build Activity Panel as the single source of truth during multi-file builds.
+- Fixed context truncation and DOM ID mapping in `redivivus-backend` Guardian by increasing context size to 10k characters and explicitly enabling split of single-concern CSS files.
