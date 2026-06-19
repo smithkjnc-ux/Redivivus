@@ -101,7 +101,11 @@ export async function guardianReviewImpl(
   const keyMap = svc.getKeyMap();
   const preferred = forceProvider || selectGuardianAI(workerAI, keyMap);
   if (!preferred) {
-    return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
+    // [H3] No independent Guardian (a provider different from the Worker) is configured — fail CLOSED.
+    // Previously returned passed:true, silently shipping unreviewed code. Surface a blocking verdict.
+    return { passed: false, correctedText: null,
+      issues: ['Guardian review unavailable: no second AI provider (different from the Worker) is configured. Add another provider to enable independent review — code was NOT reviewed.'],
+      scopeAlerts: [], guardianAI: 'none', workerAI };
   }
   // [FIX][FAILOVER] Step the Guardian DOWN across configured AIs (preferred Guardian first, then the rest by
   // rank). If providers run out it degrades to whatever is left — even ONE AI doing Supervisor+Worker+Guardian
@@ -109,7 +113,8 @@ export async function guardianReviewImpl(
   // a single provider and silently skipped on any error (e.g. a capped Claude), shipping the fix unreviewed.
   // (PapaJoe: "they should all step down... could be one AI doing all three positions.")
   const ranked = Object.entries(AI_RANK)
-    .filter(([ai]: any) => keyMap[ai]?.())
+    // [H2] Never fail over to the Worker's own provider — the Guardian must stay independent.
+    .filter(([ai]: any) => ai !== workerAI && keyMap[ai]?.())
     .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
     .map(([ai]: any) => ai);
   // [ROUTING PANEL] A user-forced Guardian uses ONLY that provider (no failover, like the manual pill).
@@ -150,5 +155,9 @@ export async function guardianReviewImpl(
     } catch (e: any) { gLastError = e?.message || 'unknown'; continue; }
   }
   console.error('Guardian review failed on all providers:', gLastError);
-  return { passed: true, correctedText: null, issues: [], scopeAlerts: [], guardianAI: 'none', workerAI };
+  // [H3] Every Guardian provider failed — fail CLOSED. Previously returned passed:true, silently
+  // shipping unreviewed code. Return a blocking verdict with the error so callers surface it.
+  return { passed: false, correctedText: null,
+    issues: [`Guardian review failed on all providers (${gLastError}) — code was NOT reviewed and must not ship as-is.`],
+    scopeAlerts: [], guardianAI: 'none', workerAI };
 }

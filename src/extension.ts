@@ -106,7 +106,7 @@ export function activate(context: vscode.ExtensionContext) {
   const usageTracker = new UsageTracker(context);
   // One-time cleanup of legacy unattributed ('none') usage rows; going forward such rows are
   // labeled 'unknown' so any missed attribution is visible. Guarded by a globalState flag.
-  void usageTracker.runOneTimeNonePurge();
+  usageTracker.runOneTimeNonePurge().catch(() => { /* [L4] best-effort one-time cleanup; avoid unhandled rejection */ });
   const guardianService = new GuardianService(redivivusService);
   const statusBar = new StatusBar(redivivusService, sessionService, usageTracker);
 
@@ -309,8 +309,8 @@ export function activate(context: vscode.ExtensionContext) {
     // otherwise the orphaned pre-reload webview stays visible with stale generic-button header.
     const suppressed = !!(suppressPath && currentRoot && suppressPath === currentRoot);
     if (suppressed) { context.globalState.update('redivivus.suppressAutoOpen', undefined); }
-    require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[auto-open-timer] currentPanel=${!!ChatPanel.currentPanel} suppressed=${suppressed} currentRoot=${currentRoot}\n`);
-    
+    // [M3] Removed an unconditional fs.appendFileSync(~/redivivus_debug.log) that ran every activation.
+
     // [FIX] Extract to a check loop so we wait if deserialization is actively blocking.
     // If the window is still deserializing, we don't want to race it and create a duplicate panel.
     const checkAndShow = () => {

@@ -58,8 +58,11 @@ try {
   }
 } catch {}
 
-// Also sync to any installed redivivus extension in ~/.vscode/extensions/ and
-// ~/.redivivus/extensions/ (post-rebrand dataFolderName location)
+// Also sync to any installed redivivus extension in ~/.vscode/extensions/ and ~/.redivivus/extensions/.
+// [C2] ~/.redivivus MUST equal product.json `dataFolderName` ('.redivivus', set by
+// scripts/debrand-linux-product.js) — that is the folder the running Linux IDE reads user-installed
+// extensions from, and where the auto-updater's `--install-extension` lands a new VSIX. If the
+// debrand ever sets a different dataFolderName, update this path to match or updates won't be seen.
 for (const extRoot of [path.join(home, '.vscode', 'extensions'), path.join(home, '.redivivus', 'extensions')]) {
   if (!fs.existsSync(extRoot)) continue;
   for (const entry of fs.readdirSync(extRoot)) {

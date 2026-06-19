@@ -41,6 +41,12 @@ else
   mv "$TMPDIR/vscodium" "$BUILD_DIR/VSCode-linux-x64"
 fi
 
+# [C2] A fresh VSCodium base ships an unpatched product.json (VSCodium branding, dataFolderName
+# .vscode-oss). Re-apply the Redivivus debrand immediately so the base is never left un-debranded —
+# this is the step that was missing on Linux (only build-windows.sh had it).
+echo "▶  Debranding Linux product.json..."
+node "$PROJECT_DIR/scripts/debrand-linux-product.js" "$BUILD_DIR/VSCode-linux-x64/resources/app/product.json"
+
 echo "▶  Injecting Redivivus extension..."
 EXT_DST="$BUILD_DIR/VSCode-linux-x64/resources/app/extensions/redivivus"
 mkdir -p "$EXT_DST"

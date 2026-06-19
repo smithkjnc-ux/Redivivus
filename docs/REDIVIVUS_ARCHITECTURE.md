@@ -13,7 +13,7 @@
 - **Extension ID:** papajoe.redivivus
 - **Engine compat:** `vscode ^1.70.0` (for Windsurf compatibility)
 - **GitHub:** `https://github.com/smithkjnc-ux/Redivivus.git` (private)
-- **Backend:** `https://redivivus-backend.fly.dev` (fly.dev — `redivivus-backend` repo, `fly deploy --now`)
+- **Backend:** `https://redivivus-backend-1017737301468.us-east4.run.app` (Google Cloud Run — `redivivus-backend` repo, deployed from `Dockerfile`). This is the authoritative backend every shipped client calls. A legacy Fly.io deployment (`redivivus-backend.fly.dev`, see `fly.toml`) still runs in parallel but no shipped client references it.
 - **Website:** `https://redivivus.dev` (Cloudflare Workers — `redivivus-web` repo, `npx wrangler deploy`)
 - **Database:** Supabase (`nadcrknbzsbhpnnvhtir` instance)
 - **Dogfood project:** `~/projects/doaidream/`

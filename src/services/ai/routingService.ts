@@ -9,8 +9,6 @@ import { AI_RANK } from './guardianAI.js';
 import { routeByComplexityImpl } from './routingComplexity.js';
 import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
 import { supervisorPlanWithFailover } from './routingServiceSupervisor.js';
-import type { OrchestratedResult, ProgressCallback } from './supervisorOrchestrator.js';
-import { createPlan, executeStep, reviewOutput } from './supervisorOrchestrator.js';
 import { redivivusLog } from '../logging/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
 import { logTelemetry } from '../api/apiClient.js';
@@ -192,9 +190,7 @@ export class RoutingService {
     const { selectGuardianAI } = require('./guardianAI.js');
     return selectGuardianAI(workerAI, this.getKeyMap());
   }
-  /** Multi-AI orchestrated build — delegates to routingOrchestration.ts */
-  async orchestratedBuild(task: string, context: string, onProgress?: ProgressCallback): Promise<OrchestratedResult> {
-    const { orchestratedBuildImpl } = await import('./routingOrchestration.js');
-    return orchestratedBuildImpl(this, task, context, onProgress);
-  }
+  // [DEAD][M4] Removed `orchestratedBuild()` + `src/services/ai/routingOrchestration.ts` — they had no
+  // live callers (the only reference was a [DEAD] comment in chatPanelChunked.ts). The live orchestrated
+  // build path is core/build/chatPanelBuildOrchestrated.ts, which calls supervisorOrchestrator directly.
 }

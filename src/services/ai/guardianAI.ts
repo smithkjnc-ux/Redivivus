@@ -51,19 +51,22 @@ export const AI_CAPABILITIES: Record<string, AICapability> = {
   kimi:     { rank: 4, label: 'Kimi', strengths: ['large files', 'bulk annotation', 'long context'], bestFor: 'Large file processing, bulk operations', contextLimit: 200_000 },
 };
 
-// [RULE] Guardian === Supervisor — always the highest-ranked available AI, no exceptions.
-// Reasoning: the Supervisor writes the plan; the Guardian verifies it was executed correctly.
-// Both roles require the same depth of reasoning. A weaker Guardian misses what a stronger
-// Supervisor intended. Cost-first was tried and failed (see [DEAD] below).
+// [RULE][H2] Guardian INDEPENDENCE — the Guardian must be a DIFFERENT provider than the Worker it
+// reviews, so the AI under review can never approve its own output. Pick the highest-ranked
+// AVAILABLE provider that is NOT the Worker's provider. If the Worker's provider is the only one
+// configured, there is no independent Guardian — return null and let callers fail closed (see H3).
 // [DEAD] Cost-first guardian selection — Groq ($0.09/1M) reviewing Claude's work caused vague
 // style critiques ("could be simplified"), wasting 4-6 retry calls. Net cost was HIGHER than
 // one capable guardian call. Reverted to capability-first. Never do cost-first again.
+// [DEAD] Guardian === Supervisor (worker provider NOT excluded) — letting the same provider review
+// its own work defeated the point of an independent review. Reverted to worker-exclusion (audit H2).
 
-/** Returns the Guardian AI — always the highest-ranked available AI (same as Supervisor).
- *  workerAI param retained for call-site compatibility but is no longer used to exclude. */
-export function selectGuardianAI(_workerAI: string, keyMap: Record<string, () => string | null>): string | null {
+/** Returns the Guardian AI — the highest-ranked available provider that is NOT the Worker's
+ *  provider, guaranteeing the reviewer is independent of the AI under review. Returns null when the
+ *  Worker's provider is the only one configured (no independent Guardian possible). */
+export function selectGuardianAI(workerAI: string, keyMap: Record<string, () => string | null>): string | null {
   const ranked = Object.entries(AI_RANK)
-    .filter(([ai]) => keyMap[ai]?.())
+    .filter(([ai]) => ai !== workerAI && keyMap[ai]?.())
     .sort(([, a], [, b]) => b - a)
     .map(([ai]) => ai);
   return ranked[0] ?? null;

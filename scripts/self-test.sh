@@ -12,7 +12,7 @@ echo "════════════════════════�
 echo ""
 
 # ── 1. TypeScript Compilation ──
-echo "▸ [1/7] TypeScript compilation..."
+echo "▸ [1/6] TypeScript compilation..."
 TSC_OUT=$(npx tsc --noEmit 2>&1)
 if [ $? -eq 0 ]; then
   echo "  ✅ Zero compilation errors"
@@ -25,12 +25,24 @@ fi
 echo ""
 
 # ── 2. Broken Imports (files that import non-existent paths) ──
-echo "▸ [2/7] Checking for broken import targets..."
+echo "▸ [2/6] Checking for broken import targets..."
 BROKEN=0
+# Known false positives: import-like text that lives inside scaffold TEMPLATE STRINGS — code the
+# extension GENERATES into a user's project (e.g. a React app), not a real module import this checker
+# can resolve on disk. Format: "FILE|IMPORT_PATH". Add here (with a reason) rather than editing the
+# generated template, which must keep the import for the user's project to work.
+KNOWN_IMPORT_EXCEPTIONS=(
+  "src/core/build/chatPanelScaffoldReact.ts|./App"  # React scaffold: src/main.tsx template literal, not a real import
+)
 while IFS= read -r line; do
   FILE=$(echo "$line" | cut -d: -f1)
   IMPORT_PATH=$(echo "$line" | grep -oP "from ['\"]\\K[^'\"]+")
   if [[ "$IMPORT_PATH" == .* ]]; then
+    SKIP=0
+    for ex in "${KNOWN_IMPORT_EXCEPTIONS[@]}"; do
+      if [ "$FILE|$IMPORT_PATH" = "$ex" ]; then SKIP=1; break; fi
+    done
+    if [ $SKIP -eq 1 ]; then continue; fi
     DIR=$(dirname "$FILE")
     RESOLVED="$DIR/${IMPORT_PATH%.js}"
     if [[ ! -f "${RESOLVED}.ts" && ! -f "${RESOLVED}/index.ts" && ! -f "${RESOLVED}.js" ]]; then
@@ -47,7 +59,7 @@ fi
 echo ""
 
 # ── 3. Ghost directories (brace expansion artifacts, empty dirs) ──
-echo "▸ [3/7] Checking for ghost/junk directories..."
+echo "▸ [3/6] Checking for ghost/junk directories..."
 GHOSTS=0
 while IFS= read -r dir; do
   if [[ "$dir" == *"{"* || "$dir" == *"}"* ]]; then
@@ -68,18 +80,8 @@ fi
 ERRORS=$((ERRORS + GHOSTS))
 echo ""
 
-# ── 4. Duplicate files (old + new location both exist) ──
-echo "▸ [4/7] Checking for duplicates (src/ vs src.bak/)..."
-if [ -d "src.bak" ]; then
-  echo "  ✅ src.bak/ exists (backup intact)"
-else
-  echo "  ⚠️  No src.bak/ backup found"
-  WARNS=$((WARNS + 1))
-fi
-echo ""
-
-# ── 5. Entry point integrity ──
-echo "▸ [5/7] Entry point checks..."
+# ── 4. Entry point integrity ──
+echo "▸ [4/6] Entry point checks..."
 EP_OK=1
 if ! grep -q "export function activate" src/extension.ts 2>/dev/null; then
   echo "  ❌ extension.ts missing activate() export"
@@ -102,8 +104,8 @@ fi
 [ $EP_OK -eq 1 ] && echo "  ✅ Entry points intact"
 echo ""
 
-# ── 6. Key service files exist ──
-echo "▸ [6/7] Core file existence check..."
+# ── 5. Key service files exist ──
+echo "▸ [5/6] Core file existence check..."
 MISSING=0
 CORE_FILES=(
   "src/extension.ts"
@@ -112,8 +114,8 @@ CORE_FILES=(
   "src/services/project/redivivusPaths.ts"
   "src/services/project/templateRegistry.ts"
   "src/services/ai/routingService.ts"
-  "src/ui/chat/chatPanel.ts"
-  "src/ui/chat/chatPanelOrchestrator.ts"
+  "src/ui/panels/chat/chatPanel.ts"
+  "src/core/build/chatPanelOrchestrator.ts"
   "src/ui/sidebar/sidebarProvider.ts"
 )
 for f in "${CORE_FILES[@]}"; do
@@ -129,8 +131,8 @@ else
 fi
 echo ""
 
-# ── 7. VSIX build test ──
-echo "▸ [7/7] VSIX package test..."
+# ── 6. VSIX build test ──
+echo "▸ [6/6] VSIX package test..."
 VSIX_OUT=$(npx vsce package --no-dependencies 2>&1)
 if echo "$VSIX_OUT" | grep -q "\.vsix"; then
   VSIX_FILE=$(echo "$VSIX_OUT" | grep -oP 'redivivus-[\d.]+\.vsix')

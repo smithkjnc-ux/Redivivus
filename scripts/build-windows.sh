@@ -71,15 +71,17 @@ cp -r "$PROJECT_DIR/resources" "$EXT_DIR/"
 echo "▶  Applying branding..."
 node -e "
 const fs = require('fs');
+// [Parity] Reuse the shared cross-platform debrand (names, dataFolderName, urlProtocol,
+// serverDataFolderName, doc/issue URLs) so Windows matches the new Linux debrand exactly. Previously
+// this block set names + dataFolderName but never urlProtocol/serverDataFolderName/doc URLs.
+const { applyCrossPlatformDebrand } = require('$PROJECT_DIR/scripts/debrand-product.js');
 const winProdPath = 'VSCode-win32-x64/resources/app/product.json';
 const extraProdPath = '$BUILD_DIR/product.json';
 const winP = JSON.parse(fs.readFileSync(winProdPath, 'utf8'));
 const extraP = JSON.parse(fs.readFileSync(extraProdPath, 'utf8'));
 Object.assign(winP, extraP);
-winP.nameShort = 'Redivivus';
-winP.nameLong = 'Redivivus IDE';
-winP.applicationName = 'redivivus';
-winP.dataFolderName = '.redivivus';
+applyCrossPlatformDebrand(winP);
+// Windows-only identity fields (not applicable on Linux):
 winP.win32MutexName = 'redivivus';
 winP.win32DirName = 'Redivivus';
 winP.win32NameVersion = 'Redivivus';

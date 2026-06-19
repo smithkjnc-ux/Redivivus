@@ -69,3 +69,37 @@ export function formatPlanBreakdown(steps: PlanStep[]): string {
     `  **Step ${s.stepNumber}** — ${s.assignedLabel}: ${s.description}`
   ).join('\n');
 }
+
+/**
+ * Renders the Guardian review outcome into the conversation and reports whether the build must stop.
+ * Returns true when the build is BLOCKED — the caller must write nothing and return. Three cases:
+ *  - blocked  → 🛑 hard stop (a real Guardian failure: timeout/error/ambiguous, H3)
+ *  - degraded → ⚠️ persistent warning; the build proceeds unreviewed (single-provider mode, not passed)
+ *  - corrected → ✍️ note that the Guardian rewrote the output
+ */
+export function pushReviewOutcome(
+  deps: OrchestratorDeps,
+  review: { passed: boolean; notes: string; blocked?: boolean; degraded?: boolean; error?: string; warning?: string },
+): boolean {
+  if (review.blocked) {
+    deps.conversation.push({ role: 'assistant',
+      content: `🛑 **Build blocked — nothing was written.** ${review.error}\n\nAn independent Guardian (a second AI provider, different from the one that built this) must review the output before it can ship. Add another provider or retry, then run the build again.`,
+      timestamp: Date.now() });
+    deps.refresh();
+    return true;
+  }
+  if (review.degraded) {
+    deps.conversation.push({ role: 'assistant',
+      content: `⚠️ **Shipped without independent review (degraded mode).** ${review.warning}\n\nThe code was written, but only one AI provider is configured — so no *different* AI checked what this one built. Add a second AI provider in Setup to enable full Guardian coverage.`,
+      timestamp: Date.now() });
+    deps.refresh();
+    return false;
+  }
+  if (!review.passed && review.notes) {
+    deps.conversation.push({ role: 'assistant',
+      content: `✍️ Guardian applied corrections: ${review.notes}`,
+      timestamp: Date.now() });
+    deps.refresh();
+  }
+  return false;
+}

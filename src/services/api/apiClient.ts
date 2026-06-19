@@ -1,18 +1,20 @@
-// [SCOPE] Redivivus cloud API client -- routes AI calls through the Fly.io backend.
+// [SCOPE] Redivivus cloud API client -- routes AI calls through the Cloud Run backend.
 // Keys: stored in settings.json on device only. Sent to backend as X-Provider-Keys header (not body).
 
 import * as vscode from 'vscode';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from '../ai/routingKeys.js';
 
 const SECRET_KEY = 'redivivus.account.token';
-// [FIX] Default to PRODUCTION (Fly), like any shipped client — so dev builds test the real deployed
+// [FIX] Default to PRODUCTION (Cloud Run), like any shipped client — so dev builds test the real deployed
 // backend, not a local server. Pointing at localhost gave inaccurate tests (different code, latency,
 // cold-start behavior). To develop against a local backend, explicitly set `redivivus.apiBase` to
 // http://localhost:3000/api/v1 — it's now opt-IN, never the default.
 const API_BASE_DEFAULT = 'https://redivivus-backend-1017737301468.us-east4.run.app/api/v1';
 export function getApiBase(): string {
   // [WARN] Never hardcode or rewrite to stale Cloudflare/legacy domains.
-  // The extension hits the Fly.io backend directly — redivivus.dev is no longer the API origin.
+  // The extension hits the Cloud Run backend (…us-east4.run.app) directly — redivivus.dev is no
+  // longer the API origin. A legacy Fly.io deployment (redivivus-backend.fly.dev) still runs in
+  // parallel but no shipped client points to it; do not switch the default back to Fly.
   return vscode.workspace.getConfiguration('redivivus').get<string>('apiBase') || API_BASE_DEFAULT;
 }
 

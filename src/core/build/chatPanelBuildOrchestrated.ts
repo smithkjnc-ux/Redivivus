@@ -3,7 +3,7 @@
 // Utilities (AI_LABELS, parseFileMarkers, etc.) extracted to chatPanelBuildOrchestratedUtils.ts (Rule 9).
 
 import * as path from 'path';
-import { AI_RANK } from '../../services/ai/guardianAI';
+import { AI_RANK, selectGuardianAI } from '../../services/ai/guardianAI';
 import { createPlan, executeStep, reviewOutput } from '../../services/ai/supervisorOrchestrator';
 import { callProvider } from '../ai/providers/providerFactory';
 import type { BuildPlan, BuildPhase } from '../../services/build/buildOrchestrator';
@@ -14,7 +14,7 @@ import { readProjectRules } from '../routing/chatPanelMsgFixUtils.js';
 import { generatePlanId, formatOrchestratedPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough';
 import { log } from '../../services/logging/redivivusLogger.js';
-import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown } from './chatPanelBuildOrchestratedUtils';
+import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown, pushReviewOutcome } from './chatPanelBuildOrchestratedUtils';
 
 // Re-export utilities so existing importers don't break
 export { isOrchestratedAvailable, buildPhaseTask } from './chatPanelBuildOrchestratedUtils';
@@ -113,32 +113,46 @@ export async function runOrchestratedPhaseBuild(
     if (result.code) {
       assembledCode = assembledCode ? assembledCode + '\n\n' + result.code : result.code;
     }
+    // [M1] Surface a failed step instead of silently dropping it — otherwise the build continues with a
+    // missing piece and the user never learns why the result is incomplete.
+    if (result.failed) {
+      deps.conversation.push({
+        role: 'assistant',
+        content: `⚠️ **Step ${step.stepNumber} (${step.assignedLabel}) failed** and produced no output: ${result.error}. Continuing with the remaining steps — the result may be incomplete.`,
+        timestamp: Date.now(),
+      });
+      deps.refresh();
+    }
     totalTokens += result.tokens;
   }
 
-  // ── Step 3: Supervisor reviews assembled output ───────────────────────────
-  deps.conversation.push({
-    role: 'assistant',
-    content: `🛡️ **${supervisorLabel} (Supervisor)** reviewing assembled output...`,
-    timestamp: Date.now(),
-  });
-  deps.refresh();
-
-  const review = await reviewOutput(
-    phaseTask,
-    assembledCode,
-    ranked[0],
-    callAI,
-    planSteps.map(s => `Step ${s.stepNumber}: Create ${s.filesToCreate?.join(', ')} -> ${s.exactInstructions}`).join('\\n')
-  );
-  if (!review.passed && review.notes) {
+  // ── Step 3: Independent Guardian reviews assembled output ─────────────────
+  // [H1] The reviewer must NOT be the planner (ranked[0]) — that AI authored the plan and would be
+  // grading its own work. Select an independent Guardian (a different provider). [H3] If the review
+  // FAILS (timeout/error/ambiguous), BLOCK the ship — never write unreviewed code to disk.
+  // [DEGRADED] If the user has only one provider configured there is no independent Guardian to call;
+  // that is an expected config state, not a failure — proceed but mark the build unreviewed and warn.
+  const guardianAI = selectGuardianAI(ranked[0], keyMap);
+  const singleProvider = !guardianAI && ranked.length <= 1;
+  if (guardianAI) {
     deps.conversation.push({
       role: 'assistant',
-      content: `✍️ Supervisor applied corrections: ${review.notes}`,
+      content: `🛡️ **${AI_LABELS[guardianAI] || guardianAI} (Guardian)** reviewing assembled output...`,
       timestamp: Date.now(),
     });
     deps.refresh();
   }
+
+  const review = await reviewOutput(
+    phaseTask,
+    assembledCode,
+    guardianAI || '',
+    callAI,
+    planSteps.map(s => `Step ${s.stepNumber}: Create ${s.filesToCreate?.join(', ')} -> ${s.exactInstructions}`).join('\\n'),
+    singleProvider,
+  );
+  // [H3] blocked → stop, write nothing. [DEGRADED] degraded → persistent ⚠️ warning, proceed unreviewed.
+  if (pushReviewOutcome(deps, review)) { return []; }
   const finalCode = review.corrected;
 
   // ── Step 4: Parse FILE markers and write each file ────────────────────────

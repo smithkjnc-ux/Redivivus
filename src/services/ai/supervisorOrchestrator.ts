@@ -26,6 +26,9 @@ export interface OrchestratedResult {
   reviewPassed: boolean;
   reviewNotes: string;
   totalTokensEstimate: number;
+  // [DEGRADED] True when the build shipped WITHOUT independent Guardian review because only one
+  // provider is configured. Distinct from reviewPassed:true (independently reviewed + approved).
+  degraded?: boolean;
 }
 
 /** Progress callback for UI updates */
@@ -76,7 +79,7 @@ export async function executeStep(
   previousOutput: string,
   callAI: (ai: string, prompt: string) => Promise<AIResponse>,
   allSteps?: PlanStep[]
-): Promise<{ code: string; tokens: number }> {
+): Promise<{ code: string; tokens: number; failed?: boolean; error?: string }> {
   // Reconstruct a strict text contract for the Worker
   let specText = '';
   if (step.filesToCreate || step.dependencies || step.exactInstructions) {
@@ -114,7 +117,9 @@ export async function executeStep(
     fullResponse: res.text
   });
 
-  if (!res.success) { return { code: '', tokens: 0 }; }
+  // [M1] Signal failure to the caller instead of silently returning empty code — a dropped step would
+  // otherwise vanish from the assembled output with no indication the build is incomplete.
+  if (!res.success) { return { code: '', tokens: 0, failed: true, error: res.error || 'worker produced no output' }; }
   const tokens = Math.ceil((res.text || '').length / 4);
   return { code: res.text || '', tokens };
 }
@@ -123,10 +128,25 @@ export async function executeStep(
 export async function reviewOutput(
   task: string,
   assembledCode: string,
-  supervisorAI: string,
+  guardianAI: string,
   callAI: (ai: string, prompt: string) => Promise<AIResponse>,
-  planContext?: string
-): Promise<{ passed: boolean; corrected: string; notes: string }> {
+  planContext?: string,
+  // [DEGRADED] Caller sets this ONLY when guardianAI is empty *specifically* because the user has a
+  // single provider configured (an expected, known config state — not a failure). When set, an empty
+  // guardian degrades to "ship unreviewed + warn" instead of blocking. Any other empty-guardian case,
+  // and every real Guardian failure below, still fails CLOSED (H3) regardless of this flag.
+  allowDegradedSingleProvider = false,
+): Promise<{ passed: boolean; corrected: string; notes: string; blocked?: boolean; degraded?: boolean; error?: string; warning?: string }> {
+  if (!guardianAI) {
+    // [DEGRADED] Case 1 — only one provider configured: proceed but mark unreviewed (NOT passed:true).
+    if (allowDegradedSingleProvider) {
+      return { passed: false, degraded: true, corrected: assembledCode, notes: '',
+        warning: 'Shipped without independent Guardian review — only one AI provider is configured, so no different AI could review what this one built. Add a second provider for full review coverage.' };
+    }
+    // [H3] Case 2 — guardian absent for any other reason: fail CLOSED, do not ship unreviewed.
+    return { passed: false, corrected: assembledCode, notes: '', blocked: true,
+      error: 'No independent Guardian available — a second AI provider (different from the builder) is required to review the output.' };
+  }
   const prompt = `You are a Senior Architect/Guardian reviewing assembled code from a junior worker.
 
 ORIGINAL TASK: "${task}"
@@ -140,22 +160,28 @@ Did the worker strictly follow the exact instructions? Did they create the speci
 
   log('debug', 'services', 'supervisorOrchestrator', 'reviewOutput', 'Guardian Review Prompt', { fullPrompt: prompt });
 
-  const res = await callAI(supervisorAI, prompt);
-  
+  const res = await callAI(guardianAI, prompt);
+
   log('debug', 'services', 'supervisorOrchestrator', 'reviewOutput', 'Guardian Review Outcome', {
     success: res.success,
     fullResponse: res.text
   });
 
-  if (!res.success || !res.text) { return { passed: true, corrected: assembledCode, notes: '' }; }
+  // [H3] Guardian call failed or returned nothing — block, do NOT ship unreviewed code.
+  if (!res.success || !res.text) {
+    return { passed: false, corrected: assembledCode, notes: '', blocked: true,
+      error: `Guardian review failed (${guardianAI}): ${res.error || 'no response from reviewer'}.` };
+  }
 
   const text = res.text.trim();
   if (text.startsWith('REVIEW_PASS')) {
-    return { passed: true, corrected: assembledCode, notes: 'Supervisor approved' };
+    return { passed: true, corrected: assembledCode, notes: 'Guardian approved' };
   }
   const fixMatch = text.match(/REVIEW_FIX:\s*([\s\S]*)/);
   if (fixMatch) {
-    return { passed: false, corrected: fixMatch[1].trim(), notes: 'Supervisor corrected output' };
+    return { passed: false, corrected: fixMatch[1].trim(), notes: 'Guardian corrected output' };
   }
-  return { passed: true, corrected: assembledCode, notes: '' };
+  // [H3] Unrecognized Guardian response — ambiguous verdict; block rather than ship unreviewed code.
+  return { passed: false, corrected: assembledCode, notes: '', blocked: true,
+    error: `Guardian (${guardianAI}) returned an unrecognized response — blocking to avoid shipping unreviewed code.` };
 }

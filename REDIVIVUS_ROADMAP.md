@@ -7,7 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 18, 2026
+*Last updated:* June 19, 2026 — Post-audit tooling fixes: self-test.sh now passes 0/0 — corrected stale CORE_FILES paths (ui/chat→ui/panels/chat, chatPanelOrchestrator→core/build), removed 3 empty reorg-leftover dirs (src/ui/chat, src/tests/ui, src/tests/core/build), and added a step-2 known-exceptions list for the React-scaffold `./App` template-string false positive. Earlier today: N1 closeout (removed `src.bak/` + self-test step 4, renumbered 7→6). Full audit status in AUDIT_REPORT.md.
+
+*Prior:* 2026-06-18 — Audit remediation: fixed C1/C2, H1–H4 (+degraded single-provider), M1–M4, M6, L2/L4; added integration tests (test-guardian-independence.cjs, test-update-and-debrand.cjs); remaining items triaged/flagged in AUDIT_REPORT.md.
 
 *Prior:* 2026-06-14 — Build Contract enforcement (PRIORITY): worker gets full rulebook, quality gate rejects flat games, distillation logged+retried, multi-file decomposition. Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md.
 

@@ -1,6 +1,9 @@
 import typescriptEslint from "typescript-eslint";
 
 export default [{
+    // [L2] Don't lint vendored third-party code (e.g. pwa/vendor/qrcode.js) — not ours to fix.
+    ignores: ["**/vendor/**"],
+}, {
     files: ["**/*.ts"],
 }, {
     plugins: {

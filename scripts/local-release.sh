@@ -30,6 +30,12 @@ echo "▶  Version bumped to $NEW_VERSION"
 echo "▶  Compiling..."
 npm run compile
 
+# [C2] Debrand the Linux product.json before packaging so every release tarball ships Redivivus
+# branding (and dataFolderName=.redivivus, which the auto-updater/deploy target depend on). Idempotent,
+# so it is safe even when the base was already patched by update-linux-base.sh.
+echo "▶  Debranding Linux product.json..."
+node "$PROJECT_DIR/scripts/debrand-linux-product.js" "$BUILD_DIR/resources/app/product.json"
+
 echo "▶  Packaging tarball..."
 cd "$HOME/projects/redivivus-build"
 FOLDER="redivivus-$NEW_VERSION"
@@ -100,16 +106,20 @@ ICON_SRC="$BUILD_DIR/resources/app/resources/linux/redivivus.png"
 ICON_DEST="$HOME/.local/share/icons/redivivus.png"
 if [ -f "$ICON_SRC" ]; then cp -f "$ICON_SRC" "$ICON_DEST"; fi
 DESKTOP_FILE="$HOME/.local/share/applications/redivivus.desktop"
+# [H4] Match install.sh exactly: launch via the `redivivus` symlink with --class=Redivivus so the
+# Electron WM_CLASS matches StartupWMClass=Redivivus (dock grouping + icon). The flag must go on the
+# root ELF (codium, via the redivivus symlink), NOT the bin wrapper. Ensure the symlink exists.
+if [ -f "$BUILD_DIR/codium" ] && [ ! -e "$BUILD_DIR/redivivus" ]; then ln -sf codium "$BUILD_DIR/redivivus"; fi
 cat > "$DESKTOP_FILE" <<DESKTOPEOF
 [Desktop Entry]
 Name=Redivivus IDE
 Comment=AI-powered code editor
-Exec=$STABLE_LINK/codium --no-sandbox --reuse-window %U
+Exec=$STABLE_LINK/redivivus --class=Redivivus --no-sandbox --reuse-window %U
 Icon=$ICON_DEST
 Terminal=false
 Type=Application
 Categories=Development;IDE;
-StartupWMClass=codium
+StartupWMClass=Redivivus
 MimeType=text/plain;inode/directory;
 DESKTOPEOF
 chmod +x "$DESKTOP_FILE"

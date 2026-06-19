@@ -140,11 +140,9 @@ jobs:
           git commit -am "chore: release $NEW_VERSION"
           git push origin master
 
-      - name: Update Fly.io REDIVIVUS_VERSION secret
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-        run: |
-          curl -L https://fly.io/install.sh | sh
-          export PATH="$HOME/.fly/bin:$PATH"
-          flyctl secrets set REDIVIVUS_VERSION=$NEW_VERSION \
-            --app redivivus-backend
+      # [M2] The former "Update Fly.io REDIVIVUS_VERSION secret" step was removed. /api/version derives
+      # the version from the latest GitHub Release (created in step 6 above) — that is the single source
+      # of truth on both the live Cloud Run backend and the legacy Fly.io one. Setting REDIVIVUS_VERSION
+      # would PIN the version and fight that design (the backend's own route.ts says keep it UNSET), and
+      # it targeted Fly.io, which no shipped client calls. No version-push secret is needed; FLY_API_TOKEN
+      # is therefore NOT a prerequisite for re-enabling this workflow.
