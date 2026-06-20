@@ -51,6 +51,21 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // [FIX] No workspace open means no code to fix — treat as a new build request so autoCreateProject runs.
   if (!root) { await deps.handleBuildRequest(userText, true); return; }
 
+  // [NO-PROJECT GUARD] A fix/edit needs a specific project. When the workspace is the bare projects container
+  // (~/projects) with no project open, a fix would scan ALL sibling projects and land changes in the wrong
+  // place (the "I forgot to open the project" trap). Warn and stop BEFORE any AI calls. Builds are exempt —
+  // a build at the container legitimately creates a new project, so this guard lives only in the fix path.
+  if (isProjectsContainer(root)) {
+    conversation.push({
+      role: 'assistant',
+      content: `⚠️ **No project is open.** You’re in the projects home (\`~/projects\`), so a fix or edit would run against your **whole projects folder** instead of one project — almost certainly not what you want.\n\n**Open a project first**, then send your request again:\n• Click a project in the sidebar, or\n• **File → Open Folder** and pick the project.\n\n_(Building something new works fine from here — this guard only applies to fixes and edits.)_`,
+      timestamp: Date.now(),
+    });
+    refresh();
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+    return;
+  }
+
   // [FIX] Snapshot session cost now so every result message (incl. failures) can show THIS fix's cost (delta).
   const _costBefore = fixSessionCostBefore(deps, root);
 

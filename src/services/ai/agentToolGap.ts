@@ -44,31 +44,53 @@ Can the task be accomplished using ONLY the available toolset? Reply with EXACTL
   }
 }
 
-// [TOOL-GAP] A command FAILED at runtime. If the failure is "the executable isn't installed" (exit 127 /
-// command not found) AND `command -v` confirms it's genuinely missing, log a SEPARATE per-tool project
-// dead-end and raise the owner flag — exactly as an out-of-plan dead end would, even though this command
-// was IN the plan. Each missing tool is logged on its own; we never bundle several failures into one "dead
-// plan." Returns a one-line note to append to the agent's failure output (so the model + user see it), or ''.
+/** True if `x` resolves on PATH right now. Only a strict token is checkable, else false (never false-log). */
+function toolExists(x: string): boolean {
+  if (!/^[A-Za-z0-9._+-]+$/.test(x)) { return false; }
+  try { require('child_process').execSync(`command -v ${x}`, { stdio: 'ignore' }); return true; } catch { return false; }
+}
+
+/** Log a confirmed-missing capability as a per-project dead-end + raise the owner flag, and return a one-line
+ *  note for the agent's failure output. `pattern` keys the dead-end (tool-unavailable / python-module). */
+function logGap(ctx: ToolGapCtx, command: string, pattern: string, name: string, reason: string, instead: string): string {
+  try {
+    const { appendProjectDeadEnd } = require('../../core/routing/chatPanelMsgFixDeadEnds.js');
+    appendProjectDeadEnd(ctx.root, pattern, `The Agent ran \`${command}\` but ${reason}`, reason, instead);
+    writeToolGapFlag(require('fs'), { tool: name, task: ctx.task, command, reason });
+    ctx.log(`🛑 Tool gap: ${pattern} — logged as a project dead-end and flagged for the owner.`);
+    return `\n\n🛑 Tool gap: ${reason} Logged as a project dead-end and flagged for you (rigops will show it). ${instead}`;
+  } catch { return ''; }
+}
+
+// [TOOL-GAP] A command FAILED at runtime. Detect the missing capability — even when it's INDIRECT (buried in
+// a `python3 -c "import X"` or behind a `command -v X` probe), not just a bare executable that exited 127 —
+// and log a SEPARATE per-capability project dead-end + owner flag. Each missing thing is logged on its own;
+// we never bundle. Returns a one-line note for the agent's failure output (so the model + user see it), or ''.
 export function noteToolGapOnFailure(ctx: ToolGapCtx, command: string, err: any): string {
   try {
+    const text = `${err?.code ?? ''} ${err?.stdout ?? ''} ${err?.stderr ?? ''} ${err?.message ?? ''}`;
+    // (a) A Python import failed — the missing capability is the MODULE, even though the command ran python.
+    const mod = text.match(/No module named ['"]?([A-Za-z0-9_]+)/)?.[1];
+    if (mod) {
+      return logGap(ctx, command, `python-module: ${mod}`, mod,
+        `the Python module \`${mod}\` isn't installed here.`,
+        `Install it (e.g. \`pip install ${mod}\`) or use a tool that is installed — don't keep importing ${mod}.`);
+    }
+    // (b) An availability probe failed — the probed tool is genuinely missing.
+    const probe = command.match(/\b(?:command -v|which|type)\s+([A-Za-z0-9._+-]+)/)?.[1];
+    if (probe && !toolExists(probe)) {
+      return logGap(ctx, command, `tool-unavailable: ${probe}`, probe,
+        `\`${probe}\` isn't installed here.`,
+        `Don't prescribe ${probe} for this project — use an installed alternative, or ask the user to install it.`);
+    }
+    // (c) A bare executable wasn't found (exit 127 / command not found), confirmed genuinely absent.
     const exe = ((command || '').trim().split(/\s+/)[0] || '').split('/').pop() || '';
-    if (!exe || !/^[a-zA-Z0-9._+-]+$/.test(exe)) { return ''; }
-    const text = `${err?.code ?? ''} ${err?.stderr ?? ''} ${err?.message ?? ''}`;
-    if (err?.code !== 127 && !/(command )?not found/i.test(text)) { return ''; }
-    // Confirm it's truly absent (not a 127 bubbling up from something nested) before we teach the project.
-    try { require('child_process').execSync(`command -v ${exe}`, { stdio: 'ignore' }); return ''; } catch { /* genuinely missing */ }
-    const reason = `\`${exe}\` is not installed in this environment (the command exited 'command not found').`;
-    const { appendProjectDeadEnd } = require('../../core/routing/chatPanelMsgFixDeadEnds.js');
-    appendProjectDeadEnd(
-      ctx.root,
-      `tool-unavailable: ${exe}`,
-      `The Agent ran \`${command}\` as part of the plan, but ${exe} is not available here.`,
-      reason,
-      `Do NOT prescribe ${exe} for this project — it isn't installed. Use an installed alternative, or ask the user to install it.`,
-    );
-    writeToolGapFlag(require('fs'), { tool: exe, task: ctx.task, command, reason });
-    ctx.log(`🛑 Tool gap: \`${exe}\` is missing — logged as a project dead-end and flagged for the owner.`);
-    return `\n\n🛑 Tool gap: \`${exe}\` isn't installed here. Logged as a project dead-end and flagged for you (rigops will show it). Install it or use an installed alternative — don't keep retrying ${exe}.`;
+    if (exe && /^[A-Za-z0-9._+-]+$/.test(exe) && (err?.code === 127 || /(command )?not found/i.test(text)) && !toolExists(exe)) {
+      return logGap(ctx, command, `tool-unavailable: ${exe}`, exe,
+        `\`${exe}\` isn't installed here (the command exited 'command not found').`,
+        `Don't prescribe ${exe} for this project — use an installed alternative, or ask the user to install it.`);
+    }
+    return '';
   } catch { return ''; /* best-effort, never break the command result */ }
 }
 

@@ -13,6 +13,7 @@ import { runSupervisorPreplanning } from './agentSupervisor.js';
 import { clearToolGapFlag } from './toolGapEscalation.js';
 import { buildAgentSystemPrompt } from './agentPrompt.js';
 import { createAgentLogger } from './agentActionLog.js';
+import { executionNudge } from './agentCompletionGuard.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -47,8 +48,10 @@ export async function executeAgentTask(
   const ledger = new BuildLedger();
   const MAX_ITERATIONS = 15;
   let iterations = 0;
-  // [COMPLETION-GUARD] Track real execution so an environment/verify task can't finish without running.
-  let ranCommands = 0; let nudgedForExecution = false;
+  // [COMPLETION-GUARD] Track real execution so an environment/verify task can't finish without running —
+  // and can't write a script then quit without running it. Nudges capped so a genuinely-impossible task
+  // (all tools missing) still gets to finish with its gap report.
+  let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false;
   const alog = createAgentLogger(agentCtx.root, task);
 
   // [Redivivus] Supervisor reads current project files THEN generates a prescription.
@@ -119,14 +122,13 @@ export async function executeAgentTask(
     const rawWriteMatch = aiText.match(/<write_file\s+path="([^"]+)">([\s\S]*?)<\/write_file>/);
     const toolMatch = !rawWriteMatch ? aiText.match(/<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/) : null;
     if (!rawWriteMatch && !toolMatch) {
-      // [COMPLETION-GUARD] An environment/verify handoff is NOT done until it has actually run something.
-      // The model often writes the code file then declares victory without running/verifying (README got
-      // written, pandoc never ran). Push back ONCE and make it execute, instead of accepting a premature
-      // final answer. Guarded by nudgedForExecution so it can't loop.
-      if (agentCtx.requiresExecution && ranCommands === 0 && !nudgedForExecution) {
-        nudgedForExecution = true;
-        alog.log('completion-guard: model tried to finish without running anything — nudging to execute/verify');
-        history += `\n\nSystem:\n<tool_result>\nYou have NOT run or verified anything yet, and this task REQUIRES execution in the environment. Do NOT finish. Use run_command to actually run the build/verification directly — invoke the real tool itself (e.g. \`pandoc ...\`), not a wrapper script. If it isn't installed, run the alternatives; if none are available, run_command will surface that, and only THEN report exactly which tools are missing.\n</tool_result>`;
+      // [COMPLETION-GUARD] Refuse a premature "final answer" on an environment/verify task — nothing run, or
+      // a script written but never run. See agentCompletionGuard (capped so an impossible task still finishes).
+      const nudge = executionNudge(!!agentCtx.requiresExecution, ranCommands, wroteUnrunScript, guardNudges);
+      if (nudge) {
+        guardNudges++;
+        alog.log(`completion-guard nudge #${guardNudges} (${ranCommands === 0 ? 'nothing-run' : 'unrun-script'})`);
+        history += `\n\nSystem:\n<tool_result>\n${nudge}\n</tool_result>`;
         continue;
       }
       alog.done(`final answer after ${iterations} step(s), ${ranCommands} command(s) run`);
@@ -161,7 +163,10 @@ export async function executeAgentTask(
     if (builtInTool) {
       onUpdate(narrateTool(builtInTool.name, toolData.args || {}, iterations, MAX_ITERATIONS));
       alog.log(`tool: ${toolData.name}`, toolData.args);
-      if (toolData.name === 'run_command') { ranCommands++; }
+      // Track for the completion guard: a command counts as "ran" (and clears any unrun-script flag); a
+      // write to a script/program file sets the flag so the agent can't write-then-quit without running it.
+      if (toolData.name === 'run_command') { ranCommands++; wroteUnrunScript = false; }
+      else if (toolData.name === 'write_file' && /\.(sh|py|js|ts|mjs|cjs|rb|go|rs|java|php|pl|bash)$/i.test(toolData.args?.filePath || '')) { wroteUnrunScript = true; }
       result = await builtInTool.execute(toolData.args || {}, agentCtx);
       alog.log('result', String(result).slice(0, 400));
     } else {

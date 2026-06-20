@@ -39,23 +39,31 @@ function stripFixedEntries(text: string): string {
   return text.replace(/^## \[FIXED\][\s\S]*?(?:\n---\n+|$)/gim, '');
 }
 
-/** Auto-revalidate the mechanically-checkable dead ends. A `tool-unavailable: <exe>` whose tool is now on
- *  PATH is marked [FIXED] with a verified-on date. Logic dead ends (guardian-rejected / fix-failed) are
- *  judgment calls — left untouched for human review. Best-effort; writes back only if something changed. */
+/** True if Python can import `mod` right now. Strict identifier only, else false (never false-retire). */
+function moduleAvailable(mod: string): boolean {
+  if (!/^[A-Za-z0-9_]+$/.test(mod)) { return false; }
+  try { require('child_process').execSync(`python3 -c "import ${mod}"`, { stdio: 'ignore' }); return true; } catch { return false; }
+}
+
+/** Auto-revalidate the mechanically-checkable dead ends. A `tool-unavailable: <exe>` now on PATH, or a
+ *  `python-module: <mod>` now importable, is marked [FIXED] with a verified-on date. Logic dead ends
+ *  (guardian-rejected / fix-failed) are judgment calls — left untouched. Writes back only if changed. */
 export function revalidateProjectDeadEnds(root: string): void {
   try {
     const p = DEAD_ENDS_PATH(root);
     if (!fs.existsSync(p)) { return; }
     const today = new Date().toISOString().slice(0, 10);
     let changed = false;
-    const next = fs.readFileSync(p, 'utf-8').replace(
-      /^## \[DEAD\] tool-unavailable: (\S+)(.*)$/gim,
-      (line, exe, rest) => {
-        if (!toolAvailable(exe)) { return line; }
-        changed = true;
-        return `## [FIXED] tool-unavailable: ${exe}${rest}  — verified available ${today}`;
-      });
-    if (changed) { fs.writeFileSync(p, next, 'utf-8'); }
+    let text = fs.readFileSync(p, 'utf-8');
+    text = text.replace(/^## \[DEAD\] tool-unavailable: (\S+)(.*)$/gim, (line, exe, rest) => {
+      if (!toolAvailable(exe)) { return line; }
+      changed = true; return `## [FIXED] tool-unavailable: ${exe}${rest}  — verified available ${today}`;
+    });
+    text = text.replace(/^## \[DEAD\] python-module: (\S+)(.*)$/gim, (line, mod, rest) => {
+      if (!moduleAvailable(mod)) { return line; }
+      changed = true; return `## [FIXED] python-module: ${mod}${rest}  — verified available ${today}`;
+    });
+    if (changed) { fs.writeFileSync(p, text, 'utf-8'); }
   } catch { /* best-effort */ }
 }
 
