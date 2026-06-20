@@ -2,7 +2,7 @@
 // Runs the Supervisor AI in a ReAct (Reasoning and Acting) loop, allowing it to autonomously use tools.
 
 import type { AgentContext } from './agentTools.js';
-import { BUILT_IN_TOOLS, getToolInstructions } from './agentTools.js';
+import { BUILT_IN_TOOLS } from './agentTools.js';
 import type { RoutingService } from './routingService.js';
 import type { AIResponse } from './routingTypes.js';
 import { Redivivus_WORKER_RULES } from './redivivusWorkerRules.js';
@@ -11,6 +11,8 @@ import { BuildLedger } from '../build/buildLedgerService.js';
 import { extractAgentThought, narrateTool, friendlyModelName } from './agentNarrator.js';
 import { runSupervisorPreplanning } from './agentSupervisor.js';
 import { clearToolGapFlag } from './toolGapEscalation.js';
+import { buildAgentSystemPrompt } from './agentPrompt.js';
+import { createAgentLogger } from './agentActionLog.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -40,37 +42,14 @@ export async function executeAgentTask(
     ).join('\n\n');
   }
 
-  let history = `AVAILABLE TOOLS:
-${getToolInstructions()}${mcpInstructions}
-
-HOW TO USE A TOOL:
-To use a tool, output an XML block like this:
-<tool_call>
-{
-  "name": "read_file",
-  "args": { "filePath": "index.html" }
-}
-</tool_call>
-
-CRITICAL -- write_file with large content: Embedding large files in JSON causes parse errors.
-If the file content is longer than 50 lines, use this raw block format INSTEAD of the JSON args:
-<write_file path="relative/path/to/file">
-[raw file content here -- no JSON escaping needed, no markdown fences, paste code exactly as-is]
-</write_file>
-
-You can only use ONE tool at a time. After you use a tool, the system will execute it and provide you with the <tool_result>.
-If you do not need to use a tool, simply output your final answer. Do NOT output a <tool_call> block if you are finished.
-
-TASK: ${task}
-
-PROJECT CONTEXT:
-${context}
-
-Begin. Think step-by-step.`;
+  let history = buildAgentSystemPrompt(task, context, mcpInstructions);
 
   const ledger = new BuildLedger();
   const MAX_ITERATIONS = 15;
   let iterations = 0;
+  // [COMPLETION-GUARD] Track real execution so an environment/verify task can't finish without running.
+  let ranCommands = 0; let nudgedForExecution = false;
+  const alog = createAgentLogger(agentCtx.root, task);
 
   // [Redivivus] Supervisor reads current project files THEN generates a prescription.
   // Agent implements the prescription exactly -- no re-analysis, no deviation.
@@ -140,7 +119,17 @@ Begin. Think step-by-step.`;
     const rawWriteMatch = aiText.match(/<write_file\s+path="([^"]+)">([\s\S]*?)<\/write_file>/);
     const toolMatch = !rawWriteMatch ? aiText.match(/<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/) : null;
     if (!rawWriteMatch && !toolMatch) {
-      // No tool call -> final answer
+      // [COMPLETION-GUARD] An environment/verify handoff is NOT done until it has actually run something.
+      // The model often writes the code file then declares victory without running/verifying (README got
+      // written, pandoc never ran). Push back ONCE and make it execute, instead of accepting a premature
+      // final answer. Guarded by nudgedForExecution so it can't loop.
+      if (agentCtx.requiresExecution && ranCommands === 0 && !nudgedForExecution) {
+        nudgedForExecution = true;
+        alog.log('completion-guard: model tried to finish without running anything — nudging to execute/verify');
+        history += `\n\nSystem:\n<tool_result>\nYou have NOT run or verified anything yet, and this task REQUIRES execution in the environment. Do NOT finish. Use run_command to actually run the build/verification directly — invoke the real tool itself (e.g. \`pandoc ...\`), not a wrapper script. If it isn't installed, run the alternatives; if none are available, run_command will surface that, and only THEN report exactly which tools are missing.\n</tool_result>`;
+        continue;
+      }
+      alog.done(`final answer after ${iterations} step(s), ${ranCommands} command(s) run`);
       return { success: true, finalAnswer: aiText, iterations, ledger };
     }
 
@@ -171,7 +160,10 @@ Begin. Think step-by-step.`;
 
     if (builtInTool) {
       onUpdate(narrateTool(builtInTool.name, toolData.args || {}, iterations, MAX_ITERATIONS));
+      alog.log(`tool: ${toolData.name}`, toolData.args);
+      if (toolData.name === 'run_command') { ranCommands++; }
       result = await builtInTool.execute(toolData.args || {}, agentCtx);
+      alog.log('result', String(result).slice(0, 400));
     } else {
       const mcpTool = mcpTools.find(t => t.name === toolData.name);
       if (mcpTool) {
@@ -188,6 +180,7 @@ Begin. Think step-by-step.`;
     
     if (result.startsWith('_PAUSE_ASK_USER_')) {
       const question = result.replace('_PAUSE_ASK_USER_', '');
+      alog.done(`paused for user after ${iterations} step(s), ${ranCommands} command(s) run`);
       return { success: true, finalAnswer: question, iterations, ledger };
     }
 

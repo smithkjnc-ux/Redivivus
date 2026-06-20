@@ -23,6 +23,9 @@ export interface AgentContext {
   // [TOOL-GAP] The Supervisor's approved plan/prescription (set by executeAgentTask). run_command
   // checks commands against this; a divergence triggers the Tool-Gap escalation.
   plan?: string;
+  // [COMPLETION-GUARD] True for handoffs whose whole purpose is to RUN/verify in the environment. The
+  // agent loop refuses to accept a "final answer" from such a task until at least one command has run.
+  requiresExecution?: boolean;
   // [TOOL-GAP] Live per-session cost choice for the costlier-alternate tier. Supplied by the chat
   // orchestrator (clarify bridge). If absent, the gap conservatively resolves to "wait".
   askUser?: (prompt: string) => Promise<'alternate' | 'wait'>;

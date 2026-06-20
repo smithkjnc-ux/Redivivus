@@ -35,6 +35,9 @@ export async function executeAgentHandoff(
             log: (msg: string) => { conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() }); deps.refresh(); },
             modifiedFiles: new Set<string>(written),
             snapshotId: fixSnapId,
+            // [COMPLETION-GUARD] Both handoff types exist to RUN/verify in the environment — the agent loop
+            // must not accept a final answer until it has actually executed a command.
+            requiresExecution: true,
             routing: deps.routing,
             blueprintContext: deps.redivivus.isInitialized() ? JSON.stringify(deps.redivivus.loadConfig()?.blueprint || {}) : '',
             // [TOOL-GAP] Live per-session cost choice when run_command hits a costlier out-of-plan
