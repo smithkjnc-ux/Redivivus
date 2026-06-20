@@ -81,6 +81,9 @@ export function registerActiveProjectWatcher(context: vscode.ExtensionContext): 
       vscode.commands.executeCommand('redivivus.openChatPanel'); // surface the chat so the switch is visible
     })
   );
+  // [INOTIFY] Once at startup, make sure heavy dirs aren't watched so the container workspace doesn't blow
+  // the OS inotify limit. Independent of the active project — these are static derived-dir globs.
+  import('./projectFocusMode.js').then(m => m.applyWatcherExcludes()).catch(() => {});
   // Activate for whatever is already open at startup. If nothing activates (home/launcher), clear any
   // stale focus-mode excludes from a prior session so all project folders are visible.
   const activated = activateProjectForFile(vscode.window.activeTextEditor?.document.uri.fsPath);
