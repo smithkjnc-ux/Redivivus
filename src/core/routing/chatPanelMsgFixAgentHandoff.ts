@@ -28,7 +28,22 @@ export async function executeAgentHandoff(
             modifiedFiles: new Set<string>(written),
             snapshotId: fixSnapId,
             routing: deps.routing,
-            blueprintContext: deps.redivivus.isInitialized() ? JSON.stringify(deps.redivivus.loadConfig()?.blueprint || {}) : ''
+            blueprintContext: deps.redivivus.isInitialized() ? JSON.stringify(deps.redivivus.loadConfig()?.blueprint || {}) : '',
+            // [TOOL-GAP] Live per-session cost choice when run_command hits a costlier out-of-plan
+            // alternate. This is the LIVE agent path (the run_command Tool-Gap pilot), so wire it here.
+            askUser: async (prompt: string): Promise<'alternate' | 'wait'> => {
+                const { encodeClarifyToken } = await import('../../ui/panels/chat/chatPanelClarify.js');
+                const { setPendingClarifyResolve } = await import('../../ui/panels/chat/chatPanelClarifyBridge.js');
+                const q = { id: 'toolgap_cost_choice', question: prompt,
+                    options: [{ label: 'Try alternate approach (uses extra tokens)' }, { label: 'Wait' }] };
+                conversation.push({ role: 'assistant', content: encodeClarifyToken([q]), timestamp: Date.now() });
+                deps.refresh();
+                const answers = await new Promise<Record<string, string>>((resolve) => {
+                    setPendingClarifyResolve(resolve);
+                    setTimeout(() => resolve({ toolgap_cost_choice: 'Wait' }), 300_000);
+                });
+                return (answers['toolgap_cost_choice'] || 'Wait').startsWith('Try alternate') ? 'alternate' : 'wait';
+            },
         };
         
         const config = deps.redivivus.isInitialized() ? deps.redivivus.loadConfig() : null;
