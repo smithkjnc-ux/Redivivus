@@ -28,6 +28,7 @@ Module._load = function (request, parent, isMain) {
 const { BUILT_IN_TOOLS } = require(path.resolve(__dirname, '..', 'out', 'services', 'ai', 'agentTools.js'));
 const runCommand = BUILT_IN_TOOLS.find((t) => t.name === 'run_command');
 const FLAG = path.join(os.homedir(), '.redivivus', 'pending_toolgap.json');
+const DEAD_ENDS_MD = path.join(os.tmpdir(), '.redivivus', 'dead_ends.md'); // ctx root is os.tmpdir()
 
 let passed = 0;
 const ok = (m) => { passed++; console.log('  ✓', m); };
@@ -79,8 +80,9 @@ const ctx = (plan, supervisorReply, userChoice) => ({
     ok('costlier alternate → "wait" → nothing ran, agent paused, no flag');
   }
 
-  console.log('4) out-of-plan DEAD END → writes the real flag + blocks the loop:');
+  console.log('4) out-of-plan DEAD END → writes the real flag + a project dead-end + blocks the loop:');
   {
+    try { fs.unlinkSync(DEAD_ENDS_MD); } catch {}
     const out = await runCommand.execute(
       { command: 'ffmpeg -i in.mp4 out.gif' },
       ctx('use rsvg-convert', 'DEAD_END: ffmpeg / video tooling', 'wait'),
@@ -92,7 +94,13 @@ const ctx = (plan, supervisorReply, userChoice) => ({
     assert.strictEqual(payload.command, 'ffmpeg -i in.mp4 out.gif', 'flag JSON notes the command');
     assert.ok(payload.tool && payload.task && payload.at, 'flag JSON has tool + task + timestamp');
     console.log('     flag JSON →', JSON.stringify(payload));
-    ok('dead end → real flag written (rigops would go RED), agent loop blocked with owner message');
+    // NEW: the lesson is also logged to the project's dead_ends.md so a FUTURE fix avoids the missing tool.
+    assert.ok(fs.existsSync(DEAD_ENDS_MD), 'project dead_ends.md was written for the missing tool');
+    const de = fs.readFileSync(DEAD_ENDS_MD, 'utf8');
+    assert.ok(/tool-unavailable/i.test(de) && /ffmpeg/.test(de), 'dead-end names the unavailable tool so a future Supervisor wont prescribe it');
+    console.log('     dead_ends.md →', (de.match(/tool-unavailable: .*/) || [''])[0]);
+    try { fs.unlinkSync(DEAD_ENDS_MD); } catch {}
+    ok('dead end → real flag + project dead-end logged (future fixes learn), agent loop blocked');
   }
 
   // Clean up the real flag so rigops doesn't stay red after the test.

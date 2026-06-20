@@ -18,6 +18,9 @@ export async function runSupervisorVerify(
 ): Promise<SupervisorVerifyResult> {
   const verifySystem = `You are the Supervisor AI verifying your Worker's output. You wrote the diagnosis. Now check: did the Worker LOGICALLY achieve what you asked for?
 
+ENVIRONMENT / EXECUTION PASS-THROUGH — CHECK THIS FIRST, IT OVERRIDES THE RULES BELOW:
+If fulfilling the task REQUIRES running or verifying something in the environment — executing a command, building/compiling an artifact (a PDF, a binary, a bundle), installing a tool, starting a server, rendering, or running tests — then a code-only Worker physically CANNOT complete OR verify it, and neither can you from here. Do NOT FAIL the Worker for imperfect build/execution code, and do NOT loop retrying it. Respond with ONLY the word PASS so the final reviewer can route this to the Agent that can actually run it. (Your verification is for IN-FILE logic fixes only; environment execution is handled downstream by the Agent.)
+
 VERIFICATION RULES:
 - You are checking LOGIC, not syntax. The code may compile fine but still be wrong.
 - Compare each bug in your diagnosis to the Worker's edit. Did it actually fix the root cause, or just paper over the symptom?

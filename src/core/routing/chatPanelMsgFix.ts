@@ -223,6 +223,18 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
+  // [AGENT-GATE] Diagnosis-time handoff (bulletproof): the Supervisor decides up-front, BEFORE the Worker runs,
+  // whether the task needs the environment (run/build/install/serve/test) and emits [AGENT_HANDOFF]. Route
+  // straight to the Agent — skip Worker/Verify/Guardian so we never write throwaway code the direct editor
+  // can't run or verify. (The Guardian gate is the safety net for tasks that slip past this earlier check.)
+  if (/\[AGENT_HANDOFF\]/i.test(diagnosis)) {
+    fixLog('Supervisor routed to Agent at diagnosis time — skipping Worker/Verify/Guardian');
+    const { executeAgentHandoff } = await import('./chatPanelMsgFixAgentHandoff.js');
+    await executeAgentHandoff(deps, root, userText, [], undefined, conversation);
+    finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+    return;
+  }
+
   // Phase 2+3: Worker generates fix → Guardian reviews → retry/escalate if rejected
   let finalResponse = ''; let workerLabel = 'AI'; let guardianLabel = 'AI'; let guardianNote = ''; let scopeNote = ''; let needsAgentHandoff = false;
   let written: string[] = []; let failed: string[] = []; let skipped: string[] = []; let fixSnapId: string | undefined;

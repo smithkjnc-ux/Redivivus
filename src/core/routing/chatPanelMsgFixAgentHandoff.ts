@@ -11,9 +11,15 @@ export async function executeAgentHandoff(
     fixSnapId: string | undefined,
     conversation: any[]
 ): Promise<void> {
+    // [TOOL-GAP] Two entry points: the Guardian-time handoff (Worker already applied edits → Agent VERIFIES;
+    // written is non-empty), and the diagnosis-time handoff (Worker never ran → Agent does the FULL task;
+    // written is empty). The empty-written check distinguishes them without threading a new flag.
+    const fromDiagnosis = written.length === 0;
     conversation.push({
         role: 'assistant',
-        content: `> 🔄 **Agent Handoff Initiated:** Simple Pipeline applied the code edits, but the Guardian AI detected that this task requires environment testing (e.g. compiling, starting a server, running checks). Handing off to the Agent to complete verification...`,
+        content: fromDiagnosis
+            ? `> 🔄 **Agent Handoff Initiated:** The Supervisor determined up-front that this task needs to run and verify in the environment (building, installing, starting a server, running checks) — something the direct editor can't do. Routing straight to the Agent, with no throwaway code first...`
+            : `> 🔄 **Agent Handoff Initiated:** Simple Pipeline applied the code edits, but the Guardian AI detected that this task requires environment testing (e.g. compiling, starting a server, running checks). Handing off to the Agent to complete verification...`,
         timestamp: Date.now()
     });
     deps.refresh();
@@ -23,7 +29,9 @@ export async function executeAgentHandoff(
         const { executeAgentTask } = await import('../../services/ai/agentService.js');
         const agentCtx: any = {
             root: root,
-            task: `[HANDOFF] The user requested: "${userText}". The code files have already been modified by a surgical worker. Your ONLY task is to run the necessary terminal commands (e.g. 'npm run build', starting a server, or running tests) to verify the system works. Do NOT rewrite the code unless the verification fails. Cite your verification commands.`,
+            task: fromDiagnosis
+                ? `The user requested: "${userText}". No code has been written yet — you own the WHOLE task. Write any files needed, then ACTUALLY RUN the terminal commands to do it and verify the result (e.g. build the artifact and confirm it exists, start the server and check it responds, run the tests). If a required tool isn't installed, try the alternatives in your plan before giving up. Cite the commands you ran and their output.`
+                : `[HANDOFF] The user requested: "${userText}". The code files have already been modified by a surgical worker. Your ONLY task is to run the necessary terminal commands (e.g. 'npm run build', starting a server, or running tests) to verify the system works. Do NOT rewrite the code unless the verification fails. Cite your verification commands.`,
             log: (msg: string) => { conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() }); deps.refresh(); },
             modifiedFiles: new Set<string>(written),
             snapshotId: fixSnapId,

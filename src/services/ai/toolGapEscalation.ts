@@ -30,6 +30,9 @@ export interface ToolGapDeps {
   log: (msg: string) => void;
   fs: FsLike;
   flagPath?: string;
+  // [DEAD-END] Record a true dead end as a PROJECT dead-end (dead_ends.md) so a FUTURE fix's Supervisor
+  // won't prescribe the missing tool again. Injected (keeps this module pure/testable). Best-effort.
+  recordDeadEnd?: (tool: string, command: string, reason: string) => void;
 }
 
 export type ToolGapOutcome =
@@ -99,6 +102,8 @@ export async function resolveToolGap(
     deps.fs.mkdirSync(path.dirname(flagPath), { recursive: true });
     deps.fs.writeFileSync(flagPath, JSON.stringify(payload, null, 2));
   } catch { /* the flag is a best-effort signal, not load-bearing */ }
+  // The flag alerts the owner NOW; this teaches the pipeline so a future fix doesn't repeat the dead end.
+  deps.recordDeadEnd?.(payload.tool, command, payload.reason);
   const message =
     `🛑 **Tool gap — needs your attention.** I need a capability the toolset doesn't have ` +
     `(\`${payload.tool}\`) to run \`${command}\`, and there is no workaround. Flagged for the owner ` +

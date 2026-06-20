@@ -5,6 +5,7 @@
 import { type Represcribe, type ToolGapDeps } from './toolGapEscalation.js';
 
 interface ToolGapCtx {
+  root: string;
   task: string;
   log: (msg: string) => void;
   routing?: any;
@@ -49,5 +50,18 @@ export function buildToolGapDeps(ctx: ToolGapCtx): ToolGapDeps {
     askUser: ctx.askUser || (async () => 'wait'), // default: don't spend extra tokens without consent
     log: ctx.log,
     fs: require('fs'),
+    // [DEAD-END] On a true dead end, teach this project so a future fix won't prescribe the missing tool.
+    recordDeadEnd: (tool, command, reason) => {
+      try {
+        const { appendProjectDeadEnd } = require('../../core/routing/chatPanelMsgFixDeadEnds.js');
+        appendProjectDeadEnd(
+          ctx.root,
+          `tool-unavailable: ${tool}`,
+          `The Agent ran \`${command}\` but ${tool} is not available here and no workaround exists in the toolset.`,
+          reason,
+          `Do NOT prescribe ${tool} for this project — it isn't installed/available. Use an installed alternative, or ask the user to install ${tool}.`,
+        );
+      } catch { /* best-effort, same as the flag */ }
+    },
   };
 }
