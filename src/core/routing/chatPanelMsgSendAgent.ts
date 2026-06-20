@@ -47,7 +47,22 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
     root: rootPath, task: userText,
     log: (msg: string) => { conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() }); refresh(); },
     modifiedFiles: new Set<string>(), snapshotId: undefined,
-    routing: deps.routing, blueprintContext: blueprintCtx
+    routing: deps.routing, blueprintContext: blueprintCtx,
+    // [TOOL-GAP] Live per-session cost choice — reuses the clarify card/bridge (synchronous: blocks
+    // run_command until the user clicks). Times out to "wait" so it can never hang the build.
+    askUser: async (prompt: string): Promise<'alternate' | 'wait'> => {
+      const { encodeClarifyToken } = await import('../../ui/panels/chat/chatPanelClarify.js');
+      const { setPendingClarifyResolve } = await import('../../ui/panels/chat/chatPanelClarifyBridge.js');
+      const q = { id: 'toolgap_cost_choice', question: prompt,
+        options: [{ label: 'Try alternate approach (uses extra tokens)' }, { label: 'Wait' }] };
+      conversation.push({ role: 'assistant', content: encodeClarifyToken([q]), timestamp: Date.now() });
+      refresh();
+      const answers = await new Promise<Record<string, string>>((resolve) => {
+        setPendingClarifyResolve(resolve);
+        setTimeout(() => resolve({ toolgap_cost_choice: 'Wait' }), 300_000);
+      });
+      return (answers['toolgap_cost_choice'] || 'Wait').startsWith('Try alternate') ? 'alternate' : 'wait';
+    },
   };
   let projectContext = blueprintCtx ? `Blueprint: ${blueprintCtx}` : 'No blueprint available.';
   try {

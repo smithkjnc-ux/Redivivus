@@ -7,6 +7,8 @@ import * as path from 'path';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { NETWORK_TOOLS } from './agentToolsNetwork';
+import { resolveToolGap } from './toolGapEscalation.js';
+import { buildToolGapDeps } from './agentToolGap.js';
 
 const execAsync = promisify(exec);
 
@@ -18,6 +20,12 @@ export interface AgentContext {
   snapshotId?: string;
   routing?: any; // RoutingService instance
   blueprintContext?: string;
+  // [TOOL-GAP] The Supervisor's approved plan/prescription (set by executeAgentTask). run_command
+  // checks commands against this; a divergence triggers the Tool-Gap escalation.
+  plan?: string;
+  // [TOOL-GAP] Live per-session cost choice for the costlier-alternate tier. Supplied by the chat
+  // orchestrator (clarify bridge). If absent, the gap conservatively resolves to "wait".
+  askUser?: (prompt: string) => Promise<'alternate' | 'wait'>;
 }
 
 export interface AgentTool {
@@ -107,9 +115,24 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     description: 'Executes a shell command in the project directory and returns the output (e.g. npm install, gcc).',
     parameters: '{ "command": "string (shell command)" }',
     execute: async (args: any, ctx: AgentContext) => {
-      ctx.log(`🖥️ Running: \`${args.command}\``);
+      const requested: string = args.command || '';
+      // [TOOL-GAP] Before running, check the command against the Supervisor's approved plan. In-plan →
+      // run as-is. Out-of-plan → escalate: Supervisor re-prescription → live user cost-choice → owner flag.
+      const outcome = await resolveToolGap(requested, ctx.plan || '', ctx.task, buildToolGapDeps(ctx));
+      if (outcome.kind === 'blocked') {
+        ctx.log(outcome.message);
+        return `_PAUSE_ASK_USER_${outcome.message}`; // end the loop — owner must resolve the gap
+      }
+      if (outcome.kind === 'wait') {
+        const msg = '⏸️ Holding — you chose to wait rather than spend extra tokens on an alternate approach.';
+        ctx.log(msg);
+        return `_PAUSE_ASK_USER_${msg}`;
+      }
+      const command = (outcome.kind === 'proceed' || outcome.kind === 'proceed-costly') ? outcome.command : requested;
+      if (command !== requested) { ctx.log(`↪️ Using an alternate approach: \`${command}\``); }
+      ctx.log(`🖥️ Running: \`${command}\``);
       try {
-        const { stdout, stderr } = await execAsync(args.command, { cwd: ctx.root, timeout: 15000 });
+        const { stdout, stderr } = await execAsync(command, { cwd: ctx.root, timeout: 15000 });
         let result = '';
         if (stdout) {result += `STDOUT:\n${stdout}\n`;}
         if (stderr) {result += `STDERR:\n${stderr}\n`;}

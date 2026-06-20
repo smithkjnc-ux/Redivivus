@@ -10,6 +10,7 @@ import { getAllTools, callTool } from '../mcpService.js';
 import { BuildLedger } from '../build/buildLedgerService.js';
 import { extractAgentThought, narrateTool, friendlyModelName } from './agentNarrator.js';
 import { runSupervisorPreplanning } from './agentSupervisor.js';
+import { clearToolGapFlag } from './toolGapEscalation.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -28,7 +29,9 @@ export async function executeAgentTask(
   onUpdate: (msg: string) => void
 ): Promise<AgentExecutionResult> {
   const { supervisor } = routing.selectSupervisorAndWorker();
-  
+
+  clearToolGapFlag(require('fs')); // [TOOL-GAP] new run = retry → clear stale flag (re-written if gap recurs)
+
   const mcpTools = getAllTools();
   let mcpInstructions = '';
   if (mcpTools.length > 0) {
@@ -75,6 +78,7 @@ Begin. Think step-by-step.`;
   if (supervisorPrescription) {
     history = history.replace('Begin. Think step-by-step.', `${supervisorPrescription}\nBegin. Implement the prescription above. Think step-by-step.`);
   }
+  agentCtx.plan = supervisorPrescription || ''; // [TOOL-GAP] expose plan for run_command plan-match
 
   onUpdate('🧠 **Autonomous Agent** spinning up — analysing your task and preparing a plan...');
   const base = require('../api/apiClient.js').getApiBase();
