@@ -5,6 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { SetupProgress } from '../../../services/project/setupProgressService';
 import type { ChatHeaderInfo } from './chatPanelHtml';
+import { getActiveProjectRoot } from '../../../services/project/activeProjectRoot.js';
 
 export interface DashboardData {
   blueprint?: { who?: string; what?: string; why?: string; where?: string; when?: string };
@@ -49,6 +50,21 @@ export function readDashboardData(root: string, config: any): DashboardData {
     fileCount = countFiles(root);
   } catch {}
   return { blueprint, recentBuilds, fileCount, deadEndCount, buildCount };
+}
+
+// [DASHBOARD-ROOT] Read dashboard stats from the ACTIVE PROJECT root (the built/opened subfolder), not the
+// workspace folder. When the workspace is the ~/projects container with a project selected via the Project
+// Files tree, reading the container's own .redivivus/ leaked stale stats — e.g. sibling projects' dead ends
+// (the "3 dead ends" bug). Loads the active project's config too so the blueprint summary matches the label.
+export function readActiveProjectDashboard(panel: any, fallbackRoot: string): DashboardData {
+  const root = getActiveProjectRoot(panel) || fallbackRoot;
+  let config: any = null;
+  try {
+    const cfgPath = path.join(root, '.redivivus', 'config.json');
+    if (fs.existsSync(cfgPath)) { config = JSON.parse(fs.readFileSync(cfgPath, 'utf-8')); }
+  } catch { /* fall through to the service config */ }
+  if (!config) { try { config = panel?.redivivus?.isInitialized?.() ? panel.redivivus.loadConfig() : null; } catch { /* none */ } }
+  return readDashboardData(root, config);
 }
 
 export function buildProjectDashboard(header: ChatHeaderInfo, progress: SetupProgress | undefined, data?: DashboardData): string {

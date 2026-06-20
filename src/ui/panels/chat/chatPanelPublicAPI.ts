@@ -7,7 +7,7 @@ import { ChatPanel } from './chatPanel';
 import { buildHeaderInfo } from './chatPanelHeader';
 import { SetupProgressService } from '../../../services/project/setupProgressService';
 import { buildChatHtml } from './chatPanelHtml';
-import { readDashboardData } from './chatPanelDashboard';
+import { readActiveProjectDashboard } from './chatPanelDashboard';
 import { logProjectContextSwitch } from '../../../services/logging/projectContextLogger';
 
 export function panelShowGettingStarted(panel: any): void {
@@ -126,7 +126,7 @@ export async function panelRefresh(panel: any): Promise<void> {
       try { progress = await new SetupProgressService(panel.redivivus, root).getProgress(); } catch {}
     }
     if (root && (headerInfo as any).workspaceHasRedivivus && !(headerInfo as any).workspaceIsAssistMode && state.conversation.length === 0) {
-      try { const config = panel.redivivus.isInitialized() ? panel.redivivus.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
+      try { headerInfo.dashData = readActiveProjectDashboard(panel, root); } catch {}
     }
     _panel.webview.html = buildChatHtml(state.conversation, headerInfo, progress);
     panel._initialized = true;
@@ -169,7 +169,7 @@ export async function panelRefresh(panel: any): Promise<void> {
       try { progress = await new SetupProgressService(panel.redivivus, root).getProgress(); } catch {}
     }
     if (root && (headerInfo as any).workspaceHasRedivivus && !(headerInfo as any).workspaceIsAssistMode) {
-      try { const config = panel.redivivus.isInitialized() ? panel.redivivus.loadConfig() : null; headerInfo.dashData = readDashboardData(root, config); } catch {}
+      try { headerInfo.dashData = readActiveProjectDashboard(panel, root); } catch {}
     }
     const { buildEmptyStateHtml } = await import('./chatPanelEmptyState.js');
     htmlToInject = buildEmptyStateHtml(headerInfo, progress);
