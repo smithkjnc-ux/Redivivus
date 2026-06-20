@@ -51,15 +51,18 @@ export function buildToolGapDeps(ctx: ToolGapCtx): ToolGapDeps {
     log: ctx.log,
     fs: require('fs'),
     // [DEAD-END] On a true dead end, teach this project so a future fix won't prescribe the missing tool.
+    // Key the entry on the actual EXECUTABLE (first token of the command) so revalidation can later check
+    // `command -v <exe>` and auto-retire it once the tool is installed; keep the descriptive phrase in the body.
     recordDeadEnd: (tool, command, reason) => {
       try {
+        const exe = ((command || '').trim().split(/\s+/)[0] || tool || '').split('/').pop() || tool;
         const { appendProjectDeadEnd } = require('../../core/routing/chatPanelMsgFixDeadEnds.js');
         appendProjectDeadEnd(
           ctx.root,
-          `tool-unavailable: ${tool}`,
-          `The Agent ran \`${command}\` but ${tool} is not available here and no workaround exists in the toolset.`,
+          `tool-unavailable: ${exe}`,
+          `The Agent ran \`${command}\` (needed: ${tool}) but ${exe} is not available here and no workaround exists in the toolset.`,
           reason,
-          `Do NOT prescribe ${tool} for this project — it isn't installed/available. Use an installed alternative, or ask the user to install ${tool}.`,
+          `Do NOT prescribe ${exe} for this project — it isn't installed/available. Use an installed alternative, or ask the user to install it.`,
         );
       } catch { /* best-effort, same as the flag */ }
     },
