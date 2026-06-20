@@ -226,14 +226,16 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // [PLAN-GATE] High-stakes fix? Show the plan — plain English + the EDITABLE steps — and wait for the user
   // to approve / edit / cancel BEFORE any Worker or Agent runs. Smart-trigger only (environment handoff or
   // multi-step), or always when Plan-First is on. runFixPlanGate is fail-open, so a gate hiccup never blocks.
+  let approvedPlan: string | undefined; // the user-approved (possibly edited) plan — flows to the Agent path
   {
     let planFirst = false;
     try { planFirst = !!require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext?.globalState.get('redivivus.planFirst'); } catch { /* default off */ }
     const { shouldGateFix, runFixPlanGate } = await import('./chatPanelMsgFixPlanGate.js');
     if (shouldGateFix(diagnosis, subtasks, planFirst)) {
-      const gate = await runFixPlanGate(deps, diagnosis, subtasks, fileNames);
+      const gate = await runFixPlanGate(deps, diagnosis, subtasks, fileNames, userText);
       if (!gate.proceed) { finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return; }
-      diagnosis = gate.diagnosis; // carry the user's edits forward as the contract
+      diagnosis = gate.diagnosis; // Worker path: carry the user's edits forward as the contract
+      approvedPlan = gate.approvedPlan; // Agent path: carry the user's edits to the handoff
       if (deps.turnContext) { deps.turnContext.artifacts.prescription = diagnosis; }
     }
   }
@@ -245,7 +247,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   if (/\[AGENT_HANDOFF\]/i.test(diagnosis)) {
     fixLog('Supervisor routed to Agent at diagnosis time — skipping Worker/Verify/Guardian');
     const { executeAgentHandoff } = await import('./chatPanelMsgFixAgentHandoff.js');
-    await executeAgentHandoff(deps, root, userText, [], undefined, conversation);
+    await executeAgentHandoff(deps, root, userText, [], undefined, conversation, approvedPlan);
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
     return;
   }

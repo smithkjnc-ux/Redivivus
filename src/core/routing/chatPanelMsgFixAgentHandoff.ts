@@ -9,8 +9,13 @@ export async function executeAgentHandoff(
     userText: string,
     written: string[],
     fixSnapId: string | undefined,
-    conversation: any[]
+    conversation: any[],
+    approvedPlan?: string
 ): Promise<void> {
+    // [PLAN-GATE] If the user reviewed/edited a plan at the gate, fold it into the agent's instructions so
+    // their edits actually drive the run (the handoff is otherwise built from the raw request).
+    const planNote = (approvedPlan && approvedPlan.trim() && approvedPlan.trim() !== userText.trim())
+        ? ` The user reviewed and APPROVED this plan — follow it exactly: ${approvedPlan.trim()}` : '';
     // [TOOL-GAP] Two entry points: the Guardian-time handoff (Worker already applied edits → Agent VERIFIES;
     // written is non-empty), and the diagnosis-time handoff (Worker never ran → Agent does the FULL task;
     // written is empty). The empty-written check distinguishes them without threading a new flag.
@@ -30,7 +35,7 @@ export async function executeAgentHandoff(
         const agentCtx: any = {
             root: root,
             task: fromDiagnosis
-                ? `The user requested: "${userText}". No code has been written yet — you own the WHOLE task. Write any files needed, then ACTUALLY RUN the terminal commands to do it and verify the result (e.g. build the artifact and confirm it exists, start the server and check it responds, run the tests). When the task depends on an external CLI tool (a converter, compiler, packager), INVOKE THAT TOOL DIRECTLY as its own run_command first (e.g. \`pandoc ...\`, then if it fails \`wkhtmltopdf ...\`) BEFORE wrapping the attempts inside a helper script you run via python/bash — burying a tool inside a script hides which one is missing and stops the gap from being recorded. You may still write a helper script in addition. If a required tool isn't installed, try the alternatives in your plan; if none are available, say exactly which are missing. Cite the commands you ran and their output.`
+                ? `The user requested: "${userText}".${planNote} No code has been written yet — you own the WHOLE task. Write any files needed, then ACTUALLY RUN the terminal commands to do it and verify the result (e.g. build the artifact and confirm it exists, start the server and check it responds, run the tests). When the task depends on an external CLI tool (a converter, compiler, packager), INVOKE THAT TOOL DIRECTLY as its own run_command first (e.g. \`pandoc ...\`, then if it fails \`wkhtmltopdf ...\`) BEFORE wrapping the attempts inside a helper script you run via python/bash — burying a tool inside a script hides which one is missing and stops the gap from being recorded. You may still write a helper script in addition. If a required tool isn't installed, try the alternatives in your plan; if none are available, say exactly which are missing. Cite the commands you ran and their output.`
                 : `[HANDOFF] The user requested: "${userText}". The code files have already been modified by a surgical worker. Your ONLY task is to run the necessary terminal commands (e.g. 'npm run build', starting a server, or running tests) to verify the system works. Do NOT rewrite the code unless the verification fails. Cite your verification commands.`,
             log: (msg: string) => { conversation.push({ role: 'assistant', content: msg, timestamp: Date.now() }); deps.refresh(); },
             modifiedFiles: new Set<string>(written),
