@@ -91,24 +91,30 @@ export async function resolveToolGap(
 
   // Tier 3 — true dead end: write the owner flag + block.
   const flagPath = deps.flagPath || TOOL_GAP_FLAG;
-  const payload = {
-    tool: rx.neededTool || (command.split(' ')[0] || command),
-    task,
-    command,
-    reason: rx.note || 'No viable approach exists in the current toolset.',
-    at: new Date().toISOString(),
-  };
-  try {
-    deps.fs.mkdirSync(path.dirname(flagPath), { recursive: true });
-    deps.fs.writeFileSync(flagPath, JSON.stringify(payload, null, 2));
-  } catch { /* the flag is a best-effort signal, not load-bearing */ }
+  const tool = rx.neededTool || (command.split(' ')[0] || command);
+  const reason = rx.note || 'No viable approach exists in the current toolset.';
+  writeToolGapFlag(deps.fs, { tool, task, command, reason }, flagPath);
   // The flag alerts the owner NOW; this teaches the pipeline so a future fix doesn't repeat the dead end.
-  deps.recordDeadEnd?.(payload.tool, command, payload.reason);
+  deps.recordDeadEnd?.(tool, command, reason);
   const message =
     `🛑 **Tool gap — needs your attention.** I need a capability the toolset doesn't have ` +
-    `(\`${payload.tool}\`) to run \`${command}\`, and there is no workaround. Flagged for the owner ` +
+    `(\`${tool}\`) to run \`${command}\`, and there is no workaround. Flagged for the owner ` +
     `(\`${flagPath}\`); the build is paused until it's resolved.`;
   return { kind: 'blocked', message };
+}
+
+/** Write the owner flag (~/.redivivus/pending_toolgap.json) rigops polls. Shared by the out-of-plan
+ *  dead-end tier AND the in-plan tool-not-found path so a missing tool surfaces to the owner the same
+ *  way whether the plan diverged or a planned tool simply isn't installed. Best-effort. */
+export function writeToolGapFlag(
+  fs: Pick<typeof import('fs'), 'mkdirSync' | 'writeFileSync'>,
+  payload: { tool: string; task: string; command: string; reason: string },
+  flagPath: string = TOOL_GAP_FLAG,
+): void {
+  try {
+    fs.mkdirSync(path.dirname(flagPath), { recursive: true });
+    fs.writeFileSync(flagPath, JSON.stringify({ ...payload, at: new Date().toISOString() }, null, 2));
+  } catch { /* the flag is a best-effort signal, not load-bearing */ }
 }
 
 /** Clear the dead-end flag. Call when a build is RETRIED (the gap is presumed fixed); if it isn't,

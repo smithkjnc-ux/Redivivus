@@ -8,7 +8,7 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import { NETWORK_TOOLS } from './agentToolsNetwork';
 import { resolveToolGap } from './toolGapEscalation.js';
-import { buildToolGapDeps } from './agentToolGap.js';
+import { buildToolGapDeps, noteToolGapOnFailure } from './agentToolGap.js';
 
 const execAsync = promisify(exec);
 
@@ -142,7 +142,9 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         if (e.killed && e.signal === 'SIGTERM') {
           return `Command timed out after 15 seconds and was killed.\nSTDOUT:\n${e.stdout || ''}\nSTDERR:\n${e.stderr || ''}\nIf you are trying to start a server or long-running process, you MUST run it in the background and detach output, e.g.: \`python3 -m http.server > server.log 2>&1 &\``;
         }
-        return `Command failed:\nSTDOUT:\n${e.stdout || ''}\nSTDERR:\n${e.stderr || ''}\nERROR:\n${e.message}`;
+        // A planned command can still fail because its tool isn't installed — log that one tool as a dead end.
+        const gapNote = noteToolGapOnFailure(ctx, command, e);
+        return `Command failed:\nSTDOUT:\n${e.stdout || ''}\nSTDERR:\n${e.stderr || ''}\nERROR:\n${e.message}${gapNote}`;
       }
     }
   },

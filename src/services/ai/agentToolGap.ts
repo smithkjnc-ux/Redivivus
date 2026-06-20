@@ -2,7 +2,7 @@
 // Turns an agent context into the injectable deps resolveToolGap() needs: a Supervisor
 // re-prescription call and the live user cost-choice.
 
-import { type Represcribe, type ToolGapDeps } from './toolGapEscalation.js';
+import { type Represcribe, type ToolGapDeps, writeToolGapFlag } from './toolGapEscalation.js';
 
 interface ToolGapCtx {
   root: string;
@@ -42,6 +42,34 @@ Can the task be accomplished using ONLY the available toolset? Reply with EXACTL
   } catch {
     return { found: false, costlier: false };
   }
+}
+
+// [TOOL-GAP] A command FAILED at runtime. If the failure is "the executable isn't installed" (exit 127 /
+// command not found) AND `command -v` confirms it's genuinely missing, log a SEPARATE per-tool project
+// dead-end and raise the owner flag — exactly as an out-of-plan dead end would, even though this command
+// was IN the plan. Each missing tool is logged on its own; we never bundle several failures into one "dead
+// plan." Returns a one-line note to append to the agent's failure output (so the model + user see it), or ''.
+export function noteToolGapOnFailure(ctx: ToolGapCtx, command: string, err: any): string {
+  try {
+    const exe = ((command || '').trim().split(/\s+/)[0] || '').split('/').pop() || '';
+    if (!exe || !/^[a-zA-Z0-9._+-]+$/.test(exe)) { return ''; }
+    const text = `${err?.code ?? ''} ${err?.stderr ?? ''} ${err?.message ?? ''}`;
+    if (err?.code !== 127 && !/(command )?not found/i.test(text)) { return ''; }
+    // Confirm it's truly absent (not a 127 bubbling up from something nested) before we teach the project.
+    try { require('child_process').execSync(`command -v ${exe}`, { stdio: 'ignore' }); return ''; } catch { /* genuinely missing */ }
+    const reason = `\`${exe}\` is not installed in this environment (the command exited 'command not found').`;
+    const { appendProjectDeadEnd } = require('../../core/routing/chatPanelMsgFixDeadEnds.js');
+    appendProjectDeadEnd(
+      ctx.root,
+      `tool-unavailable: ${exe}`,
+      `The Agent ran \`${command}\` as part of the plan, but ${exe} is not available here.`,
+      reason,
+      `Do NOT prescribe ${exe} for this project — it isn't installed. Use an installed alternative, or ask the user to install it.`,
+    );
+    writeToolGapFlag(require('fs'), { tool: exe, task: ctx.task, command, reason });
+    ctx.log(`🛑 Tool gap: \`${exe}\` is missing — logged as a project dead-end and flagged for the owner.`);
+    return `\n\n🛑 Tool gap: \`${exe}\` isn't installed here. Logged as a project dead-end and flagged for you (rigops will show it). Install it or use an installed alternative — don't keep retrying ${exe}.`;
+  } catch { return ''; /* best-effort, never break the command result */ }
 }
 
 export function buildToolGapDeps(ctx: ToolGapCtx): ToolGapDeps {

@@ -65,6 +65,10 @@ export function appendProjectDeadEnd(root: string, patternName: string, triedWha
     const p = DEAD_ENDS_PATH(root);
     fs.mkdirSync(path.dirname(p), { recursive: true });
     const existing = fs.existsSync(p) ? fs.readFileSync(p, 'utf-8') : DEAD_ENDS_HEADER;
+    // Dedup: don't re-log a live [DEAD] for the same pattern (e.g. the same missing tool across retries or
+    // runs). Keeps each distinct failure separate without piling up identical entries.
+    const esc = patternName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    if (new RegExp(`^## \\[DEAD\\] ${esc}(\\s|\\(|$)`, 'm').test(existing)) { return; }
     const date = new Date().toISOString().slice(0, 10);
     const entry = `## [DEAD] ${patternName} (logged ${date})\n- **What was tried:** ${triedWhat}\n- **Why it fails:** ${whyFails}\n- **Do this instead:** ${doInstead}\n\n---\n\n`;
     fs.writeFileSync(p, existing + entry, 'utf-8');

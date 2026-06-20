@@ -103,6 +103,29 @@ const ctx = (plan, supervisorReply, userChoice) => ({
     ok('dead end → real flag + project dead-end logged (future fixes learn), agent loop blocked');
   }
 
+  console.log('5) IN-PLAN command whose tool is MISSING → per-tool dead-end logged + owner flag (not bundled):');
+  {
+    try { fs.unlinkSync(DEAD_ENDS_MD); } catch {}
+    try { fs.unlinkSync(FLAG); } catch {}
+    // `zzmissing999abc` is in the plan (tier 0, runs as-is) but doesn't exist → exits 127 at runtime.
+    const out = await runCommand.execute(
+      { command: 'zzmissing999abc' },
+      ctx('run zzmissing999abc to verify the build', 'PROCEED: x', 'wait'),
+    );
+    assert.ok(/Command failed/.test(out), 'the failure is still reported to the agent');
+    assert.ok(/Tool gap/i.test(out) && /zzmissing999abc/.test(out), 'failure output tells the agent the tool is missing');
+    assert.ok(fs.existsSync(DEAD_ENDS_MD), 'an in-plan missing tool still gets a project dead-end');
+    const de = fs.readFileSync(DEAD_ENDS_MD, 'utf8');
+    assert.ok(/## \[DEAD\] tool-unavailable: zzmissing999abc/.test(de), 'logged as its OWN tool-unavailable entry');
+    assert.ok(fs.existsSync(FLAG), 'owner flag raised for the missing in-plan tool');
+    // Dedup: running it again must NOT add a second identical entry.
+    await runCommand.execute({ command: 'zzmissing999abc' }, ctx('run zzmissing999abc to verify the build', 'PROCEED: x', 'wait'));
+    const occurrences = (fs.readFileSync(DEAD_ENDS_MD, 'utf8').match(/## \[DEAD\] tool-unavailable: zzmissing999abc/g) || []).length;
+    assert.strictEqual(occurrences, 1, 'the same missing tool is logged once, not duplicated on retry');
+    try { fs.unlinkSync(DEAD_ENDS_MD); } catch {}
+    ok('in-plan missing tool → its own dead-end + flag, deduped on retry (failures logged separately)');
+  }
+
   // Clean up the real flag so rigops doesn't stay red after the test.
   try { fs.unlinkSync(FLAG); } catch {}
   assert.ok(!fs.existsSync(FLAG), 'flag cleaned up after the test');
