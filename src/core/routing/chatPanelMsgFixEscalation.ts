@@ -1,11 +1,14 @@
 // [SCOPE] Autonomous Escalation Loop — retries Worker on Guardian rejection, escalates to smarter model if retries exhausted.
 // Called by chatPanelMsgFix.ts in place of the old sequential Phase 2 + Phase 3 blocks.
+// Step helpers live in chatPanelMsgFixEscalationUtils.ts (Rule 9 split); the loop control flow stays here.
 
 import type { MessageHandlerDeps } from './chatPanelMessages';
-import { modelLabel } from './chatPanelMsgFixUtils';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
-import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds';
 import { fixActStep, fixActCode } from './fixActivityPanel.js';
+import {
+  updateStatus, enrichDepsWithCritiques, runVerifyStep, renderGuardianVerdict,
+  represcribeAfterRejection, logExhaustedDeadEnd, isTruncationText,
+} from './chatPanelMsgFixEscalationUtils.js';
 
 export interface EscalationResult {
   finalResponse: string;
@@ -102,44 +105,12 @@ export async function runEscalationLoop(params: {
     // ── Phase 2.5: Supervisor verifies Worker logic ──
     updateStatus(conversation, supervisorLabel, 'verify', attempt, escalated);
     refresh();
-
-    try {
-      const { runSupervisorVerify } = await import('./chatPanelMsgFixVerify.js');
-      const userRequest = conversation.map(m => m.role === 'user' ? m.content : '').filter(Boolean).pop() || 'Fix the issue';
-      fixLog(`Supervisor verify (attempt ${attempt + 1}): Starting...`);
-      const verifyResult = await runSupervisorVerify(diagnosis, workerResponse, userRequest, deps, root);
-      fixLog(`Supervisor verify result`, { passed: verifyResult.passed, issues: verifyResult.issues });
-
-      if (!verifyResult.passed) {
-        const logicIssue = verifyResult.issues.join('; ') || 'Logic does not match intent';
-        accumulatedCritiques.push(`[SUPERVISOR LOGIC CHECK] ${logicIssue}`);
-        fixLog(`Supervisor REJECTED Worker logic (attempt ${attempt + 1})`, { issue: logicIssue.substring(0, 300) });
-        // [FIX-ACTIVITY] Verify step — show WHAT was different from what the fix should be (the logic mismatch).
-        fixActStep({ phase: 'supervisor', status: 'fix', label: "Checked the fix — it didn't match the intent, retrying", detail: logicIssue });
-
-        // [FIX] Detect truncation errors and force surgical format on retry
-        const isTruncated = /truncated|incomplete|cuts off mid-function|max_tokens|finish_reason.*length/i.test(logicIssue);
-        if (isTruncated && attempt < maxRetries) {
-          forceSurgical = true;
-          fixLog(`[TRUNCATION DETECTED] Switching to surgical format for retry ${attempt + 2}`);
-          accumulatedCritiques.push(`[FORMAT CHANGE] Previous attempt used FULL FILE but output was truncated. Use SURGICAL EDITS (SEARCH/REPLACE) instead for reliability.`);
-        }
-
-        if (attempt < maxRetries) {
-          conversation[conversation.length - 1].content =
-            `Supervisor (${supervisorLabel}): done\nWorker: rejected \u2014 "${logicIssue.slice(0, 80)}" \u2014 retrying...\nVerify: pending\nGuardian: pending`;
-          refresh();
-          continue;
-        } else {
-          throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${logicIssue}`);
-        }
-      }
-      // [FIX-ACTIVITY] Verify passed — the fix matches the intent.
-      fixActStep({ phase: 'supervisor', status: 'pass', label: 'Checked — the fix matches what you asked for' });
-    } catch (e: any) {
-      if (e.message?.startsWith('Supervisor rejected Worker output')) throw e;
-      fixLog(`Supervisor verify skipped (error): ${e?.message || e}`);
+    const verify = await runVerifyStep({ diagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques: accumulatedCritiques });
+    if (verify.forceSurgical) { forceSurgical = true; }
+    if (verify.action === 'fail') {
+      throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${verify.message}`);
     }
+    if (verify.action === 'retry') { refresh(); continue; }
 
     // ── Phase 3: Guardian reviews the fix ──
     updateStatus(conversation, supervisorLabel, 'guardian', attempt, escalated);
@@ -153,54 +124,23 @@ export async function runEscalationLoop(params: {
       // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
       const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), '', deps.routingOverrides?.guardian);
       fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
-      // [FIX] The Guardian's model must never be empty -> "none". guardianReview sometimes doesn't echo the model
-      // it used; fall back to the Supervisor's provider (the Guardian IS the Supervisor-tier model — Workshop
-      // principle 3). Empty was rendering a bogus "none" row in Pipeline Usage AND pricing those tokens at ~$0,
-      // which UNDERCOUNTED the cost. A real provider both labels it correctly and prices it correctly.
       // [FIX] Distinguish a REAL guardian verdict from the "couldn't run on any provider" fallback. routingGuardian
-      // returns guardianAI:'none', passed:true when EVERY provider failed — that is NOT an approval, it's an
-      // unreviewed pass. Be honest: don't label it "approved", don't book a phantom 'none' cost row, don't price
-      // tokens that were never spent. (Was showing "Guardian (none)" + a bogus "none: 482 tokens" usage row.)
+      // returns guardianAI:'none' when EVERY provider failed — that is NOT an approval, it's an unreviewed pass.
       const guardianRan = !!guardianResult.guardianAI && guardianResult.guardianAI !== 'none';
       const guardianProvider = guardianRan
         ? guardianResult.guardianAI
         : ((() => { try { return routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude');
 
-      if (guardianRan) {
-        // [FIX-ACTIVITY] Guardian verdict — approved, or the issues it wants addressed (expandable detail).
-        fixActStep({ phase: 'guardian', status: guardianResult.passed ? 'pass' : 'fix',
-          label: guardianResult.passed ? 'Final review — approved' : 'Final review found issues — improving',
-          detail: (guardianResult.issues || []).join('\n') || undefined,
-          model: modelLabel(guardianProvider) });
-        if (guardianResult.issues?.length) {
-          fixLog(`Guardian issues found`, { issues: guardianResult.issues });
-        }
-        deps.usageTracker?.recordUsage(
-          Math.ceil(workerResponse.length / 4), 0,
-          guardianProvider, guardianResult.inputTokens, guardianResult.outputTokens,
-          'guardian', require('path').basename(root)
-        );
-        guardianLabel = modelLabel(guardianProvider);
-      } else {
-        // No reviewer available on ANY provider — the fix still applies (graceful degradation, Workshop principle
-        // 7), but say so plainly. No phantom cost row, no "approved" claim. (Never cry wolf — in either direction.)
-        fixLog(`Guardian could not run on any provider — fix applied WITHOUT final review`);
-        fixActStep({ phase: 'guardian', status: 'failover', label: 'Final review skipped — no AI reviewer available' });
-        guardianLabel = 'skipped';
-      }
-
-      if (guardianResult.scopeAlerts?.length) {
-        scopeNote = `\n\n**Guardian also noticed (not applied -- say "also fix..." to address):**\n${guardianResult.scopeAlerts.map((a: string) => `- ${a}`).join('\n')}`;
-      }
+      const verdict = renderGuardianVerdict({ guardianRan, guardianResult, guardianProvider, workerResponse, root, deps });
+      guardianLabel = verdict.guardianLabel;
+      scopeNote = verdict.scopeNote;
 
       // Check Simple Pipeline insufficiency
       if (guardianResult.issues?.some((issue: string) => issue.includes("Simple Pipeline is insufficient"))) {
         needsAgentHandoff = true;
-        // [HANDOFF] The Guardian explicitly said the simple pipeline can't do this and to route to the
-        // Agent (it needs to RUN/verify in the environment). Return NOW — don't burn Worker retries the
-        // Guardian already said can't succeed. runFixFinalize sees needsAgentHandoff and calls
-        // executeAgentHandoff (the live run_command Tool-Gap path). Without this, the loop retried 3x and
-        // died with "Supervisor rejected Worker output after 3 attempts," and the handoff never fired.
+        // [HANDOFF] Guardian says the simple pipeline can't do this → route to the Agent. Return NOW so
+        // runFixFinalize calls executeAgentHandoff (the live run_command Tool-Gap path) instead of burning
+        // Worker retries the Guardian already said can't succeed (the old bug: retried 3x, then died).
         fixLog('Guardian routed to Agent Pipeline — handing off immediately (skipping Worker retries)');
         guardianNote = `Guardian (${guardianLabel}): routing to Agent for environment verification`;
         return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated, forceSurgical };
@@ -220,62 +160,16 @@ export async function runEscalationLoop(params: {
       fixLog(`Guardian REJECTED the fix (attempt ${attempt + 1})`, { critique: critique.substring(0, 300) });
 
       // [FIX] Detect truncation errors and force surgical format on retry
-      const isTruncated = /truncated|incomplete|cuts off mid-function|max_tokens|finish_reason.*length/i.test(critique);
-      if (isTruncated && attempt < maxRetries) {
+      if (isTruncationText(critique) && attempt < maxRetries) {
         forceSurgical = true;
         fixLog(`[TRUNCATION DETECTED] Switching to surgical format for retry ${attempt + 2}`);
         accumulatedCritiques.push(`[FORMAT CHANGE] Previous attempt used FULL FILE but output was truncated. Use SURGICAL EDITS (SEARCH/REPLACE) instead for reliability.`);
       }
 
       // [STAGE 2] RE-PRESCRIPTION: Call Supervisor again with enriched context after Guardian rejection
-      if (attempt < maxRetries && userText) {
-        fixLog(`[RE-PRESCRIBE] Guardian rejected attempt ${attempt + 1} — calling Supervisor for new prescription`);
-        try {
-          // Re-read file contents after failed attempt (file may have changed or not depending on truncation)
-          const { collectSourceFiles } = await import('./chatPanelMsgFixContext.js');
-          const refreshedFiles = collectSourceFiles(root, userText);
-          if (refreshedFiles && refreshedFiles.length > 0) {
-            filesBlock = refreshedFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
-            fixLog(`[RE-PRESCRIBE] Refreshed file contents for re-prescription (${refreshedFiles.length} files)`);
-          }
-
-          // Build enriched dead ends including this session's accumulated failures
-          const sessionDeadEnds = accumulatedCritiques
-            .map((c, i) => `## Attempt ${i + 1} failed\n- What was tried: ${currentDiagnosis.slice(0, 100).replace(/\n/g, ' ')}...\n- Why it failed: ${c}\n- Do NOT repeat this approach`)
-            .join('\n\n');
-          const enrichedDeadEnds = [projectDeadEnds, sessionDeadEnds].filter(Boolean).join('\n\n---\n\n');
-
-          const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
-          const rePrescription = await runPhase1Supervisor(
-            userText,
-            filesBlock,
-            buildContext || '',
-            activePatterns,
-            enrichedDeadEnds,
-            projectRules || '',
-            deps,
-            root,
-            undefined, undefined,
-            true  // isRetry = true
-          );
-
-          if (rePrescription && rePrescription.diagnosis) {
-            const oldDiagnosis = currentDiagnosis.slice(0, 80);
-            currentDiagnosis = rePrescription.diagnosis;
-            fixLog(`[RE-PRESCRIBE] New prescription received`, {
-              oldPreview: oldDiagnosis + '...',
-              newPreview: currentDiagnosis.substring(0, 200) + '...'
-            });
-          } else {
-            fixLog(`[RE-PRESCRIBE] Supervisor returned no new diagnosis, continuing with original prescription`);
-          }
-        } catch (err) {
-          fixLog(`[RE-PRESCRIBE] Re-prescription failed, continuing with original prescription`, {
-            err: err instanceof Error ? err.message : String(err)
-          });
-          // Non-fatal — fall through to retry with original/current prescription
-        }
-      }
+      const rp = await represcribeAfterRejection({ attempt, maxRetries, userText, root, filesBlock, currentDiagnosis, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, deps });
+      filesBlock = rp.filesBlock;
+      currentDiagnosis = rp.diagnosis;
 
       // If we've exhausted retries, escalate to supervisor model
       if (attempt === maxRetries && !escalated) {
@@ -301,47 +195,6 @@ export async function runEscalationLoop(params: {
 
   // All retries + escalation exhausted
   guardianNote = `Guardian (${guardianLabel}): Failed after ${retryCount} retries${escalated ? ' + escalation' : ''}. Applying best available fix.`;
-  // [FIX] Write actual Guardian rejection reasons to dead_ends.md
-  // [STAGE 2] Include re-prescription attempts in dead end logging
-  if (accumulatedCritiques.length > 0) {
-    const critiqueText = accumulatedCritiques.join('; ');
-    const prescriptionAttempts = `Original + ${retryCount} re-prescription(s)`;
-    appendProjectDeadEnd(
-      root,
-      `guardian-rejected: ${critiqueText.slice(0, 80)}`,
-      critiqueText,
-      `Guardian rejected after ${maxRetries + 1} attempts${escalated ? ' including escalation' : ''} with ${prescriptionAttempts}`,
-      'Try FULL FILE format instead of surgical edits, or rephrase the fix request more specifically'
-    );
-    fixLog('[DEAD END] Wrote Guardian rejection reasons to dead_ends.md', { critiques: accumulatedCritiques, prescriptionAttempts });
-  }
+  logExhaustedDeadEnd(root, accumulatedCritiques, retryCount, maxRetries, escalated);
   return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: maxRetries, escalated, forceSurgical, accumulatedCritiques };
-}
-
-/** Renders a 4-step progress list into the last conversation message. */
-function updateStatus(conversation: any[], supervisorLabel: string, phase: 'worker' | 'verify' | 'guardian', attempt: number, escalated: boolean, streamBytes = 0): void {
-  const lastMsg = conversation[conversation.length - 1];
-  if (!lastMsg) { return; }
-  const retry = attempt > 0 ? (escalated ? ' — escalated' : ` — retry ${attempt}`) : '';
-  const kbNote = streamBytes > 512 ? ` (${(streamBytes / 1024).toFixed(1)} KB)` : '';
-  const workerStatus = phase === 'worker' ? `writing fix${kbNote}${retry}...` : `fix written${attempt > 0 ? retry : ''}`;
-  const verifyStatus = phase === 'verify' ? 'checking logic...' : phase === 'guardian' ? 'done' : 'pending';
-  const guardianStatus = phase === 'guardian' ? 'reviewing...' : 'pending';
-  lastMsg.content =
-    `Supervisor (${supervisorLabel}): done\n` +
-    `Worker: ${workerStatus}\n` +
-    `Verify: ${verifyStatus}\n` +
-    `Guardian: ${guardianStatus}`;
-}
-
-/** Creates a copy of deps with accumulated Guardian critiques injected into the routing context */
-function enrichDepsWithCritiques(deps: MessageHandlerDeps, critiques: string[]): MessageHandlerDeps {
-  const critiqueBlock = critiques.map((c, i) => `Attempt ${i + 1} failed: ${c}`).join('\n');
-  const enrichedRouting = Object.create(deps.routing);
-  const originalPrompt = deps.routing.prompt.bind(deps.routing);
-  enrichedRouting.prompt = async (text: string, timeoutMs?: number, imageBase64?: string, imageType?: string) => {
-    const enriched = `${text}\n\nPREVIOUS GUARDIAN REJECTIONS (your fix MUST address ALL of these):\n${critiqueBlock}`;
-    return originalPrompt(enriched, timeoutMs, imageBase64, imageType);
-  };
-  return { ...deps, routing: enrichedRouting };
 }
