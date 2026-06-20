@@ -135,8 +135,8 @@ export async function runEscalationLoop(params: {
       guardianLabel = verdict.guardianLabel;
       scopeNote = verdict.scopeNote;
 
-      // Check Simple Pipeline insufficiency
-      if (guardianResult.issues?.some((issue: string) => issue.includes("Simple Pipeline is insufficient"))) {
+      // Hand off when the Guardian uses any of its explicit "this needs the Agent" phrasings.
+      if (guardianResult.issues?.some((issue: string) => /Simple Pipeline is insufficient|Routing to Agent|Agent Pipeline/i.test(issue))) {
         needsAgentHandoff = true;
         // [HANDOFF] Guardian says the simple pipeline can't do this → route to the Agent. Return NOW so
         // runFixFinalize calls executeAgentHandoff (the live run_command Tool-Gap path) instead of burning
