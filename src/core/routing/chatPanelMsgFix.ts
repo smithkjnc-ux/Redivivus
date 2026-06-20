@@ -223,6 +223,21 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
+  // [PLAN-GATE] High-stakes fix? Show the plan — plain English + the EDITABLE steps — and wait for the user
+  // to approve / edit / cancel BEFORE any Worker or Agent runs. Smart-trigger only (environment handoff or
+  // multi-step), or always when Plan-First is on. runFixPlanGate is fail-open, so a gate hiccup never blocks.
+  {
+    let planFirst = false;
+    try { planFirst = !!require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext?.globalState.get('redivivus.planFirst'); } catch { /* default off */ }
+    const { shouldGateFix, runFixPlanGate } = await import('./chatPanelMsgFixPlanGate.js');
+    if (shouldGateFix(diagnosis, subtasks, planFirst)) {
+      const gate = await runFixPlanGate(deps, diagnosis, subtasks, fileNames);
+      if (!gate.proceed) { finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return; }
+      diagnosis = gate.diagnosis; // carry the user's edits forward as the contract
+      if (deps.turnContext) { deps.turnContext.artifacts.prescription = diagnosis; }
+    }
+  }
+
   // [AGENT-GATE] Diagnosis-time handoff (bulletproof): the Supervisor decides up-front, BEFORE the Worker runs,
   // whether the task needs the environment (run/build/install/serve/test) and emits [AGENT_HANDOFF]. Route
   // straight to the Agent — skip Worker/Verify/Guardian so we never write throwaway code the direct editor

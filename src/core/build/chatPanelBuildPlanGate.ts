@@ -9,6 +9,17 @@ export type PlanDecision = 'approve' | 'revise' | 'cancel';
 const _pendingPlanApprovals = new Map<string, (decision: PlanDecision) => void>();
 let _planIdCounter = 0;
 
+// [PLAN-EDIT] Side channel for an EDITED plan (fix-mode inline edit). Kept separate from the decision so
+// awaitPlanApproval's signature stays unchanged → build mode is untouched. The webview posts the textarea
+// value with the approve message; the fix gate reads it once after approval.
+const _planEdits = new Map<string, string>();
+export function setPlanEditedText(planId: string, text: string): void {
+  if (typeof text === 'string' && text.trim()) { _planEdits.set(planId, text.trim()); }
+}
+export function takePlanEditedText(planId: string): string | undefined {
+  const t = _planEdits.get(planId); _planEdits.delete(planId); return t;
+}
+
 /** Resolve a pending plan approval from a webview message */
 export function resolvePlanApproval(planId: string, decision: PlanDecision): void {
   const resolve = _pendingPlanApprovals.get(planId);

@@ -206,7 +206,7 @@ export function buildActionsScript(): string {
       }
       // [FIX] Plan Approval Gate button handlers
       const planApprove = target.closest ? target.closest('.plan-approve-btn') : null;
-      if (planApprove) { var pid = planApprove.getAttribute('data-plan-id'); planApprove.textContent='Building...'; planApprove.setAttribute('disabled','true'); try{vscode.postMessage({type:'plan-approve',planId:pid});}catch(e){} return; }
+      if (planApprove) { var pid = planApprove.getAttribute('data-plan-id'); var pTa = document.querySelector('.plan-edit[data-plan-id="'+pid+'"]'); var pEdit = pTa ? pTa.value : undefined; planApprove.textContent='Working…'; planApprove.setAttribute('disabled','true'); try{vscode.postMessage({type:'plan-approve',planId:pid,editedPlan:pEdit});}catch(e){} return; }
       const planRevise = target.closest ? target.closest('.plan-revise-btn') : null;
       if (planRevise) { var pid2 = planRevise.getAttribute('data-plan-id'); try{vscode.postMessage({type:'plan-revise',planId:pid2});}catch(e){} return; }
       const planCancel = target.closest ? target.closest('.plan-cancel-btn') : null;

@@ -196,8 +196,12 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
 
   // [FIX] Plan Approval Gate — bridges webview plan buttons to the build pipeline Promise
   } else if (msg.type === 'plan-approve' || msg.type === 'plan-revise' || msg.type === 'plan-cancel') {
-    const { resolvePlanApproval } = await import('../build/chatPanelBuildPlanGate.js');
+    const { resolvePlanApproval, setPlanEditedText } = await import('../build/chatPanelBuildPlanGate.js');
     const outcome = msg.type === 'plan-approve' ? 'approve' : msg.type === 'plan-revise' ? 'revise' : 'cancel';
-    if (msg.planId) { resolvePlanApproval(msg.planId, outcome as 'approve' | 'revise' | 'cancel'); }
+    if (msg.planId) {
+      // [PLAN-EDIT] Stash the user's inline edits (fix mode) before resolving, so the fix gate picks them up.
+      if (msg.editedPlan) { setPlanEditedText(msg.planId, msg.editedPlan); }
+      resolvePlanApproval(msg.planId, outcome as 'approve' | 'revise' | 'cancel');
+    }
   }
 }

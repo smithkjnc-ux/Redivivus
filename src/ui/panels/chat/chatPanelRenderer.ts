@@ -51,13 +51,24 @@ export function renderMessages(conversation: ChatMessage[]): string {
     html = html.replace(/GUARDIAN_PASS\s*/g, '');
     html = html.replace(/📝 (.+)/g, (_m, t) => `<div class="story-line"><span class="story-dot">✅</span><span>${escapeHtml(t)}</span></div>`);
     html = html.replace(/__ACTION_CARD__([^|]+)\|\|\|([^|]+)\|\|\|END__/g, (_m, c, l) => renderActionCard(c, l));
-    // [FIX] Plan Approval Gate buttons — renders Approve/Revise/Cancel for build plan review
-    html = html.replace(/__PLAN_GATE__([^|]+)\|\|\|END_PLAN_GATE__/g, (_m, planId) => {
-      return `<div class="plan-gate-actions" style="display:flex;gap:10px;margin-top:12px;">`
-        + `<button class="plan-approve-btn" data-plan-id="${escapeHtml(planId)}" style="padding:8px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#2563eb,#4d9eff);color:#fff;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(77,158,255,0.3);font-family:inherit;">Approve Plan</button>`
-        + `<button class="plan-revise-btn" data-plan-id="${escapeHtml(planId)}" style="padding:8px 16px;border:1px solid #fbbf24;border-radius:8px;background:transparent;color:#fbbf24;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">Revise</button>`
-        + `<button class="plan-cancel-btn" data-plan-id="${escapeHtml(planId)}" style="padding:8px 16px;border:1px solid #f87171;border-radius:8px;background:transparent;color:#f87171;cursor:pointer;font-size:13px;font-family:inherit;">Cancel</button>`
-        + `</div>`;
+    // [FIX] Plan Approval Gate buttons — Approve/Revise/Cancel. When the token carries an EDIT:: segment
+    // (fix-mode inline edit), render an editable textarea pre-filled with the steps and drop Revise (editing
+    // inline replaces the need to re-plan).
+    html = html.replace(/__PLAN_GATE__([^|]+)\|\|\|(?:EDIT::([^|]*)\|\|\|)?END_PLAN_GATE__/g, (_m, planId, editB64) => {
+      const pid = escapeHtml(planId);
+      let editor = '';
+      if (editB64) {
+        let text = '';
+        try { text = Buffer.from(editB64, 'base64').toString('utf-8'); } catch { text = ''; }
+        editor = `<textarea class="plan-edit" data-plan-id="${pid}" rows="8" spellcheck="false" style="width:100%;box-sizing:border-box;margin:6px 0 10px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:8px;padding:10px 12px;color:var(--vscode-foreground);font-family:var(--vscode-editor-font-family,monospace);font-size:12px;line-height:1.5;resize:vertical;outline:none;">${escapeHtml(text)}</textarea>`;
+      }
+      const approveLabel = editB64 ? 'Approve &amp; run' : 'Approve Plan';
+      const reviseBtn = editB64 ? '' : `<button class="plan-revise-btn" data-plan-id="${pid}" style="padding:8px 16px;border:1px solid #fbbf24;border-radius:8px;background:transparent;color:#fbbf24;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">Revise</button>`;
+      return `<div class="plan-gate-card">${editor}<div class="plan-gate-actions" style="display:flex;gap:10px;margin-top:4px;">`
+        + `<button class="plan-approve-btn" data-plan-id="${pid}" style="padding:8px 20px;border:none;border-radius:8px;background:linear-gradient(135deg,#2563eb,#4d9eff);color:#fff;cursor:pointer;font-size:13px;font-weight:700;box-shadow:0 2px 10px rgba(77,158,255,0.3);font-family:inherit;">${approveLabel}</button>`
+        + reviseBtn
+        + `<button class="plan-cancel-btn" data-plan-id="${pid}" style="padding:8px 16px;border:1px solid #f87171;border-radius:8px;background:transparent;color:#f87171;cursor:pointer;font-size:13px;font-family:inherit;">Cancel</button>`
+        + `</div></div>`;
     });
     html = html.replace(/__RESULT_CARD__([\s\S]*?)__END_RESULT_CARD__/g, (_m, s) => renderResultCard(s));
     html = html.replace(/__AI_BREAKDOWN__([\s\S]*?)\|\|\|END_BREAKDOWN__/g, (_m, r) => renderAIByline(r));
