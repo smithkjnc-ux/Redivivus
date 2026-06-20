@@ -196,6 +196,14 @@ export async function runEscalationLoop(params: {
       // Check Simple Pipeline insufficiency
       if (guardianResult.issues?.some((issue: string) => issue.includes("Simple Pipeline is insufficient"))) {
         needsAgentHandoff = true;
+        // [HANDOFF] The Guardian explicitly said the simple pipeline can't do this and to route to the
+        // Agent (it needs to RUN/verify in the environment). Return NOW — don't burn Worker retries the
+        // Guardian already said can't succeed. runFixFinalize sees needsAgentHandoff and calls
+        // executeAgentHandoff (the live run_command Tool-Gap path). Without this, the loop retried 3x and
+        // died with "Supervisor rejected Worker output after 3 attempts," and the handoff never fired.
+        fixLog('Guardian routed to Agent Pipeline — handing off immediately (skipping Worker retries)');
+        guardianNote = `Guardian (${guardianLabel}): routing to Agent for environment verification`;
+        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated, forceSurgical };
       }
 
       if (guardianResult.passed) {
