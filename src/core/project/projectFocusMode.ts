@@ -62,9 +62,12 @@ async function writeExclude(next: Record<string, boolean>): Promise<void> {
 export async function applyFocus(activeDir: string): Promise<void> {
   if (!workspaceIsHome()) { return; }
   if (!activeDir || isProjectsContainer(activeDir)) { return clearFocus(); }
-  const activeName = path.basename(activeDir);
+  // [CATEGORY] Keep the active project's TOP-LEVEL folder visible — for a nested project that's its category
+  // (e.g. games/tetris → keep "games"), for a flat project it's the project itself. Keying off basename would
+  // hide the active project's own category folder.
+  const activeTop = path.relative(projectsDir(), activeDir).split(path.sep)[0] || path.basename(activeDir);
   const next = baseWorkspaceExclude();
-  for (const name of projectFolderNames()) { if (name !== activeName) { next[name] = true; } }
+  for (const name of projectFolderNames()) { if (name !== activeTop) { next[name] = true; } }
   await writeExclude(next);
 }
 

@@ -9,6 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { enumerateProjects, classifyCategory, writeProjectMarker } from '../services/project/projectResolver.js';
+import { isProtectedProject } from '../core/project/activeProjectWatcher.js';
 
 function projectsDir(): string {
   return vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
@@ -27,6 +28,9 @@ function planOrganize(home: string): { moves: Move[]; backfill: string[] } {
   const moves: Move[] = [];
   const backfill: string[] = [];
   for (const p of enumerateProjects(home)) {
+    // [PARADOX GUARD] Never touch protected folders — Redivivus's own source repos (redivivus, redivivus-*).
+    // Organize must not move/mark them, the same way build/fix refuse to target them.
+    if (isProtectedProject(p.path)) { continue; }
     if (!fs.existsSync(path.join(p.path, '.redivivus', 'project.json'))) { backfill.push(p.path); }
     if (p.category) { continue; } // already in a category — leave it
     const cat = classifyCategory(blueprintOf(p.path));
