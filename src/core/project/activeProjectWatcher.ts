@@ -27,14 +27,12 @@ export function isProtectedProject(projectDir: string): boolean {
   return false;
 }
 
-/** Maps a file path to the immediate project subfolder of the projects home, or undefined if not applicable. */
+/** Maps a file path to the project it belongs to — the nearest ancestor folder marked as a project, stopping
+ *  at the projects home. Supports both flat (~/projects/tetris) and category-nested (~/projects/games/tetris)
+ *  layouts. Returns undefined for files in the home itself or in a category folder (not a project). */
 export function projectForFile(filePath: string): string | undefined {
-  const container = projectsDir();
-  const rel = path.relative(container, filePath);
-  if (!rel || rel.startsWith('..') || path.isAbsolute(rel)) { return undefined; } // not under the home
-  const seg = rel.split(path.sep)[0];
-  if (!seg || seg.startsWith('.')) { return undefined; } // a dotfolder, or a file directly in home
-  return path.join(container, seg);
+  const { nearestProjectRoot } = require('../../services/project/projectResolver.js');
+  return nearestProjectRoot(filePath, projectsDir());
 }
 
 /** Sets the active project and refreshes the chat header to follow it. No-op if it's already active. */

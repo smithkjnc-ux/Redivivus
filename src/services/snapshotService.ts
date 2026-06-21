@@ -1,23 +1,25 @@
-// [SCOPE] Redivivus Snapshot Service — pre-build snapshots, initial-state capture, archive on overflow
-// Active snapshots: .redivivus/snapshots/<id>/  |  Archive: .redivivus/snapshots/archive/<id>.json.gz
-// init_ prefix = permanent baseline (first build), never pruned. archive/ = compressed history, always restorable.
+// [SCOPE] Redivivus Snapshot Service — pre-build/-fix undo snapshots, kept 100% INSIDE the project so they
+// travel with it (move it, zip it, open it elsewhere — the history comes along). Each snapshot is ONE
+// COMPRESSED bundle: .redivivus/snapshots/<id>.json.gz (a gzipped map of relPath -> file content, plus
+// _meta.json). Compressed = opaque to every project tool (vitest, jest, tsc, eslint, webpack), so snapshot
+// copies of *.test.js etc. are NEVER discovered and run. init_ prefix = permanent baseline (never pruned).
+// [DEAD] Previously stored ACTIVE snapshots as uncompressed file TREES (.redivivus/snapshots/<id>/src/…). Vitest
+// globbed those *.test.js copies and ran them against the real DB → phantom failures that derailed the agent.
+// Replaced with bundles; _migrateLegacy() converts any old trees on construct and deletes them.
 
 import * as fs from 'fs';
 import * as path from 'path';
 import * as zlib from 'zlib';
 
 const SNAPSHOTS_DIR = '.redivivus/snapshots';
-const MAX_SNAPSHOTS = 10; // keep 10 active; older ones go to archive, not deleted
+const MAX_SNAPSHOTS = 25; // keep the 25 most recent non-init bundles; older are pruned (init_ kept forever)
+// Skip binaries/huge files — snapshots are for source-code undo; utf8 bundles would corrupt binaries.
+const SKIP_BINARY = /\.(db|sqlite3?|png|jpe?g|gif|ico|webp|bmp|pdf|zip|gz|tgz|tar|woff2?|ttf|eot|otf|mp[34]|mov|webm|wasm|node|class|jar|so|dylib|dll|exe)$/i;
+const MAX_FILE_BYTES = 512 * 1024;
 
 export interface SnapshotMeta {
-  id: string;
-  timestamp: number;
-  task: string;
-  files: string[];
-  preExisting: string[];
-  newFiles: string[];
-  isInitial?: boolean;
-  isArchived?: boolean;
+  id: string; timestamp: number; task: string; files: string[];
+  preExisting: string[]; newFiles: string[]; isInitial?: boolean; isArchived?: boolean;
 }
 
 export class SnapshotService {
@@ -25,40 +27,94 @@ export class SnapshotService {
 
   constructor(private root: string) {
     this.snapshotsRoot = path.join(root, SNAPSHOTS_DIR);
+    this._migrateLegacy(); // heal old uncompressed tree snapshots → bundles (one-time, best-effort)
   }
 
+  private bundlePath(id: string): string { return path.join(this.snapshotsRoot, `${id}.json.gz`); }
+
+  private writeBundle(id: string, files: Record<string, string>, meta: SnapshotMeta): void {
+    fs.mkdirSync(this.snapshotsRoot, { recursive: true });
+    const bundle = { ...files, '_meta.json': JSON.stringify(meta) };
+    fs.writeFileSync(this.bundlePath(id), zlib.gzipSync(Buffer.from(JSON.stringify(bundle), 'utf8')));
+  }
+
+  private readBundle(id: string): Record<string, string> | null {
+    const p = this.bundlePath(id);
+    if (fs.existsSync(p)) {
+      try { return JSON.parse(zlib.gunzipSync(fs.readFileSync(p)).toString('utf8')); } catch { return null; }
+    }
+    return this._readLegacy(id);
+  }
+
+  /** Snapshot the project's current source state before a change, so it can be undone. */
   prepare(task: string, filePaths: string[]): string {
     const id = Date.now().toString();
-    const snapDir = path.join(this.snapshotsRoot, id);
-    if (!fs.existsSync(snapDir)) { fs.mkdirSync(snapDir, { recursive: true }); }
-    // [FIX] Snapshot ALL source files, not just the ones being changed.
-    // Without this, reverting only restores changed files and leaves other files in a broken state.
-    const allSourceFiles = this._getAllSourceFiles();
-    const prescribedSet = new Set(filePaths);
+    const files: Record<string, string> = {};
     const preExisting: string[] = [];
     const newFiles: string[] = [];
-    for (const rel of filePaths) {
-      const abs = path.join(this.root, rel);
-      if (!fs.existsSync(abs)) { newFiles.push(rel); }
+    for (const rel of filePaths) { if (!fs.existsSync(path.join(this.root, rel))) { newFiles.push(rel); } }
+    for (const rel of this._getAllSourceFiles()) {
+      try { files[rel] = fs.readFileSync(path.join(this.root, rel), 'utf8'); preExisting.push(rel); } catch { /* skip */ }
     }
-    for (const rel of allSourceFiles) {
-      const abs = path.join(this.root, rel);
-      if (fs.existsSync(abs)) {
-        preExisting.push(rel);
-        const dest = path.join(snapDir, rel);
-        fs.mkdirSync(path.dirname(dest), { recursive: true });
-        fs.copyFileSync(abs, dest);
-      }
-    }
-    const meta: SnapshotMeta = { id, timestamp: Date.now(), task, files: filePaths, preExisting, newFiles };
-    fs.writeFileSync(path.join(snapDir, '_meta.json'), JSON.stringify(meta, null, 2), 'utf8');
+    this.writeBundle(id, files, { id, timestamp: Date.now(), task, files: filePaths, preExisting, newFiles });
     this._pruneOld();
     return id;
   }
 
+  /** Call AFTER the first build — a permanent baseline (init_ prefix) that is never pruned. */
+  captureInitial(task: string, filePaths: string[]): string {
+    const id = `init_${Date.now()}`;
+    const files: Record<string, string> = {};
+    const preExisting: string[] = [];
+    for (const rel of filePaths) {
+      try { files[rel] = fs.readFileSync(path.join(this.root, rel), 'utf8'); preExisting.push(rel); } catch { /* skip */ }
+    }
+    this.writeBundle(id, files, { id, timestamp: Date.now(), task, files: filePaths, preExisting, newFiles: [], isInitial: true });
+    return id;
+  }
+
+  restore(snapshotId: string): { restored: number; deleted: number; error?: string } {
+    const bundle = this.readBundle(snapshotId);
+    if (!bundle) { return { restored: 0, deleted: 0, error: 'Snapshot not found' }; }
+    let meta: SnapshotMeta;
+    try { meta = JSON.parse(bundle['_meta.json']); } catch { return { restored: 0, deleted: 0, error: 'Snapshot metadata is corrupted' }; }
+    let restored = 0, deleted = 0;
+    for (const rel of meta.preExisting || []) {
+      const content = bundle[rel];
+      if (content !== undefined) {
+        const dest = path.join(this.root, rel);
+        fs.mkdirSync(path.dirname(dest), { recursive: true });
+        fs.writeFileSync(dest, content, 'utf8'); restored++;
+      }
+    }
+    for (const rel of meta.newFiles || []) {
+      const abs = path.join(this.root, rel);
+      if (fs.existsSync(abs)) { fs.unlinkSync(abs); deleted++; }
+    }
+    return { restored, deleted };
+  }
+
+  getSnapshotFileContent(snapshotId: string, relPath: string): string | null {
+    const bundle = this.readBundle(snapshotId);
+    return bundle ? (bundle[relPath] ?? null) : null;
+  }
+
+  listSnapshots(): SnapshotMeta[] {
+    if (!fs.existsSync(this.snapshotsRoot)) { return []; }
+    return fs.readdirSync(this.snapshotsRoot)
+      .filter(f => f.endsWith('.json.gz'))
+      .map(f => { const b = this.readBundle(f.replace(/\.json\.gz$/, '')); try { return b ? JSON.parse(b['_meta.json']) as SnapshotMeta : null; } catch { return null; } })
+      .filter((m): m is SnapshotMeta => !!m)
+      .sort((a, b) => b.timestamp - a.timestamp);
+  }
+
+  /** [COMPAT] Snapshots are no longer split into active/archive — all are equal compressed bundles. Kept so
+   *  older callers don't break; returns [] (nothing is separately "archived"). */
+  listArchivedSnapshots(): SnapshotMeta[] { return []; }
+
   private _getAllSourceFiles(): string[] {
     const results: string[] = [];
-    const ignored = new Set(['.redivivus', 'node_modules', '.git', 'dist', 'out', 'build']);
+    const ignored = new Set(['.redivivus', 'node_modules', '.git', 'dist', 'out', 'build', '.next', 'coverage']);
     const walk = (dir: string, base: string) => {
       try {
         for (const entry of fs.readdirSync(dir)) {
@@ -66,136 +122,69 @@ export class SnapshotService {
           const full = path.join(dir, entry);
           const rel = base ? base + '/' + entry : entry;
           try {
-            if (fs.statSync(full).isDirectory()) { walk(full, rel); }
-            else { results.push(rel); }
-          } catch {}
+            const st = fs.statSync(full);
+            if (st.isDirectory()) { walk(full, rel); }
+            else if (!SKIP_BINARY.test(entry) && st.size <= MAX_FILE_BYTES) { results.push(rel); }
+          } catch { /* skip */ }
         }
-      } catch {}
+      } catch { /* skip */ }
     };
     walk(this.root, '');
     return results;
   }
 
-  /** Call AFTER writing a new file — saves the initial state as a permanent baseline that is never pruned. */
-  captureInitial(task: string, filePaths: string[]): string {
-    const id = `init_${Date.now()}`;
-    const snapDir = path.join(this.snapshotsRoot, id);
-    if (!fs.existsSync(snapDir)) { fs.mkdirSync(snapDir, { recursive: true }); }
-    const preExisting: string[] = [];
-    for (const rel of filePaths) {
-      const abs = path.join(this.root, rel);
-      if (fs.existsSync(abs)) {
-        preExisting.push(rel);
-        const dest = path.join(snapDir, rel);
-        fs.mkdirSync(path.dirname(dest), { recursive: true });
-        fs.copyFileSync(abs, dest);
-      }
-    }
-    const meta = { id, timestamp: Date.now(), task, files: filePaths, preExisting, newFiles: [], isInitial: true };
-    fs.writeFileSync(path.join(snapDir, '_meta.json'), JSON.stringify(meta, null, 2), 'utf8');
-    return id;
-  }
-
-  restore(snapshotId: string): { restored: number; deleted: number; error?: string } {
-    const snapDir = path.join(this.snapshotsRoot, snapshotId);
-    if (!fs.existsSync(snapDir)) { return this.restoreFromArchive(snapshotId); }
-    let meta: SnapshotMeta;
-    try { meta = JSON.parse(fs.readFileSync(path.join(snapDir, '_meta.json'), 'utf8')); }
-    catch { return { restored: 0, deleted: 0, error: 'Snapshot metadata is corrupted' }; }
-    let restored = 0, deleted = 0;
-    for (const rel of meta.preExisting) {
-      const src = path.join(snapDir, rel);
-      const dest = path.join(this.root, rel);
-      if (fs.existsSync(src)) { fs.mkdirSync(path.dirname(dest), { recursive: true }); fs.copyFileSync(src, dest); restored++; }
-    }
-    for (const rel of meta.newFiles) {
-      const abs = path.join(this.root, rel);
-      if (fs.existsSync(abs)) { fs.unlinkSync(abs); deleted++; }
-    }
-    return { restored, deleted };
-  }
-
-  /** Returns the content of a specific file from a snapshot (active or archived). Null if not found. */
-  getSnapshotFileContent(snapshotId: string, relPath: string): string | null {
-    const snapDir = path.join(this.snapshotsRoot, snapshotId);
-    if (fs.existsSync(snapDir)) {
-      const p = path.join(snapDir, relPath);
-      return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : null;
-    }
-    const archivePath = path.join(this.snapshotsRoot, 'archive', snapshotId + '.json.gz');
-    if (!fs.existsSync(archivePath)) { return null; }
-    try {
-      const bundle = JSON.parse(zlib.gunzipSync(fs.readFileSync(archivePath)).toString('utf8')) as Record<string, string>;
-      return bundle[relPath] ?? null;
-    } catch { return null; }
-  }
-
-  restoreFromArchive(snapshotId: string): { restored: number; deleted: number; error?: string } {
-    const archivePath = path.join(this.snapshotsRoot, 'archive', snapshotId + '.json.gz');
-    if (!fs.existsSync(archivePath)) { return { restored: 0, deleted: 0, error: 'Snapshot not found in active or archive' }; }
-    try {
-      const bundle = JSON.parse(zlib.gunzipSync(fs.readFileSync(archivePath)).toString('utf8')) as Record<string, string>;
-      const meta = JSON.parse(bundle['_meta.json']) as SnapshotMeta;
-      let restored = 0;
-      for (const rel of meta.preExisting) {
-        const content = bundle[rel];
-        if (content !== undefined) {
-          fs.mkdirSync(path.dirname(path.join(this.root, rel)), { recursive: true });
-          fs.writeFileSync(path.join(this.root, rel), content, 'utf8');
-          restored++;
-        }
-      }
-      return { restored, deleted: 0 };
-    } catch (e) { return { restored: 0, deleted: 0, error: String(e) }; }
-  }
-
-  listSnapshots(): SnapshotMeta[] {
-    return [...this._listActive(), ...this.listArchivedSnapshots()].sort((a, b) => b.timestamp - a.timestamp);
-  }
-
-  listArchivedSnapshots(): SnapshotMeta[] {
-    const archiveDir = path.join(this.snapshotsRoot, 'archive');
-    if (!fs.existsSync(archiveDir)) { return []; }
-    return fs.readdirSync(archiveDir).filter(f => f.endsWith('.json.gz')).map(f => {
-      try {
-        const bundle = JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(archiveDir, f))).toString('utf8')) as Record<string, string>;
-        return { ...JSON.parse(bundle['_meta.json']) as SnapshotMeta, isArchived: true };
-      } catch { return null; }
-    }).filter(Boolean).sort((a, b) => b!.timestamp - a!.timestamp) as SnapshotMeta[];
-  }
-
-  private _listActive(): SnapshotMeta[] {
-    if (!fs.existsSync(this.snapshotsRoot)) { return []; }
-    return fs.readdirSync(this.snapshotsRoot)
-      .filter(d => d !== 'archive' && fs.existsSync(path.join(this.snapshotsRoot, d, '_meta.json')))
-      .sort((a, b) => b.localeCompare(a))
-      .map(d => { try { return JSON.parse(fs.readFileSync(path.join(this.snapshotsRoot, d, '_meta.json'), 'utf8')); } catch { return null; } })
-      .filter(Boolean) as SnapshotMeta[];
-  }
-
-  private _archiveSnapshot(id: string): void {
-    const snapDir = path.join(this.snapshotsRoot, id);
-    const archiveDir = path.join(this.snapshotsRoot, 'archive');
-    if (!fs.existsSync(archiveDir)) { fs.mkdirSync(archiveDir, { recursive: true }); }
-    try {
-      const bundle: Record<string, string> = {};
-      const walk = (dir: string, base: string) => {
-        for (const entry of fs.readdirSync(dir)) {
-          const full = path.join(dir, entry), rel = base ? base + '/' + entry : entry;
-          fs.statSync(full).isDirectory() ? walk(full, rel) : (bundle[rel] = fs.readFileSync(full, 'utf8'));
-        }
-      };
-      walk(snapDir, '');
-      fs.writeFileSync(path.join(archiveDir, id + '.json.gz'), zlib.gzipSync(Buffer.from(JSON.stringify(bundle), 'utf8')));
-    } catch { /* archive failed — proceed to delete anyway */ }
-    fs.rmSync(snapDir, { recursive: true, force: true });
-  }
-
   private _pruneOld(): void {
-    if (!fs.existsSync(this.snapshotsRoot)) { return; }
-    const dirs = fs.readdirSync(this.snapshotsRoot)
-      .filter(d => !d.startsWith('init_') && d !== 'archive' && fs.statSync(path.join(this.snapshotsRoot, d)).isDirectory())
-      .sort((a, b) => b.localeCompare(a));
-    for (const old of dirs.slice(MAX_SNAPSHOTS)) { this._archiveSnapshot(old); }
+    try {
+      const bundles = fs.readdirSync(this.snapshotsRoot)
+        .filter(f => f.endsWith('.json.gz') && !f.startsWith('init_'))
+        .sort((a, b) => b.localeCompare(a)); // newest first (id = timestamp string)
+      for (const old of bundles.slice(MAX_SNAPSHOTS)) { try { fs.unlinkSync(path.join(this.snapshotsRoot, old)); } catch { /* */ } }
+    } catch { /* */ }
+  }
+
+  /** Read a legacy uncompressed tree snapshot (`<id>/…`) or an old `archive/<id>.json.gz` into a bundle map. */
+  private _readLegacy(id: string): Record<string, string> | null {
+    const dir = path.join(this.snapshotsRoot, id);
+    try {
+      if (fs.existsSync(dir) && fs.statSync(dir).isDirectory()) {
+        const out: Record<string, string> = {};
+        const walk = (d: string, base: string) => {
+          for (const e of fs.readdirSync(d)) {
+            const full = path.join(d, e), rel = base ? base + '/' + e : e;
+            try { fs.statSync(full).isDirectory() ? walk(full, rel) : (out[rel] = fs.readFileSync(full, 'utf8')); } catch { /* */ }
+          }
+        };
+        walk(dir, '');
+        return out;
+      }
+    } catch { /* */ }
+    const ar = path.join(this.snapshotsRoot, 'archive', `${id}.json.gz`);
+    if (fs.existsSync(ar)) { try { return JSON.parse(zlib.gunzipSync(fs.readFileSync(ar)).toString('utf8')); } catch { /* */ } }
+    return null;
+  }
+
+  /** One-time heal: convert old uncompressed tree snapshots → .json.gz bundles and DELETE the trees (those
+   *  were the files tools discovered). Also flatten the old archive/ dir. Best-effort; safe to re-run. */
+  private _migrateLegacy(): void {
+    try {
+      if (!fs.existsSync(this.snapshotsRoot)) { return; }
+      for (const entry of fs.readdirSync(this.snapshotsRoot)) {
+        const full = path.join(this.snapshotsRoot, entry);
+        try {
+          if (entry !== 'archive' && fs.statSync(full).isDirectory()) {
+            const bundle = this._readLegacy(entry);
+            if (bundle) { fs.writeFileSync(this.bundlePath(entry), zlib.gzipSync(Buffer.from(JSON.stringify(bundle), 'utf8'))); }
+            fs.rmSync(full, { recursive: true, force: true });
+          }
+        } catch { /* skip this entry */ }
+      }
+      const archiveDir = path.join(this.snapshotsRoot, 'archive');
+      if (fs.existsSync(archiveDir)) {
+        for (const f of fs.readdirSync(archiveDir)) {
+          if (f.endsWith('.json.gz')) { try { fs.renameSync(path.join(archiveDir, f), path.join(this.snapshotsRoot, f)); } catch { /* */ } }
+        }
+        try { fs.rmSync(archiveDir, { recursive: true, force: true }); } catch { /* */ }
+      }
+    } catch { /* best-effort migration */ }
   }
 }

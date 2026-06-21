@@ -20,6 +20,8 @@ export async function initProject(paths: RedivivusPaths, projectName: string): P
       fs.mkdirSync(dir, { recursive: true });
     }
   }
+  // [MARKER] Project marker first — recognised as a project immediately. See projectResolver.
+  require('./projectResolver.js').writeProjectMarker(root, projectName);
 
   const today = new Date().toISOString().slice(0, 10);
   const emptyBlueprint: Blueprint = {

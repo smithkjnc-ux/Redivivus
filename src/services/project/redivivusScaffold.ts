@@ -12,6 +12,9 @@ export async function scaffoldAt(targetPath: string, projectName: string, bluepr
 
   fs.mkdirSync(redivivusDir, { recursive: true });
   fs.mkdirSync(sessionsDir, { recursive: true });
+  // [MARKER] Drop the project marker FIRST so this folder is recognised as a project the instant it exists —
+  // before the rest of the scaffold (config, blueprint, src…) is written. See projectResolver.
+  require('./projectResolver.js').writeProjectMarker(targetPath, projectName);
 
   const today = new Date().toISOString().slice(0, 10);
   const bp: Blueprint = blueprint ? {
