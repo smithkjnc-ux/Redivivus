@@ -146,7 +146,22 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         ctx.log(msg);
         return `_PAUSE_ASK_USER_${msg}`;
       }
-      const command = (outcome.kind === 'proceed' || outcome.kind === 'proceed-costly') ? outcome.command : requested;
+      let command = (outcome.kind === 'proceed' || outcome.kind === 'proceed-costly') ? outcome.command : requested;
+      if (command !== requested) {
+        // [ALT-GUARD] An "alternate" is only an improvement if its tool actually exists. The Supervisor
+        // re-prescription can hallucinate a DIFFERENT package manager (e.g. `yarn install` on an npm project)
+        // that isn't installed — swapping a working command for a missing tool, which then fails 'command not
+        // found', flags the owner, and derails the run. If the alternate needs a tool we don't have, discard
+        // it and keep the agent's original command (whose tool it already has). See agentToolGapExtract.
+        try {
+          const { extractMissingCapabilities } = await import('./agentToolGapExtract.js');
+          const altMissing = extractMissingCapabilities(command).filter((c: any) => c && c.name);
+          if (altMissing.length) {
+            ctx.log(`↪️ Ignoring suggested alternate \`${command}\` — it needs ${altMissing.map((c: any) => `\`${c.name}\``).join(', ')} which isn't installed. Keeping \`${requested}\`.`);
+            command = requested;
+          }
+        } catch { /* best-effort — if the probe fails, fall through to the alternate as before */ }
+      }
       if (command !== requested) { ctx.log(`↪️ Using an alternate approach: \`${command}\``); }
       ctx.log(`🖥️ Running: \`${command}\``);
       // [EXEC] Streamed run: no 1MB buffer cap, and an INACTIVITY timeout (not a 15s wall-clock guillotine)
