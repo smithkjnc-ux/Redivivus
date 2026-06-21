@@ -134,10 +134,33 @@ export async function routeCloudChatResult(
 
 
   // ── command ──
-  if (chatResult.action === 'command' && chatResult.task) {
-    try { await vscode.commands.executeCommand(chatResult.task); } catch { /* needs args or unknown */ }
-    conversation.push({ role: 'assistant', content: chatResult.text || `Done -- **${chatResult.task.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim()}**`, timestamp: Date.now() });
+  // [FIX] Guard against a misclassified 'command' response. A real VS Code command ID is a dotted
+  // namespaced token with NO spaces (e.g. "redivivus.reviewFile"). When the cloud returns prose like
+  // "Reading the Prisma schema file." as the task, it is NOT a command — it is the classifier
+  // continuing a stalled agent narrative. Blindly calling executeCommand() with prose silently fails,
+  // pushes the text to chat, and returns early — so the fix pipeline is NEVER entered. Guard by
+  // checking the pattern; on failure, fall through to the fix/build dispatch below.
+  const _isRealCommand = chatResult.task && /^[\w]+\.[\w.]+$/.test(chatResult.task.trim());
+  if (chatResult.action === 'command' && _isRealCommand) {
+    const _cmd = chatResult.task!;
+    try { await vscode.commands.executeCommand(_cmd); } catch { /* needs args or unknown */ }
+    conversation.push({ role: 'assistant', content: chatResult.text || `Done -- **${_cmd.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim()}**`, timestamp: Date.now() });
     refresh(); releaseInput(); return;
+  }
+  // [FIX] command action with prose task (misclassification) — recover to fix if project is open,
+  // otherwise treat as an answer so the user at least sees the text.
+  if (chatResult.action === 'command' && !_isRealCommand) {
+    _dbg(`[COMMAND-MISCLASS] task="${(chatResult.task ?? '').slice(0, 80)}" is not a command ID → recovering\n`);
+    if (hasProjectOpen) {
+      await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
+      return;
+    }
+    // No project open — show the text as a plain answer rather than silently doing nothing.
+    if (chatResult.text) {
+      conversation.push({ role: 'assistant', content: chatResult.text, timestamp: Date.now() });
+      refresh();
+    }
+    releaseInput(); return;
   }
 
   // ── personality-picker ──

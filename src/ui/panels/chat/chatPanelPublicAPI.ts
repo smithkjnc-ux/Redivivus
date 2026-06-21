@@ -60,8 +60,13 @@ export function panelSetLastModel(panel: any, model: string): void {
   panel.refresh();
 }
 
+// [WARN] This key is PERSISTED in globalState (survives restarts). It must NOT include process.pid —
+// the pid changes every launch, so a pid-keyed entry can never be restored OR cleared after a restart, and
+// stale entries pile up forever (one per pid per root). That was the real "trash button does nothing" bug:
+// clear targeted the CURRENT pid's key while the visible conversation was saved under a DIFFERENT pid. Key on
+// the project root only, so save/restore/clear are always consistent. [DEAD] was `...${process.pid}.${root}`.
 export function chatHistoryKey(root?: string): string {
-  return `redivivus.chatHistory.${process.pid}.${root || 'global'}`;
+  return `redivivus.chatHistory.${root || 'global'}`;
 }
 
 /** Restore saved conversation from globalState. Call in ChatPanel constructor before refresh(). */
@@ -102,7 +107,14 @@ export function clearPersistedConversation(): void {
   try {
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const ctx = ChatPanel.extensionContext;
-    if (ctx && root) { ctx.globalState.update(chatHistoryKey(root), undefined); }
+    if (!ctx) { return; }
+    if (root) { ctx.globalState.update(chatHistoryKey(root), undefined); }
+    // [FIX] Also sweep any LEGACY pid-keyed entries (from the old buggy key format) so a Clear actually
+    // empties the chat instead of leaving a stale pid-keyed copy that gets restored next launch.
+    try {
+      const keys: readonly string[] = (ctx.globalState as any).keys ? (ctx.globalState as any).keys() : [];
+      for (const k of keys) { if (k.startsWith('redivivus.chatHistory.')) { ctx.globalState.update(k, undefined); } }
+    } catch { /* keys() may be unavailable on older API — current-key clear above still applies */ }
   } catch {}
 }
 
