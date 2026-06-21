@@ -19,6 +19,9 @@ export interface ExecOpts {
   startAt: number;
   fetchFn: (url: string, init: any, timeoutMs: number) => Promise<{ ok: boolean; json: () => Promise<any> }>;
   onFailover?: (from: string, to: string, reason: string) => void;
+  // Fired for EVERY provider that errors (even the last in the chain, where onFailover wouldn't fire). Lets
+  // the caller record a sustained outage (out of credits / bad key) so the provider is skipped next time.
+  onProviderError?: (provider: string, reason: string) => void;
 }
 
 /** Try the provider at `startAt`, then each later one in the chain, until one answers. Returns the turn plus
@@ -44,6 +47,7 @@ export async function callExecuteWithFailover(opts: ExecOpts): Promise<{ turn: E
       };
     } catch (e: any) {
       lastErr = e?.message || String(e);
+      if (opts.onProviderError) { opts.onProviderError(provider, lastErr); }
       const next = opts.chain[i + 1];
       if (next && opts.onFailover) { opts.onFailover(provider, next.provider, lastErr); }
     }

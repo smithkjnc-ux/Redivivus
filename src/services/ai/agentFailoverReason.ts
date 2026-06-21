@@ -39,3 +39,11 @@ export function describeProviderError(raw: string | undefined | null): string {
 
   return (s.trim().slice(0, 80)) || 'unavailable';
 }
+
+/** True when `raw` indicates a SUSTAINED outage that won't recover within a session — out of credits, or a
+ *  bad/missing key. The caller uses this to STICKILY skip the provider for the rest of the session. Transient
+ *  conditions (rate limited, overloaded, context too long) return false: those should be retried, not skipped. */
+export function isSustainedFailure(raw: string | undefined | null): boolean {
+  const r = describeProviderError(raw);
+  return r === 'out of API credits' || r === 'invalid or missing API key';
+}

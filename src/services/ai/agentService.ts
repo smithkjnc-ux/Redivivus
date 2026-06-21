@@ -15,7 +15,7 @@ import { createAgentLogger } from './agentActionLog.js';
 import { executionNudge, budgetNudge, ceilingMessage, proactiveTestNudge } from './agentCompletionGuard.js';
 import { detectTestFramework } from '../build/testFramework.js';
 import { callExecuteWithFailover } from './agentExecuteFailover.js';
-import { describeProviderError } from './agentFailoverReason.js';
+import { describeProviderError, isSustainedFailure } from './agentFailoverReason.js';
 import { packageManagerGuidance } from './agentPackageManager.js';
 import * as vscode from 'vscode';
 
@@ -78,9 +78,19 @@ export async function executeAgentTask(
   // [FAILOVER] Build the provider chain: the chosen supervisor first, then every other configured provider in
   // rank order. The loop walks this chain on error and STAYS on whichever answers (providerIdx), so a quota
   // outage mid-run continues on the next provider instead of halting the whole task. See agentExecuteFailover.
+  const { isProviderUnavailable, markProviderUnavailable, unavailableReason } = require('./providerTierState.js');
   const _roster = routing.buildRoster();
   const _order = [supervisor, ..._roster.workers, _roster.supervisor].filter((p, i, a) => p && a.indexOf(p) === i);
-  const chain = _order.map((p: string) => ({ provider: p, model: bestModelForRole(p, 'pro')?.modelId || p }));
+  // [STICKY-SKIP] Drop providers already flagged out-of-credits/bad-key this session so we don't lead with a
+  // dead provider and waste a failover hop on every fix/edit. If ALL are flagged (maybe one recovered), keep
+  // the full order rather than ending up with an empty chain. See providerTierState.isProviderUnavailable.
+  const _usable = _order.filter((p: string) => !isProviderUnavailable(p));
+  const _chainOrder = _usable.length ? _usable : _order;
+  const _skipped = _order.filter((p: string) => !_usable.includes(p));
+  if (_usable.length && _skipped.length) {
+    onUpdate(`ℹ️ Skipping ${_skipped.map((p: string) => friendlyModelName(p)).join(', ')} this session (${unavailableReason(_skipped[0]) || 'unavailable'}) — using ${friendlyModelName(_chainOrder[0])}.`);
+  }
+  const chain = _chainOrder.map((p: string) => ({ provider: p, model: bestModelForRole(p, 'pro')?.modelId || p }));
   let providerIdx = 0;
 
   while (iterations < MAX_ITERATIONS) {
@@ -97,6 +107,9 @@ export async function executeAgentTask(
       base, token, keys: keysPayload, prompt: history, chain, startAt: providerIdx,
       fetchFn: (routing as any).fetchWithTimeout,
       onFailover: (from, to, reason) => onUpdate(`⚠️ ${friendlyModelName(from)} unavailable (${describeProviderError(reason)}) — switching to ${friendlyModelName(to)} and continuing…`),
+      // [STICKY-SKIP] A sustained outage (out of credits / bad key) won't recover this session — flag the
+      // provider so the chain above skips it on the next iteration AND subsequent fix/edit/build runs.
+      onProviderError: (provider, reason) => { if (isSustainedFailure(reason)) { markProviderUnavailable(provider, describeProviderError(reason)); } },
     });
     providerIdx = usedIndex; // stick to the provider that worked
     const res = turn;

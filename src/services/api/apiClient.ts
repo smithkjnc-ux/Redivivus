@@ -84,7 +84,20 @@ export function getPreferred(): string | undefined {
   const { getGeminiKey: gk, getClaudeKey: ck, getOpenAIKey: ok, getGroqKey: gr, getXAIKey: xk, getKimiKey: km, getDeepseekKey: dk } = require('../ai/routingKeys.js');
   const keyMap: Record<string, () => string | null> = { gemini: gk, claude: ck, openai: ok, groq: gr, xai: xk, kimi: km, deepseek: dk };
   const { supervisor } = selectSupervisorAndWorker(keyMap);
-  return supervisor || vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || undefined;
+  // [STICKY-SKIP] If the top-ranked supervisor is already flagged out-of-credits/bad-key this session, lead a
+  // build with the next live provider instead — otherwise every build starts on the dead provider and only
+  // fails over server-side, wasting a hop each time. Falls back to the top pick if ALL are flagged (recovery).
+  let chosen = supervisor;
+  try {
+    const { isProviderUnavailable } = require('../ai/providerTierState.js');
+    if (chosen && isProviderUnavailable(chosen)) {
+      const { buildRoster } = require('../ai/routingServiceRoster.js');
+      const roster = buildRoster(keyMap);
+      const ranked = [roster.supervisor, ...roster.workers].filter(Boolean);
+      chosen = ranked.find((p: string) => !isProviderUnavailable(p)) || chosen;
+    }
+  } catch { /* availability check is best-effort — never block provider selection */ }
+  return chosen || vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || undefined;
 }
 
 async function post<T>(path: string, body: unknown): Promise<T> {
