@@ -17,6 +17,7 @@ import { detectTestFramework } from '../build/testFramework.js';
 import { callExecuteWithFailover } from './agentExecuteFailover.js';
 import { describeProviderError, isSustainedFailure } from './agentFailoverReason.js';
 import { packageManagerGuidance } from './agentPackageManager.js';
+import { synthesizeCompletion, parseTestSummary } from './agentCompletionSynthesis.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -58,6 +59,9 @@ export async function executeAgentTask(
   // and can't write a script then quit without running it. Nudges capped so a genuinely-impossible task
   // (all tools missing) still gets to finish with its gap report.
   let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false; let budgetWarned = false;
+  // [COMPLETION-SYNTH] Factual ledger of what truly happened (commands + their exit status, parsed test count)
+  // so the final bubble is built from observed actions, not the model's (often confabulated) self-report.
+  const synthActivity: { commands: { command: string; ok: boolean }[]; testSummary?: string } = { commands: [] };
   // [PROACTIVE-TEST] Detect the test runner once; nudge (capped) to leave a test behind for code changes.
   const testFw = detectTestFramework(agentCtx.root); let testNudges = 0;
   // [TRUNCATION-GUARD] A write_file cut off by the output cap leaves an unclosed tag the loop can't parse —
@@ -193,7 +197,16 @@ export async function executeAgentTask(
         continue;
       }
       alog.done(`final answer after ${iterations} step(s), ${ranCommands} command(s) run`);
-      return { success: true, finalAnswer: aiText, iterations, ledger };
+      // [COMPLETION-SYNTH] Don't surface the model's free-text answer verbatim — build the bubble from the
+      // observed ledger and fact-check the prose against files actually touched / present on disk. This kills
+      // confabulated "I edited X / added test Y" reports on weak models. See agentCompletionSynthesis.
+      const fs = require('fs'); const path = require('path');
+      const existsOnDisk = (rel: string) => { try { return fs.existsSync(path.join(agentCtx.root, rel)); } catch { return false; } };
+      const finalAnswer = synthesizeCompletion(
+        { filesModified: [...(agentCtx.modifiedFiles || [])], commands: synthActivity.commands, migrationRan: !!agentCtx.migrationRan, testSummary: synthActivity.testSummary },
+        aiText, existsOnDisk,
+      );
+      return { success: true, finalAnswer, iterations, ledger };
     }
 
     let toolData: any;
@@ -230,6 +243,14 @@ export async function executeAgentTask(
       else if (toolData.name === 'write_file' && /\.(sh|py|js|ts|mjs|cjs|rb|go|rs|java|php|pl|bash)$/i.test(toolData.args?.filePath || '')) { wroteUnrunScript = true; }
       result = await builtInTool.execute(toolData.args || {}, agentCtx);
       alog.log('result', String(result).slice(0, 400));
+      // [COMPLETION-SYNTH] Record run_command outcomes from the REAL result string so the completion bubble
+      // reflects commands that actually ran (and their pass/fail), not the model's narration of them.
+      if (toolData.name === 'run_command') {
+        const ok = !/^Command (failed|timed out)/.test(result);
+        synthActivity.commands.push({ command: String(toolData.args?.command || '').trim(), ok });
+        const ts = parseTestSummary(result);
+        if (ts) { synthActivity.testSummary = ts; }
+      }
     } else {
       const mcpTool = mcpTools.find(t => t.name === toolData.name);
       if (mcpTool) {
