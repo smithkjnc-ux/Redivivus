@@ -15,6 +15,8 @@ import { createAgentLogger } from './agentActionLog.js';
 import { executionNudge, budgetNudge, ceilingMessage, proactiveTestNudge } from './agentCompletionGuard.js';
 import { detectTestFramework } from '../build/testFramework.js';
 import { callExecuteWithFailover } from './agentExecuteFailover.js';
+import { describeProviderError } from './agentFailoverReason.js';
+import { packageManagerGuidance } from './agentPackageManager.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -44,7 +46,7 @@ export async function executeAgentTask(
     ).join('\n\n');
   }
 
-  let history = buildAgentSystemPrompt(task, context, mcpInstructions);
+  let history = buildAgentSystemPrompt(task, context, mcpInstructions, packageManagerGuidance(agentCtx.root));
 
   const ledger = new BuildLedger();
   // [BUDGET] 15 was far too tight for a real multi-file task (read several files, write several, then run +
@@ -94,7 +96,7 @@ export async function executeAgentTask(
     const { turn, usedIndex } = await callExecuteWithFailover({
       base, token, keys: keysPayload, prompt: history, chain, startAt: providerIdx,
       fetchFn: (routing as any).fetchWithTimeout,
-      onFailover: (from, to, reason) => onUpdate(`⚠️ ${friendlyModelName(from)} unavailable (${(reason || '').slice(0, 60)}) — switching to ${friendlyModelName(to)} and continuing…`),
+      onFailover: (from, to, reason) => onUpdate(`⚠️ ${friendlyModelName(from)} unavailable (${describeProviderError(reason)}) — switching to ${friendlyModelName(to)} and continuing…`),
     });
     providerIdx = usedIndex; // stick to the provider that worked
     const res = turn;
@@ -107,7 +109,7 @@ export async function executeAgentTask(
     }
 
     if (!res.success || !res.text) {
-      return { success: false, finalAnswer: '', iterations, error: res.error || 'Agent failed to respond', ledger };
+      return { success: false, finalAnswer: '', iterations, error: res.error ? `All providers unavailable (${describeProviderError(res.error)})` : 'Agent failed to respond', ledger };
     }
 
     const aiText = res.text.trim();
