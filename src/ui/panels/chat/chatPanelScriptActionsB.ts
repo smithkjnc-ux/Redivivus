@@ -173,6 +173,13 @@ export function buildActionsScriptB(): string {
         if (b64) { try { vscode.postMessage({ type: 'toolgap-terminal', cmd: b64 }); } catch(e) {} }
         return;
       }
+      // [READINESS] Production-readiness check button — runs the preflight on the active project.
+      const readyBtn = target.closest ? target.closest('.readiness-btn') : null;
+      if (readyBtn) {
+        const b64 = readyBtn.getAttribute('data-root') || '';
+        try { vscode.postMessage({ type: 'check-readiness', root: b64 }); } catch(e) {}
+        return;
+      }
       // Retry fix button — re-sends the original request as if the user typed it again.
       const retryBtn = target.closest ? target.closest('.retry-fix-btn') : null;
       if (retryBtn) {

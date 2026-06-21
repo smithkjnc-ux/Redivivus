@@ -243,6 +243,10 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
     const runCmd = !htmlFile && root ? detectRunCommand(root) : null;
     const runToken = runCmd ? `\n${TOK_RUN_PROJECT}${root}${DELIM}${TOK_RUN_PROJECT_END}` : '';
 
+    // [READINESS] Offer a launch-readiness preflight for backend/DB projects only (never a static site).
+    let readinessToken = '';
+    try { readinessToken = (await import('../../services/build/productionReadiness.js')).readinessButtonToken(root!); } catch { /* optional */ }
+
     // [FIX] Build an honest two-phase byline (Supervisor + Worker) from the real attribution instead
     // of a hardcoded "solo / primary builder" row — that hardcoding is why Claude never appeared.
     const modelLabel = result.model ?? 'AI';
@@ -257,7 +261,7 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
 
     deps.conversation.push({
       role: 'assistant',
-      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''} in ${elapsedStr}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${breakdownToken}`,
+      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''} in ${elapsedStr}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${readinessToken}${breakdownToken}`,
       timestamp: Date.now(),
     });
     deps.refresh();

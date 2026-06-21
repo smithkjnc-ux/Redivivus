@@ -71,6 +71,8 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `</div></div>`;
     });
     html = html.replace(/__TOOLGAP__([\s\S]*?)__END_TOOLGAP__/g, (_m, b64) => renderToolGapCard(b64));
+    html = html.replace(/__READINESS_BTN__([^_]*)__END_READINESS__/g, (_m, b64) =>
+      `<button class="readiness-btn" data-root="${b64}" style="margin-top:8px;padding:7px 14px;border:1px solid #4d9eff;border-radius:8px;background:transparent;color:#4d9eff;cursor:pointer;font-size:12px;font-weight:600;">🚀 Check production readiness</button>`);
     html = html.replace(/__RESULT_CARD__([\s\S]*?)__END_RESULT_CARD__/g, (_m, s) => renderResultCard(s));
     html = html.replace(/__AI_BREAKDOWN__([\s\S]*?)\|\|\|END_BREAKDOWN__/g, (_m, r) => renderAIByline(r));
     html = html.replace(/__BUILD_FEEDBACK__([^|]+)\|\|\|END_FEEDBACK__/g, (_m, f) => renderFeedbackBlock(f));

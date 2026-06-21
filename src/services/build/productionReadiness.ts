@@ -116,6 +116,16 @@ function checkTests(root: string): ReadinessItem {
         fix: 'Add a couple of tests for your critical flows (login, payments, data writes), or ask the agent to.' };
 }
 
+/** The build-result-card button token for a project, or '' for static sites (where the preflight doesn't
+ *  apply — we never nag a landing page about rate limiting). Keeps token-building out of the build runner. */
+export function readinessButtonToken(root: string): string {
+  try {
+    if (!root) { return ''; }
+    const relevant = detectServer(root).kind !== 'none' || detectToolchain(root).id !== 'none';
+    return relevant ? `\n__READINESS_BTN__${Buffer.from(root, 'utf8').toString('base64')}__END_READINESS__` : '';
+  } catch { return ''; }
+}
+
 /** Run all readiness checks for a project. Items with status 'na' are dropped (not applicable here). */
 export function runReadinessReport(root: string): ReadinessReport {
   const all = [checkSecretsInGit, checkGitignore, checkMigrations, checkBackups, checkRateLimiting, checkInputValidation, checkTests]

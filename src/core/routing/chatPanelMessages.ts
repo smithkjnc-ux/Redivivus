@@ -224,5 +224,18 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
       term.show();
       term.sendText(cmd, false);
     } catch { /* best-effort */ }
+
+  // [READINESS] Run the production-readiness preflight on the active project and post the plain-English checklist.
+  } else if (msg.type === 'check-readiness') {
+    try {
+      const { getActiveProjectRoot } = await import('../../services/project/activeProjectRoot.js');
+      const root = (msg.root ? Buffer.from(msg.root, 'base64').toString('utf-8') : '') || getActiveProjectRoot();
+      if (root) {
+        const { runReadinessReport, formatReadinessReport } = await import('../../services/build/productionReadiness.js');
+        const report = runReadinessReport(root);
+        conversation.push({ role: 'assistant', content: formatReadinessReport(report, require('path').basename(root)), timestamp: Date.now() });
+        refresh();
+      }
+    } catch { /* best-effort */ }
   }
 }
