@@ -66,10 +66,16 @@ export async function executeAgentHandoff(
         let projectContext = config?.blueprint ? `Blueprint: ${JSON.stringify(config.blueprint)}` : 'No blueprint available.';
         
         const agentResult = await executeAgentTask(agentCtx.task, projectContext, deps.routing, agentCtx, agentCtx.log);
-        // [BUDGET] On a non-success exit (e.g. step ceiling), surface the agent's closing message — which
-        // carries a Retry button to continue — so the user isn't left staring at silence.
-        if (agentResult && !agentResult.success && agentResult.finalAnswer) {
+        // [FIX] ALWAYS surface the agent's closing message. On SUCCESS it's the "here's what I did + the
+        // verification I ran (tests passed)" summary; on a non-success exit (e.g. step ceiling) it carries a
+        // Retry button to continue. Previously this only fired on failure, so a COMPLETED run rendered no
+        // closing bubble and looked identical to a silent hang — the last thing the user saw was "Running:
+        // npm test" even though the run had finished green. (Fixed 2026-06-21.)
+        if (agentResult && agentResult.finalAnswer) {
             conversation.push({ role: 'assistant', content: agentResult.finalAnswer, timestamp: Date.now() });
+            deps.refresh();
+        } else if (agentResult && agentResult.success) {
+            conversation.push({ role: 'assistant', content: '✅ **Done.** The agent completed the task and verified it in the environment.', timestamp: Date.now() });
             deps.refresh();
         }
 
