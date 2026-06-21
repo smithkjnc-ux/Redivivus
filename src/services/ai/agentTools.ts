@@ -26,6 +26,12 @@ export interface AgentContext {
   // [TOOL-GAP] Live per-session cost choice for the costlier-alternate tier. Supplied by the chat
   // orchestrator (clarify bridge). If absent, the gap conservatively resolves to "wait".
   askUser?: (prompt: string) => Promise<'alternate' | 'wait'>;
+  // [MIGRATION-GUARD] Set true when a DB schema/model file is edited (migrationHook fires), and true again
+  // once an actual migrate command runs successfully. The completion guard refuses a "final answer" while a
+  // schema was changed but never migrated — the agent must RUN the migration, not claim it ran. (A weaker
+  // model failed-over to was fabricating a migration it never executed.)
+  schemaChanged?: boolean;
+  migrationRan?: boolean;
 }
 
 export interface AgentTool {
@@ -115,7 +121,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         try {
           const { migrationHook, schemaCodeMismatch, droppedSchemaFields } = await import('../build/migrationsGuard.js');
           const mh = migrationHook(ctx.root, args.filePath, contentToWrite, ctx.task);
-          if (mh) { ctx.log(mh.log); migrationNote = mh.note; }
+          if (mh) { ctx.log(mh.log); migrationNote = mh.note; ctx.schemaChanged = true; } // [MIGRATION-GUARD]
           // [MIGRATIONS-GUARD] Destructive-change guard: a schema rewrite that DROPS an existing field will,
           // on migrate, drop that column AND its data. The usual cause is the AI rewriting the whole model
           // from a stale copy and accidentally omitting a column (e.g. adding `priority` but losing `dueDate`).
@@ -234,6 +240,12 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         const gapNote = noteToolGapOnFailure(ctx, command, { code, stdout, stderr, message: `exited with code ${code}` });
         return `Command failed (exit ${code}):\nSTDOUT:\n${trimForModel(stdout)}\nSTDERR:\n${trimForModel(stderr)}${gapNote}`;
       }
+      // [MIGRATION-GUARD] Record that an actual migration command ran (exit 0) — so the completion guard can
+      // tell a real migration from a fabricated one. See looksLikeMigrationApply + agentService.
+      try {
+        const { looksLikeMigrationApply } = await import('../build/migrationsGuard.js');
+        if (looksLikeMigrationApply(command)) { ctx.migrationRan = true; }
+      } catch { /* best-effort flag */ }
       let result = '';
       if (stdout) { result += `STDOUT:\n${trimForModel(stdout)}\n`; }
       if (stderr) { result += `STDERR:\n${trimForModel(stderr)}\n`; }

@@ -172,6 +172,20 @@ export function isApplyingPrismaMigrate(command: string): boolean {
   return /\bprisma\b[\s\S]*\bmigrate\s+dev\b/.test(command || '') && !/--create-only\b/.test(command || '');
 }
 
+/** Does this command APPLY a migration (any common toolchain)? Used to confirm the agent actually ran the
+ *  migration after a schema change, instead of just claiming it did. Broader than isApplyingPrismaMigrate. */
+export function looksLikeMigrationApply(command: string): boolean {
+  const c = command || '';
+  return /\bprisma\s+migrate\s+(dev|deploy)\b/.test(c)
+    || /manage\.py\s+migrate\b/.test(c)               // Django
+    || /\balembic\s+upgrade\b/.test(c)                // Alembic
+    || /\bdb:migrate\b/.test(c)                       // Rails / Sequelize
+    || /\bdrizzle-kit\s+(migrate|push)\b/.test(c)     // Drizzle
+    || /\btypeorm\s+migration:run\b/.test(c)          // TypeORM
+    || /\bknex\s+migrate:(latest|up)\b/.test(c)       // Knex
+    || /\bprisma\s+db\s+push\b/.test(c);              // Prisma db push (no migration file, but applies schema)
+}
+
 /** Data-loss items named in a generated migration's SQL. Prisma writes a `Warnings:` header AND uses
  *  RedefineTables on SQLite (so a dropped column never appears as a literal `DROP COLUMN`) — so we key on the
  *  human warning text first, then explicit DROPs. Returns [] for a safe migration. */

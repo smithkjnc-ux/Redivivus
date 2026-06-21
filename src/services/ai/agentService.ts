@@ -63,6 +63,9 @@ export async function executeAgentTask(
   // [TRUNCATION-GUARD] A write_file cut off by the output cap leaves an unclosed tag the loop can't parse —
   // nudge the model to re-write more concisely instead of dying silently. Capped to avoid an endless retry.
   let truncationNudges = 0;
+  // [MIGRATION-GUARD] Refuse to finish a schema-change task whose migration never actually ran (the model
+  // fabricated it). Capped so a genuinely-blocked migration still lets the run end.
+  let migrationNudges = 0;
   const alog = createAgentLogger(agentCtx.root, task);
 
   // [Redivivus] Supervisor reads current project files THEN generates a prescription.
@@ -166,6 +169,18 @@ export async function executeAgentTask(
         guardNudges++;
         alog.log(`completion-guard nudge #${guardNudges} (${ranCommands === 0 ? 'nothing-run' : 'unrun-script'})`);
         history += `\n\nSystem:\n<tool_result>\n${nudge}\n</tool_result>`;
+        continue;
+      }
+      // [MIGRATION-GUARD] The agent edited a DB schema but never RAN the migration — the exact case where a
+      // weaker model fabricates a migration it didn't execute. Don't accept the final answer: make it run the
+      // real migrate command (which also subjects it to the destructive-data-loss preview). Capped.
+      if (agentCtx.schemaChanged && !agentCtx.migrationRan && migrationNudges < 3) {
+        migrationNudges++;
+        let cmd = 'the migration command for your toolchain';
+        try { const tc = require('../build/migrationsGuard.js').detectToolchain(agentCtx.root); if (tc?.id !== 'none') { cmd = `\`${tc.migrate('the_change')}\``; } } catch { /* */ }
+        alog.log(`migration-guard nudge #${migrationNudges} (schema changed, not migrated)`);
+        onUpdate(`🗄️ You changed the database schema but haven't run the migration yet — running it now before finishing.`);
+        history += `\n\nSystem:\n<tool_result>\nYou edited the database schema but have NOT actually run the migration in this session. Do NOT claim it ran or describe its output — RUN it now with a run_command tool call (${cmd}) and wait for the real result. Only after the migration command actually executes and succeeds may you give your final answer.\n</tool_result>`;
         continue;
       }
       // [PROACTIVE-TEST] Code changed in a test-capable project but no test was left behind → nudge once to
