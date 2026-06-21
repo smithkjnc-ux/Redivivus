@@ -36,7 +36,11 @@ export async function callExecuteWithFailover(opts: ExecOpts): Promise<{ turn: E
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${opts.token}` },
         body: JSON.stringify({
           provider, model, keys: opts.keys, promptType: 'agent-orchestrator',
-          prompt: opts.prompt, maxTokens: 4000, temperature: 0.1,
+          // [OUTPUT-CAP] 4000 was too small: a single turn that writes a real file (a ~290-line test suite is
+          // ~4-5k tokens) truncated MID-FILE, leaving an unclosed <write_file> the loop couldn't parse — the
+          // run then died silently. 8192 is the safe universal ceiling across providers and only bills tokens
+          // actually generated, so reasoning turns stay cheap. (Truncation is still caught in agentService.)
+          prompt: opts.prompt, maxTokens: 8192, temperature: 0.1,
         }),
       }, 120_000);
       const data = await apiRes.json();

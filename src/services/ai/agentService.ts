@@ -60,6 +60,9 @@ export async function executeAgentTask(
   let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false; let budgetWarned = false;
   // [PROACTIVE-TEST] Detect the test runner once; nudge (capped) to leave a test behind for code changes.
   const testFw = detectTestFramework(agentCtx.root); let testNudges = 0;
+  // [TRUNCATION-GUARD] A write_file cut off by the output cap leaves an unclosed tag the loop can't parse —
+  // nudge the model to re-write more concisely instead of dying silently. Capped to avoid an endless retry.
+  let truncationNudges = 0;
   const alog = createAgentLogger(agentCtx.root, task);
 
   // [Redivivus] Supervisor reads current project files THEN generates a prescription.
@@ -132,6 +135,23 @@ export async function executeAgentTask(
     const thought = extractAgentThought(aiText);
     const modelTag = res.model ? ` \u00B7 ${friendlyModelName(res.model)}` : '';
     if (thought) { onUpdate(`\uD83D\uDCAD _Step ${iterations}${modelTag}:_ ${thought}`); }
+
+    // [TRUNCATION-GUARD] A turn that OPENED a raw <write_file> but never CLOSED it was cut off by the output
+    // cap (a very large file). With no closing tag the write can't be parsed, so the run would otherwise end
+    // silently with nothing saved. Tell the model the write was truncated and to re-emit it more concisely,
+    // then continue. Capped so a genuinely-too-big file can't loop forever.
+    const openWrite = /<write_file\s+path="([^"]+)">/.exec(aiText);
+    if (openWrite && !/<\/write_file>/.test(aiText)) {
+      if (truncationNudges < 2) {
+        truncationNudges++;
+        const tf = openWrite[1];
+        alog.log(`truncation-guard nudge #${truncationNudges} on ${tf}`);
+        onUpdate(`\u2702\uFE0F The write to \`${tf}\` was cut off (file too long for one response) \u2014 asking the agent to re-write it more concisely.`);
+        history += `\n\nSystem:\n<tool_result>\nYour previous <write_file> for "${tf}" was CUT OFF \u2014 it exceeded the output limit so the closing </write_file> tag is missing and NOTHING was saved. Re-write that file now but make it more COMPACT so it fits in one response and you can close </write_file>: drop redundant comments and trim verbose/duplicated test cases to the essential ones. Keep it correct and complete, just leaner.\n</tool_result>`;
+        continue;
+      }
+      alog.log(`truncation-guard exhausted on ${openWrite[1]} \u2014 proceeding`);
+    }
 
     // [WARN] Priority: raw <write_file> block MUST be checked before <tool_call>.
     // AI often outputs both in one response (write block + run_command verification call).
