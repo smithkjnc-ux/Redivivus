@@ -109,9 +109,18 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         // sync) via run_command. Rides on the tool result so the agent acts on it next. Best-effort.
         let migrationNote = '';
         try {
-          const { migrationHook } = await import('../build/migrationsGuard.js');
+          const { migrationHook, schemaCodeMismatch } = await import('../build/migrationsGuard.js');
           const mh = migrationHook(ctx.root, args.filePath, contentToWrite, ctx.task);
           if (mh) { ctx.log(mh.log); migrationNote = mh.note; }
+          // [MIGRATIONS-GUARD] Inverse: code using a DB field that's NOT in the schema fails at runtime — the
+          // "added it in code but forgot the schema/migration" mistake. Nudge to fix the schema first.
+          const missing = schemaCodeMismatch(ctx.root, args.filePath, contentToWrite);
+          if (missing.length) {
+            const list = missing.map((f: string) => `\`${f}\``).join(', ');
+            const plural = missing.length > 1;
+            ctx.log(`⚠️ **Schema mismatch** — this code uses ${list}, which ${plural ? 'are' : 'is'} not in your Prisma schema yet.`);
+            migrationNote += `\n\n⚠️ SCHEMA MISMATCH — your code uses Prisma field(s) ${list} that ${plural ? 'are' : 'is'} not declared in prisma/schema.prisma. Add ${plural ? 'them' : 'it'} to the schema and run \`npx prisma migrate dev\` BEFORE relying on this code, or it fails at runtime with "Unknown argument".`;
+          }
         } catch { /* guard is best-effort — never block a write */ }
         return `Successfully wrote to ${args.filePath}.${migrationNote}`;
       } catch (e: any) {

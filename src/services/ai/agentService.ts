@@ -4,7 +4,6 @@
 import type { AgentContext } from './agentTools.js';
 import { BUILT_IN_TOOLS } from './agentTools.js';
 import type { RoutingService } from './routingService.js';
-import type { AIResponse } from './routingTypes.js';
 import { Redivivus_WORKER_RULES } from './redivivusWorkerRules.js';
 import { getAllTools, callTool } from '../mcpService.js';
 import { BuildLedger } from '../build/buildLedgerService.js';
@@ -15,6 +14,7 @@ import { buildAgentSystemPrompt } from './agentPrompt.js';
 import { createAgentLogger } from './agentActionLog.js';
 import { executionNudge, budgetNudge, ceilingMessage, proactiveTestNudge } from './agentCompletionGuard.js';
 import { detectTestFramework } from '../build/testFramework.js';
+import { callExecuteWithFailover } from './agentExecuteFailover.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -73,7 +73,13 @@ export async function executeAgentTask(
   const token = await require('../api/apiClient.js').getAccountToken();
   const keysPayload = require('../api/apiClient.js').collectKeys();
   const { bestModelForRole } = require('./modelRegistry.js');
-  const actualModel = bestModelForRole(supervisor, 'pro')?.modelId || supervisor;
+  // [FAILOVER] Build the provider chain: the chosen supervisor first, then every other configured provider in
+  // rank order. The loop walks this chain on error and STAYS on whichever answers (providerIdx), so a quota
+  // outage mid-run continues on the next provider instead of halting the whole task. See agentExecuteFailover.
+  const _roster = routing.buildRoster();
+  const _order = [supervisor, ..._roster.workers, _roster.supervisor].filter((p, i, a) => p && a.indexOf(p) === i);
+  const chain = _order.map((p: string) => ({ provider: p, model: bestModelForRole(p, 'pro')?.modelId || p }));
+  let providerIdx = 0;
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
@@ -84,31 +90,15 @@ export async function executeAgentTask(
       history += `\n\nSystem:\n<tool_result>\n${budgetNudge(iterations, MAX_ITERATIONS)}\n</tool_result>`;
     }
 
-    // Use secure backend endpoint for agent iterations
-    let res: AIResponse;
-    try {
-      const fetchFn = (routing as any).fetchWithTimeout;
-      const apiRes = await fetchFn(`${base}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({
-          provider: supervisor, // using supervisor AI for agent loop
-          model: actualModel,
-          keys: keysPayload,
-          promptType: 'agent-orchestrator',
-          prompt: history,
-          maxTokens: 4000,
-          temperature: 0.1
-        })
-      }, 120_000);
-      
-      const data = await apiRes.json();
-      if (!apiRes.ok) throw new Error(data.error || 'Agent execute failed');
-      res = { text: data.text, success: true, model: supervisor, inputTokens: data.inputTokens, outputTokens: data.outputTokens };
-    } catch (e: any) {
-      res = { text: '', success: false, error: e.message, model: supervisor };
-    }
-    
+    // Use the secure /execute endpoint WITH provider failover (sticky to whichever answers).
+    const { turn, usedIndex } = await callExecuteWithFailover({
+      base, token, keys: keysPayload, prompt: history, chain, startAt: providerIdx,
+      fetchFn: (routing as any).fetchWithTimeout,
+      onFailover: (from, to, reason) => onUpdate(`⚠️ ${friendlyModelName(from)} unavailable (${(reason || '').slice(0, 60)}) — switching to ${friendlyModelName(to)} and continuing…`),
+    });
+    providerIdx = usedIndex; // stick to the provider that worked
+    const res = turn;
+
     // Track tokens for this iteration
     const inTok = res.inputTokens || 0;
     const outTok = res.outputTokens || 0;
