@@ -41,6 +41,40 @@ export interface AgentTool {
   execute: (args: any, context: AgentContext) => Promise<string>;
 }
 
+/** Shared post-write schema/migration guards for BOTH write_file and edit_file (so the two paths can never
+ *  drift). `before` is the file's prior content (null for a new file). Logs via ctx.log, sets ctx.schemaChanged,
+ *  and returns a note to append to the tool result. Best-effort — never throws. */
+async function schemaWriteGuards(ctx: AgentContext, rel: string, before: string | null, after: string): Promise<string> {
+  let note = '';
+  try {
+    const mg = await import('../build/migrationsGuard.js');
+    const mh = mg.migrationHook(ctx.root, rel, after, ctx.task);
+    if (mh) { ctx.log(mh.log); note += mh.note; ctx.schemaChanged = true; } // [MIGRATION-GUARD]
+    // Inverse: code using a Prisma field that's NOT in the schema fails at runtime ("Unknown argument").
+    const missing = mg.schemaCodeMismatch(ctx.root, rel, after);
+    if (missing.length) {
+      const list = missing.map((f: string) => `\`${f}\``).join(', ');
+      const plural = missing.length > 1;
+      ctx.log(`⚠️ **Schema mismatch** — this code uses ${list}, which ${plural ? 'are' : 'is'} not in your Prisma schema yet.`);
+      note += `\n\n⚠️ SCHEMA MISMATCH — your code uses Prisma field(s) ${list} that ${plural ? 'are' : 'is'} not declared in prisma/schema.prisma. Add ${plural ? 'them' : 'it'} to the schema and run \`npx prisma migrate dev\` BEFORE relying on this code, or it fails at runtime with "Unknown argument".`;
+    }
+    if (/\.prisma$/.test(rel)) {
+      // Destructive: a rewrite/edit that REMOVES an existing field → migrate will DROP that column + data.
+      const dropped = mg.droppedSchemaFields(before, after);
+      if (dropped.length) {
+        const list = dropped.map((f: string) => `\`${f}\``).join(', ');
+        const plural = dropped.length > 1;
+        ctx.log(`🛑 **Destructive schema change** — this change REMOVES existing field(s) ${list}. Migrating will DROP ${plural ? 'those columns' : 'that column'} and all ${plural ? 'their' : 'its'} data.`);
+        note += `\n\n🛑 DESTRUCTIVE SCHEMA CHANGE — your new schema REMOVES field(s) ${list} that currently exist in prisma/schema.prisma. Running the migration will DROP ${plural ? 'those columns' : 'that column'} AND ALL ${plural ? 'THEIR' : 'ITS'} DATA. If you only meant to ADD a field, you deleted ${plural ? 'these' : 'this'} by mistake — restore ${plural ? 'them' : 'it'} BEFORE migrating. Only proceed with the removal if the task explicitly asked to delete ${plural ? 'those fields' : 'that field'}.`;
+      }
+      // Scaffold-doctor: make a project using env("DATABASE_URL") with no working .env runnable.
+      const fixed = mg.ensureDatabaseUrl(ctx.root);
+      if (fixed) { ctx.log(`🩺 ${fixed}`); note += `\n\nℹ️ DB config: ${fixed}`; }
+    }
+  } catch { /* guards are best-effort — never block a write */ }
+  return note;
+}
+
 export const BUILT_IN_TOOLS: AgentTool[] = [
   {
     name: 'read_file',
@@ -114,43 +148,8 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         ctx.log(`✅ Wrote \`${args.filePath}\``);
         // [Redivivus] Live preview: open written file beside the chat immediately.
         try { const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath)); await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch { /* non-blocking */ }
-        // [MIGRATIONS-GUARD] If this write is a DB schema change, don't leave the schema edited directly —
-        // direct the agent to follow up with a proper migration (ordered, reversible, keeps local+prod in
-        // sync) via run_command. Rides on the tool result so the agent acts on it next. Best-effort.
-        let migrationNote = '';
-        try {
-          const { migrationHook, schemaCodeMismatch, droppedSchemaFields } = await import('../build/migrationsGuard.js');
-          const mh = migrationHook(ctx.root, args.filePath, contentToWrite, ctx.task);
-          if (mh) { ctx.log(mh.log); migrationNote = mh.note; ctx.schemaChanged = true; } // [MIGRATION-GUARD]
-          // [MIGRATIONS-GUARD] Destructive-change guard: a schema rewrite that DROPS an existing field will,
-          // on migrate, drop that column AND its data. The usual cause is the AI rewriting the whole model
-          // from a stale copy and accidentally omitting a column (e.g. adding `priority` but losing `dueDate`).
-          // Warn loudly + direct the agent to restore it BEFORE migrating. (Doesn't block the write — the
-          // earliest safe intervention is to tell the agent to fix the schema before it runs the migration.)
-          const dropped = droppedSchemaFields(prevSchema, contentToWrite);
-          if (dropped.length) {
-            const list = dropped.map((f: string) => `\`${f}\``).join(', ');
-            const plural = dropped.length > 1;
-            ctx.log(`🛑 **Destructive schema change** — this rewrite REMOVES existing field(s) ${list}. Migrating will DROP ${plural ? 'those columns' : 'that column'} and all ${plural ? 'their' : 'its'} data.`);
-            migrationNote += `\n\n🛑 DESTRUCTIVE SCHEMA CHANGE — your new schema REMOVES field(s) ${list} that currently exist in prisma/schema.prisma. Running the migration will DROP ${plural ? 'those columns' : 'that column'} AND ALL ${plural ? 'THEIR' : 'ITS'} DATA. If you only meant to ADD a field, you deleted ${plural ? 'these' : 'this'} by mistake — put ${plural ? 'them' : 'it'} back in the model and rewrite the file BEFORE migrating. Only proceed with the removal if the task explicitly asked to delete ${plural ? 'those fields' : 'that field'}.`;
-          }
-          // [SCAFFOLD-DOCTOR] A Prisma schema that uses env("DATABASE_URL") with no working .env is broken out
-          // of the box (migrate/test/run fail on the missing var). Make it runnable: hardcode the SQLite url,
-          // or drop a .env placeholder for other providers. Idempotent — no-op once it's already fine.
-          if (/\.prisma$/.test(args.filePath)) {
-            const fixed = (await import('../build/migrationsGuard.js')).ensureDatabaseUrl(ctx.root);
-            if (fixed) { ctx.log(`🩺 ${fixed}`); migrationNote += `\n\nℹ️ DB config: ${fixed}`; }
-          }
-          // [MIGRATIONS-GUARD] Inverse: code using a DB field that's NOT in the schema fails at runtime — the
-          // "added it in code but forgot the schema/migration" mistake. Nudge to fix the schema first.
-          const missing = schemaCodeMismatch(ctx.root, args.filePath, contentToWrite);
-          if (missing.length) {
-            const list = missing.map((f: string) => `\`${f}\``).join(', ');
-            const plural = missing.length > 1;
-            ctx.log(`⚠️ **Schema mismatch** — this code uses ${list}, which ${plural ? 'are' : 'is'} not in your Prisma schema yet.`);
-            migrationNote += `\n\n⚠️ SCHEMA MISMATCH — your code uses Prisma field(s) ${list} that ${plural ? 'are' : 'is'} not declared in prisma/schema.prisma. Add ${plural ? 'them' : 'it'} to the schema and run \`npx prisma migrate dev\` BEFORE relying on this code, or it fails at runtime with "Unknown argument".`;
-          }
-        } catch { /* guard is best-effort — never block a write */ }
+        // Schema/migration guards (migration hook, destructive-drop, scaffold-doctor, code↔schema mismatch).
+        const migrationNote = await schemaWriteGuards(ctx, args.filePath, prevSchema, contentToWrite);
         return `Successfully wrote to ${args.filePath}.${migrationNote}`;
       } catch (e: any) {
         return `Error writing file: ${e.message}`;
@@ -291,6 +290,37 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         const end = Math.min(lines.length, args.endLine || lines.length);
         return `Lines ${start + 1}-${end} of ${lines.length} total:\n${lines.slice(start, end).join('\n')}`;
       } catch (e: any) { return `Error reading file: ${e.message}`; }
+    }
+  },
+  {
+    // [CROSS-AI] edit_file is the PREFERRED way to change an existing file. Asking a model to regurgitate a
+    // whole file (write_file) is the hardest thing you can ask it — capable-but-not-frontier models (Gemini,
+    // etc.) drop existing fields, truncate, or recreate the file in the wrong place. A small SEARCH/REPLACE
+    // can't drop unrelated code and works regardless of model strength. Backed by the build path's fuzzy
+    // surgical-edit engine (applySurgicalEdits) so whitespace drift still matches.
+    name: 'edit_file',
+    description: 'PREFERRED for changing an EXISTING file: replaces one exact snippet with new text (a surgical SEARCH/REPLACE) and leaves the rest of the file untouched. Always use this instead of write_file when the file already exists — it cannot accidentally drop other code and works even for large files. `search` must match the current file text EXACTLY (read the file first; include enough surrounding lines to be unique). To DELETE code, set replace to "". For a brand-NEW file, use write_file.',
+    parameters: '{ "filePath": "string (relative path)", "search": "string (exact existing snippet to find)", "replace": "string (text to put in its place; \\"\\" to delete)" }',
+    execute: async (args: any, ctx: AgentContext) => {
+      const rel = (args.filePath || '').trim();
+      const absPath = path.join(ctx.root, rel);
+      if (!rel) { return 'Error: filePath is required.'; }
+      if (!fs.existsSync(absPath)) { return `Error: ${rel} does not exist. To create a new file use write_file; edit_file only changes existing files.`; }
+      if (typeof args.search !== 'string' || args.search === '') { return 'Error: "search" must be a non-empty exact snippet copied from the current file (read it first).'; }
+      try {
+        const before = fs.readFileSync(absPath, 'utf8');
+        const { applySurgicalEdits } = await import('../build/surgicalEditService.js');
+        const [res] = applySurgicalEdits([{ filePath: rel, searchBlock: args.search, replaceBlock: typeof args.replace === 'string' ? args.replace : '' }], ctx.root);
+        if (!res || !res.success) {
+          return `Edit failed: ${res?.error || 'the search text was not found'}. Read the file (read_file / read_file_lines) and copy the snippet EXACTLY, including indentation — or if the file is small, use write_file to rewrite it.`;
+        }
+        ctx.modifiedFiles.add(rel);
+        ctx.log(`✏️ Edited \`${rel}\`${res.usedFallback ? ' (fuzzy match)' : ''}`);
+        try { const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath)); await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch { /* non-blocking */ }
+        const after = fs.readFileSync(absPath, 'utf8');
+        const note = await schemaWriteGuards(ctx, rel, before, after);
+        return `Successfully edited ${rel}.${note}`;
+      } catch (e: any) { return `Error editing file: ${e.message}`; }
     }
   },
   ...NETWORK_TOOLS,
