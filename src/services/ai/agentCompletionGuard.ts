@@ -42,9 +42,25 @@ export function proactiveTestNudge(
 
 export function executionNudge(
   requiresExecution: boolean, ranCommands: number, wroteUnrunScript: boolean, nudgesSoFar: number,
+  filesModified = 1,
 ): string | null {
   if (!requiresExecution || nudgesSoFar >= 2) { return null; }
   if (ranCommands === 0) {
+    // [WEAK-MODEL] When the model has touched NOTHING (no files, no commands) and is trying to finish, a vague
+    // "go verify" is useless — its real gap is step 1. Weak models (e.g. Gemini Flash) bail to a confabulated
+    // success report when the work feels unbounded, so spell out the literal next actions and demand step 1 NOW.
+    if (filesModified === 0) {
+      return 'STOP — you are claiming this is done but you have NOT read, edited, or run ANYTHING. You only listed '
+        + 'the directory. You cannot know the file contents you need to change without reading them, and nothing '
+        + 'has been verified. Do the work now, one tool call at a time, in THIS order:\n'
+        + '1. read_file the file that defines the data model/schema (e.g. the Prisma schema or model file).\n'
+        + '2. edit_file to make the change (a small SEARCH/REPLACE — do NOT rewrite the whole file).\n'
+        + '3. read_file then edit_file the endpoint/handler that must accept the new value.\n'
+        + '4. run_command to apply the migration (the real migrate command for this toolchain).\n'
+        + '5. run_command to run the tests and confirm they pass.\n'
+        + 'Output your VERY NEXT tool call now: step 1, a read_file. Do NOT write a final answer until you have '
+        + 'actually run the migration and the tests and seen their real output.';
+    }
     return 'You have NOT run or verified anything yet, and this task REQUIRES running it. Use run_command to '
       + 'run the build/verification DIRECTLY — invoke the real tool itself (e.g. `pandoc ...`), not only inside '
       + 'a wrapper script.';

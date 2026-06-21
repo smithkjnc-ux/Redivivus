@@ -17,7 +17,7 @@ import { detectTestFramework } from '../build/testFramework.js';
 import { callExecuteWithFailover } from './agentExecuteFailover.js';
 import { describeProviderError, isSustainedFailure } from './agentFailoverReason.js';
 import { packageManagerGuidance } from './agentPackageManager.js';
-import { synthesizeCompletion, parseTestSummary } from './agentCompletionSynthesis.js';
+import { synthesizeCompletion, parseTestSummary, isNoOpFabrication } from './agentCompletionSynthesis.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -137,6 +137,10 @@ export async function executeAgentTask(
 
     const aiText = res.text.trim();
     history += `\n\nAssistant:\n${aiText}`;
+    // [AUDIT] Log the RAW model output each turn — the action log otherwise records only parsed tool calls, so a
+    // model that emits prose-only (no tool call) and confabulates is invisible. With this, every run is fully
+    // auditable from disk instead of inferred from a screenshot. See agentActionLog.
+    alog.log(`step ${iterations} raw (${friendlyModelName(res.model || '')})`, aiText);
 
     // [Redivivus] Surface AI's own reasoning as narrator bubble — zero extra tokens
     const thought = extractAgentThought(aiText);
@@ -168,10 +172,14 @@ export async function executeAgentTask(
     if (!rawWriteMatch && !toolMatch) {
       // [COMPLETION-GUARD] Refuse a premature "final answer" on an environment/verify task — nothing run, or
       // a script written but never run. See agentCompletionGuard (capped so an impossible task still finishes).
-      const nudge = executionNudge(!!agentCtx.requiresExecution, ranCommands, wroteUnrunScript, guardNudges);
+      const filesTouched = agentCtx.modifiedFiles?.size ?? 0;
+      const nudge = executionNudge(!!agentCtx.requiresExecution, ranCommands, wroteUnrunScript, guardNudges, filesTouched);
       if (nudge) {
         guardNudges++;
-        alog.log(`completion-guard nudge #${guardNudges} (${ranCommands === 0 ? 'nothing-run' : 'unrun-script'})`);
+        alog.log(`completion-guard nudge #${guardNudges} (${ranCommands === 0 ? (filesTouched === 0 ? 'nothing-touched' : 'nothing-run') : 'unrun-script'})`);
+        // [COMPLETION-SYNTH] Surface the nudge so a model that CLAIMS done without running anything is visible —
+        // otherwise the run looks like "one step then finished" and hides the model ignoring the guard.
+        onUpdate(`⚠️ The agent tried to finish without actually running anything — sending it back to do the real work (nudge ${guardNudges}/2).`);
         history += `\n\nSystem:\n<tool_result>\n${nudge}\n</tool_result>`;
         continue;
       }
@@ -202,11 +210,13 @@ export async function executeAgentTask(
       // confabulated "I edited X / added test Y" reports on weak models. See agentCompletionSynthesis.
       const fs = require('fs'); const path = require('path');
       const existsOnDisk = (rel: string) => { try { return fs.existsSync(path.join(agentCtx.root, rel)); } catch { return false; } };
-      const finalAnswer = synthesizeCompletion(
-        { filesModified: [...(agentCtx.modifiedFiles || [])], commands: synthActivity.commands, migrationRan: !!agentCtx.migrationRan, testSummary: synthActivity.testSummary },
-        aiText, existsOnDisk,
-      );
-      return { success: true, finalAnswer, iterations, ledger };
+      const _activity = { filesModified: [...(agentCtx.modifiedFiles || [])], commands: synthActivity.commands, migrationRan: !!agentCtx.migrationRan, testSummary: synthActivity.testSummary };
+      const finalAnswer = synthesizeCompletion(_activity, aiText, existsOnDisk);
+      // [COMPLETION-SYNTH] A run that observed NO real actions but claimed success is a fabrication — report it
+      // as a FAILURE so retries/telemetry don't count a phantom success. The synthesizer wrote the honest bubble.
+      const fabricated = isNoOpFabrication(_activity, aiText, existsOnDisk);
+      if (fabricated) { alog.done(`no-op fabrication after ${iterations} step(s) — reported as failure`); }
+      return { success: !fabricated, finalAnswer, iterations, ledger };
     }
 
     let toolData: any;

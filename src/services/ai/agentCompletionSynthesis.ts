@@ -50,6 +50,28 @@ export function fabricatedFileClaims(modelAnswer: string, filesModified: string[
   return fabricated;
 }
 
+// Does the prose ASSERT it performed concrete, verifiable work (edited files / ran a migration / passed
+// tests / "successfully did X")? Used to tell a fabricated success report from a legitimate informational
+// answer (which can genuinely have no file/command facts behind it).
+function claimsConcreteWork(modelAnswer: string): boolean {
+  return /\b\d+\s+tests?\s+(passed|failed)\b/i.test(modelAnswer)
+    || /\bmigrat(?:ion|ed|e)\b[^.]*\b(?:success|appli|execut|ran|complet)/i.test(modelAnswer)
+    || /\b(?:successfully|completed|verified)\b[^.]*\b(?:ran|executed|created|added|updated|modified|migrat|test)/i.test(modelAnswer)
+    || /\ball\s+(?:\d+\s+)?tests?\s+pass/i.test(modelAnswer);
+}
+
+// THE loud fabrication signal: the harness observed NOTHING — no files touched, no commands run, no migration —
+// yet the model's answer claims it did concrete work (or cites files that don't exist). On weak models this is
+// the worst case (a 100%-confabulated success report, as Gemini Flash produced: invented .ts files + a fake
+// "6 tests passed" for a JS project, having run zero tools). Detect it so the caller can mark the run failed
+// and the bubble can tell the truth instead of relaying fiction.
+export function isNoOpFabrication(activity: AgentActivity, modelAnswer: string, existsOnDisk: (rel: string) => boolean): boolean {
+  const hasFacts = activity.filesModified.length || activity.commands.length || activity.migrationRan;
+  if (hasFacts) { return false; }
+  if (fabricatedFileClaims(modelAnswer, activity.filesModified, existsOnDisk).length) { return true; }
+  return claimsConcreteWork(modelAnswer);
+}
+
 // Build the completion bubble. Leads with the VERIFIED ledger always. If the model's prose cited files that
 // don't exist (confabulation), suppress the prose and warn; otherwise include the prose as the human summary.
 export function synthesizeCompletion(activity: AgentActivity, modelAnswer: string, existsOnDisk: (rel: string) => boolean): string {
@@ -84,9 +106,19 @@ export function synthesizeCompletion(activity: AgentActivity, modelAnswer: strin
     lines.push('---', '', modelAnswer.trim());
   }
 
-  // If we somehow logged nothing concrete, don't show an empty shell — fall back to the model's words.
+  // [WARN] Nothing was observed this run. Do NOT relay the model's words as success — zero actions + a success
+  // claim is the STRONGEST fabrication signal (the model reported work it never did). Tell the truth instead.
   const hasFacts = activity.filesModified.length || activity.commands.length || activity.migrationRan;
-  if (!hasFacts) { return modelAnswer.trim() || '✅ Done.'; }
+  if (!hasFacts) {
+    if (isNoOpFabrication(activity, modelAnswer, existsOnDisk)) {
+      return '⚠️ **Nothing was actually done.** I did not edit any files or run any commands this run, so the task '
+        + 'is NOT verified and was almost certainly NOT completed — despite the summary the model produced (it '
+        + 'referenced files, migrations, or test results that were never created or run). This means the model '
+        + 'reported success it cannot back up. Please retry; if it keeps happening on this model, it is not able to '
+        + 'complete this task — try a stronger model.';
+    }
+    return modelAnswer.trim() || '✅ Done.'; // legitimate informational answer with no file/command work
+  }
 
   return lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
