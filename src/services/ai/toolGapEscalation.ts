@@ -102,6 +102,15 @@ export async function resolveToolGap(
   const flagPath = deps.flagPath || TOOL_GAP_FLAG;
   const reason = rx.note || 'No viable approach exists in the current toolset.';
   const caps = (deps.missingCapabilities?.(command) || []).filter((c) => c && c.name);
+  // [FALSE-GAP GUARD] A represcribe "dead end" with NO genuinely-missing tool is plan-strictness, not a
+  // capability gap — the command's executables all exist (e.g. `ls`, `cat`, `npx prisma migrate`, `npm test`).
+  // Blocking it pauses the build AND flags a PHANTOM gap to the owner (the Supervisor's refusal sentence shown
+  // as a "missing tool"). Only a REAL missing tool blocks; otherwise run the available command — if it truly
+  // lacks a tool the extractor missed, the run-time failure path (noteToolGapOnFailure) logs the real gap.
+  if (deps.missingCapabilities && caps.length === 0) {
+    deps.log(`▶️ Running an available command the approved plan didn't pre-list: \`${command}\``);
+    return { kind: 'proceed', command };
+  }
   const tool = rx.neededTool || caps[0]?.name || firstRealToken(command) || command;
   const missing = caps.length ? caps : undefined;
   const install = missing ? missing.map((c) => `${c.name} — ${c.install}`).join('\n') : undefined;
