@@ -13,7 +13,8 @@ import { runSupervisorPreplanning } from './agentSupervisor.js';
 import { clearToolGapFlag } from './toolGapEscalation.js';
 import { buildAgentSystemPrompt } from './agentPrompt.js';
 import { createAgentLogger } from './agentActionLog.js';
-import { executionNudge, budgetNudge, ceilingMessage } from './agentCompletionGuard.js';
+import { executionNudge, budgetNudge, ceilingMessage, proactiveTestNudge } from './agentCompletionGuard.js';
+import { detectTestFramework } from '../build/testFramework.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -55,6 +56,8 @@ export async function executeAgentTask(
   // and can't write a script then quit without running it. Nudges capped so a genuinely-impossible task
   // (all tools missing) still gets to finish with its gap report.
   let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false; let budgetWarned = false;
+  // [PROACTIVE-TEST] Detect the test runner once; nudge (capped) to leave a test behind for code changes.
+  const testFw = detectTestFramework(agentCtx.root); let testNudges = 0;
   const alog = createAgentLogger(agentCtx.root, task);
 
   // [Redivivus] Supervisor reads current project files THEN generates a prescription.
@@ -138,6 +141,15 @@ export async function executeAgentTask(
         guardNudges++;
         alog.log(`completion-guard nudge #${guardNudges} (${ranCommands === 0 ? 'nothing-run' : 'unrun-script'})`);
         history += `\n\nSystem:\n<tool_result>\n${nudge}\n</tool_result>`;
+        continue;
+      }
+      // [PROACTIVE-TEST] Code changed in a test-capable project but no test was left behind → nudge once to
+      // add + run one, so coverage accretes. Offers an out, so a genuinely test-less change still finishes.
+      const tNudge = proactiveTestNudge([...(agentCtx.modifiedFiles || [])], testFw, testNudges);
+      if (tNudge) {
+        testNudges++;
+        alog.log('proactive-test nudge');
+        history += `\n\nSystem:\n<tool_result>\n${tNudge}\n</tool_result>`;
         continue;
       }
       alog.done(`final answer after ${iterations} step(s), ${ranCommands} command(s) run`);

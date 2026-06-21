@@ -19,6 +19,27 @@ export function ceilingMessage(task: string, max: number): string {
     + `fully verify the result. Click below to let me continue from here.\n\n__RETRY_FIX__:${b64}__END_RETRY__`;
 }
 
+// [PROACTIVE-TEST] A code change in a project that CAN run tests should leave a test behind, so coverage
+// accretes instead of every fix being verified once and forgotten. Fires at most ONCE, only when real logic
+// changed and no test was written, and always offers an out so a genuinely test-less change can still finish.
+function isCodeFile(p: string): boolean {
+  return /\.(ts|tsx|js|jsx|mjs|cjs|py|go|rs|rb|java|php|vue|svelte)$/.test(p) && !/\.d\.ts$/.test(p);
+}
+export function proactiveTestNudge(
+  modifiedFiles: string[],
+  fw: { label: string; runCmd: string; isTestFile: (p: string) => boolean } | null,
+  nudgesSoFar: number,
+): string | null {
+  if (nudgesSoFar >= 1 || !fw) { return null; }
+  const modifiedCode = modifiedFiles.some(isCodeFile);
+  const wroteTest = modifiedFiles.some((p) => fw.isTestFile(p));
+  if (!modifiedCode || wroteTest) { return null; }
+  return `You changed code but didn't add or update an automated test. Add a small, focused ${fw.label} test for `
+    + `the behavior you just changed and run it (\`${fw.runCmd}\`) to confirm it passes — tests stay in the project `
+    + `and protect this behavior on future changes. If a test genuinely doesn't apply to this change, say so in one `
+    + `line and finish.`;
+}
+
 export function executionNudge(
   requiresExecution: boolean, ranCommands: number, wroteUnrunScript: boolean, nudgesSoFar: number,
 ): string | null {
