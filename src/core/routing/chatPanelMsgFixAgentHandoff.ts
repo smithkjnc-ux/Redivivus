@@ -66,6 +66,25 @@ export async function executeAgentHandoff(
         let projectContext = config?.blueprint ? `Blueprint: ${JSON.stringify(config.blueprint)}` : 'No blueprint available.';
         
         await executeAgentTask(agentCtx.task, projectContext, deps.routing, agentCtx, agentCtx.log);
+
+        // [TOOL-GAP] If the agent hit a wall the USER must clear (a tool/module that needs installing), the
+        // structured flag is present. Surface a user-facing card: plain-English purpose + the exact install
+        // command for their OS + Copy / Open-in-terminal / Retry. We never auto-install. The flag stays as the
+        // owner's telemetry signal and clears itself when the user retries (executeAgentTask clears it on run).
+        try {
+            const fs = require('fs'); const os = require('os'); const path = require('path');
+            const flagPath = path.join(os.homedir(), '.redivivus', 'pending_toolgap.json');
+            if (fs.existsSync(flagPath)) {
+                const flag = JSON.parse(fs.readFileSync(flagPath, 'utf-8'));
+                const items = Array.isArray(flag.missing) ? flag.missing : [];
+                if (items.length) {
+                    const retry = Buffer.from(userText, 'utf-8').toString('base64');
+                    const payload = Buffer.from(JSON.stringify({ items, retry }), 'utf-8').toString('base64');
+                    conversation.push({ role: 'assistant', content: `__TOOLGAP__${payload}__END_TOOLGAP__`, timestamp: Date.now() });
+                    deps.refresh();
+                }
+            }
+        } catch { /* best-effort: the agent already explained the gap in prose */ }
     } catch (e) {
         const _b64h = Buffer.from(userText, 'utf8').toString('base64');
         conversation.push({

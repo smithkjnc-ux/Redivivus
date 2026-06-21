@@ -203,5 +203,26 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
       if (msg.editedPlan) { setPlanEditedText(msg.planId, msg.editedPlan); }
       resolvePlanApproval(msg.planId, outcome as 'approve' | 'revise' | 'cancel');
     }
+
+  // [TOOL-GAP] User chose to copy an install command — drop it on the clipboard, confirm with a toast.
+  } else if (msg.type === 'toolgap-copy') {
+    try {
+      const cmd = Buffer.from(msg.cmd || '', 'base64').toString('utf-8');
+      const vs = require('vscode') as typeof import('vscode');
+      await vs.env.clipboard.writeText(cmd);
+      vs.window.showInformationMessage(`Copied: ${cmd}`);
+    } catch { /* best-effort */ }
+
+  // [TOOL-GAP] User chose the terminal hand-off — open a terminal with the command PRE-FILLED but NOT run.
+  // sendText(cmd, false) types it without the trailing newline, so the user reads it and presses Enter
+  // themselves (and provides their sudo password). We never execute an install on their behalf.
+  } else if (msg.type === 'toolgap-terminal') {
+    try {
+      const cmd = Buffer.from(msg.cmd || '', 'base64').toString('utf-8');
+      const vs = require('vscode') as typeof import('vscode');
+      const term = vs.window.createTerminal('Redivivus: Install');
+      term.show();
+      term.sendText(cmd, false);
+    } catch { /* best-effort */ }
   }
 }

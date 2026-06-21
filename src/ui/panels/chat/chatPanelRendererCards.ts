@@ -99,6 +99,41 @@ export function renderActionCard(command: string, label: string): string {
   return `<div style="margin:10px 0;padding:10px 14px;background:var(--vscode-button-background);color:var(--vscode-button-foreground);border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:10px;" data-cmd="${command}"><span style="flex:1;">${escapeHtml(label)}</span><span style="font-size:11px;opacity:0.7;">Tap to run ▶</span></div>`;
 }
 
+// [TOOL-GAP] User-facing "you need to install this" card. Addressed to the USER (not the owner): plain-English
+// purpose, the exact command for their OS, and Copy / Open-in-terminal buttons. We never auto-install — the
+// terminal hand-off pre-fills the command but the user runs it (their permission + password). Reuses the
+// existing retry-fix-btn for "Retry when done". Input is base64(JSON{items:MissingCap[], retry:b64(userText)}).
+export function renderToolGapCard(b64: string): string {
+  let data: any = {};
+  try { data = JSON.parse(Buffer.from(b64, 'base64').toString('utf-8')); } catch { return ''; }
+  const items: any[] = Array.isArray(data.items) ? data.items : [];
+  if (!items.length) { return ''; }
+  const head = items.length === 1 ? "One thing's missing" : `${items.length} things are missing`;
+  const rows = items.map((c) => {
+    const cmd = String(c.install || '');
+    const cmd64 = Buffer.from(cmd, 'utf-8').toString('base64');
+    const what = c.what ? ` — ${escapeHtml(String(c.what))}` : '';
+    const kindTag = c.kind === 'module' ? 'Python package' : 'tool';
+    const note = c.note ? `<div style="font-size:11px;color:var(--vscode-descriptionForeground);margin-top:4px;">↳ ${escapeHtml(String(c.note))}</div>` : '';
+    return `<div style="margin:10px 0;padding:10px 12px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:8px;">`
+      + `<div style="font-size:13px;"><strong>${escapeHtml(String(c.name))}</strong> <span style="font-size:10px;opacity:0.6;">(${kindTag})</span>${what}. <span style="opacity:0.8;">It's not installed on your computer.</span></div>`
+      + `<div style="display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap;">`
+      + `<code style="flex:1;min-width:180px;padding:6px 10px;background:var(--vscode-textCodeBlock-background,#1e1e1e);border-radius:5px;font-family:var(--vscode-editor-font-family,monospace);font-size:12px;overflow-x:auto;">${escapeHtml(cmd)}</code>`
+      + `<button class="tg-copy" data-cmd="${cmd64}" style="padding:5px 10px;border:1px solid var(--vscode-input-border);border-radius:5px;background:transparent;color:var(--vscode-foreground);cursor:pointer;font-size:12px;">📋 Copy</button>`
+      + `<button class="tg-term" data-cmd="${cmd64}" style="padding:5px 10px;border:none;border-radius:5px;background:#0e639c;color:#fff;cursor:pointer;font-size:12px;font-weight:600;">▶ Open in terminal</button>`
+      + `</div>${note}</div>`;
+  }).join('');
+  const retry = data.retry
+    ? `<button class="retry-fix-btn" data-retry="${escapeHtml(String(data.retry))}" style="margin-top:4px;padding:6px 14px;background:#1f8a3b;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:12px;font-weight:600;">&#x21A9; Retry when done</button>`
+    : '';
+  return `<div style="margin:12px 0;padding:14px;background:var(--vscode-editorWidget-background,var(--vscode-input-background));border:1px solid #d9822b;border-radius:10px;">`
+    + `<div style="font-weight:700;font-size:14px;margin-bottom:4px;">⚠️ ${head}</div>`
+    + `<div style="font-size:12px;color:var(--vscode-descriptionForeground);margin-bottom:6px;">To finish this, your computer needs the software below. Installing it asks for your permission and password, so Redivivus won't change your computer on its own — run whichever you're comfortable with, then Retry.</div>`
+    + `${rows}`
+    + `<div style="font-size:11px;color:var(--vscode-descriptionForeground);margin:8px 0;">“Open in terminal” fills the command in for you — you press Enter and type your password. Nothing runs until you do.</div>`
+    + `${retry}</div>`;
+}
+
 export function renderResultCard(summary: string): string {
   // [FIX] summary is already HTML-escaped by renderMessages — do NOT call escapeHtml again (double-escape shows &amp;).
   // Apply minimal markdown on pre-escaped content.

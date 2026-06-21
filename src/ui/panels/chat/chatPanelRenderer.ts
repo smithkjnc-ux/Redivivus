@@ -2,7 +2,7 @@
 // Extracted from chatPanelHtml.ts. Keep under 200 lines.
 
 import type { ChatMessage } from './chatPanelHtml';
-import { renderStoryBlock, renderAIByline, renderActionCard, renderResultCard } from './chatPanelRendererCards';
+import { renderStoryBlock, renderAIByline, renderActionCard, renderResultCard, renderToolGapCard } from './chatPanelRendererCards';
 import { renderFeedbackBlock, renderArchitectActions, renderArchitectConfirm, renderUndoButton } from './chatPanelRendererArchitect';
 import { renderClarifyCard } from './chatPanelRendererClarify';
 import { renderBlueprintGapsToken, renderBlueprintCardToken } from './chatPanelRendererBlueprintCard';
@@ -70,6 +70,7 @@ export function renderMessages(conversation: ChatMessage[]): string {
         + `<button class="plan-cancel-btn" data-plan-id="${pid}" style="padding:8px 16px;border:1px solid #f87171;border-radius:8px;background:transparent;color:#f87171;cursor:pointer;font-size:13px;font-family:inherit;">Cancel</button>`
         + `</div></div>`;
     });
+    html = html.replace(/__TOOLGAP__([\s\S]*?)__END_TOOLGAP__/g, (_m, b64) => renderToolGapCard(b64));
     html = html.replace(/__RESULT_CARD__([\s\S]*?)__END_RESULT_CARD__/g, (_m, s) => renderResultCard(s));
     html = html.replace(/__AI_BREAKDOWN__([\s\S]*?)\|\|\|END_BREAKDOWN__/g, (_m, r) => renderAIByline(r));
     html = html.replace(/__BUILD_FEEDBACK__([^|]+)\|\|\|END_FEEDBACK__/g, (_m, f) => renderFeedbackBlock(f));

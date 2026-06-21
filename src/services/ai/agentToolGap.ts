@@ -3,6 +3,8 @@
 // re-prescription call and the live user cost-choice.
 
 import { type Represcribe, type ToolGapDeps, writeToolGapFlag } from './toolGapEscalation.js';
+import { extractMissingCapabilities } from './agentToolGapExtract.js';
+import { installHint } from './agentToolGapInstall.js';
 
 interface ToolGapCtx {
   root: string;
@@ -54,11 +56,13 @@ function toolExists(x: string): boolean {
  *  note for the agent's failure output. `pattern` keys the dead-end (tool-unavailable / python-module). */
 function logGap(ctx: ToolGapCtx, command: string, pattern: string, name: string, reason: string, instead: string): string {
   try {
+    const kind: 'tool' | 'module' = pattern.startsWith('python-module') ? 'module' : 'tool';
+    const install = installHint(name, kind); // copy-pasteable owner guidance — carried to the flag + dead-end
     const { appendProjectDeadEnd } = require('../../core/routing/chatPanelMsgFixDeadEnds.js');
-    appendProjectDeadEnd(ctx.root, pattern, `The Agent ran \`${command}\` but ${reason}`, reason, instead);
-    writeToolGapFlag(require('fs'), { tool: name, task: ctx.task, command, reason });
-    ctx.log(`🛑 Tool gap: ${pattern} — logged as a project dead-end and flagged for the owner.`);
-    return `\n\n🛑 Tool gap: ${reason} Logged as a project dead-end and flagged for you (rigops will show it). ${instead}`;
+    appendProjectDeadEnd(ctx.root, pattern, `The Agent ran \`${command}\` but ${reason}`, `${reason} Install: ${install}`, instead);
+    writeToolGapFlag(require('fs'), { tool: name, task: ctx.task, command, reason, missing: [{ name, kind, install }], install });
+    ctx.log(`🛑 Tool gap: ${pattern} — logged as a project dead-end and flagged for the owner (install: ${install}).`);
+    return `\n\n🛑 Tool gap: ${reason} **Install:** ${install}. Logged as a project dead-end and flagged for you (rigops will show it). ${instead}`;
   } catch { return ''; }
 }
 
@@ -100,19 +104,25 @@ export function buildToolGapDeps(ctx: ToolGapCtx): ToolGapDeps {
     askUser: ctx.askUser || (async () => 'wait'), // default: don't spend extra tokens without consent
     log: ctx.log,
     fs: require('fs'),
+    // [TOOL-GAP] Name the REAL missing capabilities in `command` (pandoc, weasyprint, a python module) so the
+    // dead end + owner flag are keyed on the thing to install — never the `set`/`bash` wrapper they sat inside.
+    missingCapabilities: (command) => extractMissingCapabilities(command),
     // [DEAD-END] On a true dead end, teach this project so a future fix won't prescribe the missing tool.
-    // Key the entry on the actual EXECUTABLE (first token of the command) so revalidation can later check
-    // `command -v <exe>` and auto-retire it once the tool is installed; keep the descriptive phrase in the body.
-    recordDeadEnd: (tool, command, reason) => {
+    // resolveToolGap now passes the SPECIFIC capability name + kind (one call per missing thing), so we key
+    // the entry directly on it — `tool-unavailable: <exe>` (revalidates via `command -v`) or
+    // `python-module: <mod>` (revalidates via import) — and auto-retires once it's installed.
+    recordDeadEnd: (tool, command, reason, kind) => {
       try {
-        const exe = ((command || '').trim().split(/\s+/)[0] || tool || '').split('/').pop() || tool;
+        const pattern = kind === 'module' ? `python-module: ${tool}` : `tool-unavailable: ${tool}`;
+        const what = kind === 'module' ? `the Python module \`${tool}\`` : `\`${tool}\``;
+        const instead = kind === 'module'
+          ? `Install it (e.g. \`pip install ${tool}\`) or use an installed alternative — don't keep importing ${tool}.`
+          : `Do NOT prescribe ${tool} for this project — it isn't installed/available. Use an installed alternative, or ask the user to install it.`;
         const { appendProjectDeadEnd } = require('../../core/routing/chatPanelMsgFixDeadEnds.js');
         appendProjectDeadEnd(
-          ctx.root,
-          `tool-unavailable: ${exe}`,
-          `The Agent ran \`${command}\` (needed: ${tool}) but ${exe} is not available here and no workaround exists in the toolset.`,
-          reason,
-          `Do NOT prescribe ${exe} for this project — it isn't installed/available. Use an installed alternative, or ask the user to install it.`,
+          ctx.root, pattern,
+          `The Agent ran \`${command}\` but ${what} is not available here and no workaround exists in the toolset.`,
+          reason, instead,
         );
       } catch { /* best-effort, same as the flag */ }
     },

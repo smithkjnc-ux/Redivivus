@@ -24,6 +24,10 @@ export interface Represcribe {
 
 type FsLike = Pick<typeof import('fs'), 'existsSync' | 'writeFileSync' | 'unlinkSync' | 'mkdirSync'>;
 
+/** One genuinely-missing capability + how to install it. Mirrors agentToolGapExtract.MissingCap.
+ *  `what` = plain-English purpose, `note` = optional caveat (e.g. native libs) — both for the user card. */
+export interface MissingCap { name: string; kind: 'tool' | 'module'; install: string; what?: string; note?: string; }
+
 export interface ToolGapDeps {
   represcribe: (command: string, task: string, plan: string) => Promise<Represcribe>;
   askUser: (prompt: string) => Promise<'alternate' | 'wait'>;
@@ -32,7 +36,11 @@ export interface ToolGapDeps {
   flagPath?: string;
   // [DEAD-END] Record a true dead end as a PROJECT dead-end (dead_ends.md) so a FUTURE fix's Supervisor
   // won't prescribe the missing tool again. Injected (keeps this module pure/testable). Best-effort.
-  recordDeadEnd?: (tool: string, command: string, reason: string) => void;
+  recordDeadEnd?: (tool: string, command: string, reason: string, kind?: 'tool' | 'module') => void;
+  // [TOOL-GAP] Pull the REAL missing capabilities out of `command` (impure: probes PATH / python imports).
+  // Injected so this module stays pure/testable. Lets us name pandoc/weasyprint instead of the `set`
+  // wrapper, and carry install steps to the owner flag. Absent → fall back to firstRealToken().
+  missingCapabilities?: (command: string) => MissingCap[];
 }
 
 export type ToolGapOutcome =
@@ -89,18 +97,47 @@ export async function resolveToolGap(
       : { kind: 'wait' };
   }
 
-  // Tier 3 — true dead end: write the owner flag + block.
+  // Tier 3 — true dead end: name the REAL missing capabilities (not the `set`/`bash` wrapper they were
+  // buried in), write the owner flag WITH install steps, record each as a separate project dead-end, block.
   const flagPath = deps.flagPath || TOOL_GAP_FLAG;
-  const tool = rx.neededTool || (command.split(' ')[0] || command);
   const reason = rx.note || 'No viable approach exists in the current toolset.';
-  writeToolGapFlag(deps.fs, { tool, task, command, reason }, flagPath);
+  const caps = (deps.missingCapabilities?.(command) || []).filter((c) => c && c.name);
+  const tool = rx.neededTool || caps[0]?.name || firstRealToken(command) || command;
+  const missing = caps.length ? caps : undefined;
+  const install = missing ? missing.map((c) => `${c.name} — ${c.install}`).join('\n') : undefined;
+  writeToolGapFlag(deps.fs, { tool, task, command, reason, missing, install }, flagPath);
   // The flag alerts the owner NOW; this teaches the pipeline so a future fix doesn't repeat the dead end.
-  deps.recordDeadEnd?.(tool, command, reason);
-  const message =
-    `🛑 **Tool gap — needs your attention.** I need a capability the toolset doesn't have ` +
-    `(\`${tool}\`) to run \`${command}\`, and there is no workaround. Flagged for the owner ` +
-    `(\`${flagPath}\`); the build is paused until it's resolved.`;
+  // Each missing capability is logged on its own (never bundled) so revalidation can retire them one by one.
+  if (missing) {
+    for (const c of missing) {
+      const what = c.kind === 'module' ? `Python module \`${c.name}\`` : `\`${c.name}\``;
+      deps.recordDeadEnd?.(c.name, command, `${reason} — ${what} is missing. Install: ${c.install}`, c.kind);
+    }
+  } else {
+    deps.recordDeadEnd?.(tool, command, reason);
+  }
+  const message = missing
+    ? `🛑 **Tool gap — needs your attention.** Missing: ${missing.map((c) => `\`${c.name}\``).join(', ')}. ` +
+      `No workaround exists in the toolset. Flagged for the owner (\`${flagPath}\`) with install steps; build paused.`
+    : `🛑 **Tool gap — needs your attention.** I need a capability the toolset doesn't have ` +
+      `(\`${tool}\`) to run \`${command}\`, and there is no workaround. Flagged for the owner ` +
+      `(\`${flagPath}\`); the build is paused until it's resolved.`;
   return { kind: 'blocked', message };
+}
+
+/** Pure fallback when no extractor is injected: the first REAL command token, skipping shell builtins /
+ *  wrappers / VAR=val assignments so we never key a dead end on `set`, `sudo`, `bash`, etc. */
+function firstRealToken(command: string): string {
+  const noise = new Set(['set', 'cd', 'export', 'echo', 'printf', 'env', 'bash', 'sh', 'zsh', 'sudo',
+    'nohup', 'time', 'if', 'while', 'for', 'then', 'do', 'test']);
+  for (const seg of (command || '').split(/[\n;|]+|&&|\|\|/)) {
+    const toks = seg.trim().split(/\s+/).filter(Boolean);
+    let i = 0;
+    while (i < toks.length && (noise.has(toks[i]) || /^[A-Za-z_][A-Za-z0-9_]*=/.test(toks[i]))) { i++; }
+    const t = (toks[i] || '').split('/').pop() || '';
+    if (t && /^[A-Za-z]/.test(t)) { return t; }
+  }
+  return '';
 }
 
 /** Write the owner flag (~/.redivivus/pending_toolgap.json) rigops polls. Shared by the out-of-plan
@@ -108,7 +145,7 @@ export async function resolveToolGap(
  *  way whether the plan diverged or a planned tool simply isn't installed. Best-effort. */
 export function writeToolGapFlag(
   fs: Pick<typeof import('fs'), 'mkdirSync' | 'writeFileSync'>,
-  payload: { tool: string; task: string; command: string; reason: string },
+  payload: { tool: string; task: string; command: string; reason: string; missing?: MissingCap[]; install?: string },
   flagPath: string = TOOL_GAP_FLAG,
 ): void {
   try {

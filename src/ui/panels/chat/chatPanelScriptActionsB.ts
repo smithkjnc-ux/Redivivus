@@ -159,6 +159,20 @@ export function buildActionsScriptB(): string {
         if (b64) { try { const root = decodeURIComponent(escape(atob(b64))); vscode.postMessage({ type: 'open-visual-editor', root }); } catch(e) {} }
         return;
       }
+      // [TOOL-GAP] Copy an install command to the clipboard (user runs it wherever they like).
+      const tgCopy = target.closest ? target.closest('.tg-copy') : null;
+      if (tgCopy) {
+        const b64 = tgCopy.getAttribute('data-cmd');
+        if (b64) { try { vscode.postMessage({ type: 'toolgap-copy', cmd: b64 }); } catch(e) {} }
+        return;
+      }
+      // [TOOL-GAP] Open a terminal with the install command PRE-FILLED but NOT run — the user presses Enter.
+      const tgTerm = target.closest ? target.closest('.tg-term') : null;
+      if (tgTerm) {
+        const b64 = tgTerm.getAttribute('data-cmd');
+        if (b64) { try { vscode.postMessage({ type: 'toolgap-terminal', cmd: b64 }); } catch(e) {} }
+        return;
+      }
       // Retry fix button — re-sends the original request as if the user typed it again.
       const retryBtn = target.closest ? target.closest('.retry-fix-btn') : null;
       if (retryBtn) {
