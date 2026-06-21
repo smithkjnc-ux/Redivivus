@@ -6,7 +6,10 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const SKIP_DIRS = new Set(['.redivivus', 'node_modules', '.git', 'dist', 'out', 'build', '.next', 'coverage', '__pycache__', '.venv', 'venv', '.cache']);
-const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.cs', '.java', '.rb', '.html', '.css', '.scss', '.sh', '.toml', '.yaml', '.yml']);
+// [WARN] Schema/DDL files belong here. `.prisma` and `.sql` were MISSING, so for any database task the most
+// important file (the Prisma schema / migration SQL) was invisible to the fix+build pipeline — the agent was
+// handed a useless migration_lock.toml instead of schema.prisma and couldn't proceed. Keep schema formats in.
+const SOURCE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx', '.py', '.go', '.rs', '.cs', '.java', '.rb', '.html', '.css', '.scss', '.sh', '.toml', '.yaml', '.yml', '.prisma', '.sql', '.graphql', '.proto']);
 const MAX_FILE_BYTES = 60_000;
 
 export interface SourceFile {

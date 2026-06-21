@@ -58,8 +58,11 @@ export function executionNudge(
         + '3. read_file then edit_file the endpoint/handler that must accept the new value.\n'
         + '4. run_command to apply the migration (the real migrate command for this toolchain).\n'
         + '5. run_command to run the tests and confirm they pass.\n'
-        + 'Output your VERY NEXT tool call now: step 1, a read_file. Do NOT write a final answer until you have '
-        + 'actually run the migration and the tests and seen their real output.';
+        + 'If a file you need is not in the list you were given, do NOT ask for its path and do NOT stop — just '
+        + 'TRY read_file with the conventional location (e.g. `prisma/schema.prisma`, `src/app.js`); read_file '
+        + 'will tell you if the path is wrong and you can try another. You have the tools to find it yourself.\n'
+        + 'Output your VERY NEXT tool call now: step 1, a read_file. Do NOT write a final answer (and do NOT ask '
+        + 'the user a question) until you have actually run the migration and the tests and seen their real output.';
     }
     return 'You have NOT run or verified anything yet, and this task REQUIRES running it. Use run_command to '
       + 'run the build/verification DIRECTLY — invoke the real tool itself (e.g. `pandoc ...`), not only inside '
