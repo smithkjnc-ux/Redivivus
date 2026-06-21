@@ -44,11 +44,17 @@ class ProjectFolderDecorations implements vscode.FileDecorationProvider {
     const depth = rel.split(path.sep).length;
     if (depth > 2) { return undefined; } // only category folders (1) and projects (1 flat / 2 nested)
 
-    // A category folder = an immediate subfolder that holds projects → count badge (not a folder rename).
+    // A category folder = an immediate subfolder that holds projects → count badge + a distinct accent color
+    // so it reads as a GROUP, visually separate from project folders. (VS Code's decoration API only allows
+    // badge/color/tooltip — no bold/underline/caps on native Explorer items — so colour is the lever.)
     if (depth === 1 && !isProjectRoot(uri.fsPath)) {
       const count = countProjectsIn(uri.fsPath);
       if (count > 0) {
-        return { badge: count > 99 ? '99' : String(count), tooltip: `${count} project${count !== 1 ? 's' : ''}` };
+        return {
+          badge: count > 99 ? '99' : String(count),
+          color: new vscode.ThemeColor('charts.blue'),
+          tooltip: `📂 Category — ${count} project${count !== 1 ? 's' : ''}`,
+        };
       }
       return undefined; // a plain non-project folder, not a category
     }
