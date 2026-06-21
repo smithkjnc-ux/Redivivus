@@ -13,7 +13,7 @@ import { runSupervisorPreplanning } from './agentSupervisor.js';
 import { clearToolGapFlag } from './toolGapEscalation.js';
 import { buildAgentSystemPrompt } from './agentPrompt.js';
 import { createAgentLogger } from './agentActionLog.js';
-import { executionNudge } from './agentCompletionGuard.js';
+import { executionNudge, budgetNudge, ceilingMessage } from './agentCompletionGuard.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -46,12 +46,15 @@ export async function executeAgentTask(
   let history = buildAgentSystemPrompt(task, context, mcpInstructions);
 
   const ledger = new BuildLedger();
-  const MAX_ITERATIONS = 15;
+  // [BUDGET] 15 was far too tight for a real multi-file task (read several files, write several, then run +
+  // verify burns it in one pass). 40 gives room for genuine work; a soft "wrap up" nudge near the end (see
+  // budgetWarned below) keeps cost bounded and lets the agent converge instead of getting cut off mid-task.
+  const MAX_ITERATIONS = 40;
   let iterations = 0;
   // [COMPLETION-GUARD] Track real execution so an environment/verify task can't finish without running —
   // and can't write a script then quit without running it. Nudges capped so a genuinely-impossible task
   // (all tools missing) still gets to finish with its gap report.
-  let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false;
+  let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false; let budgetWarned = false;
   const alog = createAgentLogger(agentCtx.root, task);
 
   // [Redivivus] Supervisor reads current project files THEN generates a prescription.
@@ -71,7 +74,13 @@ export async function executeAgentTask(
 
   while (iterations < MAX_ITERATIONS) {
     iterations++;
-    
+    // [BUDGET] Soft landing: once inside the last 8 steps, tell the agent ONCE to converge — finish the core
+    // task, run its verification, and answer — rather than starting new work it can't finish before the cap.
+    if (!budgetWarned && iterations >= MAX_ITERATIONS - 8) {
+      budgetWarned = true;
+      history += `\n\nSystem:\n<tool_result>\n${budgetNudge(iterations, MAX_ITERATIONS)}\n</tool_result>`;
+    }
+
     // Use secure backend endpoint for agent iterations
     let res: AIResponse;
     try {
@@ -193,5 +202,8 @@ export async function executeAgentTask(
     history += `\n\nSystem:\n<tool_result>\n${result}\n</tool_result>`;
   }
 
-  return { success: false, finalAnswer: '', iterations, error: 'Max agent iterations reached.', ledger };
+  // [BUDGET] Hit the ceiling without a final answer. Don't dump a bare error — ceilingMessage tells the user
+  // plainly that work landed but verification didn't finish, with a Retry to continue from here.
+  alog.done(`hit step ceiling (${MAX_ITERATIONS}) without a final answer`);
+  return { success: false, iterations, error: 'Max agent iterations reached.', ledger, finalAnswer: ceilingMessage(task, MAX_ITERATIONS) };
 }

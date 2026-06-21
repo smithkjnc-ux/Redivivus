@@ -1,6 +1,6 @@
 // [SCOPE] SecretStorage-backed AI provider key store. Keys encrypted in OS keychain (local device only).
-// Migration path: chassis.* settings → redivivus.* settings → SecretStorage.
-// Call initSecretKeyStore(ctx) AFTER migrateChassisSettings(). Use getKeyCached() for sync read.
+// Key source order: SecretStorage → redivivus.* settings.json (promoted into SecretStorage on first read) → env.
+// Use getKeyCached() for sync read.
 // [WARN] getKeyCached() returns null before init completes — always call after activation.
 
 import * as vscode from 'vscode';
@@ -43,12 +43,8 @@ export async function initSecretKeyStore(ctx: vscode.ExtensionContext): Promise<
     let key: string | null = null;
     try { key = (await Promise.resolve(ctx.secrets.get(SECRET_PREFIX + p))) ?? null; } catch { key = null; }
     if (!key) {
-      // Migration chain: redivivus.* settings → chassis.* settings (old namespace fallback)
-      // migrateChassisSettings() should have already promoted chassis.* → redivivus.* before this runs.
-      // The chassis check here is a safety net for any remaining cases.
-      const legacy = cfg.get<string>(SETTINGS_MAP[p])
-        || vscode.workspace.getConfiguration('chassis').get<string>(SETTINGS_MAP[p])
-        || null;
+      // One-time promotion: a key set in redivivus.* settings.json → SecretStorage (OS keychain).
+      const legacy = cfg.get<string>(SETTINGS_MAP[p]) || null;
       if (legacy?.trim()) {
         try {
           await Promise.resolve(ctx.secrets.store(SECRET_PREFIX + p, legacy.trim()));

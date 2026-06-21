@@ -1,6 +1,6 @@
 // [SCOPE] Routing API key getters — retrieves AI provider keys from SecretStorage (via secretKeyStore).
 // SecretStorage = OS keychain = encrypted, local device only, never synced.
-// Falls back to redivivus.* settings, then chassis.* settings (legacy namespace), then env vars.
+// Falls back to redivivus.* settings, then env vars.
 // [WARN] Returns null until initSecretKeyStore() completes — always call after extension activation.
 
 import * as vscode from 'vscode';

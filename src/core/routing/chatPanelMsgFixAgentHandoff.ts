@@ -65,7 +65,13 @@ export async function executeAgentHandoff(
         const config = deps.redivivus.isInitialized() ? deps.redivivus.loadConfig() : null;
         let projectContext = config?.blueprint ? `Blueprint: ${JSON.stringify(config.blueprint)}` : 'No blueprint available.';
         
-        await executeAgentTask(agentCtx.task, projectContext, deps.routing, agentCtx, agentCtx.log);
+        const agentResult = await executeAgentTask(agentCtx.task, projectContext, deps.routing, agentCtx, agentCtx.log);
+        // [BUDGET] On a non-success exit (e.g. step ceiling), surface the agent's closing message — which
+        // carries a Retry button to continue — so the user isn't left staring at silence.
+        if (agentResult && !agentResult.success && agentResult.finalAnswer) {
+            conversation.push({ role: 'assistant', content: agentResult.finalAnswer, timestamp: Date.now() });
+            deps.refresh();
+        }
 
         // [TOOL-GAP] If the agent hit a wall the USER must clear (a tool/module that needs installing), the
         // structured flag is present. Surface a user-facing card: plain-English purpose + the exact install

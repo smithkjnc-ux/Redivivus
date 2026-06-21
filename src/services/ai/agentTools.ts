@@ -4,13 +4,10 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
 import { NETWORK_TOOLS } from './agentToolsNetwork';
 import { resolveToolGap } from './toolGapEscalation.js';
 import { buildToolGapDeps, noteToolGapOnFailure } from './agentToolGap.js';
-
-const execAsync = promisify(exec);
+import { runShell, trimForModel, IDLE_MS, HARD_MS } from './agentToolsExec.js';
 
 export interface AgentContext {
   root: string;
@@ -107,7 +104,16 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         ctx.log(`✅ Wrote \`${args.filePath}\``);
         // [Redivivus] Live preview: open written file beside the chat immediately.
         try { const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(absPath)); await vscode.window.showTextDocument(doc, { preview: true, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch { /* non-blocking */ }
-        return `Successfully wrote to ${args.filePath}.`;
+        // [MIGRATIONS-GUARD] If this write is a DB schema change, don't leave the schema edited directly —
+        // direct the agent to follow up with a proper migration (ordered, reversible, keeps local+prod in
+        // sync) via run_command. Rides on the tool result so the agent acts on it next. Best-effort.
+        let migrationNote = '';
+        try {
+          const { migrationHook } = await import('../build/migrationsGuard.js');
+          const mh = migrationHook(ctx.root, args.filePath, contentToWrite, ctx.task);
+          if (mh) { ctx.log(mh.log); migrationNote = mh.note; }
+        } catch { /* guard is best-effort — never block a write */ }
+        return `Successfully wrote to ${args.filePath}.${migrationNote}`;
       } catch (e: any) {
         return `Error writing file: ${e.message}`;
       }
@@ -134,21 +140,24 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
       const command = (outcome.kind === 'proceed' || outcome.kind === 'proceed-costly') ? outcome.command : requested;
       if (command !== requested) { ctx.log(`↪️ Using an alternate approach: \`${command}\``); }
       ctx.log(`🖥️ Running: \`${command}\``);
-      try {
-        const { stdout, stderr } = await execAsync(command, { cwd: ctx.root, timeout: 15000 });
-        let result = '';
-        if (stdout) {result += `STDOUT:\n${stdout}\n`;}
-        if (stderr) {result += `STDERR:\n${stderr}\n`;}
-        if (!result) {result = 'Command completed successfully with no output.';}
-        return result;
-      } catch (e: any) {
-        if (e.killed && e.signal === 'SIGTERM') {
-          return `Command timed out after 15 seconds and was killed.\nSTDOUT:\n${e.stdout || ''}\nSTDERR:\n${e.stderr || ''}\nIf you are trying to start a server or long-running process, you MUST run it in the background and detach output, e.g.: \`python3 -m http.server > server.log 2>&1 &\``;
-        }
-        // A planned command can still fail because its tool isn't installed — log that one tool as a dead end.
-        const gapNote = noteToolGapOnFailure(ctx, command, e);
-        return `Command failed:\nSTDOUT:\n${e.stdout || ''}\nSTDERR:\n${e.stderr || ''}\nERROR:\n${e.message}${gapNote}`;
+      // [EXEC] Streamed run: no 1MB buffer cap, and an INACTIVITY timeout (not a 15s wall-clock guillotine)
+      // so real installs/builds/tests that keep printing can finish. See agentToolsExec.
+      const { stdout, stderr, code, timedOut } = await runShell(command, ctx.root);
+      if (timedOut) {
+        const why = timedOut === 'idle'
+          ? `produced no output for ${IDLE_MS / 1000}s (it looks hung)`
+          : `ran past the ${Math.round(HARD_MS / 60000)}-minute ceiling`;
+        return `Command timed out — ${why} — and was killed.\nSTDOUT:\n${trimForModel(stdout)}\nSTDERR:\n${trimForModel(stderr)}\nIf you are starting a server or long-running process, run it detached, e.g.: \`python3 -m http.server > server.log 2>&1 &\``;
       }
+      if (code !== 0) {
+        // A planned command can still fail because its tool isn't installed — log that one tool as a dead end.
+        const gapNote = noteToolGapOnFailure(ctx, command, { code, stdout, stderr, message: `exited with code ${code}` });
+        return `Command failed (exit ${code}):\nSTDOUT:\n${trimForModel(stdout)}\nSTDERR:\n${trimForModel(stderr)}${gapNote}`;
+      }
+      let result = '';
+      if (stdout) { result += `STDOUT:\n${trimForModel(stdout)}\n`; }
+      if (stderr) { result += `STDERR:\n${trimForModel(stderr)}\n`; }
+      return result || 'Command completed successfully with no output.';
     }
   },
   {

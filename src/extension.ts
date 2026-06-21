@@ -30,7 +30,6 @@ import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
 import { initApiClient, logSessionStart } from './services/api/apiClient.js';
 import { initSecretKeyStore, onSecretKeyStoreReady } from './services/ai/secretKeyStore.js';
-import { migrateChassisSettings } from './extensionMigration.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
 import { initProjectContextLogger, resetProjectContext } from './services/logging/projectContextLogger.js';
@@ -57,12 +56,10 @@ export function activate(context: vscode.ExtensionContext) {
   // mid-build host reload). One-time + idle; no-op after the first establish. See ensureProjectsWorkspace.
   ensureProjectsWorkspace(context);
   initApiClient(context);
-  // Migrate chassis.* → redivivus.* first, then SecretStorage init reads the promoted values.
   // [FIX] After init resolves, invalidate the roster cache and re-render the panel — the panel
   // auto-opens at 500ms and reads the roster BEFORE SecretStorage finishes, so the badge shows
   // a stale pre-init value (Gemini +2). Refreshing here gives it the real key set (Claude +5).
-  migrateChassisSettings(context)
-    .then(() => initSecretKeyStore(context))
+  initSecretKeyStore(context)
     .catch(err => console.error('[Redivivus] Init failed:', err));
   onSecretKeyStoreReady(() => {
     invalidateRosterCache();

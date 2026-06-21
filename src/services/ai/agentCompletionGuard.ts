@@ -4,6 +4,21 @@
 // genuinely-impossible task (all tools missing) still gets to finish with its gap report. Extracted from
 // agentService.ts to keep that loop under the 200-line limit. Pure — returns the nudge text or null.
 
+// [BUDGET] Soft "wrap up" nudge once the loop enters its final stretch, so the agent converges (finishes +
+// verifies) instead of getting cut off mid-task at the step ceiling.
+export function budgetNudge(iterations: number, max: number): string {
+  return `You are on step ${iterations} of ${max} (your step budget). Start wrapping up: finish the core `
+    + `task, run your verification now, and give your final answer. Do not begin new sub-tasks.`;
+}
+
+// [BUDGET] Closing message when the loop hits its ceiling without a final answer — carries a Retry token so
+// the user can continue from where it stopped, rather than seeing a bare error.
+export function ceilingMessage(task: string, max: number): string {
+  const b64 = Buffer.from(task, 'utf8').toString('base64');
+  return `⏸️ I hit my step limit (${max}) on this one. Any file changes I made are saved, but I didn't get to `
+    + `fully verify the result. Click below to let me continue from here.\n\n__RETRY_FIX__:${b64}__END_RETRY__`;
+}
+
 export function executionNudge(
   requiresExecution: boolean, ranCommands: number, wroteUnrunScript: boolean, nudgesSoFar: number,
 ): string | null {
