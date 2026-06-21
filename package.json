@@ -58,6 +58,10 @@
         "title": "Open as Redivivus Project"
       },
       {
+        "command": "redivivus.organizeProjects",
+        "title": "Redivivus: Organize Projects into Categories"
+      },
+      {
         "command": "redivivus.init",
         "title": "Redivivus: Initialize Project"
       },

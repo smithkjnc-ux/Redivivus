@@ -46,6 +46,7 @@ import { registerSelectionCommands } from './commands/selection.js';
 import { registerTimelineCommand } from './commands/timeline.js';
 import { registerLoggingCommands } from './commands/logging.js';
 import { registerSavePointCommand } from './commands/savePoint.js';
+import { registerOrganizeProjects } from './commands/organizeProjects.js';
 import { registerFileSplitCommand } from './commands/fileSplit.js';
 import { registerRetrofitBlueprintCommand } from './commands/retrofitBlueprint.js';
 import { registerScopeCreepCommand } from './commands/scopeCreep.js';
@@ -130,6 +131,7 @@ export function registerAllCommands(
   try {   registerTimelineCommand(context, redivivusService); } catch (e) { console.error('Failed to register ' + 'registerTimelineCommand(context, redivivusService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerTimelineCommand(context, redivivusService); failed: ' + e + '\n'); }
   try {   registerLoggingCommands(context, redivivusService); } catch (e) { console.error('Failed to register ' + 'registerLoggingCommands(context, redivivusService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerLoggingCommands(context, redivivusService); failed: ' + e + '\n'); }
   try {   registerSavePointCommand(context); } catch (e) { console.error('Failed to register ' + 'registerSavePointCommand(context);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerSavePointCommand(context); failed: ' + e + '\n'); }
+  try {   registerOrganizeProjects(context); } catch (e) { console.error('Failed to register registerOrganizeProjects', e); }
   try {   registerFileSplitCommand(context, routingService); } catch (e) { console.error('Failed to register ' + 'registerFileSplitCommand(context, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerFileSplitCommand(context, routingService); failed: ' + e + '\n'); }
   try {   registerRetrofitBlueprintCommand(context, redivivusService, routingService); } catch (e) { console.error('Failed to register ' + 'registerRetrofitBlueprintCommand(context, redivivusService, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerRetrofitBlueprintCommand(context, redivivusService, routingService); failed: ' + e + '\n'); }
   try {   registerScopeCreepCommand(context, redivivusService, routingService); } catch (e) { console.error('Failed to register ' + 'registerScopeCreepCommand(context, redivivusService, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerScopeCreepCommand(context, redivivusService, routingService); failed: ' + e + '\n'); }
