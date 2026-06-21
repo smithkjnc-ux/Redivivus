@@ -150,6 +150,14 @@ export async function processBuildResults(
     if (!isDoc && (!primaryPath || ext === '.html')) { primaryPath = absPath; }
   }
 
+  // [SCAFFOLD-DOCTOR] A freshly-built Prisma project whose schema uses env("DATABASE_URL") with no working
+  // .env is broken out of the box (migrate/test/run fail on the missing var). Make it runnable immediately:
+  // hardcode the SQLite url, or drop a .env placeholder for other providers. Idempotent + best-effort.
+  try {
+    const { ensureDatabaseUrl } = await import('./migrationsGuard.js');
+    ensureDatabaseUrl(root);
+  } catch { /* best-effort — never block a build */ }
+
   if (newRelPaths.length > 0) {
     try {
       const { SnapshotService } = await import('../../services/snapshotService.js');

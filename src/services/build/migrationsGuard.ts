@@ -100,18 +100,39 @@ const PRISMA_KW = new Set([
   'startsWith', 'endsWith', 'mode', 'some', 'every', 'none', 'is', 'isNot', 'AND', 'OR', 'NOT',
 ]);
 
-/** Field names declared across all `model` blocks in a Prisma schema. */
-function prismaSchemaFields(root: string): Set<string> | null {
-  const schema = read(root, 'prisma/schema.prisma') ?? read(root, 'schema.prisma');
-  if (!schema) { return null; }
+/** Field names declared across all `model` blocks in a Prisma schema CONTENT string. */
+export function prismaFieldsFromContent(content: string): Set<string> {
   const fields = new Set<string>();
   let inModel = false;
-  for (const line of schema.split('\n')) {
+  for (const line of (content || '').split('\n')) {
     if (/^\s*model\s+\w+\s*\{/.test(line)) { inModel = true; continue; }
     if (inModel && /^\s*\}/.test(line)) { inModel = false; continue; }
     if (inModel) { const m = line.match(/^\s*(\w+)\s+\S/); if (m && !m[1].startsWith('@')) { fields.add(m[1]); } }
   }
   return fields;
+}
+
+/** Field names declared across all `model` blocks in the on-disk Prisma schema. */
+function prismaSchemaFields(root: string): Set<string> | null {
+  const schema = read(root, 'prisma/schema.prisma') ?? read(root, 'schema.prisma');
+  if (!schema) { return null; }
+  return prismaFieldsFromContent(schema);
+}
+
+/** Fields the incoming schema write would REMOVE vs. the current schema — i.e. a DESTRUCTIVE change (the
+ *  migration will DROP that column and its data). This is the #1 way an "add a field" task silently regresses:
+ *  the AI rewrites the whole model from a stale copy, omits an existing column, and `prisma migrate dev` drops
+ *  it WITHOUT anyone noticing (non-interactive run = auto-confirm the data-loss warning). Compares two content
+ *  strings (the previous on-disk schema vs. the about-to-be-written one) so it's pure/testable. Prisma-only
+ *  (the toolchain we can parse reliably); [] when either side has no model block. Never throws. */
+export function droppedSchemaFields(prevContent: string | null | undefined, newContent: string): string[] {
+  try {
+    if (!prevContent) { return []; }
+    const before = prismaFieldsFromContent(prevContent);
+    const after = prismaFieldsFromContent(newContent);
+    if (before.size === 0 || after.size === 0) { return []; } // couldn't parse one side — don't guess
+    return [...before].filter((f) => !after.has(f));
+  } catch { return []; }
 }
 
 /** Object keys used inside `data:{…}` / `where:{…}` blocks (balanced-brace scan, so spreads count too). */
@@ -143,6 +164,66 @@ export function schemaCodeMismatch(root: string, filePath: string, content: stri
     const used = dataWhereKeys(content);
     return [...new Set(used.filter((k) => !fields.has(k) && !PRISMA_KW.has(k)))];
   } catch { return []; }
+}
+
+/** A `prisma migrate dev` invocation that will APPLY changes (not the preview `--create-only` form). This is
+ *  the command that can apply a destructive DROP non-interactively (a spawned shell has no confirm prompt). */
+export function isApplyingPrismaMigrate(command: string): boolean {
+  return /\bprisma\b[\s\S]*\bmigrate\s+dev\b/.test(command || '') && !/--create-only\b/.test(command || '');
+}
+
+/** Data-loss items named in a generated migration's SQL. Prisma writes a `Warnings:` header AND uses
+ *  RedefineTables on SQLite (so a dropped column never appears as a literal `DROP COLUMN`) — so we key on the
+ *  human warning text first, then explicit DROPs. Returns [] for a safe migration. */
+export function migrationDataLoss(sql: string): string[] {
+  const s = sql || '';
+  const hits: string[] = [];
+  for (const m of s.matchAll(/about to drop the (column|table)\s+`?(\w+)`?/gi)) { hits.push(`${m[1]} \`${m[2]}\``); }
+  for (const m of s.matchAll(/\bDROP\s+(COLUMN|TABLE)\b\s+"?(\w+)"?/gi)) { hits.push(`${m[1].toLowerCase()} \`${m[2]}\``); }
+  if (!hits.length && /\bwill be lost\b/i.test(s)) { hits.push('existing data'); }
+  return [...new Set(hits)];
+}
+
+/** Path to the most-recently-created migration.sql under the project's prisma/migrations, or null. */
+export function newestMigrationSqlPath(root: string): string | null {
+  try {
+    const dir = path.join(root, 'prisma', 'migrations');
+    if (!fs.existsSync(dir)) { return null; }
+    const subs = fs.readdirSync(dir, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && /^\d/.test(e.name)).map((e) => e.name).sort();
+    if (!subs.length) { return null; }
+    const sql = path.join(dir, subs[subs.length - 1], 'migration.sql');
+    return fs.existsSync(sql) ? sql : null;
+  } catch { return null; }
+}
+
+/** Make a scaffolded Prisma project actually runnable when its schema uses `env("DATABASE_URL")`. A schema
+ *  with `url = env("DATABASE_URL")` but no working .env is broken out of the box: migrate/test/run all fail
+ *  on the missing var (vitest doesn't load .env; @prisma/client doesn't auto-load it at runtime there). For
+ *  SQLite we hardcode the standard local path (zero env machinery → works in CLI, app, AND tests). For other
+ *  providers we leave a clearly-marked .env placeholder (the real URL can't be guessed). Idempotent: once the
+ *  schema is hardcoded / the var is present, it does nothing. Returns a human summary if it changed something,
+ *  else null. Best-effort, never throws. */
+export function ensureDatabaseUrl(root: string): string | null {
+  try {
+    const schemaPath = has(root, 'prisma/schema.prisma') ? path.join(root, 'prisma', 'schema.prisma')
+      : has(root, 'schema.prisma') ? path.join(root, 'schema.prisma') : null;
+    if (!schemaPath) { return null; }
+    let schema = fs.readFileSync(schemaPath, 'utf8');
+    if (!/url\s*=\s*env\(\s*["']DATABASE_URL["']\s*\)/.test(schema)) { return null; } // not using env() → fine
+    const provider = (schema.match(/provider\s*=\s*["'](\w+)["']/) || [])[1] || '';
+    if (provider === 'sqlite') {
+      schema = schema.replace(/url\s*=\s*env\(\s*["']DATABASE_URL["']\s*\)/, 'url      = "file:./dev.db"');
+      fs.writeFileSync(schemaPath, schema);
+      return 'Set the SQLite database URL directly in schema.prisma (it was env("DATABASE_URL") with no .env, which breaks migrate and tests).';
+    }
+    const envPath = path.join(root, '.env');
+    const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+    if (/^\s*DATABASE_URL\s*=/m.test(existing)) { return null; } // already defined
+    const placeholder = `DATABASE_URL="" # TODO: set your ${provider || 'database'} connection string\n`;
+    fs.writeFileSync(envPath, existing ? existing.replace(/\s*$/, '') + '\n' + placeholder : placeholder);
+    return `Added .env with a DATABASE_URL placeholder for ${provider || 'your database'} (schema uses env("DATABASE_URL")).`;
+  } catch { return null; }
 }
 
 /** Convenience for a write hook: returns the user-facing `log` line + the `note` directive to append to the

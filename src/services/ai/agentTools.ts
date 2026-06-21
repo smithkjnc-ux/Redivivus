@@ -99,6 +99,10 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
 
         const dir = path.dirname(absPath);
         if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+        // [MIGRATIONS-GUARD] Capture the PREVIOUS schema before we overwrite it, so we can detect a write that
+        // silently REMOVES an existing field (a destructive DROP COLUMN). Must read before writeFileSync.
+        const prevSchema = (/\.prisma$/.test(args.filePath) && fs.existsSync(absPath))
+          ? (() => { try { return fs.readFileSync(absPath, 'utf8'); } catch { return null; } })() : null;
         fs.writeFileSync(absPath, contentToWrite, 'utf8');
         ctx.modifiedFiles.add(args.filePath);
         ctx.log(`✅ Wrote \`${args.filePath}\``);
@@ -109,9 +113,28 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
         // sync) via run_command. Rides on the tool result so the agent acts on it next. Best-effort.
         let migrationNote = '';
         try {
-          const { migrationHook, schemaCodeMismatch } = await import('../build/migrationsGuard.js');
+          const { migrationHook, schemaCodeMismatch, droppedSchemaFields } = await import('../build/migrationsGuard.js');
           const mh = migrationHook(ctx.root, args.filePath, contentToWrite, ctx.task);
           if (mh) { ctx.log(mh.log); migrationNote = mh.note; }
+          // [MIGRATIONS-GUARD] Destructive-change guard: a schema rewrite that DROPS an existing field will,
+          // on migrate, drop that column AND its data. The usual cause is the AI rewriting the whole model
+          // from a stale copy and accidentally omitting a column (e.g. adding `priority` but losing `dueDate`).
+          // Warn loudly + direct the agent to restore it BEFORE migrating. (Doesn't block the write — the
+          // earliest safe intervention is to tell the agent to fix the schema before it runs the migration.)
+          const dropped = droppedSchemaFields(prevSchema, contentToWrite);
+          if (dropped.length) {
+            const list = dropped.map((f: string) => `\`${f}\``).join(', ');
+            const plural = dropped.length > 1;
+            ctx.log(`🛑 **Destructive schema change** — this rewrite REMOVES existing field(s) ${list}. Migrating will DROP ${plural ? 'those columns' : 'that column'} and all ${plural ? 'their' : 'its'} data.`);
+            migrationNote += `\n\n🛑 DESTRUCTIVE SCHEMA CHANGE — your new schema REMOVES field(s) ${list} that currently exist in prisma/schema.prisma. Running the migration will DROP ${plural ? 'those columns' : 'that column'} AND ALL ${plural ? 'THEIR' : 'ITS'} DATA. If you only meant to ADD a field, you deleted ${plural ? 'these' : 'this'} by mistake — put ${plural ? 'them' : 'it'} back in the model and rewrite the file BEFORE migrating. Only proceed with the removal if the task explicitly asked to delete ${plural ? 'those fields' : 'that field'}.`;
+          }
+          // [SCAFFOLD-DOCTOR] A Prisma schema that uses env("DATABASE_URL") with no working .env is broken out
+          // of the box (migrate/test/run fail on the missing var). Make it runnable: hardcode the SQLite url,
+          // or drop a .env placeholder for other providers. Idempotent — no-op once it's already fine.
+          if (/\.prisma$/.test(args.filePath)) {
+            const fixed = (await import('../build/migrationsGuard.js')).ensureDatabaseUrl(ctx.root);
+            if (fixed) { ctx.log(`🩺 ${fixed}`); migrationNote += `\n\nℹ️ DB config: ${fixed}`; }
+          }
           // [MIGRATIONS-GUARD] Inverse: code using a DB field that's NOT in the schema fails at runtime — the
           // "added it in code but forgot the schema/migration" mistake. Nudge to fix the schema first.
           const missing = schemaCodeMismatch(ctx.root, args.filePath, contentToWrite);
@@ -148,21 +171,54 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
       }
       let command = (outcome.kind === 'proceed' || outcome.kind === 'proceed-costly') ? outcome.command : requested;
       if (command !== requested) {
-        // [ALT-GUARD] An "alternate" is only an improvement if its tool actually exists. The Supervisor
-        // re-prescription can hallucinate a DIFFERENT package manager (e.g. `yarn install` on an npm project)
-        // that isn't installed — swapping a working command for a missing tool, which then fails 'command not
-        // found', flags the owner, and derails the run. If the alternate needs a tool we don't have, discard
-        // it and keep the agent's original command (whose tool it already has). See agentToolGapExtract.
+        // [ALT-GUARD] The Supervisor re-prescription (especially weaker models) keeps rewriting the agent's
+        // perfectly-good commands into worse ones: `npm test` → `npx jest`, `npm install dotenv` → `npm
+        // install`, `rm f` → `python -c …`, `yarn install` on an npm project, etc. A re-prescription is only
+        // worth honouring when the AGENT'S ORIGINAL command is actually BLOCKED by a missing tool — that's the
+        // one case where an installed alternate genuinely helps. So:
+        //   • original runnable (all tools present) → run the ORIGINAL; ignore the swap entirely.
+        //   • original blocked, alternate runnable  → use the alternate (it unblocks).
+        //   • original blocked, alternate also blocked → keep the original and let it fail honestly so the
+        //     real missing tool is recorded (don't mask it behind a second broken command).
         try {
           const { extractMissingCapabilities } = await import('./agentToolGapExtract.js');
-          const altMissing = extractMissingCapabilities(command).filter((c: any) => c && c.name);
-          if (altMissing.length) {
-            ctx.log(`↪️ Ignoring suggested alternate \`${command}\` — it needs ${altMissing.map((c: any) => `\`${c.name}\``).join(', ')} which isn't installed. Keeping \`${requested}\`.`);
+          const reqMissing = extractMissingCapabilities(requested).filter((c: any) => c && c.name);
+          if (reqMissing.length === 0) {
+            ctx.log(`↪️ Keeping \`${requested}\` — it runs as-is, so the suggested alternate \`${command}\` isn't needed.`);
             command = requested;
+          } else {
+            const altMissing = extractMissingCapabilities(command).filter((c: any) => c && c.name);
+            if (altMissing.length) {
+              ctx.log(`↪️ Ignoring suggested alternate \`${command}\` — it needs ${altMissing.map((c: any) => `\`${c.name}\``).join(', ')} which isn't installed. Keeping \`${requested}\`.`);
+              command = requested;
+            }
           }
         } catch { /* best-effort — if the probe fails, fall through to the alternate as before */ }
       }
       if (command !== requested) { ctx.log(`↪️ Using an alternate approach: \`${command}\``); }
+      // [MIGRATIONS-GUARD] Destructive-migration backstop. `prisma migrate dev` auto-applies a DROP
+      // COLUMN/TABLE non-interactively (a spawned shell has no confirm prompt), so a data-losing migration
+      // can run SILENTLY. PREVIEW it with --create-only, scan the generated SQL, and if it drops data: discard
+      // the preview and PAUSE for the user instead of applying. A clean migration falls through and applies
+      // normally below. Best-effort — any error here just proceeds to the normal run.
+      try {
+        const mg = await import('../build/migrationsGuard.js');
+        if (mg.isApplyingPrismaMigrate(command)) {
+          const before = mg.newestMigrationSqlPath(ctx.root);
+          await runShell(`${command} --create-only`, ctx.root);
+          const after = mg.newestMigrationSqlPath(ctx.root);
+          if (after && after !== before) {
+            const sql = fs.readFileSync(after, 'utf8');
+            const loss = mg.migrationDataLoss(sql);
+            try { fs.rmSync(path.dirname(after), { recursive: true, force: true }); } catch { /* */ }
+            if (loss.length) {
+              const what = loss.join(', ');
+              ctx.log(`🛑 **Migration would lose data** — it drops ${what}. I previewed it, saw the data loss, and did NOT apply it.`);
+              return `_PAUSE_ASK_USER_🛑 The migration for \`${command}\` would DROP ${what} AND LOSE THAT DATA. I did NOT apply it. If this is a MISTAKE (you only meant to add/keep fields), fix prisma/schema.prisma to keep ${what}, then retry. If dropping ${what} is genuinely intended, say so explicitly and I'll proceed.`;
+            }
+          }
+        }
+      } catch { /* preview is best-effort — fall through to the normal run */ }
       ctx.log(`🖥️ Running: \`${command}\``);
       // [EXEC] Streamed run: no 1MB buffer cap, and an INACTIVITY timeout (not a 15s wall-clock guillotine)
       // so real installs/builds/tests that keep printing can finish. See agentToolsExec.
