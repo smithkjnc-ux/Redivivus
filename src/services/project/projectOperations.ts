@@ -24,18 +24,21 @@ export class ProjectOperations {
 
     if (!fs.existsSync(projectsDir)) { return { redivivus: [], other: [] }; }
 
-    const entries = fs.readdirSync(projectsDir, { withFileTypes: true });
-    for (const entry of entries) {
-      if (!entry.isDirectory()) { continue; }
-      const projectPath = path.join(projectsDir, entry.name);
-      const redivivusPath = path.join(projectPath, '.redivivus', 'config.json');
-
-      if (fs.existsSync(redivivusPath)) {
-        const info = await this.getProjectInfo(projectPath, entry.name);
-        redivivusProjects.push(info);
-      } else {
-        otherProjects.push(entry.name);
-      }
+    // [CATEGORY] enumerateProjects finds projects both at the root AND one level inside category folders,
+    // and tags each with its derived category. "other" = top-level folders that are neither projects nor
+    // categories (no projects inside) — i.e. plain non-Redivivus folders.
+    const { enumerateProjects, isProjectRoot } = require('./projectResolver.js');
+    const projects = enumerateProjects(projectsDir) as Array<{ path: string; name: string; category: string }>;
+    const categoryNames = new Set(projects.map(p => p.category).filter(Boolean));
+    for (const p of projects) {
+      const info = await this.getProjectInfo(p.path, p.name);
+      info.category = p.category;
+      redivivusProjects.push(info);
+    }
+    for (const entry of fs.readdirSync(projectsDir, { withFileTypes: true })) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) { continue; }
+      const full = path.join(projectsDir, entry.name);
+      if (!isProjectRoot(full) && !categoryNames.has(entry.name)) { otherProjects.push(entry.name); }
     }
 
     return { redivivus: redivivusProjects, other: otherProjects };

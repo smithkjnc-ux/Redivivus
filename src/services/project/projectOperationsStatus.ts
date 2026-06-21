@@ -15,6 +15,7 @@ export interface ProjectInfo {
   lastSession?: string;
   fileCount?: number;
   todoCount?: number;
+  category?: string; // '' when uncategorised (project sits directly at the projects root)
 }
 
 export function getProjectsDir(): string {

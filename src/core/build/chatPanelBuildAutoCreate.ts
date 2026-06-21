@@ -29,7 +29,11 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
   const projectsDir = vscode.workspace.getConfiguration('redivivus')
     .get<string>('projectsDirectory', '~/projects')!
     .replace('~', os.homedir());
-  const dir = path.join(projectsDir, slug);
+  // [CATEGORY] Auto-file the new project under a category folder (games/web/apps/…) derived from its
+  // blueprint; '' = uncategorised → stays at the projects root. The category is just the parent folder.
+  const { classifyCategory } = require('../../services/project/projectResolver.js');
+  const category = classifyCategory({ what: extracted.what, why: extracted.why });
+  const dir = category ? path.join(projectsDir, category, slug) : path.join(projectsDir, slug);
   lastAutoCreatedDir = dir;
 
   const bp = {

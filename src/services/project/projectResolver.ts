@@ -61,6 +61,25 @@ export function categoryOf(projectPath: string, container: string): string {
   return segs.length > 1 ? segs.slice(0, -1).join('/') : '';
 }
 
+// [CATEGORY] Cheap, deterministic classification from the blueprint (no AI call). Conservative: only files a
+// project under a category when a keyword clearly matches, else returns '' (stays at the projects root, and
+// the user can move it later). Order matters — most specific first.
+const CATEGORY_RULES: Array<[RegExp, string]> = [
+  [/\b(game|arcade|puzzle|platformer|shooter|rpg|tetris|snake|pong|maze|roguelike)\b/i, 'games'],
+  [/\b(video|clip|stream(ing)?|movie|footage|player)\b/i, 'video'],
+  [/\b(website|landing|portfolio|blog|dashboard|web ?app|frontend|marketing site)\b/i, 'web'],
+  [/\b(cli|converter|utility|script|parser|formatter|automation|batch|scraper)\b/i, 'utilities'],
+  [/\b(dev ?tool|plugin|extension|linter|bundler|build tool|sdk)\b/i, 'tools'],
+  [/\b(api|backend|server|rest|graphql|crud|saas|micro-?service|full-?stack|application|app)\b/i, 'apps'],
+];
+
+/** Pick a category folder for a new project from its blueprint, or '' (uncategorised → projects root). */
+export function classifyCategory(blueprint: { what?: string; why?: string }): string {
+  const text = `${blueprint.what || ''} ${blueprint.why || ''}`;
+  for (const [re, cat] of CATEGORY_RULES) { if (re.test(text)) { return cat; } }
+  return '';
+}
+
 /** Enumerate every project under the container — direct children AND projects one level inside a category
  *  folder (a config-less folder that contains projects). Each entry carries its derived category. */
 export function enumerateProjects(container: string): ProjectEntry[] {

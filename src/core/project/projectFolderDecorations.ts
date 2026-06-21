@@ -1,12 +1,23 @@
-// [SCOPE] Explorer visual emphasis for the ACTIVE project. When a project is active, every OTHER immediate
-// subfolder of the projects home is dimmed (greyed) and the active one gets a green dot badge — so it's
-// instantly obvious which project you're working in. No active project (home/launcher) => nothing dimmed.
-// Uses VS Code's FileDecorationProvider (the only API that tints/badges Explorer items).
+// [SCOPE] Explorer visual emphasis for the ACTIVE project + category counts. A CATEGORY folder (a subfolder
+// of the projects home that holds projects) gets a count badge — "5" = five projects inside, the little
+// number PapaJoe asked for (NOT a folder rename — just a badge). A PROJECT folder gets a green dot when it's
+// the active one, dimmed otherwise. No active project (home/launcher) => nothing dimmed. Uses VS Code's
+// FileDecorationProvider (the only API that tints/badges Explorer items).
 
 import * as vscode from 'vscode';
 import * as os from 'os';
+import * as fs from 'fs';
 import * as path from 'path';
 import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
+import { isProjectRoot } from '../../services/project/projectResolver.js';
+
+/** Count the project subfolders directly inside `dir` (cheap — one readdir). >0 means `dir` is a category. */
+function countProjectsIn(dir: string): number {
+  try {
+    return fs.readdirSync(dir, { withFileTypes: true })
+      .filter(e => e.isDirectory() && !e.name.startsWith('.') && isProjectRoot(path.join(dir, e.name))).length;
+  } catch { return 0; }
+}
 
 function projectsDir(): string {
   return vscode.workspace.getConfiguration('redivivus')
@@ -29,17 +40,29 @@ class ProjectFolderDecorations implements vscode.FileDecorationProvider {
   provideFileDecoration(uri: vscode.Uri): vscode.FileDecoration | undefined {
     const container = projectsDir();
     const rel = path.relative(container, uri.fsPath);
-    // Only IMMEDIATE subfolders of the projects home (no nested files, no dotfolders, not the home itself).
-    if (!rel || rel.startsWith('..') || rel.includes(path.sep) || rel.startsWith('.')) { return undefined; }
+    if (!rel || rel.startsWith('..') || rel.startsWith('.')) { return undefined; } // outside home / dotfolder
+    const depth = rel.split(path.sep).length;
+    if (depth > 2) { return undefined; } // only category folders (1) and projects (1 flat / 2 nested)
 
-    const active = activeProjectRoot();
-    // No active project (sitting at home/launcher) -> don't dim anything.
-    if (!active || isProjectsContainer(active)) { return undefined; }
-
-    if (path.resolve(uri.fsPath) === path.resolve(active)) {
-      return { badge: '●', color: new vscode.ThemeColor('charts.green'), tooltip: 'Active Redivivus project' };
+    // A category folder = an immediate subfolder that holds projects → count badge (not a folder rename).
+    if (depth === 1 && !isProjectRoot(uri.fsPath)) {
+      const count = countProjectsIn(uri.fsPath);
+      if (count > 0) {
+        return { badge: count > 99 ? '99' : String(count), tooltip: `${count} project${count !== 1 ? 's' : ''}` };
+      }
+      return undefined; // a plain non-project folder, not a category
     }
-    return { color: new vscode.ThemeColor('disabledForeground'), tooltip: 'Inactive — open a file or right-click → Open as Redivivus Project' };
+
+    // A project folder (flat or nested) → green dot when active, dimmed otherwise.
+    if (isProjectRoot(uri.fsPath)) {
+      const active = activeProjectRoot();
+      if (!active || isProjectsContainer(active)) { return undefined; } // home/launcher → don't dim
+      if (path.resolve(uri.fsPath) === path.resolve(active)) {
+        return { badge: '●', color: new vscode.ThemeColor('charts.green'), tooltip: 'Active Redivivus project' };
+      }
+      return { color: new vscode.ThemeColor('disabledForeground'), tooltip: 'Inactive — open a file or right-click → Open as Redivivus Project' };
+    }
+    return undefined;
   }
 }
 
