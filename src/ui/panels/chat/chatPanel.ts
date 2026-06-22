@@ -20,6 +20,7 @@ import { BuildHistoryService } from '../../../services/build/buildHistoryService
 import { handlePanelMessage } from '../../../core/routing/chatPanelMessageRouter';
 import { loadLastSessionContext } from './chatPanelSessionResume';
 import { restoreConversation } from './chatPanelPublicAPI';
+import { registerChatPanelListeners } from './chatPanelListeners';
 
 interface ChatPanelState {
   conversation: ChatMessage[];
@@ -80,31 +81,7 @@ export class ChatPanel {
     this._panel.webview.options = { enableScripts: true };
     this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('../../../core/routing/chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
     this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
-    // [Redivivus] Rebuild full HTML when workspace folder changes — clear old conversation so new project starts fresh
-    // [FIX] suppressConversationClear: build pipeline sets this so result card survives the folder add.
-    this._disposables.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
-      // [FIX] Check synchronous flag first — globalState is async and loses the race
-      const suppressSync = ChatPanel.suppressAutoOpen;
-      const suppress = ChatPanel.extensionContext?.globalState.get<boolean>('redivivus.suppressConversationClear');
-      ChatPanel.extensionContext?.globalState.update('redivivus.suppressConversationClear', undefined);
-      if (!suppressSync && !suppress) { this.state.conversation = []; try {
-        const newRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        if (newRoot && ChatPanel.extensionContext) { const { chatHistoryKey } = require('./chatPanelPublicAPI.js'); ChatPanel.extensionContext.globalState.update(chatHistoryKey(newRoot), undefined); }
-      } catch {} }
-      this._initialized = false;
-      this.refresh();
-    }));
-    // [Redivivus] Hot-reload roster when API key settings change
-    this._disposables.push(vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration('redivivus.geminiApiKey') ||
-          e.affectsConfiguration('redivivus.claudeApiKey') ||
-          e.affectsConfiguration('redivivus.openaiApiKey') ||
-          e.affectsConfiguration('redivivus.groqApiKey') ||
-          e.affectsConfiguration('redivivus.xaiApiKey') ||
-          e.affectsConfiguration('redivivus.kimiApiKey')) {
-        this.refresh();
-      }
-    }));
+    registerChatPanelListeners(this, this._disposables);
     // [DEAD] Build history restoration via BuildHistoryService.getLastResultCards() — disabled, causes chat tab duplication. Re-enable post-v1.0.
     this.refresh();
   }

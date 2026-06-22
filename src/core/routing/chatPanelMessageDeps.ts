@@ -1,3 +1,4 @@
+// [SCOPE] Message handler dependency types — shared interface injected into all chatPanel message handlers.
 import type * as vscode from 'vscode';
 import type { RoutingService } from '../../services/ai/routingService';
 import type { UsageTracker } from '../../services/usageTracker';

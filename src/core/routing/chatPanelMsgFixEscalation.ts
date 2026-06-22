@@ -8,20 +8,10 @@ import { fixActStep, fixActCode } from './fixActivityPanel.js';
 import {
   updateStatus, enrichDepsWithCritiques, runVerifyStep, renderGuardianVerdict,
   represcribeAfterRejection, logExhaustedDeadEnd, isTruncationText,
+  type EscalationResult,
 } from './chatPanelMsgFixEscalationUtils.js';
-
-export interface EscalationResult {
-  finalResponse: string;
-  workerLabel: string;
-  guardianLabel: string;
-  guardianNote: string;
-  scopeNote: string;
-  needsAgentHandoff: boolean;
-  retryCount: number;
-  escalated: boolean;
-  forceSurgical?: boolean; // [FIX] When true, retry with surgical format instead of FULL FILE
-  accumulatedCritiques?: string[]; // [FIX] Guardian rejection reasons for dead end logging
-}
+// [DONE] EscalationResult interface moved to chatPanelMsgFixEscalationUtils.ts (Rule 9 split)
+export type { EscalationResult } from './chatPanelMsgFixEscalationUtils.js';
 
 /** Runs Phase 2 (Worker) → Phase 3 (Guardian) with automatic retry and escalation.
  *  [STAGE 2] Now includes re-prescription: Supervisor is called again after each Guardian

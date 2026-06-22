@@ -70,3 +70,34 @@ export function setMechanics(deps: any, mechanics: string): void {
     try { syncBlueprintMd(deps.redivivus, config); } catch { /* md render best-effort */ }
   } catch { /* config write best-effort */ }
 }
+
+// [DONE] fireLivingBlueprintSeed moved here from cloudBuildResultProcessor.ts (Rule 9 split)
+/** Fire-and-forget: seed or append a build revision to the Living Blueprint contract. Never blocks the pipeline. */
+export function fireLivingBlueprintSeed(root: string, dataModel: string | undefined, deps: any, routing: any, task: string, writtenPaths: string[]): void {
+  if (!writtenPaths.length || !routing || !(deps as any).redivivus) { return; }
+  (async () => {
+    try {
+      const lb = await import('./livingBlueprintService.js');
+      const relFiles = writtenPaths.map((p: string) => { const path = require('path'); return path.relative(root, p).replace(/\\/g, '/'); });
+      const userPrompt = String(task).replace(/^Build:\s*/, '').split(/\n\s*\n|\n\s*Project Blueprint:|\n\s*SUPERVISOR/)[0].trim().slice(0, 400);
+      if (!lb.getMechanics(deps)) {
+        const { distillBuildMechanics } = await import('./livingBlueprintDistill.js');
+        console.log(`[LIVING BLUEPRINT] Distilling mechanics contract from build (${relFiles.length} files)...`);
+        let mech = await distillBuildMechanics(routing, task, relFiles);
+        if (!mech) {
+          console.warn('[LIVING BLUEPRINT] Distillation returned no mechanics — retrying once.');
+          mech = await distillBuildMechanics(routing, task, relFiles);
+        }
+        if (mech) {
+          lb.setMechanics(deps, mech);
+          lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: userPrompt, summary: 'Initial build — behavioral contract seeded.', files: relFiles, by: dataModel || 'AI' });
+          console.log(`[LIVING BLUEPRINT] Mechanics contract seeded (${mech.length} chars) -> config.json + blueprint.md`);
+        } else {
+          console.warn(`[LIVING BLUEPRINT] FAILED to distill mechanics after retry — blueprint left WITHOUT a behavioral contract for: "${userPrompt.slice(0, 80)}"`);
+        }
+      } else {
+        lb.appendRevision(root, { rev: lb.nextRev(root), ts: new Date().toISOString(), kind: 'build', request: userPrompt, summary: 'Rebuild / additional build.', files: relFiles, by: dataModel || 'AI' });
+      }
+    } catch (e) { console.warn('[LIVING BLUEPRINT] Mechanics seeding error (build unaffected):', e instanceof Error ? e.message : String(e)); }
+  })();
+}

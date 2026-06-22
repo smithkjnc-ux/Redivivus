@@ -67,6 +67,28 @@ export function revalidateProjectDeadEnds(root: string): void {
   } catch { /* best-effort */ }
 }
 
+/** Queries the global (community) dead-end vault for patterns matching this user request. Returns context string or empty. */
+export async function queryGlobalDeadEnds(userText: string): Promise<string> {
+  try {
+    const base = require('../../services/api/apiClient.js').getApiBase();
+    const token = await require('../../services/api/apiClient.js').getAccountToken();
+    const keywords = userText.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3).slice(0, 10);
+    const dqRes = await fetch(`${base}/dead-end-query/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ keywords }),
+    });
+    if (dqRes.ok) {
+      const dqData = await dqRes.json() as { patterns?: any[] };
+      if (dqData.patterns && dqData.patterns.length > 0) {
+        return '\n\nGLOBAL DEAD END VAULT (community-verified patterns):\n' +
+          dqData.patterns.map((p: any) => `- ${p.symptom}: ${p.supervisor_note}`).join('\n');
+      }
+    }
+  } catch { /* non-blocking */ }
+  return '';
+}
+
 /** Appends a dead-end entry to the project's .redivivus/dead_ends.md. Best-effort. */
 export function appendProjectDeadEnd(root: string, patternName: string, triedWhat: string, whyFails: string, doInstead: string): void {
   try {

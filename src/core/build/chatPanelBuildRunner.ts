@@ -11,10 +11,10 @@ import { isValidBuildRoot } from './chatPanelBuildUtils';
 import { autoCreateProject } from './chatPanelBuildAutoCreate';
 import { callCloudBuild } from '../../services/build/cloudBuildClient.js';
 import { getAccountToken } from '../../services/api/apiClient.js';
-import { getCommunityGotchas, fetchCommunityGotchas } from '../../services/api/apiClientKnowledge.js';
+import { fetchCommunityGotchas } from '../../services/api/apiClientKnowledge.js';
 import { appendBuildLog } from '../../services/build/buildLogger.js';
-import { buildBreakdownToken, cleanBuildNarration } from './chatPanelBuildBreakdown.js';
 import { BuildActivityPanel } from '../../ui/panels/buildActivity/buildActivityPanel.js';
+import { checkParadoxGuard, setupProjectFilesTree, assembleBuildTask, handleBuildSuccess } from './chatPanelBuildRunnerHelpers.js';
 
 function isProjectsContainer(root: string): boolean {
   const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
@@ -44,17 +44,8 @@ export async function runBuildAfterGates(
   let root = getLiveRoot(deps);
   let autoCreated = false;
 
-  // [PARADOX GUARD] Refuse to build on a protected folder (Redivivus's own source). Even if the active
-  // project is somehow Redivivus itself, the tool must never modify its own running source.
-  if (root) {
-    const { isProtectedProject } = await import('../project/activeProjectWatcher.js');
-    if (isProtectedProject(root)) {
-      deps.postToWebview({ type: 'set-status', status: 'ready' });
-      deps.conversation.push({ role: 'assistant', content: `🛡️ **\`${path.basename(root)}\` is protected** — it's Redivivus's own source. Building/fixing here is disabled so Redivivus never modifies itself. Work on it in a separate editor.`, timestamp: Date.now() });
-      deps.refresh();
-      return;
-    }
-  }
+  // [DONE] PARADOX GUARD moved to chatPanelBuildRunnerHelpers.ts (Rule 9 split)
+  if (root && await checkParadoxGuard(root, deps)) { return; }
 
   // No project open — auto-create a folder
   if (!root) {
@@ -81,28 +72,8 @@ export async function runBuildAfterGates(
       return;
     }
   }
-  // [FIX] Show the project in the Redivivus "Project Files" tree (read from disk) instead of adding it
-  // to the VS Code workspace. The native Explorer requires a workspace folder, and adding the first
-  // folder to an empty window ALWAYS reloads the extension host (killing the in-flight build and racing
-  // duplicate panels). The custom tree needs no workspace folder, so there is NO reload — it populates
-  // live as the build writes files. The build continues in-process below. The result card still offers
-  // an "Open Project in Explorer" button for users who want the native Explorer (accepts one reload).
-  const _wsfNow = vscode.workspace.workspaceFolders ?? [];
-  const _rootInWs = !!root && _wsfNow.some(f => path.resolve(f.uri.fsPath) === path.resolve(root!));
-  if (root && !_rootInWs) {
-    try {
-      const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
-      PFP.instance?.setRoot(root);
-      PFP.instance?.startLiveRefresh();
-      // Reveal the Project Files tree so the user watches the skeleton + files appear.
-      vscode.commands.executeCommand('redivivusProjectFiles.focus').then(undefined, () => {});
-    } catch (e) {
-      console.warn('[Redivivus] Could not populate Project Files tree:', e);
-    }
-  } else if (root && _rootInWs) {
-    // Folder is already an open workspace folder — the native Explorer shows it live. Just focus it.
-    vscode.commands.executeCommand('workbench.view.explorer').then(undefined, () => {});
-  }
+  // [DONE] Project Files tree setup moved to chatPanelBuildRunnerHelpers.ts (Rule 9 split)
+  if (root) { setupProjectFilesTree(root); }
 
   // Show which files are being read before building starts
   const existingFileList = (() => {
@@ -136,24 +107,8 @@ export async function runBuildAfterGates(
 
   fetchCommunityGotchas().catch(() => {}); // warm cache; sync result used this build
 
-  // [FIX] Tell the Supervisor to produce a complete implementation contract for the Worker,
-  // not just a problem diagnosis. The Worker executes Supervisor instructions literally —
-  // vague instructions produce incomplete code regardless of the Worker's capability.
-  // This is general guidance, not task-specific: every Supervisor plan should be explicit enough
-  // that any capable model can execute it without guessing.
-  const SUPERVISOR_CONTRACT_GUIDANCE = `
-
-SUPERVISOR TO WORKER CONTRACT REQUIREMENT:
-Your analysis is the Worker's only instruction set. The Worker executes what you specify — nothing more, nothing less. Structure your output as a complete implementation contract:
-- For every function that must exist: name it, state what it calls, state what it returns
-- For every rendering concern: explicitly list every entity the draw loop must render
-- For every state transition: specify the exact sequence of operations
-- Do not describe problems — prescribe solutions with enough precision that a junior developer could implement them without asking a follow-up question
-The Worker has no context beyond your instructions. Ambiguity becomes missing code.`;
-
-  const buildTask = await import('../../services/learnedMemoryService.js')
-    .then(({ LearnedMemoryService }) => { const nd = new LearnedMemoryService(root).getNeverDoForPrompt(); const cg = getCommunityGotchas(); const extra = [nd, cg].filter(Boolean).join('\n\n'); return extra ? `${task}\n\n${extra}${SUPERVISOR_CONTRACT_GUIDANCE}` : `${task}${SUPERVISOR_CONTRACT_GUIDANCE}`; })
-    .catch(() => task);
+  // [DONE] Build task assembly moved to chatPanelBuildRunnerHelpers.ts (Rule 9 split)
+  const buildTask = await assembleBuildTask(task, root!);
 
   let streamAccum = '';
   const onChunk = (chunk: string) => {
@@ -214,70 +169,8 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
       return;
     }
 
-    // Build succeeded — replace working indicator with result
-    removeWorkingMessage();
-    const files = result.files ?? [];
-    const fileList = files.map(f => `- \`${f.path}\``).join('\n');
-    // [Model A] Don't offer "Open Project in Explorer" when the project is ALREADY inside the open
-    // workspace (a subfolder of ~/projects) — it's already visible in the Explorer. Adding it as its own
-    // root converted the single ~/projects workspace into a confusing multi-root "Untitled (Workspace)"
-    // with the project shown twice. Only offer it when the project is genuinely outside the workspace.
-    const _rootInOpenWs = !!root && !!vscode.workspace.workspaceFolders?.some(wf =>
-      root === wf.uri.fsPath || root.startsWith(wf.uri.fsPath + path.sep));
-    const openWorkspaceToken = files.length > 0 && root && !_rootInOpenWs
-      ? `\n${TOK_OPEN_WORKSPACE}${root}${DELIM}${TOK_OPEN_WORKSPACE_END}`
-      : '';
-    // [FIX] Skip scaffold placeholder index.html (content is just the filename text).
-    // Prefer the largest HTML file — scaffold stubs are tiny, built files are substantial.
-    const htmlFiles = files.filter(f => f.path.endsWith('.html'));
-    const htmlFile = htmlFiles.length > 1
-      ? htmlFiles.reduce((best, f) => {
-          try { const sz = require('fs').statSync(path.join(root, f.path)).size; const bsz = require('fs').statSync(path.join(root, best.path)).size; return sz > bsz ? f : best; } catch { return best; }
-        })
-      : htmlFiles[0];
-    const previewToken = htmlFile
-      ? `\n${TOK_PREVIEW_BROWSER}${path.join(root, htmlFile.path)}${DELIM}${TOK_PREVIEW_BROWSER_END}`
-      : '';
-    // Show Run button for non-HTML projects (HTML already has Preview in Browser)
-    const { detectRunCommand } = await import('../../services/build/runtimeRunner.js');
-    const runCmd = !htmlFile && root ? detectRunCommand(root) : null;
-    const runToken = runCmd ? `\n${TOK_RUN_PROJECT}${root}${DELIM}${TOK_RUN_PROJECT_END}` : '';
-
-    // [READINESS] Offer a launch-readiness preflight for backend/DB projects only (never a static site).
-    let readinessToken = '';
-    try { readinessToken = (await import('../../services/build/productionReadiness.js')).readinessButtonToken(root!); } catch { /* optional */ }
-
-    // [FIX] Build an honest two-phase byline (Supervisor + Worker) from the real attribution instead
-    // of a hardcoded "solo / primary builder" row — that hardcoding is why Claude never appeared.
-    const modelLabel = result.model ?? 'AI';
-    const tokens = (result.inputTokens ?? 0) + (result.outputTokens ?? 0);
-    const breakdownToken = buildBreakdownToken(result, modelLabel, tokens);
-    const narration = cleanBuildNarration(result.narration);
-    const modelLine = result.modelRationale ? `\n\n🧠 ${result.modelRationale}` : '';
-    const elapsedMs = Date.now() - workingTs;
-    const elapsedStr = elapsedMs < 60000
-      ? `${Math.round(elapsedMs / 1000)}s`
-      : `${Math.floor(elapsedMs / 60000)}m ${Math.round((elapsedMs % 60000) / 1000)}s`;
-
-    deps.conversation.push({
-      role: 'assistant',
-      content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''} in ${elapsedStr}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${readinessToken}${breakdownToken}`,
-      timestamp: Date.now(),
-    });
-    deps.refresh();
-
-    // Security scan on built files — fire-and-forget, never blocks
-    if (root) {
-      import('../../services/build/securityScanner.js').then(({ scanProject, formatSecurityReport }) => {
-        const findings = scanProject(root!);
-        const report = formatSecurityReport(findings, root!);
-        if (report) { deps.conversation.push({ role: 'assistant', content: report, timestamp: Date.now() }); deps.refresh(); }
-      }).catch(() => {});
-    }
-
-    if (isFixRequest) {
-      vscode.commands.executeCommand('redivivus.resolveFix', task, files.map(f => path.join(root!, f.path)));
-    }
+    // [DONE] Build success handling moved to chatPanelBuildRunnerHelpers.ts (Rule 9 split)
+    await handleBuildSuccess(result, root!, task, workingTs, deps, isFixRequest);
   } finally {
     // Mark the activity panel finished exactly once, with the real outcome (false if the build threw).
     try { activity?.finish(buildOk ?? false); } catch {}

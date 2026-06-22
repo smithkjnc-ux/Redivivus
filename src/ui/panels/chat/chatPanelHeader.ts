@@ -12,6 +12,7 @@ import * as fs from 'fs';
 import { determineBlueprintStatus } from './chatPanelHeaderUtils.js';
 import { isProjectsContainer } from '../../../services/project/redivivusPaths.js';
 import { isSecretKeyStoreReady } from '../../../services/ai/secretKeyStore.js';
+import { getPrimaryAction, getConfiguredProviders, getVaultCounts } from './chatPanelHeaderActions';
 
 export function buildHeaderInfo(
   redivivus: RedivivusService,
@@ -111,52 +112,7 @@ export function buildHeaderInfo(
     }
   } catch {}
 
-  // Determine primary action for the header pill (Preview vs Run)
-  let primaryAction = {
-    label: 'Preview',
-    actionAttr: 'data-action',
-    actionValue: 'preview-show',
-    tooltip: 'Live preview of your project',
-    icon: '&#x25B6;'
-  };
-
-  const activeEditor = vscode.window.activeTextEditor;
-  const activeFilePath = activeEditor?.document.uri.fsPath;
-
-  if (activeFilePath) {
-    const ext = path.extname(activeFilePath).toLowerCase();
-    if (['.py', '.go', '.rs', '.sh', '.rb', '.php', '.java', '.c', '.cpp', '.cs'].includes(ext)) {
-      primaryAction = {
-        label: 'Run',
-        actionAttr: 'data-cmd',
-        actionValue: 'redivivus.runProject',
-        tooltip: 'Run your project in the terminal',
-        icon: '&#x25B6;'
-      };
-    }
-  } else if (workspaceRoot) {
-    // [FIX] Scan workspace root directly for backend file extensions.
-    // detectPostBuildInfo with empty builtFiles misses files like calculator.py because
-    // it only checks fixed entry names (main.py, app.py, etc). Direct scan catches all.
-    try {
-      const rootFiles = fs.readdirSync(workspaceRoot);
-      const backendExts = ['.py', '.go', '.rs', '.sh', '.rb', '.php', '.java', '.c', '.cpp', '.cs'];
-      const hasHtml = rootFiles.some((f: string) => f.endsWith('.html'));
-      const hasBackend = rootFiles.some((f: string) => backendExts.some(e => f.endsWith(e)));
-      // Also check for package.json without any .html — pure Node CLI project
-      const hasPackageJson = rootFiles.includes('package.json');
-      const isNodeCli = hasPackageJson && !hasHtml;
-      if ((hasBackend || isNodeCli) && !hasHtml) {
-        primaryAction = {
-          label: 'Run',
-          actionAttr: 'data-cmd',
-          actionValue: 'redivivus.runProject',
-          tooltip: 'Run your project in the terminal',
-          icon: '&#x25B6;'
-        };
-      }
-    } catch {}
-  }
+  const primaryAction = getPrimaryAction(workspaceRoot);
 
   return {
     projectName, aiName, aiLabel: displayModel,
@@ -179,39 +135,10 @@ export function buildHeaderInfo(
     projectTokens,
     buildStamp,
     primaryAction,
-    // [FIX] Count user-built items separately from seeded starter patterns.
-    // Starters are infrastructure; including them made the count misleading vs. admin panel.
-    ...(() => {
-      try {
-        const { VaultService } = require('../../../services/vault/vaultService.js');
-        const v = new VaultService(extensionContext);
-        const all = v.listItems() as Array<{ sourceProject?: string }>;
-        const SEEDED = new Set(['redivivus-starter', 'redivivus-seeded']);
-        const starters = all.filter(i => SEEDED.has(i.sourceProject || '')).length;
-        return { vaultItemCount: all.length - starters, vaultStarterCount: starters };
-      } catch { return { vaultItemCount: 0, vaultStarterCount: 0 }; }
-    })(),
+    ...getVaultCounts(extensionContext),
     isSignedIn: false,
-    healthStatus: extensionContext?.globalState.get<'green' | 'yellow' | 'red'>('redivivus.healthStatus'), // populated async below — caller uses refreshHeader() to get updated value
-    // [ADAPTIVE-PILL] All providers with an active key — used by the manual-picker popover in the webview.
-    configuredProviders: (() => {
-      const PROVIDER_META: Array<{ id: string; label: string; emoji: string; key: () => string | null }> = [
-        { id: 'groq',     label: 'Groq',     emoji: '\u26A1', key: () => { try { const { getGroqKey }     = require('../../../services/ai/routingKeys.js'); return getGroqKey(); }     catch { return null; } } },
-        { id: 'openai',   label: 'GPT-4o',   emoji: '\u25C6', key: () => { try { const { getOpenAIKey }   = require('../../../services/ai/routingKeys.js'); return getOpenAIKey(); }   catch { return null; } } },
-        { id: 'deepseek', label: 'DeepSeek', emoji: '\u25BA', key: () => { try { const { getDeepseekKey } = require('../../../services/ai/routingKeys.js'); return getDeepseekKey(); } catch { return null; } } },
-        { id: 'gemini',   label: 'Gemini',   emoji: '\u2B22', key: () => { try { const { getGeminiKey }   = require('../../../services/ai/routingKeys.js'); return getGeminiKey(); }   catch { return null; } } },
-        { id: 'claude',   label: 'Claude',   emoji: '\uD83D\uDFE0', key: () => { try { const { getClaudeKey }  = require('../../../services/ai/routingKeys.js'); return getClaudeKey(); }  catch { return null; } } },
-        { id: 'xai',      label: 'Grok',     emoji: '\u2736', key: () => { try { const { getXAIKey }      = require('../../../services/ai/routingKeys.js'); return getXAIKey(); }      catch { return null; } } },
-        { id: 'kimi',     label: 'Kimi',     emoji: '\uD83C\uDF19', key: () => { try { const { getKimiKey }     = require('../../../services/ai/routingKeys.js'); return getKimiKey(); }     catch { return null; } } },
-      ];
-      // [MANUAL MODEL PICKER] Carry each provider's REAL models (truthful: id + label straight from the registry)
-      // so the manual popover can let the user pick ANY specific model and the pipeline runs EXACTLY that one.
-      const { modelsForProvider } = require('../../../services/ai/modelRegistry.js');
-      return PROVIDER_META.filter(p => !!p.key()).map(({ id, label, emoji }) => ({
-        id, label, emoji,
-        models: (modelsForProvider(id) || []).map((m: { modelId: string; label: string; capability: number }) => ({ id: m.modelId, label: m.label, cap: m.capability })),
-      }));
-    })(),
+    healthStatus: extensionContext?.globalState.get<'green' | 'yellow' | 'red'>('redivivus.healthStatus'),
+    configuredProviders: getConfiguredProviders(),
   };
 }
 

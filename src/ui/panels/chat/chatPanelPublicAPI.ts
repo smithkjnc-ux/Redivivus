@@ -9,6 +9,7 @@ import { SetupProgressService } from '../../../services/project/setupProgressSer
 import { buildChatHtml } from './chatPanelHtml';
 import { readActiveProjectDashboard } from './chatPanelDashboard';
 import { logProjectContextSwitch } from '../../../services/logging/projectContextLogger';
+export { panelRefresh, saveConversation } from './chatPanelPublicAPIRefresh';
 
 export function panelShowGettingStarted(panel: any): void {
   panel._panel.webview.postMessage({ type: 'show-panel', panelType: 'getting-started' });
@@ -118,116 +119,6 @@ export function clearPersistedConversation(): void {
   } catch {}
 }
 
-export async function panelRefresh(panel: any): Promise<void> {
-  const state = panel.state;
-  const usageTracker = panel.usageTracker;
-  const headerInfo = buildHeaderInfo(panel.redivivus, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
-  try { const { getAccountToken } = await import('../../../services/api/apiClient.js'); headerInfo.isSignedIn = !!(await getAccountToken()); } catch {}
-  const _panel = panel._panel;
-  const _initialized = panel._initialized;
-  // Keep tab title in sync with the open project
-  const wsFolder = vscode.workspace.workspaceFolders?.[0];
-  const desiredTitle = wsFolder ? require('path').basename(wsFolder.uri.fsPath) : 'Redivivus Chat';
-  if (_panel.title !== desiredTitle) { _panel.title = desiredTitle; }
-  require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-    `[panelRefresh] _initialized=${_initialized} hasProject=${headerInfo.hasProjectOpen} conv=${panel.state?.conversation?.length}\n`);
-  if (!_initialized) {
-    let progress;
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (headerInfo.isInitialized && root && state.conversation.length === 0) {
-      try { progress = await new SetupProgressService(panel.redivivus, root).getProgress(); } catch {}
-    }
-    if (root && (headerInfo as any).workspaceHasRedivivus && !(headerInfo as any).workspaceIsAssistMode && state.conversation.length === 0) {
-      try { headerInfo.dashData = readActiveProjectDashboard(panel, root); } catch {}
-    }
-    _panel.webview.html = buildChatHtml(state.conversation, headerInfo, progress);
-    panel._initialized = true;
-    // Persist conversation after first load so existing messages survive a panel reopen
-    saveConversation(state, root);
-    // Background health probe — colors the Health button on startup and every 5 min without user interaction
-    (async () => {
-      try {
-        const { collectHealthData, getHealthStatus } = await import('./chatPanelHealthCheck.js');
-        const colorMap: Record<string, string> = { green: '#4caf50', yellow: '#ff9800', red: '#f44336' };
-        // [FIX] The Health pill must reflect REAL health proactively. Two failure modes handled here:
-        //  1) Race: the first probe posts its color before the webview listener is ready -> message lost.
-        //  2) False negative: the first probe catches a cold/slow request and comes back red, even though
-        //     the backend is fine (clicking the pill re-checks and shows green).
-        // The fix for BOTH is to RE-PROBE (a fresh check), not re-post a stale result. A few quick re-probes
-        // self-correct a transient red AND land once the listener exists.
-        const probe = async () => {
-          try {
-            const data = await collectHealthData();
-            const status = getHealthStatus(data);
-            _panel.webview.postMessage({ type: 'update-health-btn', status, color: colorMap[status] });
-            ChatPanel.extensionContext?.globalState.update('redivivus.healthStatus', status);
-          } catch {}
-        };
-        await probe();
-        setTimeout(probe, 2500);
-        setTimeout(probe, 6000);
-        setInterval(probe, 5 * 60 * 1000);
-      } catch {}
-    })();
-    return;
-  }
-  const { renderMessages } = await import('./chatPanelRenderer.js');
-  const messagesHtml = renderMessages(state.conversation);
-  let htmlToInject = messagesHtml;
-  if (!htmlToInject) {
-    let progress;
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (headerInfo.isInitialized && root) {
-      try { progress = await new SetupProgressService(panel.redivivus, root).getProgress(); } catch {}
-    }
-    if (root && (headerInfo as any).workspaceHasRedivivus && !(headerInfo as any).workspaceIsAssistMode) {
-      try { headerInfo.dashData = readActiveProjectDashboard(panel, root); } catch {}
-    }
-    const { buildEmptyStateHtml } = await import('./chatPanelEmptyState.js');
-    htmlToInject = buildEmptyStateHtml(headerInfo, progress);
-  }
-  _panel.webview.postMessage({ type: 'update-conversation', html: htmlToInject });
-  // [FIX] Surgically refresh the header + input pills so the project is recognized (Preview/Blueprint/
-  // Map/History/Run) after a no-reload build — without replacing webview.html (which risks a duplicate
-  // tab). Buttons use document-level data-cmd delegation, so innerHTML replacement keeps them clickable.
-  try {
-    const { renderHeaderRightInner, renderInputLeftInner } = require('./chatPanelHeaderRender.js');
-    _panel.webview.postMessage({ type: 'update-header', headerRight: renderHeaderRightInner(headerInfo), inputLeft: renderInputLeftInner(headerInfo) });
-  } catch {}
-  // Persist conversation on every update
-  const root2 = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  saveConversation(state, root2);
-}
-
-const _writtenMessages = new Set<string>();
-
-function saveConversation(state: any, root?: string): void {
-  try {
-    const ctx = ChatPanel.extensionContext;
-    if (!ctx || !root || !state.conversation.length) { return; }
-    ctx.globalState.update(chatHistoryKey(root), JSON.stringify(state.conversation.filter((m: any) => !m.content?.includes('__BUILD_WORKING__')).slice(-100))); // [FIX] strip working messages — don't survive host restarts
-    
-    // Append new messages to project folder log
-    const fs = require('fs');
-    const path = require('path');
-    const redDir = path.join(root, '.redivivus');
-    if (fs.existsSync(redDir)) {
-      const logPath = path.join(redDir, 'chat_history.md');
-      let toAppend = '';
-      for (const m of state.conversation) {
-        const key = `${m.timestamp}_${m.role}`;
-        if (!_writtenMessages.has(key)) {
-          toAppend += `### ${m.role === 'user' ? 'User' : 'Redivivus'} (${new Date(m.timestamp || Date.now()).toLocaleString()})\n\n${m.content}\n\n---\n\n`;
-          _writtenMessages.add(key);
-        }
-      }
-      if (toAppend) {
-        if (!fs.existsSync(logPath)) { fs.writeFileSync(logPath, '# Project Chat History\n\n', 'utf8'); }
-        fs.appendFileSync(logPath, toAppend, 'utf8');
-      }
-    }
-  } catch {}
-}
 
 export function postToChatWebview(msg: unknown): void {
   const inst = ChatPanel.currentPanel;

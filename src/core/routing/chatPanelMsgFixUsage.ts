@@ -20,3 +20,15 @@ export function fixCostByline(deps: any, root: string, costBefore: number): stri
     return `\n\n_AI cost this fix: ${costStr}_`;
   } catch { return ''; }
 }
+
+// Classify a fix-pipeline failure into a plain-English user hint.
+// Distinguishes a usage/quota limit (retry won't help) from an auth error from a transient network hiccup.
+export function fixErrorHint(errMsg: string): string {
+  if (/usage limit|rate.?limit|\bquota\b|insufficient.{0,12}(credit|balance|fund|quota)|reached your specified|regain access|\b429\b|too many requests|billing|payment required|\b402\b/i.test(errMsg)) {
+    return 'Your AI provider has hit its usage limit or run out of credit. Add credit / raise the limit in your provider account, or switch to another configured AI from the picker below. Retrying will hit the same limit.';
+  }
+  if (/401|403|invalid.{0,10}(api.)?key|api.key.{0,10}(invalid|missing|expired)|unauthorized/i.test(errMsg)) {
+    return 'This looks like an API key issue — check **Setup → AI API Keys**.';
+  }
+  return 'This is usually a temporary network hiccup — try again.';
+}

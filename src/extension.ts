@@ -3,32 +3,16 @@
 import * as vscode from 'vscode';
 import { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
 import { ProjectFilesProvider } from './ui/sidebar/projectFilesProvider.js';
-import { seedVault } from './services/vault/vaultSeeder.js';
-import { RedivivusService } from './services/redivivusService.js';
-import { BlueprintService } from './services/blueprint/blueprintService.js';
-import { SessionService } from './services/sessionService.js';
-import { RulesService } from './services/rulesService.js';
-import { ChangeTracker } from './services/build/changeTracker.js';
-import { MeasureTwiceService } from './services/build/measureTwiceService.js';
 import { ChatPanel } from './ui/panels/chat/chatPanel';
-import { WizardService } from './ui/panels/wizard/wizardService';
-import { RetrofitService } from './core/retrofit/retrofitService';
-import { RoutingService } from './services/ai/routingService.js';
-import { GuideService } from './services/guideService.js';
-import { AnalyzerService } from './ui/panels/analyzer/analyzerService';
-import { AnnotationService } from './services/annotationService.js';
-import { VaultService } from './services/vault/vaultService.js';
-import { VaultContextService } from './services/vault/vaultContextService.js';
-import { BuildFromVaultService } from './services/vault/buildFromVaultService.js';
-import { StatusBar } from './ui/views/statusBar.js';
-import { UsageTracker } from './services/usageTracker.js';
-import { GuardianService } from './services/ai/guardianService.js';
-import { GitHubBackupService } from './services/githubBackupService.js';
 import { runDiagnostic } from './core/diagnostics/selfDiagnostic';
+import { initExtensionServices } from './extensionServices';
+import { registerWorkspaceFolderListener } from './extensionWorkspaceListener';
+import { registerPanelSerializer, scheduleAutoOpenPanel } from './extensionPanelSetup';
 
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
-import { initApiClient, logSessionStart } from './services/api/apiClient.js';
+import { initApiClient } from './services/api/apiClient.js';
+import { logSessionStart } from './services/api/apiClientTelemetry.js';
 import { initSecretKeyStore, onSecretKeyStoreReady } from './services/ai/secretKeyStore.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
@@ -83,43 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
   vscode.workspace.getConfiguration().update('window.confirmSaveUntitledWorkspace', false, vscode.ConfigurationTarget.Global).then(() => {}, () => {});
 
   // ── init services ──
-  // [WARN] This block initializes all core services. The order and dependencies are critical for the extension's functionality.
-  const redivivusService = new RedivivusService();
-  const blueprintService = new BlueprintService(redivivusService);
-  const sessionService = new SessionService(redivivusService);
-  const annotationService = new AnnotationService();
-  const analyzerService = new AnalyzerService(redivivusService);
-  const guideService = new GuideService(redivivusService, sessionService);
-  const routingService = new RoutingService();
-  const measureTwice = new MeasureTwiceService();
-  const changeTracker = new ChangeTracker(redivivusService);
-  const rulesService = new RulesService(redivivusService);
-  const vaultService = new VaultService(context);
-  const vaultContextService = new VaultContextService(vaultService);
-  routingService.setVaultContextService(vaultContextService);
-  const buildFromVaultService = new BuildFromVaultService(vaultService, routingService);
-  const retrofitService = new RetrofitService(redivivusService, routingService, measureTwice, changeTracker, analyzerService);
-  const wizardService = new WizardService(redivivusService, sessionService);
-  const usageTracker = new UsageTracker(context);
-  // One-time cleanup of legacy unattributed ('none') usage rows; going forward such rows are
-  // labeled 'unknown' so any missed attribution is visible. Guarded by a globalState flag.
-  usageTracker.runOneTimeNonePurge().catch(() => { /* [L4] best-effort one-time cleanup; avoid unhandled rejection */ });
-  const guardianService = new GuardianService(redivivusService);
-  const statusBar = new StatusBar(redivivusService, sessionService, usageTracker);
-
-  // ── Vault seeding — runs on first install, seeds starter patterns ──
-  const seededKey = 'redivivus.vaultSeeded.v1';
-  if (!context.globalState.get(seededKey)) {
-    setTimeout(async () => {
-      try {
-        const result = await seedVault(vaultService, { useGitHub: false });
-        if (result.added > 0) {
-          vscode.window.showInformationMessage(`Redivivus: Loaded ${result.added} starter patterns into your vault.`);
-        }
-        context.globalState.update(seededKey, true);
-      } catch { /* never block extension over seeding failure */ }
-    }, 3000);
-  }
+  const { redivivusService, blueprintService, sessionService, annotationService, analyzerService, guideService, routingService, measureTwice, changeTracker, rulesService, vaultService, buildFromVaultService, retrofitService, wizardService, usageTracker, guardianService, statusBar, githubBackupService } = initExtensionServices(context);
 
   // [Redivivus] Initialize comprehensive logging and project context tracking
   const initialRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -182,50 +130,7 @@ export function activate(context: vscode.ExtensionContext) {
   }, 10_000);
 
   // ── dispose stale chat panel when workspace closes ──
-  context.subscriptions.push(
-    vscode.workspace.onDidChangeWorkspaceFolders((e) => {
-      if (e.removed.length > 0 && e.added.length === 0) {
-        // [FIX] Don't close+reopen — that creates a duplicate tab. Instead, refresh the existing
-        // panel in-place so it transitions to the launcher view. Close only if no panel exists.
-        if (ChatPanel.currentPanel) {
-          (ChatPanel.currentPanel as any).state.conversation = [];
-          (ChatPanel.currentPanel as any)._initialized = false;
-          ChatPanel.currentPanel.refresh();
-        }
-        // [LOG] Finalize logging when workspace closes
-        finalizeRedivivusLogger(true);
-        // [FIX] Clear project-context latch so a later project isn't blocked as an illegal switch.
-        resetProjectContext();
-      } else if (e.added.length > 0) {
-        // New folder added externally (not by onNewProject) — trigger init
-        // onNewProject handles its own init inline; this only fires for external folder additions
-        // [FIX] Check the synchronous ChatPanel.suppressAutoOpen flag FIRST — the build runner sets
-        // this before calling updateWorkspaceFolders. globalState.update is async and loses the race.
-        const _cp = require('./ui/panels/chat/chatPanel.js').ChatPanel;
-        if (_cp?.suppressAutoOpen) {
-          _cp.suppressAutoOpen = false;
-          context.globalState.update('redivivus.suppressAutoOpen', undefined);
-        } else {
-          const suppressPath = context.globalState.get<string>('redivivus.suppressAutoOpen');
-          if (!suppressPath) {
-            setTimeout(() => runAutoInit(context, redivivusService, () => statusBar.update()), 300);
-          } else {
-            context.globalState.update('redivivus.suppressAutoOpen', undefined);
-          }
-        }
-        // [LOG] Initialize logging for new workspace
-        const addedRoot = e.added[0]?.uri.fsPath;
-        if (addedRoot) {
-          const sessionId = initRedivivusLogger(addedRoot);
-          redivivusLog({ operation: 'system', message: 'Workspace opened', data: { root: addedRoot, sessionId } });
-          // [FIX] Re-point the project-context latch to the newly opened workspace so the panel/build
-          // follows it instead of staying stuck on the previous project.
-          resetProjectContext();
-          initProjectContextLogger(addedRoot);
-        }
-      }
-    })
-  );
+  registerWorkspaceFolderListener(context, redivivusService, statusBar);
 
   // ── resume state after folder close/reload (build task, vault build, new project) ──
   resumePendingState(context, [redivivusService, routingService, usageTracker, vaultService]);
@@ -240,49 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
     await handleAddToPhone();
   }));
 
-  // ── WebviewPanelSerializer — lets VS Code hand back orphaned 'redivivusChat' tabs on re-activation ──
-  // Without this, re-activation (triggered by updateWorkspaceFolders removing all folders) leaves the
-  // old tab visible but _instance=undefined → auto-open timer sees currentPanel=false → opens a 2nd tab.
-  // With this, VS Code calls deserializeWebviewPanel before auto-open fires, so _instance is restored
-  // and the auto-open timer sees currentPanel=true → skips creating a duplicate.
-  context.subscriptions.push(
-    vscode.window.registerWebviewPanelSerializer('redivivusChat', {
-      async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel) {
-        (ChatPanel as any)._isDeserializing = true;
-        if ((ChatPanel as any)._instance) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
-        // [FIX] Set _instance to a truthy sentinel BEFORE the async import so the auto-open timer's
-        // ChatPanel.currentPanel check returns truthy immediately and never races to open a second tab.
-        // The sentinel is replaced with the real panel instance below. This closes the race window
-        // entirely — no amount of import() delay can sneak the timer through.
-        const SENTINEL = { __sentinel: true };
-        (ChatPanel as any)._instance = SENTINEL;
-        webviewPanel.webview.options = { enableScripts: true };
-        const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
-        // If something else set _instance to a real panel while we were importing, discard this webview
-        if ((ChatPanel as any)._instance !== SENTINEL) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
-        const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
-        (ChatPanel as any)._instance = panel;
-        // If user closed the project, clear conversation and force launcher view
-        // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag,
-        // which is unreliable here — without it the restored panel keeps the stale project dashboard.
-        const closedByUser = wasProjectClosedRecently() || context.globalState.get<boolean>('redivivus.userClosedProject');
-        if (closedByUser) {
-          context.globalState.update('redivivus.userClosedProject', undefined);
-          if (panel?.state) { panel.state.conversation = []; }
-          // [FIX] Clearing conversation in-memory wasn't enough — saveConversation() had already written
-          // it to globalState, so a second reload would restore it. Sweep all chatHistory keys here so
-          // the cleared state is permanent across restarts.
-          try {
-            const keys: readonly string[] = (context.globalState as any).keys?.() ?? [];
-            for (const k of keys) { if (k.startsWith('redivivus.chatHistory.')) { context.globalState.update(k, undefined); } }
-          } catch { /* keys() may be unavailable on older VS Code API — non-fatal */ }
-          (panel as any)._initialized = false;
-          panel?.refresh?.();
-        }
-        (ChatPanel as any)._isDeserializing = false;
-      }
-    })
-  );
+  registerPanelSerializer(context, redivivusService, routingService, usageTracker, vaultService);
 
   // ── sidebar view with Redivivus functions ──
   const sidebarProvider = new (RedivivusSidebarProvider as any)(redivivusService, sessionService);
@@ -301,48 +164,8 @@ export function activate(context: vscode.ExtensionContext) {
   // ── Explorer emphasis — dim the other project folders, badge the active one.
   registerProjectFolderDecorations(context);
 
-  // ── auto-open chat panel on startup (first activation only) ──
-  // Open panel at startup if none is running. suppressAutoOpen only prevents DUPLICATES (currentPanel exists).
-  // After a window reload (workspace conversion), currentPanel is null — must open a fresh panel.
-  // [WARN] Do NOT skip open when currentPanel=false even if suppressed — that's the post-reload scenario.
-  setTimeout(() => {
-    const currentRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const suppressPath = context.globalState.get<string>('redivivus.suppressAutoOpen');
-    // [FIX] suppress only blocks DUPLICATE panels (currentPanel exists). After a window reload
-    // (single→multi-root workspace conversion), currentPanel is null — always open then,
-    // otherwise the orphaned pre-reload webview stays visible with stale generic-button header.
-    const suppressed = !!(suppressPath && currentRoot && suppressPath === currentRoot);
-    if (suppressed) { context.globalState.update('redivivus.suppressAutoOpen', undefined); }
-    // [M3] Removed an unconditional fs.appendFileSync(~/redivivus_debug.log) that ran every activation.
-
-    // [FIX] Extract to a check loop so we wait if deserialization is actively blocking.
-    // If the window is still deserializing, we don't want to race it and create a duplicate panel.
-    const checkAndShow = () => {
-      if ((ChatPanel as any)._isDeserializing) {
-        setTimeout(checkAndShow, 200);
-        return;
-      }
-      if (!ChatPanel.currentPanel) {
-        ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
-      }
-    };
-
-    // [FIX] Prefer the synchronous marker (survives the reload) over the async globalState flag. The
-    // async flag lost the race against the reload, so this branch failed to skip and auto-open created
-    // a DUPLICATE panel while the serializer restored the orphaned one. Do NOT delete the marker here —
-    // it self-expires by recency; deleting would re-open the deserialize/auto-open race.
-    const _closedByUser = wasProjectClosedRecently() || context.globalState.get<boolean>('redivivus.userClosedProject');
-    if (_closedByUser) {
-      context.globalState.update('redivivus.userClosedProject', undefined);
-      // Fallback: the serializer (deserializeWebviewPanel) normally restores the one orphaned tab as
-      // the launcher. If it didn't fire, open one so a close never leaves ZERO panels. The idempotent
-      // guard in deserialize prevents this from racing into a duplicate.
-      setTimeout(checkAndShow, 1200);
-    }
-    else {
-      checkAndShow();
-    }
-  }, 500);
+  // ── auto-open chat panel on startup ──
+  scheduleAutoOpenPanel(context, redivivusService, routingService, usageTracker, vaultService);
 
   // ── shared refresh helper ──
   function refreshAll() {
@@ -367,7 +190,6 @@ export function activate(context: vscode.ExtensionContext) {
   }));
 
   // ── register all commands ──
-  const githubBackupService = new GitHubBackupService(context);
   registerAllCommands(context, redivivusService, routingService, usageTracker, vaultService, measureTwice, changeTracker, analyzerService, rulesService, retrofitService, sessionService, guideService, blueprintService, statusBar, sidebarProvider, refreshAll, githubBackupService, guardianService, { value: _suppressNextFolderAdd });
 }
 

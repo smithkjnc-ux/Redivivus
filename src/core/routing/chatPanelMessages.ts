@@ -16,6 +16,7 @@ import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPrevi
 import { handleBlueprintCardConfirm, handleBlueprintCardSkip } from './chatPanelMsgBlueprintCard';
 import { handleMapContext } from '../../ui/panels/chat/chatPanelMsgMapContext';
 import { handleExpandedInterviewSubmit } from '../../ui/panels/chat/chatPanelMsgExpandedInterview';
+import { handleToolGapCopy, handleToolGapTerminal, handleCheckReadiness, handleGithubCommit, handlePlanApproval, handleFileSizeGateChoice, handleScopeSubmit, handleScopeCancel, handleTemplateWizard } from './chatPanelMsgTools';
 
 import type { MessageHandlerDeps } from './chatPanelMessageDeps.js';
 export type { MessageHandlerDeps };
@@ -68,25 +69,17 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     await handleCreateFile(msg);
 
   } else if (msg.type === 'clear-chat') {
-    conversation.length = 0;
-    try { const { clearPersistedConversation } = await import('../../ui/panels/chat/chatPanelPublicAPI.js'); clearPersistedConversation(); } catch {}
-    refresh();
+    conversation.length = 0; try { const { clearPersistedConversation } = await import('../../ui/panels/chat/chatPanelPublicAPI.js'); clearPersistedConversation(); } catch {} refresh();
 
   } else if (msg.type === 'run-command') {
     await handleRunCommand(msg, deps, panel);
 
   } else if (msg.type === 'start-session') {
     if (deps.onStartSession) { await deps.onStartSession(msg.goal || '', msg.ai || 'Unknown'); }
-
   } else if (msg.type === 'switch-ai') {
     if (deps.onSwitchAI) { await deps.onSwitchAI(msg.ai || 'gemini'); }
-
   } else if (msg.type === 'new-project') {
-    if (deps.onNewProject) {
-      const answers = msg.answers || {};
-      if (msg.originalTask) { answers._originalTask = msg.originalTask; }
-      await deps.onNewProject(msg.name || '', answers, msg.folderPath || undefined);
-    }
+    if (deps.onNewProject) { const answers = msg.answers || {}; if (msg.originalTask) { answers._originalTask = msg.originalTask; } await deps.onNewProject(msg.name || '', answers, msg.folderPath || undefined); }
 
   } else if (msg.type === 'open-project') {
     await handleOpenProject(msg);
@@ -129,22 +122,16 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     if (msg.placementId) { resolvePlacement(msg.placementId, 'cancel'); }
 
   } else if (msg.type === 'filesize-gate-choice') {
-    const { handleFileSizeGateResponse } = await import('./fileSizeGate.js');
-    handleFileSizeGateResponse({ gateId: msg.gateId, choice: msg.choice });
+    await handleFileSizeGateChoice(msg);
 
   } else if (msg.type === 'scope-submit') {
-    const { resolveScopeQuestion } = await import('../../services/project/templateScopeService.js');
-    resolveScopeQuestion(msg.answer || '');
+    await handleScopeSubmit(msg);
 
   } else if (msg.type === 'scope-cancel') {
-    const { clearPendingScopeQuestion } = await import('../../services/project/templateScopeService.js');
-    clearPendingScopeQuestion();
+    await handleScopeCancel();
 
   } else if (msg.type === 'template-wizard-submit' || msg.type === 'template-wizard-cancel') {
-    try {
-      const { resolveTemplateWizard } = await import('../../services/project/templateWizard.js');
-      resolveTemplateWizard(msg);
-    } catch { /* wizard may have already timed out */ }
+    await handleTemplateWizard(msg);
 
   } else if (msg.type === 'architect-explain') {
     await handleArchitectExplain(msg, routing, conversation, refresh);
@@ -190,52 +177,22 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     await handleExpandedInterviewSubmit(msg, deps, conversation, refresh);
 
   } else if (msg.type === 'github-commit') {
-    let files: string[] = [], commitMsg = '';
-    try { const d = JSON.parse(Buffer.from(msg.payload || '', 'base64').toString('utf-8')); files = d.files || []; commitMsg = d.message || ''; } catch {}
-    (require('vscode') as typeof import('vscode')).commands.executeCommand('redivivus.githubCommitFiles', files, commitMsg, panel.webview);
+    await handleGithubCommit(msg, deps);
 
   // [FIX] Plan Approval Gate — bridges webview plan buttons to the build pipeline Promise
   } else if (msg.type === 'plan-approve' || msg.type === 'plan-revise' || msg.type === 'plan-cancel') {
-    const { resolvePlanApproval, setPlanEditedText } = await import('../build/chatPanelBuildPlanGate.js');
-    const outcome = msg.type === 'plan-approve' ? 'approve' : msg.type === 'plan-revise' ? 'revise' : 'cancel';
-    if (msg.planId) {
-      // [PLAN-EDIT] Stash the user's inline edits (fix mode) before resolving, so the fix gate picks them up.
-      if (msg.editedPlan) { setPlanEditedText(msg.planId, msg.editedPlan); }
-      resolvePlanApproval(msg.planId, outcome as 'approve' | 'revise' | 'cancel');
-    }
+    await handlePlanApproval(msg);
 
   // [TOOL-GAP] User chose to copy an install command — drop it on the clipboard, confirm with a toast.
   } else if (msg.type === 'toolgap-copy') {
-    try {
-      const cmd = Buffer.from(msg.cmd || '', 'base64').toString('utf-8');
-      const vs = require('vscode') as typeof import('vscode');
-      await vs.env.clipboard.writeText(cmd);
-      vs.window.showInformationMessage(`Copied: ${cmd}`);
-    } catch { /* best-effort */ }
+    await handleToolGapCopy(msg);
 
   // [TOOL-GAP] User chose the terminal hand-off — open a terminal with the command PRE-FILLED but NOT run.
-  // sendText(cmd, false) types it without the trailing newline, so the user reads it and presses Enter
-  // themselves (and provides their sudo password). We never execute an install on their behalf.
   } else if (msg.type === 'toolgap-terminal') {
-    try {
-      const cmd = Buffer.from(msg.cmd || '', 'base64').toString('utf-8');
-      const vs = require('vscode') as typeof import('vscode');
-      const term = vs.window.createTerminal('Redivivus: Install');
-      term.show();
-      term.sendText(cmd, false);
-    } catch { /* best-effort */ }
+    await handleToolGapTerminal(msg);
 
   // [READINESS] Run the production-readiness preflight on the active project and post the plain-English checklist.
   } else if (msg.type === 'check-readiness') {
-    try {
-      const { getActiveProjectRoot } = await import('../../services/project/activeProjectRoot.js');
-      const root = (msg.root ? Buffer.from(msg.root, 'base64').toString('utf-8') : '') || getActiveProjectRoot();
-      if (root) {
-        const { runReadinessReport, formatReadinessReport } = await import('../../services/build/productionReadiness.js');
-        const report = runReadinessReport(root);
-        conversation.push({ role: 'assistant', content: formatReadinessReport(report, require('path').basename(root)), timestamp: Date.now() });
-        refresh();
-      }
-    } catch { /* best-effort */ }
+    await handleCheckReadiness(msg, deps);
   }
 }

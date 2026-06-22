@@ -6,10 +6,9 @@
 
 import * as path from 'path';
 import { getApiBase } from '../api/apiClient.js';
-import { processBuildResults } from './cloudBuildResultProcessor.js';
-import { calcCost } from '../../services/usageTracker.js';
 import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
-import type { CloudBuildResult } from './cloudBuildClient.js';
+import type { CloudBuildResult } from './cloudBuildTypes.js';
+import { buildSingleFileViaBuildEndpoint, finalizeMultiFileBuild } from './cloudBuildMultiFileHelpers.js';
 
 export async function executeMultiFileBuild(
   task: string,
@@ -77,68 +76,8 @@ export async function executeMultiFileBuild(
         supervisorProvider,
       });
 
-      const buildOnce = async () => {
-        const res = await fetch(`${base}/build`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...keyHeaders },
-          body,
-        });
-        if (res.status === 401) {
-          const { clearAccountToken } = await import('../api/apiClient.js');
-          await clearAccountToken();
-          throw Object.assign(new Error('NOT_AUTHENTICATED'), { _authError: true });
-        }
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({ error: res.statusText })) as any;
-          throw Object.assign(new Error(`Failed on ${file.path}: ${err.error || res.statusText}`), { _failureSource: 'cloud' });
-        }
-        
-        if (!res.body) {
-          throw Object.assign(new Error(`Failed on ${file.path}: No response body`), { _failureSource: 'cloud' });
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder('utf-8');
-        let lineBuf = '';
-        let payloadResult: any = null;
-
-        const routeFrame = (t: string): boolean => {
-          if (t.startsWith('@@RDV_STEP@@')) { try { onStep?.(JSON.parse(t.slice(12))); } catch {} return true; }
-          if (t.startsWith('@@RDV_CODE@@')) { try { onCode?.(JSON.parse(t.slice(12)).text || ''); } catch {} return true; }
-          if (t.startsWith('@@RDV_RESULT@@')) { try { payloadResult = JSON.parse(t.slice(14)); } catch {} return true; }
-          return false;
-        };
-
-        const drain = (incoming: string, isFinal: boolean) => {
-          lineBuf += incoming;
-          let nl: number;
-          while ((nl = lineBuf.indexOf('\n')) >= 0) {
-            const line = lineBuf.slice(0, nl);
-            lineBuf = lineBuf.slice(nl + 1);
-            routeFrame(line.trimStart());
-          }
-          if (isFinal && lineBuf) {
-            routeFrame(lineBuf.trimStart());
-            lineBuf = '';
-          }
-        };
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          drain(decoder.decode(value, { stream: true }), false);
-        }
-        drain('', true);
-
-        if (!payloadResult) {
-           throw Object.assign(new Error(`Failed on ${file.path}: Build stream ended without a result payload`), { _failureSource: 'cloud' });
-        }
-        if (payloadResult.error) {
-           throw Object.assign(new Error(`Failed on ${file.path}: ${payloadResult.error}`), { _failureSource: 'cloud' });
-        }
-
-        return payloadResult as { files: typeof allFiles; model: string; workerProvider?: string; supervisorProvider?: string; inputTokens: number; outputTokens: number; requiresClientExecution?: boolean; guardianEscInputTokens?: number; guardianEscOutputTokens?: number };
-      };
+      // [DONE] buildOnce moved to cloudBuildMultiFileHelpers.ts as buildSingleFileViaBuildEndpoint (Rule 9 split)
+      const buildOnce = () => buildSingleFileViaBuildEndpoint(base, token, keyHeaders, body, file.path, onStep, onCode);
 
       // [FIX] Raised from 240s → 600s. Guardian retries and Supervisor splits on oversized files (like index.html
       // generated as a flat 700-line monolith) can take up to 4 sequential AI calls, which easily exceeds 4 minutes.
@@ -220,52 +159,6 @@ export async function executeMultiFileBuild(
     return { success: false, error: 'Cloud build returned no files — nothing was written. Try a simpler request or build files individually.', failureSource: 'cloud' };
   }
 
-  // [GUARDIAN] Emit a step that SHOWS the Guardian's work — what it checks for and the per-file result —
-  // as expandable detail, the same way the Supervisor shows its plan and the Worker shows its code. The
-  // Guardian runs on the backend (route.ts) AFTER each file is written and auto-retries on failure, so any
-  // file it had to fix or split is flagged with ⚠ in the list below — letting the user spot a problem file
-  // instantly instead of guessing why a build looks off.
-  const _flagged = guardianLog.filter(l => l.startsWith('⚠')).length;
-  const guardianDetail = [
-    'The Guardian validates every file the Worker produced before the build completes.',
-    '',
-    'WHAT IT CHECKS FOR:',
-    '• File size — flags oversized files and splits them into focused modules (FILE_TOO_LARGE)',
-    '• ES module structure — imports/exports are valid and resolve to real sibling files (IMPORT_MISMATCH)',
-    '• Element IDs — IDs referenced in JS exist in the HTML and are unique (ELEMENT_ID_MISMATCH)',
-    '• Broken references — no calls to undefined functions or missing files',
-    '',
-    `FILES VALIDATED (${allFiles.length}):`,
-    ...guardianLog.map(l => `  ${l}`),
-  ].join('\n');
-  const guardianLabel = _flagged > 0
-    ? `Guardian: validated ${allFiles.length} files — ${_flagged} needed correction`
-    : `Guardian: validated ${allFiles.length} files — all passed`;
-  onStep?.({ label: guardianLabel, model: 'guardian', status: 'success', detail: guardianDetail, index: planFiles.length, total: planFiles.length });
-
-  const narration = `Built ${allFiles.length} files for: ${task.slice(0, 60)}${task.length > 60 ? '...' : ''}`;
-
-  const wCost = calcCost(lastWorkerProvider || lastModel, workerInputTokens, workerOutputTokens);
-  const sCost = supervisorModel ? calcCost(supervisorModel, supervisorInputTokens, supervisorOutputTokens) : 0;
-  const totalCostUSD = wCost + sCost;
-
-  return processBuildResults(
-    {
-      files: allFiles,
-      narration,
-      model: lastModel,
-      inputTokens: workerInputTokens,     // worker-only — Supervisor reported via supervisor* fields
-      outputTokens: workerOutputTokens,
-      costUSD: totalCostUSD,
-      // Supervisor attribution — shows [S] Supervisor + [W] Worker in the result card
-      supervisorRan: !!supervisorModel,
-      supervisorModel: supervisorModel ?? undefined,
-      supervisorProvider: supervisorProvider ?? undefined,
-      supervisorInputTokens,
-      supervisorOutputTokens,
-      workerProvider: lastWorkerProvider,
-    },
-    task, root, deps,
-    { source: 'cloud' },
-  );
+  // [DONE] Guardian step emission + result assembly moved to cloudBuildMultiFileHelpers.ts (Rule 9 split)
+  return finalizeMultiFileBuild(allFiles, guardianLog, planFiles.length, task, root, deps, supervisorModel, supervisorProvider, supervisorInputTokens, supervisorOutputTokens, workerInputTokens, workerOutputTokens, lastModel, lastWorkerProvider, onStep);
 }

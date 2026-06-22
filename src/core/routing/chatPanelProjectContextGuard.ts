@@ -6,15 +6,13 @@
 //   Project NOT open:  new BUILD = OK.  fix/edit/add = blocked (nothing to fix).
 //   Compound escape:   "open X and build Y", "close project then do Z" — detected and passed through.
 //
-// [WARN] This guard runs BEFORE cloudChat so misroutes never reach the AI pre-pass.
-// [Rule 18] AI classifier replaced regex-based intent detection. Regex helpers are catch-block fallback only.
+// [WARN] This guard runs BEFORE cloudChat — must be zero-cost (no AI calls).
+// [WARN] Only hard-blocks on HIGH-confidence signals. Ambiguous messages pass through unchanged.
 
 import * as vscode from 'vscode';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
-import type { RoutingService } from '../../services/ai/routingService';
 
 // ── Compound-command detection (user explicitly mentions switching context) ──────────────────────
-// These are allowed through regardless of current project state.
 const COMPOUND_PATTERNS = [
   /\b(open|load|switch to|go to)\b.{1,60}\b(project|folder|workspace)\b.{0,40}\b(and|then|after|,)\b/i,
   /\b(close|exit|leave)\b.{1,40}\b(project|folder|workspace)\b.{0,40}\b(and|then|open|load|switch)\b/i,
@@ -26,12 +24,14 @@ export function isCompoundContextCommand(text: string): boolean {
   return COMPOUND_PATTERNS.some(p => p.test(text));
 }
 
-// ── Regex fallbacks — used only when AI classifier is unavailable ─────────────────────────────────
-const BUILD_VERBS_RE   = /\b(build|make|create|generate|write|code( up)?|implement|scaffold|start( a| an| the)?)\b/i;
-const FIX_VERBS_RE     = /\b(fix|debug|repair|update|change|improve|edit|modify|refactor|add to|remove from|cannot|broken|not working|fails|error|crash|blank)\b/i;
-const QUESTION_RE      = /^(how|what|why|when|where|who|can you|could you|would you|should|is there|are there|does|do you|will|explain|tell me|show me)\b/i;
-const NEW_OBJECT_RE    = /\b(a|an|me a|me an|new|another)\b/i;
-const DEFINITE_REF_RE  = /\b(the|this|that|these|those|it|its|them|their|they)\b/i;
+// ── Confident intent detection — conservative regex, zero API cost ────────────────────────────────
+const BUILD_VERBS_RE  = /\b(build|make|create|generate|write|code( up)?|implement|scaffold|start( a| an| the)?)\b/i;
+const FIX_VERBS_RE    = /\b(fix|debug|repair|update|change|improve|edit|modify|refactor|add to|remove from|cannot|broken|not working|fails|error|crash|blank)\b/i;
+const QUESTION_RE     = /^(how|what|why|when|where|who|can you|could you|would you|should|is there|are there|does|do you|will|explain|tell me|show me)\b/i;
+const NEW_OBJECT_RE   = /\b(a|an|me a|me an|new|another)\b/i;
+// [FIX] Definite reference ("the vehicles", "it", "the game") = modify existing, NOT a new build.
+// Prevents "make the vehicles look more real" from being blocked as a new-build inside a project.
+const DEFINITE_REF_RE = /\b(the|this|that|these|those|it|its|them|their|they)\b/i;
 
 export function isConfidentNewBuild(text: string): boolean {
   const t = text.trim();
@@ -66,74 +66,44 @@ function getProjectContext(effectiveRoot?: string): { hasProject: boolean; proje
   return { hasProject, projectName, isContainer };
 }
 
-// ── Main guard function ───────────────────────────────────────────────────────────────────────────
-// Returns null = no guard fired, proceed normally.
-// Returns a string = block message to show the user.
-// [Rule 18] AI classifier determines intent. Regex helpers are catch-block fallback only.
-export async function checkProjectContextGuard(
+// ── Main guard — synchronous, zero AI cost ────────────────────────────────────────────────────────
+// Returns null = no guard fired. Returns a string = block message to show the user.
+// Ambiguous messages always return null and fall through to cloudChat for proper classification.
+export function checkProjectContextGuard(
   userText: string,
   conversation: ChatMessage[],
   refresh: () => void,
-  routing: RoutingService,
   effectiveRoot?: string
-): Promise<string | null> {
+): string | null {
   if (isCompoundContextCommand(userText)) { return null; }
 
   const { hasProject, projectName, isContainer } = getProjectContext(effectiveRoot);
 
-  // AI classifier — ~60 token call, Groq-first. Falls back to regex on failure.
-  let intent: 'new_build' | 'fix_existing' | 'question' | 'other' = 'other';
-  try {
-    const prompt = `Classify this message into exactly one category. Reply with ONLY the category name.
-- NEW_BUILD: creating a brand-new project, app, game, or website from scratch
-- FIX_EXISTING: modifying, fixing, updating, or adding to something that already exists
-- QUESTION: asking a question (how, what, why, explain, tell me, etc.)
-- OTHER: does not clearly fit the above
-
-Message: "${userText.slice(0, 300)}"
-Reply with ONE of: NEW_BUILD, FIX_EXISTING, QUESTION, OTHER`;
-    const result = await routing.prompt(prompt, 12_000);
-    if (result.success && result.text) {
-      const t = result.text.trim().toUpperCase();
-      if (t.includes('NEW_BUILD')) { intent = 'new_build'; }
-      else if (t.includes('FIX_EXISTING')) { intent = 'fix_existing'; }
-      else if (t.includes('QUESTION')) { intent = 'question'; }
-    }
-  } catch {
-    if (QUESTION_RE.test(userText.trim())) { intent = 'question'; }
-    else if (isConfidentNewBuild(userText)) { intent = 'new_build'; }
-    else if (isConfidentFixRequest(userText)) { intent = 'fix_existing'; }
-  }
-
-  if (intent === 'question' || intent === 'other') { return null; }
-
-  // ── Guard A: New build attempted while a project is open ─────────────────────────────────────
-  if (hasProject && intent === 'new_build') {
+  if (hasProject && isConfidentNewBuild(userText)) {
     const name = projectName ? `**${projectName}**` : 'your current project';
     return (
-      `\u{1F6AB} **You’re inside ${name}.**\n\n` +
-      `Builds create a new standalone project — that can’t be done inside an open project.\n\n` +
+      `\u{1F6AB} **You're inside ${name}.**\n\n` +
+      `Builds create a new standalone project — that can't be done inside an open project.\n\n` +
       `**What you can do:**\n` +
-      `- “Add a login screen to this project” → I’ll add it here\n` +
-      `- “Close this project, then build me a X” → I’ll open the projects folder and build\n` +
+      `- “Add a login screen to this project” → I'll add it here\n` +
+      `- “Close this project, then build me a X” → I'll open the projects folder and build\n` +
       `- “Open the projects folder” → then ask me to build from there`
     );
   }
 
-  // ── Guard B: Fix/edit attempted with no project open ────────────────────────────────────────
-  if (!hasProject && intent === 'fix_existing') {
+  if (!hasProject && isConfidentFixRequest(userText)) {
     const containerHint = isContainer
-      ? `You’re in the projects folder — open a specific project first.`
+      ? `You're in the projects folder — open a specific project first.`
       : `No project is open right now.`;
     return (
       `\u{1F6AB} **No project is open.**\n\n` +
       `${containerHint}\n\n` +
       `**What you can do:**\n` +
-      `- “Open [project name]” → I’ll switch to it, then you can ask me to fix\n` +
+      `- “Open [project name]” → I'll switch to it, then you can ask me to fix\n` +
       `- “Build me a X” → create a new project from scratch\n` +
       `- Ask me any question → always works without a project`
     );
   }
 
-  return null; // no guard fired — proceed normally
+  return null;
 }

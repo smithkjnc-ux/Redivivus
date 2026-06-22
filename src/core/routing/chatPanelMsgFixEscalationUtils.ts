@@ -7,6 +7,20 @@ import { fixLog } from '../../services/logging/fixPipelineLogger';
 import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds';
 import { fixActStep } from './fixActivityPanel.js';
 
+// [DONE] EscalationResult moved here from chatPanelMsgFixEscalation.ts (Rule 9 split)
+export interface EscalationResult {
+  finalResponse: string;
+  workerLabel: string;
+  guardianLabel: string;
+  guardianNote: string;
+  scopeNote: string;
+  needsAgentHandoff: boolean;
+  retryCount: number;
+  escalated: boolean;
+  forceSurgical?: boolean;
+  accumulatedCritiques?: string[];
+}
+
 /** Truncation/cut-off detector — when a critique looks like the output was cut off, the retry switches
  *  to surgical-edit format for reliability. */
 export function isTruncationText(s: string): boolean {

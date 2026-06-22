@@ -7,7 +7,7 @@ import * as path from 'path';
 import { RedivivusService } from '../services/redivivusService.js';
 import type { WizardPanelState } from './messageRouterTypes.js';
 import { syncBlueprintMd } from '../services/blueprint/blueprintWriter.js';
-import { getKeyCached, storeKey, getConfiguredProviders } from '../services/ai/secretKeyStore.js';
+import { handleKeyMessage } from './messageRouterKeys.js';
 
 export async function handleCoreMessage(
   msg: any,
@@ -124,79 +124,8 @@ export async function handleCoreMessage(
       refresh();
       return true;
     }
-    case 'getKeyPreviews': {
-      const providers = getConfiguredProviders();
-      const envMap: Record<string, string> = {
-        gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY',
-        groq: 'GROQ_API_KEY', xai: 'XAI_API_KEY', kimi: 'MOONSHOT_API_KEY',
-      };
-      const previews: Record<string, string> = {};
-      for (const provider of providers) {
-        const key = getKeyCached(provider);
-        if (key) {
-          // Mask: first 8 + ... + last 4
-          const masked = key.length > 12 ? key.slice(0, 8) + '...' + key.slice(-4) : '***';
-          previews[provider] = masked;
-        }
-      }
-      postToWebview?.({ type: 'keyPreviews', previews });
-      return true;
-    }
-    case 'exportKey': {
-      const key = getKeyCached(msg.provider);
-      if (key) {
-        await vscode.env.clipboard.writeText(key);
-        postToWebview?.({ type: 'keyExported', success: true });
-      } else {
-        postToWebview?.({ type: 'keyExported', success: false });
-      }
-      return true;
-    }
-    case 'exportAllKeys': {
-      const providers = getConfiguredProviders();
-      const envMap: Record<string, string> = {
-        gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY',
-        groq: 'GROQ_API_KEY', xai: 'XAI_API_KEY', kimi: 'MOONSHOT_API_KEY',
-      };
-      const lines: string[] = ['# Redivivus API Keys — ' + new Date().toISOString().split('T')[0]];
-      for (const provider of providers) {
-        const key = getKeyCached(provider);
-        if (key && envMap[provider]) {
-          lines.push(`${envMap[provider]}=${key}`);
-        }
-      }
-      const envContent = lines.join('\n');
-      await vscode.env.clipboard.writeText(envContent);
-      postToWebview?.({ type: 'allKeysExported', success: true });
-      return true;
-    }
-    case 'importKeys': {
-      const envMap: Record<string, string> = {
-        GEMINI_API_KEY: 'gemini', ANTHROPIC_API_KEY: 'claude', OPENAI_API_KEY: 'openai',
-        GROQ_API_KEY: 'groq', XAI_API_KEY: 'xai', MOONSHOT_API_KEY: 'kimi',
-      };
-      const imported: string[] = [];
-      const lines = (msg.text || '').split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) continue;
-        const match = trimmed.match(/^([A-Z_]+)=(.+)$/);
-        if (match) {
-          const [, envName, keyValue] = match;
-          const provider = envMap[envName];
-          if (provider && keyValue.trim()) {
-            await storeKey(provider, keyValue.trim());
-            imported.push(provider);
-          }
-        }
-      }
-      postToWebview?.({ type: 'keysImported', imported });
-      if (imported.length > 0) {
-        refresh();
-      }
-      return true;
-    }
+    // [DONE] getKeyPreviews, exportKey, exportAllKeys, importKeys moved to messageRouterKeys.ts (Rule 9 split)
     default:
-      return false;
+      return await handleKeyMessage(msg, postToWebview, refresh);
   }
 }

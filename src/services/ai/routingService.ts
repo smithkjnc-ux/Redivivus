@@ -11,7 +11,7 @@ import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
 import { supervisorPlanWithFailover } from './routingServiceSupervisor.js';
 import { redivivusLog } from '../logging/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
-import { logTelemetry } from '../api/apiClient.js';
+import { logTelemetry } from '../api/apiClientTelemetry.js';
 import { logAICall } from './aiCallLogger.js';
 import { promptCheapImpl } from './routingServiceCheap.js';
 import { recordQuotaError } from './providerTierState.js';

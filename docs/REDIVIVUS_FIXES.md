@@ -3,6 +3,239 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 22, 2026: Rule 9 Split — extensionCommands.ts (228 → 148 lines)
+
+**Files changed:**
+- `src/extensionCommands.ts` (228 → 148 lines)
+- `src/commands/vaultDedup.ts` (new, 44 lines) — `registerVaultDedupCommand`
+- `src/commands/closeProject.ts` (new, 35 lines) — `registerCloseProjectCommand`
+- `src/commands/compileProject.ts` (new, 32 lines) — `registerCompileProjectCommand`
+
+**What changed:** Three inline command registrations extracted to their own command files. Four dead imports removed.
+**Why:** Rule 9 — 228 lines. Inline handlers fit the existing `commands/` pattern cleanly.
+**Risk:** Low — compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — surgicalEditService.ts (355 → 192 lines)
+
+**Files changed:**
+- `src/services/build/surgicalEditService.ts` (355 → 192 lines)
+- `src/services/build/surgicalEditParser.ts` (new, 78 lines) — `SurgicalEdit`, `EditResult`, `parseSurgicalEdits`, `detectResponseFormat`
+- `src/services/build/surgicalEditMatcher.ts` (new, 46 lines) — `normalizeForMatch`, `calculateSimilarity`, `findFuzzyMatch`
+
+**What changed:** Parser logic and fuzzy matching helpers extracted to dedicated files. All re-exported from main file so callers unchanged.
+**Why:** Rule 9 — 355 lines. Two clean separation of concerns: parsing vs. application.
+**Risk:** Low — compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — chatPanelIntent.ts (202 → 188 lines)
+
+**Files changed:**
+- `src/core/ai/chatPanelIntent.ts` (202 → 188 lines)
+- `src/core/ai/chatPanelBuildDeps.ts` (new, 26 lines) — `BuildRequestDeps` interface
+
+**What changed:** `BuildRequestDeps` interface extracted to dedicated types file. Re-exported from chatPanelIntent.ts so all 7+ callers unchanged.
+**Why:** Rule 9 — 202 lines.
+**Risk:** Low — type-only move, compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — chatPanelMsgFixEscalation.ts (209 → 198 lines)
+
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixEscalation.ts` (209 → 198 lines)
+- `src/core/routing/chatPanelMsgFixEscalationUtils.ts` (174 → 188 lines) — `EscalationResult` added
+
+**What changed:** `EscalationResult` interface moved to utils file. Re-exported from escalation file.
+**Why:** Rule 9 — 209 lines. Interface is the cleanest extraction without breaking the tightly coupled loop.
+**Risk:** Low — type-only move, compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — chatPanelMsgArchitect.ts (209 → 123 lines)
+
+**Files changed:**
+- `src/ui/panels/chat/chatPanelMsgArchitect.ts` (209 → 123 lines)
+- `src/ui/panels/chat/chatPanelMsgArchitectFix.ts` (new, 94 lines) — `handleArchitectFixAll`, `handleArchitectFixOne`
+
+**What changed:** The two largest handlers (fix-all and fix-one step-through) extracted to dedicated file. Both import shared Maps from main file — no circular dep.
+**Why:** Rule 9 — 209 lines.
+**Risk:** Low — compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — chatPanelMsgFixUtils.ts (241 → 175 lines)
+
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixUtils.ts` (241 → 175 lines)
+- `src/core/routing/chatPanelMsgFixBuildCtx.ts` (new, 63 lines) — `readProjectRules`, `getRecentBuildContext`, `getRecentBuildsContext`
+- `src/core/routing/chatPanelMsgFixContext.ts` — import updated to use new file; added `resolveSourceFiles` alias and `collectAllFixContext` for pre-existing broken imports in chatPanelMsgFix.ts
+
+**What changed:** Build context gathering (readProjectRules, getRecentBuildContext, getRecentBuildsContext) moved to new file. Also fixed pre-existing broken imports in chatPanelMsgFix.ts (resolveSourceFiles/collectAllFixContext were imported but didn't exist).
+**Why:** Rule 9 — 241 lines.
+**Risk:** Low — re-exports preserve all existing callers; compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — usageTracker.ts (232 → 199 lines)
+
+**Files changed:**
+- `src/services/usageTracker.ts` (232 → 199 lines)
+- `src/services/usageCosts.ts` (new, 37 lines) — `normalizeAI`, `calcCost`
+
+**What changed:** Cost calculation and provider normalization extracted to usageCosts.ts. Imported and re-exported from usageTracker.ts.
+**Why:** Rule 9 — 232 lines. Cost table and normalizer are independently testable.
+**Risk:** Low — compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — migrationsGuard.ts (271 → 181 lines)
+
+**Files changed:**
+- `src/services/build/migrationsGuard.ts` (271 → 181 lines)
+- `src/services/build/migrationsGuardPrisma.ts` (new, 95 lines) — `prismaFieldsFromContent`, `droppedSchemaFields`, `schemaCodeMismatch`, `isApplyingPrismaMigrate`, `looksLikeMigrationApply`
+
+**What changed:** Prisma schema inspection + migration-command detection extracted to dedicated file. Re-exported from main file so all existing import paths unchanged.
+**Why:** Rule 9 — 271 lines. Prisma-specific code is an independent concern.
+**Risk:** Low — re-export pattern keeps existing callers working; compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — messageRouterCore.ts (203 → 131 lines)
+
+**Files changed:**
+- `src/ui/messageRouterCore.ts` (203 → 131 lines)
+- `src/ui/messageRouterKeys.ts` (new, 78 lines) — `handleKeyMessage`: getKeyPreviews, exportKey, exportAllKeys, importKeys
+
+**What changed:** Key export/import cases extracted from the switch to a dedicated file. Default arm delegates to `handleKeyMessage`.
+**Why:** Rule 9 — 203 lines.
+**Risk:** Low — same logic, compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — selfDiagnosticChecks.ts (203 → 111 lines)
+
+**Files changed:**
+- `src/core/diagnostics/selfDiagnosticChecks.ts` (203 → 111 lines)
+- `src/core/diagnostics/selfDiagnosticProviders.ts` (new, 69 lines) — `checkProviderReachable` + PROVIDER_PING + extractProviderError
+
+**What changed:** Provider reachability check (PROVIDER_PING table, extractProviderError helper, checkProviderReachable function) moved to dedicated file. Re-exported from main file.
+**Why:** Rule 9 — 203 lines. Provider ping is an independent concern.
+**Risk:** Low — `import type { DiagResult }` from checks avoids circular dep.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — apiClient.ts (271 → 167 lines)
+
+**Files changed:**
+- `src/services/api/apiClient.ts` (271 → 167 lines)
+- `src/services/api/apiClientTelemetry.ts` (new, ~90 lines) — `logTelemetry`, `logSessionStart`, `logGotcha`
+- `src/services/ai/routingService.ts` — import updated to apiClientTelemetry.ts
+- `src/services/ai/routingServiceCheap.ts` — import updated
+- `src/extension.ts` — import split (initApiClient from apiClient, logSessionStart from apiClientTelemetry)
+- `src/core/build/chatPanelBuildReview.ts` — dynamic import updated
+
+**What changed:** Moved telemetry functions and their private helpers (`getIdeVersion`, `userIdFromToken`) to a dedicated file. No re-export in apiClient.ts — callers import directly from apiClientTelemetry.ts to avoid circular ESM dependency.
+**Why:** Rule 9 — 271 lines, 14 recent changes. Telemetry is a clean independent concern.
+**Risk:** Low — 4 callers updated; TypeScript compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — cloudBuildMultiFile.ts (272 → 164 lines)
+
+**Files changed:**
+- `src/services/build/cloudBuildMultiFile.ts` (272 → 164 lines)
+- `src/services/build/cloudBuildMultiFileHelpers.ts` (new, ~120 lines) — `buildSingleFileViaBuildEndpoint` + `finalizeMultiFileBuild`
+
+**What changed:** Extracted the `buildOnce` inner fetch+drain function to `buildSingleFileViaBuildEndpoint`, and the post-loop Guardian summary step + `processBuildResults` call to `finalizeMultiFileBuild`. Both helpers live in a new sibling file.
+**Why:** Rule 9 — 272 lines, 14 recent changes. The two extracted sections were independently callable with no shared mutable state.
+**Risk:** Low — TypeScript compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — chatPanelBuildRunner.ts (293 → 185 lines)
+
+**Files changed:**
+- `src/core/build/chatPanelBuildRunner.ts` (293 → 185 lines)
+- `src/core/build/chatPanelBuildRunnerHelpers.ts` (new, 111 lines)
+
+**What changed:** Extracted 4 sections: (1) PARADOX GUARD to `checkParadoxGuard`; (2) Project Files tree setup to `setupProjectFilesTree`; (3) build task assembly (learned memory + community gotchas + supervisor contract guidance) to `assembleBuildTask`; (4) entire success result card assembly to `handleBuildSuccess`. Runner is now a thin orchestrator.
+**Why:** Rule 9 — 293 lines, 16 recent changes (most frequently edited build file). All 4 sections were independently callable.
+**Risk:** Low — TypeScript compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — cloudBuildClient.ts (363 → 184 lines)
+
+**Files changed:**
+- `src/services/build/cloudBuildClient.ts` (363 → 184 lines)
+- `src/services/build/cloudBuildTypes.ts` (new, 26 lines) — `CloudBuildResult` interface (broke circular dep with processor)
+- `src/services/build/cloudBuildPlan.ts` (new, 116 lines) — `makeTimeout`, `runBuildPlanStep`, `applySkeletonMeta`
+- `src/services/build/cloudBuildStream.ts` (new, 73 lines) — `drainBuildStream` SSE frame router
+
+**What changed:** Extracted 4 sections from the single `callCloudBuild` function: (1) `CloudBuildResult` interface to a shared types file (breaking the circular import with cloudBuildResultProcessor); (2) `/plan` streaming step to `runBuildPlanStep`; (3) skeleton-first meta setup to `applySkeletonMeta`; (4) SSE stream drain + frame routing to `drainBuildStream`. Client re-exports `CloudBuildResult` so existing consumers need no import changes.
+**Why:** Rule 9 — 363 lines, 11 recent changes. One large function with 4 independent phases.
+**Risk:** Low — re-export preserves consumer paths; TypeScript compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — cloudBuildResultProcessor.ts (342 → 185 lines)
+
+**Files changed:**
+- `src/services/build/cloudBuildResultProcessor.ts` (342 → 185 lines)
+- `src/services/build/cloudBuildFileNamer.ts` (48 → 108 lines) — absorbed `extractFilesFromRawText`
+- `src/services/build/buildContractDocs.ts` (new, 54 lines) — BUILD CONTRACT docs writer
+- `src/services/blueprint/livingBlueprintService.ts` (72 → 103 lines) — absorbed `fireLivingBlueprintSeed`
+
+**What changed:** Three large sections extracted as standalone helpers: raw AI text→file parsing, BUILD CONTRACT pillar 3 docs writing, and Living Blueprint fire-and-forget seeding.
+**Why:** Rule 9 — 342 lines, 12 recent changes (most frequently edited build file). All three sections were independently callable.
+**Risk:** Low — static imports; TypeScript compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — chatPanelMsgFixPhases.ts (280 → 158 lines)
+
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixPhases.ts` (280 → 158 lines)
+- `src/core/routing/chatPanelMsgFixPhase2Worker.ts` (new, ~105 lines)
+
+**What changed:** Moved `runPhase2Worker` (Phase 2 backend call + provider failover loop + cost estimation) to a dedicated file. Kept `runPhase1Supervisor` (Phase 1 backend call + subtask parsing + context expansion) in the phases file. Re-export from the phases file preserves all existing import paths with zero caller changes.
+**Why:** Rule 9 — 280 lines, 14 recent changes (most frequently edited fix-pipeline file). The two functions are independently callable and have no shared local state.
+**Risk:** Low — re-export pattern; TypeScript compile clean.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — agentTools.ts (361 → 57 lines)
+
+**Files changed:**
+- `src/services/ai/agentTools.ts` (361 → 57 lines — now types + combined array only)
+- `src/services/ai/agentToolsHelpers.ts` (new, ~55 lines — realFilesHint + schemaWriteGuards)
+- `src/services/ai/agentToolsFileIO.ts` (new, ~80 lines — read_file + write_file tools)
+- `src/services/ai/agentToolsCommands.ts` (new, ~155 lines — run_command, ask_user, list_dir, read_file_lines, edit_file tools)
+
+**What changed:** Extracted the tool execute functions into category files (`FileIO`, `Commands`). Shared helpers (`realFilesHint`, `schemaWriteGuards`) moved to `agentToolsHelpers.ts`. Main file is now a thin combiner: types + `[...FILE_IO_TOOLS, ...COMMAND_TOOLS, ...NETWORK_TOOLS]`. All existing exports (BUILT_IN_TOOLS, AgentContext, AgentTool, getToolInstructions) remain at the same import path.
+**Why:** Rule 9 — file was 361 lines, blocking all future edits. Natural split: tool categories are self-contained and already imported `NETWORK_TOOLS` from a sub-file.
+**Risk:** Low — TypeScript compile clean; circular type import handled via `import type`.
+
+---
+
+## Fix — Jun 22, 2026: Rule 9 Split — chatPanelMsgFix.ts (403 → 144 lines)
+
+**Files changed:**
+- `src/core/routing/chatPanelMsgFix.ts` (403 → 144 lines — now orchestrator only)
+- `src/core/routing/chatPanelMsgFixPhase23.ts` (new, 135 lines — Phase 2+3 Worker/Guardian loop)
+- `src/core/routing/chatPanelMsgFixContext.ts` (111 → 168 — added `resolveSourceFiles`, `collectAllFixContext`)
+- `src/core/routing/chatPanelMsgFixDeadEnds.ts` (84 → 106 — added `queryGlobalDeadEnds`)
+- `src/core/routing/chatPanelMsgFixUsage.ts` (22 → 34 — added `fixErrorHint`)
+
+**What changed:** Extracted 4 pieces from `handleFixRequest`: (1) `_fixErrorHint` → `fixErrorHint` export in usage.ts; (2) global dead-end vault query → `queryGlobalDeadEnds` in deadEnds.ts; (3) source-file resolution with subfolder fallback → `resolveSourceFiles` in context.ts; (4) full context assembly (vault + IDE signals + dead ends + conversation) → `collectAllFixContext` in context.ts; (5) entire Phase 2+3 Worker/Guardian loop → `runFixPhase23` in new phase23.ts. Also removed 9 unused imports that were dead code from earlier splits.
+**Why:** Rule 9 — file was 403 lines, blocking all future edits. handleFixRequest is now a thin 100-line orchestrator that reads clearly.
+**Risk:** Low — all logic preserved verbatim; TypeScript compile clean.
+
+---
+
 ## Fix — Jun 22, 2026: Project Category Classification — AI Classifier Replaces Keyword Regex
 
 **File changed:** `src/core/build/chatPanelBuildAutoCreate.ts`

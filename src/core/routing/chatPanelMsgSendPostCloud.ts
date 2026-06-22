@@ -18,6 +18,7 @@ import { calcCost } from '../../services/usageTracker';
 import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
 import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
 import { handleChangeRequest } from './handleChangeRequest.js';
+import { handleAnswerClarifyResult, handleCommandResult } from './chatPanelMsgSendPostCloudHandlers';
 
 // Routes the resolved chatResult from the AI classifier to the correct pipeline.
 // Called after cloudChat succeeds (non-null). Returns void — all side effects are via deps/conversation.
@@ -78,89 +79,15 @@ export async function routeCloudChatResult(
 
   // ── answer / clarify ──
   if (chatResult.action === 'answer' || chatResult.action === 'clarify') {
-    // [FIX][SILENT-DROP] Classifier returned a BUILD spec embedded in answer/clarify text — rescue it.
-    const isBuildSpec = /[`\s]*\{[\s\S]*"action"\s*:\s*"build"/i.test(chatResult.text?.trim() ?? '');
-    if (isBuildSpec) {
-      try {
-        const _m2 = chatResult.text.match(/\{[\s\S]*\}/);
-        if (_m2) { const _spec = JSON.parse(_m2[0]); if (_spec && typeof _spec.task === 'string' && _spec.task.trim()) { chatResult.task = _spec.task.trim(); } }
-      } catch { /* keep userText as the task */ }
-      // [FIX] BUILD spec inside an open project → fix, not build.
-      // The backend embedded a "build" action in answer text, but we're already inside a project.
-      // Route straight to fix so the Supervisor applies the change rather than launching a new build wizard.
-      // [FIX] ...UNLESS the root is a projects CONTAINER (e.g. ~/projects holding many apps). A new build
-      // spec there is a brand-new app, not a modification of the container — fall through to build so it
-      // gets a blueprint + its own sub-project, matching the clean-`action:"build"` path at line 61. Without
-      // this guard, a malformed (answer-wrapped) build response silently became a fix with no blueprint.
-      if (hasProjectOpen && !isProjectsContainer(effectiveRoot || '')) {
-        _dbg(`[BUILD-SPEC-IN-PROJECT] isBuildSpec + hasProject → routing to fix directly\n`);
-        await handleFixRequest(chatResult.task || userText, deps, msg.imageBase64, msg.imageType);
-        return;
-      }
-      chatResult.action = 'build';
-      // fall through to build routing below — do NOT return
-    } else {
-      const _isImperative = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
-      const _isBugReport = /\b(broken|bug|doesn't work|not working|error|crash|fail|fails|glitch|stuck|missing|wrong|nothing happens|does nothing|won't start)\b/i.test(userText);
-      const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
-      const _isRecoverableToFix = hasProjectOpen && (_isImperative || _isBugReport) && !_isQuestion;
-
-      // [FIX] answer OR clarify on an imperative inside an open project → always route to fix.
-      // The backend returns this response under 'clarify' sometimes and 'answer' other times —
-      // both are wrong for an imperative inside an open project. The Supervisor has full context.
-      // [RULE] _isQuestion guards against catching genuine Q&A (e.g. "how does X work?").
-      if (_isRecoverableToFix) {
-        _dbg(`[IMPERATIVE-RECOVERY] action=${chatResult.action} + open project + imperative → routing to fix\n`);
-        fixLog(`[IMPERATIVE-RECOVERY] ${chatResult.action} on imperative inside open project → routing to fix`);
-        await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
-        return;
-      }
-
-      // [FIX][SILENT-DROP] Empty text with no imperative/project context — release and return.
-      if (!chatResult.text) {
-        _dbg(`[SILENT-DROP] no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})\n`);
-        fixLog(`[SILENT-DROP] answer/clarify empty text, no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})`);
-        releaseInput();
-        return;
-      }
-      // Normal answer/clarify with non-empty text — genuine Q&A (question detected or no project open)
-      conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
-      refresh();
-      releaseInput();
-      await deps.usageTracker?.recordUsage(chatResult.inputTokens + chatResult.outputTokens, 0, chatResult.model, chatResult.inputTokens, chatResult.outputTokens, 'qa').catch(() => {});
-      return;
-    }
+    const _r = await handleAnswerClarifyResult(msg, userText, deps, conversation, refresh, chatResult, effectiveRoot, hasProjectOpen, _byline, releaseInput, _dbg);
+    if (_r === 'handled') { return; }
+    // 'fall-through-build' — chatResult.action already set to 'build' by the handler
   }
-
 
   // ── command ──
-  // [FIX] Guard against a misclassified 'command' response. A real VS Code command ID is a dotted
-  // namespaced token with NO spaces (e.g. "redivivus.reviewFile"). When the cloud returns prose like
-  // "Reading the Prisma schema file." as the task, it is NOT a command — it is the classifier
-  // continuing a stalled agent narrative. Blindly calling executeCommand() with prose silently fails,
-  // pushes the text to chat, and returns early — so the fix pipeline is NEVER entered. Guard by
-  // checking the pattern; on failure, fall through to the fix/build dispatch below.
-  const _isRealCommand = chatResult.task && /^[\w]+\.[\w.]+$/.test(chatResult.task.trim());
-  if (chatResult.action === 'command' && _isRealCommand) {
-    const _cmd = chatResult.task!;
-    try { await vscode.commands.executeCommand(_cmd); } catch { /* needs args or unknown */ }
-    conversation.push({ role: 'assistant', content: chatResult.text || `Done -- **${_cmd.replace(/^(redivivus|workbench\.action)\./, '').replace(/([A-Z])/g, ' $1').trim()}**`, timestamp: Date.now() });
-    refresh(); releaseInput(); return;
-  }
-  // [FIX] command action with prose task (misclassification) — recover to fix if project is open,
-  // otherwise treat as an answer so the user at least sees the text.
-  if (chatResult.action === 'command' && !_isRealCommand) {
-    _dbg(`[COMMAND-MISCLASS] task="${(chatResult.task ?? '').slice(0, 80)}" is not a command ID → recovering\n`);
-    if (hasProjectOpen) {
-      await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
-      return;
-    }
-    // No project open — show the text as a plain answer rather than silently doing nothing.
-    if (chatResult.text) {
-      conversation.push({ role: 'assistant', content: chatResult.text, timestamp: Date.now() });
-      refresh();
-    }
-    releaseInput(); return;
+  if (chatResult.action === 'command') {
+    await handleCommandResult(msg, userText, deps, conversation, refresh, chatResult, hasProjectOpen, releaseInput, _dbg);
+    return;
   }
 
   // ── personality-picker ──

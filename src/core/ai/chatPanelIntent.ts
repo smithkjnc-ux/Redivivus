@@ -29,22 +29,9 @@ import { extractBlueprintFromPrompt } from '../../services/blueprint/blueprintEx
 import { runPlacementGate, awaitCostConfirmation } from '../../ui/panels/chat/chatPanelGates';
 
 
-export interface BuildRequestDeps {
-  redivivus: RedivivusService;
-  routing: RoutingService;
-  vault?: VaultService;
-  conversation: ChatMessage[];
-  blueprintContext: string;
-  refresh: () => void;
-  logError: (task: string, prompt: string, error: string, promptTokens?: number) => void;
-  postToWebview: (msg: unknown) => void;
-  onClarifySubmit?: (answers: Record<string, string>) => void;
-  setActiveBuildCtx: (ctx: BuildContext | undefined) => void;
-  pendingTask: string | undefined;
-  setPendingTask: (t: string | undefined) => void;
-  usageTracker?: import('../../services/usageTracker').UsageTracker;
-  buildMode?: 'plan' | 'direct';
-}
+// [DONE] BuildRequestDeps moved to chatPanelBuildDeps.ts (Rule 9 split)
+export type { BuildRequestDeps } from './chatPanelBuildDeps.js';
+import type { BuildRequestDeps } from './chatPanelBuildDeps.js';
 
 /** 
  * AI-driven intent classifier - replaces regex pattern matching with natural language understanding.

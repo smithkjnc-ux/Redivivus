@@ -16,13 +16,11 @@ import type { GuideService } from './services/guideService.js';
 import type { BlueprintService } from './services/blueprint/blueprintService.js';
 import type { StatusBar } from './ui/views/statusBar.js';
 import type { GuardianService } from './services/ai/guardianService.js';
-import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel';
-import { MapPanel } from './ui/map/mapPanel.js';
-import { debugLog } from './services/workspace/diagnosticLogger.js';
-import { seedVault } from './services/vault/vaultSeeder.js';
 import type { GitHubBackupService } from './services/githubBackupService.js';
-import { ChatPanel } from './ui/panels/chat/chatPanel';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
+import { registerVaultDedupCommand } from './commands/vaultDedup.js';
+import { registerCloseProjectCommand } from './commands/closeProject.js';
+import { registerCompileProjectCommand } from './commands/compileProject.js';
 import type { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
 import { registerOnNewProject } from './commands/init.js';
 import { registerInitCommands } from './commands/initCommands.js';
@@ -60,7 +58,6 @@ import { registerSignInCommand } from './commands/signIn.js';
 import { registerReportIssueCommand } from './commands/reportIssue.js';
 import { registerCheckForUpdatesCommand } from './commands/checkForUpdates.js';
 import { initOutputChannels } from './ui/logging/outputChannelManager.js';
-import { markProjectClosed } from './services/project/closeMarker.js';
 
 export function registerAllCommands(
   context: vscode.ExtensionContext,
@@ -96,34 +93,8 @@ export function registerAllCommands(
   try {   registerVaultTranslateCommand(context, vaultService, routingService); } catch (e) { console.error('Failed to register ' + 'registerVaultTranslateCommand(context, vaultService, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerVaultTranslateCommand(context, vaultService, routingService); failed: ' + e + '\n'); }
   try { const { BuildFromVaultService } = require('./services/vault/buildFromVaultService.js'); registerBuildFromVaultCommand(context, new BuildFromVaultService(vaultService, routingService)); } catch (e) { console.error('Failed to register buildFromVault', e); }
   
-  // [Redivivus] Vault Deduplication command — scan + confirm merge via Quick Pick
-  context.subscriptions.push(
-    vscode.commands.registerCommand('redivivus.vaultDedup', async () => {
-      const clusters: any[] = [];
-      if (clusters.length === 0) {
-        vscode.window.showInformationMessage('Redivivus Vault: No near-duplicates found. Vault is clean.');
-        return;
-      }
-      const total = clusters.reduce((n: number, c: any) => n + c.duplicates.length, 0);
-      const choice = await vscode.window.showInformationMessage(
-        `Redivivus Vault: Found ${clusters.length} duplicate cluster${clusters.length !== 1 ? 's' : ''} (${total} redundant item${total !== 1 ? 's' : ''}). Merge now?`,
-        'Merge (remove duplicates)',
-        'Preview in Chat',
-        'Cancel'
-      );
-      if (choice === 'Merge (remove duplicates)') {
-        const result: any = { totalMerged: 0 };
-        vscode.window.showInformationMessage(`Redivivus Vault: Removed ${result.totalMerged} duplicate${result.totalMerged !== 1 ? 's' : ''}.`);
-      } else if (choice === 'Preview in Chat') {
-        if (!ChatPanel.currentPanel) {
-          ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
-        }
-        setTimeout(() => {
-          ChatPanel.currentPanel?.handleMessage({ type: 'vault-dedup-preview', clusters });
-        }, ChatPanel.currentPanel ? 0 : 600);
-      }
-    })
-  );
+  // [DONE] vaultDedup inline handler moved to commands/vaultDedup.ts (Rule 9 split)
+  try { registerVaultDedupCommand(context, redivivusService, routingService, usageTracker, vaultService); } catch (e) { console.error('Failed to register vaultDedup command', e); }
   try {   registerApiSetupCommand(context); } catch (e) { console.error('Failed to register ' + 'registerApiSetupCommand(context);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerApiSetupCommand(context); failed: ' + e + '\n'); }
   try {   registerUsageCommands(context, usageTracker, routingService); } catch (e) { console.error('Failed to register ' + 'registerUsageCommands(context, usageTracker, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerUsageCommands(context, usageTracker, routingService); failed: ' + e + '\n'); }
   try {   registerSetupProgressCommand(context, redivivusService); } catch (e) { console.error('Failed to register ' + 'registerSetupProgressCommand(context, redivivusService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerSetupProgressCommand(context, redivivusService); failed: ' + e + '\n'); }
@@ -138,36 +109,8 @@ export function registerAllCommands(
   try {   registerDuplicateCodeCommand(context, routingService); } catch (e) { console.error('Failed to register ' + 'registerDuplicateCodeCommand(context, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerDuplicateCodeCommand(context, routingService); failed: ' + e + '\n'); }
   try {   registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerMiscCommands(context, redivivusService, sessionService, guideService, rulesService, null as any, refreshAll); failed: ' + e + '\n'); }
 
-  // ── Close Project ──
-  // [FIX] Dispose the panel BEFORE removing workspace folders. Removing the last folder from a
-  // single-folder workspace causes a full window reload. If the panel still exists at reload time,
-  // VS Code visually restores the orphaned tab and the deserializer + auto-open timer race to
-  // create panels → duplicate tabs. By disposing first, the serializer has nothing to restore
-  // and the auto-open timer creates exactly ONE fresh launcher panel.
-  context.subscriptions.push(
-    vscode.commands.registerCommand('redivivus.closeProject', async () => {
-      markProjectClosed();
-      // [Model A] "Close Project" = deactivate the active subfolder and drop back to the HOME launcher.
-      // Do NOT remove ~/projects from the workspace — that left "NO FOLDER OPENED". The workspace IS home.
-      try {
-        const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        const { isProjectsContainer } = require('./services/project/redivivusPaths.js');
-        if (wsRoot && isProjectsContainer(wsRoot)) {
-          const PFP = require('./ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
-          PFP.instance?.setRoot(wsRoot); // active project = the container = none -> chat shows the launcher
-          try { require('./core/project/projectFolderDecorations.js').refreshProjectFolderDecorations(); } catch {}
-          try { import('./core/project/projectFocusMode.js').then(m => m.clearFocus()).catch(() => {}); } catch {} // un-hide the other projects
-          const cp = ChatPanel.currentPanel as any;
-          if (cp?.state) { cp.state.conversation = []; cp._initialized = false; cp.refresh?.(); }
-          return;
-        }
-      } catch { /* fall through to legacy close */ }
-      // Legacy fallback (workspace is a standalone folder, not the projects home): close the folder.
-      ChatPanel.close();
-      const folders = vscode.workspace.workspaceFolders;
-      if (folders && folders.length > 0) { await vscode.workspace.updateWorkspaceFolders(0, folders.length); }
-    })
-  );
+  // [DONE] closeProject inline handler moved to commands/closeProject.ts (Rule 9 split)
+  try { registerCloseProjectCommand(context); } catch (e) { console.error('Failed to register closeProject command', e); }
 
   // [FIX] registerInlineCommands was the only registration NOT wrapped in try/catch.
   // If it throws (e.g. terminalErrorService setup, inline command init), signIn and reportIssue
@@ -195,31 +138,8 @@ export function registerAllCommands(
     openBlueprintPanel(context, redivivusService, routingService);
   }));
 
-  // redivivus.compileProject — triggered by "Package as Executable" action card button
-  context.subscriptions.push(vscode.commands.registerCommand('redivivus.compileProject', async () => {
-    const { _lastCompileTarget, runCompilePipeline, getCompilePipeline } = require('./ui/chat/chatPanelBuildPipeline.js');
-    let target = _lastCompileTarget;
-    if (!target) {
-      // Fallback: scan workspace for a compilable file
-      const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (!root) { vscode.window.showWarningMessage('No project open — open a project folder first.'); return; }
-      const fs = require('fs'), path = require('path');
-      const exts = ['.py', '.rs', '.go', '.c', '.cpp'];
-      const srcDir = path.join(root, 'src');
-      const searchDirs = [srcDir, root].filter((d: string) => fs.existsSync(d));
-      let found: string | null = null;
-      for (const dir of searchDirs) {
-        const files: string[] = fs.readdirSync(dir).filter((f: string) => exts.some((e: string) => f.endsWith(e)));
-        if (files.length) { found = path.join(dir, files[0]); break; }
-      }
-      if (!found) { vscode.window.showWarningMessage('No compilable file found (.py, .rs, .go, .c, .cpp).'); return; }
-      const relPath = require('path').relative(root, found);
-      const pipeline = getCompilePipeline(relPath, root);
-      if (!pipeline) { vscode.window.showWarningMessage('No compile pipeline for this file type.'); return; }
-      target = { root, relPath, pipeline };
-    }
-    runCompilePipeline(target.pipeline, target.root);
-  }));
+  // [DONE] compileProject inline handler moved to commands/compileProject.ts (Rule 9 split)
+  try { registerCompileProjectCommand(context); } catch (e) { console.error('Failed to register compileProject command', e); }
 
   // Register deep link handler
   registerAuthHandler(context, statusBar);

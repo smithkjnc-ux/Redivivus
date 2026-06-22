@@ -25,7 +25,7 @@ export async function runGuardianReview(ctx: BuildContext, code: string, relPath
     if (result.finalIssues.length > 0) {
       const learned = new LearnedMemoryService(root);
       const ext = relPath.split('.').pop() || 'code';
-      const { logGotcha } = await import('../../services/api/apiClient.js');
+      const { logGotcha } = await import('../../services/api/apiClientTelemetry.js');
       result.finalIssues.forEach(issue => {
         learned.addNeverDo(issue, ext);
         logGotcha({ pattern: issue.slice(0, 200), issueText: issue, buildContext: ext, taskSummary: task.slice(0, 200) });

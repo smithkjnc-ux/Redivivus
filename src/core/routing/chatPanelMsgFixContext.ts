@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { getRecentBuildContext } from './chatPanelMsgFixUtils';
+import { getRecentBuildContext } from './chatPanelMsgFixBuildCtx.js';
 import { getLastTerminalError } from '../../services/workspace/terminalErrorService';
 import { getPreviewErrors } from '../../services/workspace/previewErrorService';
 import { listSourceFiles } from '../../services/workspace/codebaseSearch';
@@ -108,4 +108,22 @@ export function collectFixContext(root: string, sourceFiles: { rel: string; cont
   } catch {}
 
   return parts.join('\n\n');
+}
+
+// [FIX] resolveSourceFiles is the new name used in chatPanelMsgFix.ts after refactor;
+//       collectSourceFiles is the original. Keep both so the file compiles.
+export { collectSourceFiles as resolveSourceFiles };
+// [FIX] collectAllFixContext — gathers build context, dead ends, and project rules for the fix pipeline.
+export async function collectAllFixContext(
+  root: string,
+  sourceFiles: { rel: string }[],
+  _userText: string,
+  _deps: any
+): Promise<{ buildContext: string; projectDeadEnds: string; projectRules: string }> {
+  const { readProjectDeadEnds } = await import('./chatPanelMsgFixDeadEnds.js');
+  const { readProjectRules, getRecentBuildContext } = await import('./chatPanelMsgFixBuildCtx.js');
+  const buildContext = getRecentBuildContext(root, sourceFiles);
+  const projectDeadEnds = readProjectDeadEnds(root) || '';
+  const projectRules = readProjectRules(root);
+  return { buildContext, projectDeadEnds, projectRules };
 }

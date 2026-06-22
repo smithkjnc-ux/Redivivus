@@ -2,14 +2,13 @@
 // Static HTML projects: built-in Node HTTP server (no npm deps required).
 // npm-based projects (Next, Vite, CRA, Express): terminal dev server.
 // Non-web projects (Python, CLI, shell): returns null + a redirect message to Run button.
+// Server helpers (_buildStaticServer, _injectInspector, _isPortOpen) extracted to chatPanelPreviewServer.ts (Rule 9 split).
 
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as http from 'http';
-import * as net from 'net';
-import { getInspectorScript } from './chatPanelPreviewInspector';
-import { getCaptureScript } from './chatPanelPreviewCapture';
+import { buildStaticServer, isPortOpen } from './chatPanelPreviewServer';
 
 // [PREVIEW-AUTOFIX Phase 0] Runtime reports beaconed by the injected capture script (POST /__rdv_runtime).
 // Buffered here so the extension can read "did this preview actually run?" — uncaught errors, failed script
@@ -30,16 +29,6 @@ export interface DevServerInfo {
 
 export type ProjectKind = 'web' | 'python' | 'node-cli' | 'api' | 'shell' | 'unknown';
 
-const MIME: Record<string, string> = {
-  '.html': 'text/html; charset=utf-8', '.css': 'text/css',
-  '.js': 'application/javascript', '.mjs': 'application/javascript',
-  '.ts': 'application/javascript', '.json': 'application/json',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
-  '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
-  '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf',
-  '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg',
-  '.webm': 'video/webm', '.mp4': 'video/mp4',
-};
 
 let _staticServer: http.Server | null = null;
 let _staticRoot: string | null = null; // which webRoot our static server is serving (to detect stale roots)
@@ -138,13 +127,13 @@ export async function startPreviewServer(root: string, info: DevServerInfo): Pro
     }
     stopPreviewServer(); // closes our stale-root server (frees the port for the new root)
     clearRuntimeReports(); // [PREVIEW-AUTOFIX] fresh runtime signals for this project's preview
-    _staticServer = _buildStaticServer(webRoot, info.port);
+    _staticServer = buildStaticServer(webRoot, info.port, _runtimeReports);
     _staticRoot = webRoot;
     _staticServer.listen(info.port, 'localhost');
     return { port: info.port, stop: stopPreviewServer, alreadyRunning: false };
   }
   // Non-static dev server (npm/vite/next) — reuse if already up on its port; these own their port.
-  if (await _isPortOpen(info.port)) {
+  if (await isPortOpen(info.port)) {
     return { port: info.port, stop: () => {}, alreadyRunning: true };
   }
   stopPreviewServer();
@@ -163,78 +152,8 @@ export function stopPreviewServer(): void {
 export async function waitForPort(port: number, timeoutMs = 30_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (await _isPortOpen(port)) { return true; }
+    if (await isPortOpen(port)) { return true; }
     await new Promise(r => setTimeout(r, 600));
   }
   return false;
-}
-
-function _isPortOpen(port: number): Promise<boolean> {
-  return new Promise(resolve => {
-    const socket = new net.Socket();
-    socket.setTimeout(500);
-    socket.once('connect', () => { socket.destroy(); resolve(true); });
-    socket.once('error',   () => { socket.destroy(); resolve(false); });
-    socket.once('timeout', () => { socket.destroy(); resolve(false); });
-    socket.connect(port, 'localhost');
-  });
-}
-
-function _injectInspector(html: string): string {
-  const script = getInspectorScript();
-  // [PREVIEW-AUTOFIX] Capture script goes EARLY (right after <head>/<html>) so its rAF + error hooks are
-  // installed BEFORE the page's own scripts run. Falls back to prepend if there's no head/html tag.
-  const capture = getCaptureScript();
-  let out = html;
-  if (/<head[^>]*>/i.test(out)) { out = out.replace(/<head[^>]*>/i, m => m + capture); }
-  else if (/<html[^>]*>/i.test(out)) { out = out.replace(/<html[^>]*>/i, m => m + capture); }
-  else { out = capture + out; }
-  // Inspector stays at the end (it activates on demand from the webview parent).
-  return out.includes('</body>') ? out.replace('</body>', script + '</body>') : out + script;
-}
-
-function _buildStaticServer(root: string, port: number): http.Server {
-  return http.createServer((req, res) => {
-    const urlPath = (req.url || '/').split('?')[0].split('#')[0];
-    // [PREVIEW-AUTOFIX] Runtime beacon endpoint — the injected capture script POSTs failures here.
-    if (req.method === 'POST' && urlPath === '/__rdv_runtime') {
-      let body = '';
-      req.on('data', c => { body += c; if (body.length > 10000) { req.destroy(); } });
-      req.on('end', () => {
-        try {
-          const r = JSON.parse(body);
-          if (r && r.kind) {
-            _runtimeReports.push({ kind: String(r.kind), msg: String(r.msg || '').slice(0, 400), image: r.image ? String(r.image) : undefined, t: Date.now() });
-            if (_runtimeReports.length > 200) { _runtimeReports.shift(); }
-          }
-        } catch { /* malformed beacon — ignore */ }
-        res.writeHead(204); res.end();
-      });
-      return;
-    }
-    const normalized = urlPath === '/' ? '/index.html' : urlPath;
-    const filePath = path.join(root, normalized);
-    if (!filePath.startsWith(root)) { res.writeHead(403); res.end('Forbidden'); return; }
-    const ext = path.extname(filePath).toLowerCase();
-    try {
-      let content: Buffer | string = fs.readFileSync(filePath);
-      if (ext === '.html') { content = _injectInspector(content.toString('utf-8')); }
-      res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
-      res.end(content);
-    } catch {
-      try {
-        let fallbackPath = path.join(root, 'index.html');
-        if (!fs.existsSync(fallbackPath)) {
-          const htmlFiles = fs.readdirSync(root).filter(f => f.endsWith('.html') && !f.startsWith('.'));
-          if (htmlFiles.length > 0) { fallbackPath = path.join(root, htmlFiles[0]); }
-        }
-        const indexHtml = _injectInspector(fs.readFileSync(fallbackPath, 'utf-8'));
-        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache' });
-        res.end(indexHtml);
-      } catch {
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('Not found');
-      }
-    }
-  });
 }

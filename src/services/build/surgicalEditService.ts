@@ -5,68 +5,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-// [FIX] Fuzzy matching support for surgical edits -- handles whitespace drift and minor changes
-// that occur after multiple fix attempts on the same file.
-
-/** Normalize text for matching -- handles line endings, tabs, whitespace, blank lines. */
-function normalizeForMatch(text: string): string {
-  return text
-    .replace(/\r\n/g, '\n')          // normalize line endings
-    .replace(/\t/g, '  ')            // tabs to spaces
-    .replace(/[ \t]+$/gm, '')        // trim trailing whitespace per line
-    .replace(/\n{3,}/g, '\n\n')      // collapse 3+ blank lines to 2
-    .trim();                          // trim leading/trailing whitespace
-}
-
-/** Calculate similarity between two strings (0-1 scale). Uses line-based comparison. */
-function calculateSimilarity(a: string, b: string): number {
-  const linesA = a.split('\n').filter(l => l.trim().length > 0);
-  const linesB = b.split('\n').filter(l => l.trim().length > 0);
-  if (linesA.length === 0 || linesB.length === 0) return 0;
-  
-  // Find longest common subsequence of non-empty lines (normalized)
-  const normA = linesA.map(l => l.trim().replace(/\s+/g, ' '));
-  const normB = linesB.map(l => l.trim().replace(/\s+/g, ' '));
-  
-  let matches = 0;
-  let bi = 0;
-  for (const line of normA) {
-    const idx = normB.indexOf(line, bi);
-    if (idx !== -1) { matches++; bi = idx + 1; }
-  }
-  
-  return matches / Math.max(normA.length, normB.length);
-}
-
-/** Find best fuzzy match location in content using similarity. Returns {index, similarity}. */
-function findFuzzyMatch(searchBlock: string, content: string, threshold: number): { index: number; similarity: number } | null {
-  const searchLines = normalizeForMatch(searchBlock).split('\n').filter(l => l.length > 0);
-  const contentLines = content.split('\n');
-  
-  if (searchLines.length === 0) return null;
-  if (searchLines.length < 3) return null; // Don't fuzzy-match short blocks -- too risky
-  
-  let bestIndex = -1;
-  let bestSimilarity = 0;
-  
-  // Sliding window over content lines
-  for (let i = 0; i <= contentLines.length - searchLines.length; i++) {
-    const windowContent = contentLines.slice(i, i + searchLines.length).join('\n');
-    const similarity = calculateSimilarity(searchBlock, windowContent);
-    if (similarity > bestSimilarity) {
-      bestSimilarity = similarity;
-      bestIndex = i;
-    }
-  }
-  
-  if (bestSimilarity >= threshold && bestIndex !== -1) {
-    // Convert line index to character index
-    const index = contentLines.slice(0, bestIndex).join('\n').length + (bestIndex > 0 ? 1 : 0);
-    return { index, similarity: bestSimilarity };
-  }
-  
-  return null;
-}
+// [DONE] normalizeForMatch, calculateSimilarity, findFuzzyMatch moved to surgicalEditMatcher.ts (Rule 9 split)
+import { normalizeForMatch, findFuzzyMatch } from './surgicalEditMatcher.js';
 
 /** Log helper for surgical matching -- uses console but can be swapped for proper logger. */
 function surgicalLog(msg: string, details?: any): void {
@@ -75,104 +15,10 @@ function surgicalLog(msg: string, details?: any): void {
   else { console.log(prefix, msg); }
 }
 
-export interface SurgicalEdit {
-  filePath: string;       // relative path
-  searchBlock: string;    // exact text to find
-  replaceBlock: string;   // text to replace with
-}
-
-export interface EditResult {
-  filePath: string;
-  success: boolean;
-  editCount: number;
-  error?: string;
-  usedFallback?: boolean;
-}
-
-/**
- * Parse AI response for SEARCH/REPLACE blocks.
- * Expected format per edit:
- *   ## Edit: relative/path/to/file
- *   <<<SEARCH
- *   [exact existing code to find]
- *   ===
- *   [replacement code]
- *   REPLACE>>>
- *
- * Multiple edits per file are supported.
- */
-export function parseSurgicalEdits(response: string, defaultFilePath: string = 'default'): SurgicalEdit[] {
-  const edits: SurgicalEdit[] = [];
-
-  // 1. Primary path: XML Structured Format (Gap 4 update)
-  const xmlFileRe = /<file\s+path="([^"]+)">([\s\S]*?)<\/file>/g;
-  let xmlFileMatch: RegExpExecArray | null;
-  let foundXml = false;
-
-  while ((xmlFileMatch = xmlFileRe.exec(response)) !== null) {
-    foundXml = true;
-    const filePath = xmlFileMatch[1].trim();
-    const fileContent = xmlFileMatch[2];
-
-    const xmlEditRe = /<edit>[\s\S]*?<search>\n?([\s\S]*?)\n?<\/search>[\s\S]*?<replace>\n?([\s\S]*?)\n?<\/replace>[\s\S]*?<\/edit>/g;
-    let xmlEditMatch: RegExpExecArray | null;
-    let foundEdits = false;
-    
-    while ((xmlEditMatch = xmlEditRe.exec(fileContent)) !== null) {
-      foundEdits = true;
-      edits.push({
-        filePath,
-        searchBlock: xmlEditMatch[1],
-        replaceBlock: xmlEditMatch[2],
-      });
-    }
-
-    // If it was a full file output in XML format
-    if (!foundEdits) {
-      const xmlContentRe = /<content>\n?([\s\S]*?)\n?<\/content>/;
-      const contentMatch = xmlContentRe.exec(fileContent);
-      if (contentMatch) {
-        // Technically a full file replacement, but we can treat it as a surgical edit that replaces everything
-        // Wait, chatPanelMsgFixApply needs full-file parsing. 
-        // We'll let chatPanelMsgFixApply handle <content> tags in its fallback.
-      }
-    }
-  }
-
-  if (foundXml) {
-    return edits;
-  }
-
-  // 2. Legacy path: Markdown Headers + SEARCH/REPLACE blocks
-  const filePattern = /^##\s+(?:Edit|Fix):\s*(.+?)\s*$/gm;
-  let fileMatch: RegExpExecArray | null;
-  const filePositions: Array<{ path: string; start: number }> = [];
-
-  while ((fileMatch = filePattern.exec(response)) !== null) {
-    filePositions.push({ path: fileMatch[1].trim(), start: fileMatch.index + fileMatch[0].length });
-  }
-
-  if (filePositions.length === 0) {
-    filePositions.push({ path: defaultFilePath, start: 0 });
-  }
-
-  for (let i = 0; i < filePositions.length; i++) {
-    const fp = filePositions[i];
-    const end = i + 1 < filePositions.length ? filePositions[i + 1].start : response.length;
-    const section = response.slice(fp.start, end);
-
-    const editBlockRe = /<<<SEARCH\n([\s\S]*?)\n===\n([\s\S]*?)\nREPLACE>>>/g;
-    let editMatch: RegExpExecArray | null;
-    while ((editMatch = editBlockRe.exec(section)) !== null) {
-      edits.push({
-        filePath: fp.path,
-        searchBlock: editMatch[1],
-        replaceBlock: editMatch[2],
-      });
-    }
-  }
-  return edits;
-}
+// [DONE] SurgicalEdit, EditResult, parseSurgicalEdits moved to surgicalEditParser.ts (Rule 9 split)
+import type { SurgicalEdit, EditResult } from './surgicalEditParser.js';
+export type { SurgicalEdit, EditResult } from './surgicalEditParser.js';
+export { parseSurgicalEdits } from './surgicalEditParser.js';
 
 /**
  * Apply surgical edits to files on disk.
@@ -341,14 +187,6 @@ export function applySurgicalEdits(edits: SurgicalEdit[], root: string): EditRes
   return results;
 }
 
-/**
- * Detect whether an AI response contains surgical edits, a unified diff, or full-file output.
- */
-export function detectResponseFormat(response: string): 'surgical' | 'unified' | 'fullfile' {
-  if (/<file\s+path=".*?">[\s\S]*?<edit>/m.test(response)) { return 'surgical'; }
-  if (/<<<SEARCH\n[\s\S]*?\n===\n[\s\S]*?\nREPLACE>>>/m.test(response)) { return 'surgical'; }
-  if (/^---\s+\S+\n\+\+\+\s+\S+/m.test(response)) { return 'unified'; }
-  return 'fullfile';
-}
-
+// [DONE] detectResponseFormat moved to surgicalEditParser.ts (Rule 9 split)
+export { detectResponseFormat } from './surgicalEditParser.js';
 export { parseUnifiedDiff } from './surgicalEditDiff.js';

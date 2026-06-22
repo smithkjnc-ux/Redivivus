@@ -64,27 +64,12 @@ export async function runPreCloudRouting(
   }
   const hasWorkspace = !!effectiveRoot;
 
-  // ── Bug-report pre-classifier: skip cloudChat for clear fix signals ──
-  // [Rule 18] AI classifier replaced regex keyword matching — catches bug reports the regex missed
-  // (paraphrases, non-English signals) and avoids false positives on words like "issue" or "problem".
-  let looksLikeBugReport = false;
-  if (hasWorkspace) {
-    try {
-      const bugPrompt = `Reply with YES or NO only. Is this message describing a bug, error, or something that is not working correctly — something the user wants fixed in their project?
-Do NOT answer YES for: general questions, requests to build something new from scratch, or questions about how something works.
-Message: "${userText.slice(0, 300)}"`;
-      const bugResult = await deps.routing.prompt(bugPrompt, 12_000);
-      looksLikeBugReport = bugResult.success && !!bugResult.text?.trim().toUpperCase().startsWith('YES');
-    } catch { /* classifier unavailable — fall through to cloudChat */ }
-  }
-  if (looksLikeBugReport) {
-    fixLog(`[PRE-CLASSIFY] Bug report detected, routing to fix pipeline: "${userText.slice(0, 60)}..."`);
-    await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
-    return { outcome: 'done' };
-  }
-
   // ── Project context guard ──
-  const _ctxBlock = await checkProjectContextGuard(userText, conversation, refresh, deps.routing, effectiveRoot);
+  // [DEAD] looksLikeBugReport pre-classifier (regex then AI) was removed — it added a network call
+  // before cloudChat on every message, defeating the point of a fast-path. Bug classification is
+  // cloudChat's job; the pre-classifier caused both latency overhead and false positives on words
+  // like "issue" and "problem" in non-bug messages.
+  const _ctxBlock = checkProjectContextGuard(userText, conversation, refresh, effectiveRoot);
   if (_ctxBlock) {
     conversation.push({ role: 'assistant', content: _ctxBlock, timestamp: Date.now() });
     refresh();
