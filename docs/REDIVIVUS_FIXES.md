@@ -3,6 +3,20 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 22, 2026: AI Used Card — HTML Entity Double-Escape in Supervisor Error
+
+**File changed:** `src/core/build/chatPanelBuildBreakdown.ts`
+**What changed:** Added `humanError()` helper that extracts the `"message"` field from raw JSON error blobs (e.g. `400 {"type":"error","error":{"message":"..."}}`) before storing in the breakdown token. Supervisor error reason now shows "Your credit balance is too low..." instead of the raw JSON.
+**Why:** The raw JSON error string contained `"` chars. After double-escaping these displayed as `&quot;type&quot;` in the AI Used card.
+**Risk:** None — falls back to `safeField(raw)` if no message field is found.
+
+**File changed:** `src/ui/panels/chat/chatPanelRendererCards.ts`
+**What changed:** Line 69 — removed `escapeHtml()` call on `parts[6]` (the reason field). Added comment explaining why.
+**Why:** `renderMessages` already calls `escapeHtml(displayContent)` on the full message at line 49, before token replacement runs. A second `escapeHtml` on `parts[6]` double-escaped quotes: `"` → `&quot;` → `&amp;quot;`, which the browser rendered as literal `&quot;`. 
+**Risk:** Low — `safeField()` in the token builder still strips `~` `|` and other delimiters. The content is safe; it just no longer gets double-escaped.
+
+---
+
 ## Fix — Jun 22, 2026: Extended Thinking (Claude) + Reasoning Effort (OpenAI o-series)
 
 **File changed:** `src/services/ai/agentDialectAnthropic.ts`

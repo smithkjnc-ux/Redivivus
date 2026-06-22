@@ -14,6 +14,14 @@ function safeField(s: string): string {
   return (s || '').replace(/[~|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 160);
 }
 
+// Extract a human-readable sentence from a raw JSON error blob or "400 {...}" string.
+// Falls back to the first 120 chars of the original when no message field is found.
+function humanError(raw: string): string {
+  const msgMatch = raw.match(/"message"\s*:\s*"([^"]+)"/);
+  if (msgMatch) { return safeField(msgMatch[1]); }
+  return safeField(raw);
+}
+
 /** Build the `__AI_BREAKDOWN__...|||END_BREAKDOWN__` token from the real two-phase attribution. */
 export function buildBreakdownToken(result: CloudBuildResult, workerLabel: string, workerTokens: number): string {
   const rows: string[] = [];
@@ -45,7 +53,7 @@ export function buildBreakdownToken(result: CloudBuildResult, workerLabel: strin
     const role = ranSupervisor ? 'worker' : 'solo';
     const reason = ranSupervisor
       ? 'built from the prescription'
-      : (result.supervisorError ? `built solo — Supervisor unavailable: ${safeField(result.supervisorError)}` : 'primary builder');
+      : (result.supervisorError ? `built solo — Supervisor unavailable: ${humanError(result.supervisorError)}` : 'primary builder');
     const wCost = calcCost(result.model || workerLabel, result.inputTokens ?? 0, result.outputTokens ?? 0).toFixed(8);
     rows.push(`${safeField(workerLabel)}~${role}~built~${workerTokens}~${wCost}~0~${reason}`);
   }

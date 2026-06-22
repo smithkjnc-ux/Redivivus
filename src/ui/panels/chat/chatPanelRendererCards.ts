@@ -66,7 +66,10 @@ export function renderAIByline(raw: string): string {
     const cost = parseFloat(parts[4] || '0');
     totTokens += tokens; totCost += cost;
     const hasFallback = parts[5] === '1';
-    const reason = parts[6] ? escapeHtml(parts[6].trim()) : '';
+    // [FIX] parts[6] arrives pre-escaped — renderMessages calls escapeHtml on the full message
+    // before token replacement runs. A second escapeHtml here double-escapes quotes ("→&quot;→&amp;quot;)
+    // causing entity codes to display literally. Use the value as-is.
+    const reason = parts[6] ? parts[6].trim() : '';
     const name = friendlyModelName(ai);
     const what = friendlyAction(role, actions);
     const emoji = ROLE_EMOJI[role] || '[?]';
