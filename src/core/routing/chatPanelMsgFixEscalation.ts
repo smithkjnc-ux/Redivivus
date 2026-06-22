@@ -170,6 +170,14 @@ export async function runEscalationLoop(params: {
       const rp = await represcribeAfterRejection({ attempt, maxRetries, userText, root, filesBlock, currentDiagnosis, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, deps });
       filesBlock = rp.filesBlock;
       currentDiagnosis = rp.diagnosis;
+      // [FIX] Re-prescription may return [AGENT_HANDOFF] — the outer guard in chatPanelMsgFix.ts only
+      // checks the original diagnosis, so this path was missed. The Worker receiving [AGENT_HANDOFF] as
+      // its prescription produces garbage on the next attempt. Break out and signal agent handoff instead.
+      if (/\[AGENT_HANDOFF\]/i.test(currentDiagnosis)) {
+        needsAgentHandoff = true;
+        fixLog('Re-prescription returned [AGENT_HANDOFF] — breaking out of escalation loop');
+        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote: 'Re-prescription routed to Agent pipeline', scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated };
+      }
 
       // If we've exhausted retries, escalate to supervisor model
       if (attempt === maxRetries && !escalated) {

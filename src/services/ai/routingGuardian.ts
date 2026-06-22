@@ -147,7 +147,14 @@ export async function guardianReviewImpl(
       const isPass = raw.includes('GUARDIAN_PASS');
       const issuesMatch = raw.match(/GUARDIAN_ISSUES:([\s\S]*?)(?:GUARDIAN_SCOPE_ALERTS:|$)/);
       const scopeMatch = raw.match(/GUARDIAN_SCOPE_ALERTS:([\s\S]*?)$/);
-      const issues = issuesMatch ? issuesMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
+      let issues = issuesMatch ? issuesMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
+      // [FIX] Guardian returned GUARDIAN_FAIL with no GUARDIAN_ISSUES bullets — extract raw text as the
+      // implicit critique so re-prescription has real context instead of 'Unknown issue'. Without this,
+      // the critique is blank → re-prescription is blind → Worker repeats correct code → loop repeats.
+      if (!isPass && issues.length === 0) {
+        const rawCritique = raw.replace(/^GUARDIAN_FAIL\s*/i, '').replace(/GUARDIAN_ISSUES:[\s\S]*/g, '').replace(/GUARDIAN_SCOPE_ALERTS:[\s\S]*/g, '').trim();
+        issues = rawCritique.length > 5 ? [rawCritique.slice(0, 400)] : ['Guardian rejected with no structured reason (possible format mismatch).'];
+      }
       const scopeAlerts = scopeMatch ? scopeMatch[1].split('\n').map((l: string) => l.trim()).filter((l: string) => l.startsWith('-') || l.match(/^\[.*\]/)).map((l: string) => l.replace(/^[-\[\]\s]+/, '')) : [];
       const result = { passed: isPass && issues.length === 0, correctedText: null, issues, scopeAlerts, guardianAI, workerAI };
       logAICall({ role: 'guardian', model: guardianAI, prompt: `[Secure Backend Prompt] TASK: ${originalTask}`, response: JSON.stringify({ passed: result.passed, issues: result.issues, scopeAlerts: result.scopeAlerts }), durationMs: Date.now() - startTime });
