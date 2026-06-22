@@ -14,7 +14,7 @@
 
 export type AgentMessage =
   | { role: 'user'; content: string }
-  | { role: 'assistant'; content?: string; toolCall?: { id: string; name: string; args: any } }
+  | { role: 'assistant'; content?: string; toolCall?: { id: string; name: string; args: any }; _anthropicBlocks?: any[] }
   | { role: 'tool'; toolCallId: string; name: string; content: string };
 
 /** Provider-agnostic JSON Schema subset — each dialect converter maps it to the native format. */
@@ -29,8 +29,8 @@ export interface ToolSchema {
 }
 
 export type NativeCallResult =
-  | { type: 'tool_call'; id: string; name: string; args: any; thinkingText?: string; model?: string; usage?: { inputTokens: number; outputTokens: number } }
-  | { type: 'text'; content: string; model?: string; usage?: { inputTokens: number; outputTokens: number } }
+  | { type: 'tool_call'; id: string; name: string; args: any; thinkingText?: string; model?: string; usage?: { inputTokens: number; outputTokens: number }; rawBlocks?: any[] }
+  | { type: 'text'; content: string; model?: string; usage?: { inputTokens: number; outputTokens: number }; rawBlocks?: any[] }
   | { type: 'error'; error: string };
 
 /** Append a note to the last user message to avoid back-to-back user messages (Anthropic strict alternation). */
@@ -87,11 +87,12 @@ export async function nativeAgentCall(
   messages: AgentMessage[],
   tools: ToolSchema[],
   keys: Record<string, string>,
+  thinkingBudget = 0,
 ): Promise<NativeCallResult> {
   try {
     if (provider === 'claude') {
       if (!keys.claude) { throw new Error('No Claude API key configured'); }
-      return await callAnthropic(keys.claude, model, systemPrompt, messages, tools);
+      return await callAnthropic(keys.claude, model, systemPrompt, messages, tools, thinkingBudget);
     }
     if (provider === 'gemini') {
       if (!keys.gemini) { throw new Error('No Gemini API key configured'); }

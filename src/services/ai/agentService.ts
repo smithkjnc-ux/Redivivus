@@ -73,7 +73,11 @@ export async function executeAgentTask(
   if (_usable.length && _skipped.length) {
     onUpdate(`Info: Skipping ${_skipped.map((p: string) => friendlyModelName(p)).join(', ')} this session (${unavailableReason(_skipped[0]) || 'unavailable'}) -- using ${friendlyModelName(_chainOrder[0])}.`);
   }
-  const chain: Array<{ provider: string; model: string }> = _chainOrder.map((p: string) => ({ provider: p, model: bestModelForRole(p, 'pro')?.modelId || p }));
+  const chain: Array<{ provider: string; model: string; thinkingBudget: number }> = _chainOrder.map((p: string) => {
+    const m = bestModelForRole(p, 'pro');
+    const reg = (MODEL_REGISTRY as any[]).find((r: any) => r.modelId === m?.modelId);
+    return { provider: p, model: m?.modelId || p, thinkingBudget: reg?.thinking ? 8000 : 0 };
+  });
 
   // [CONTEXT-PRUNE] For models with contextK <= 32, trim history before each API call.
   // The original `messages` array is never mutated — failover to larger-context providers gets full history.

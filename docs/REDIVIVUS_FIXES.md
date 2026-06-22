@@ -3,6 +3,36 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 22, 2026: Extended Thinking (Claude) + Reasoning Effort (OpenAI o-series)
+
+**File changed:** `src/services/ai/agentDialectAnthropic.ts`
+**What changed:** `callAnthropic` now accepts `thinkingBudget: number`. When > 0: adds `anthropic-beta: interleaved-thinking-2025-05-14` header and `thinking: { type: 'enabled', budget_tokens: N }` to the request body. Response is parsed for `type: 'thinking'` blocks. The full raw content array is returned as `rawBlocks` on the result.
+`toAnthropicMessages` updated: when an assistant message carries `_anthropicBlocks`, those blocks are passed to the API verbatim (round-trip). Falling back to field reconstruction only when `_anthropicBlocks` is absent (messages from non-Claude turns or pre-thinking history).
+**Why:** Without round-tripping thinking blocks, Anthropic returns HTTP 400 on subsequent turns. The API requires thinking blocks to be present in any assistant message where they were originally emitted.
+**Risk:** Medium. The round-trip path (`_anthropicBlocks`) is the critical invariant — if rawBlocks is ever undefined on a Claude turn, the next turn reconstructs from fields (safe fallback, but no thinking context preserved).
+
+**File changed:** `src/services/ai/agentNativeCall.ts`
+**What changed:** `AgentMessage` assistant type gets `_anthropicBlocks?: any[]`. `NativeCallResult` tool_call and text variants get `rawBlocks?: any[]`. `nativeAgentCall` gains `thinkingBudget = 0` param, passed through to `callAnthropic`.
+**Why:** Type-safe plumbing for thinking block round-trip and budget control.
+**Risk:** Low — all new fields are optional; existing callers that don't pass `thinkingBudget` get 0 (thinking disabled).
+
+**File changed:** `src/services/ai/agentDialectOpenAICompat.ts`
+**What changed:** o-series models (matching `/^o\d/`) now get `reasoning_effort: 'medium'` in the request body.
+**Why:** Without it, o-series uses default reasoning depth (unspecified). 'medium' gives meaningful chain-of-thought without burning 'high' budget on every agent turn.
+**Risk:** Low — only affects o3, o4-mini, o1 variants. Non-o-series models unchanged.
+
+**File changed:** `src/services/ai/agentService.ts`
+**What changed:** Chain array now includes `thinkingBudget: number` per provider. Computed from MODEL_REGISTRY: if the model has `thinking: true`, budget is 8000 tokens; otherwise 0.
+**Why:** Budget must be set at chain-build time so each failover provider gets the right value.
+**Risk:** Low — 8000 token budget is conservative (Claude's max is 32K+). Can be tuned per task profile later.
+
+**File changed:** `src/services/ai/agentServiceLoop.ts`
+**What changed:** `AgentLoopParams.chain` type updated to include `thinkingBudget`. Both `nativeAgentCall` call sites pass `chain[idx].thinkingBudget`. Both assistant message pushes (tool_call branch + text branch) now include `_anthropicBlocks: callResult.rawBlocks` so thinking blocks survive into the next turn's history.
+**Why:** The loop is where messages are written to history — this is the only place where `_anthropicBlocks` can be attached at the right time.
+**Risk:** Low — `rawBlocks` is undefined for Gemini/OpenAI turns; spreading undefined into the push means `_anthropicBlocks` is simply absent (no effect on `toAnthropicMessages` fallback path).
+
+---
+
 ## Fix — Jun 22, 2026: Model Registry — New Models + Thinking Flags
 
 **File changed:** `src/services/ai/modelRegistry.ts`

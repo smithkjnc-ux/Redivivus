@@ -21,7 +21,7 @@ export interface AgentLoopParams {
   systemPrompt: string;
   messages: AgentMessage[];
   toolSchemas: ToolSchema[];
-  chain: Array<{ provider: string; model: string }>;
+  chain: Array<{ provider: string; model: string; thinkingBudget: number }>;
   msgsFor: (modelId: string) => AgentMessage[];
   ledger: BuildLedger;
   agentCtx: AgentContext;
@@ -50,15 +50,15 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
       appendUserNote(messages, budgetNudge(iterations, MAX_ITERATIONS));
     }
 
-    let callResult = await nativeAgentCall(chain[providerIdx].provider, chain[providerIdx].model, systemPrompt, msgsFor(chain[providerIdx].model), toolSchemas, keysPayload);
+    let callResult = await nativeAgentCall(chain[providerIdx].provider, chain[providerIdx].model, systemPrompt, msgsFor(chain[providerIdx].model), toolSchemas, keysPayload, chain[providerIdx].thinkingBudget);
     if (callResult.type === 'error') {
       let recovered = false;
       for (let fi = providerIdx + 1; fi < chain.length; fi++) {
-        const { provider, model } = chain[fi];
+        const { provider, model, thinkingBudget } = chain[fi];
         const errMsg = callResult.type === 'error' ? callResult.error : '';
         if (isSustainedFailure(errMsg)) { markProviderUnavailable(chain[providerIdx].provider, describeProviderError(errMsg)); }
         onUpdate(`Warning: ${friendlyModelName(chain[providerIdx].provider)} unavailable (${describeProviderError(errMsg)}) -- switching to ${friendlyModelName(provider)}...`);
-        callResult = await nativeAgentCall(provider, model, systemPrompt, msgsFor(model), toolSchemas, keysPayload);
+        callResult = await nativeAgentCall(provider, model, systemPrompt, msgsFor(model), toolSchemas, keysPayload, thinkingBudget);
         if (callResult.type !== 'error') { providerIdx = fi; recovered = true; break; }
       }
       if (!recovered) {
@@ -111,7 +111,9 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
         alog.done(`paused for user after ${iterations} step(s)`);
         return { success: true, finalAnswer: result.replace('_PAUSE_ASK_USER_', ''), iterations, ledger };
       }
-      messages.push({ role: 'assistant', toolCall: { id: toolId, name: toolName, args: toolArgs } });
+      // [THINKING] _anthropicBlocks carries thinking + tool_use blocks for round-trip on next turn.
+      // Other providers leave rawBlocks undefined — the field is simply omitted from the message.
+      messages.push({ role: 'assistant', toolCall: { id: toolId, name: toolName, args: toolArgs }, _anthropicBlocks: (callResult as any).rawBlocks });
       messages.push({ role: 'tool', toolCallId: toolId, name: toolName, content: result });
       continue;
     }
@@ -121,7 +123,7 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
     alog.log(`step ${iterations} text (${modelLabel})`, aiText);
     const thought = extractAgentThought(aiText);
     if (thought) { onUpdate(`${stepTag}: ${thought}`); }
-    messages.push({ role: 'assistant', content: aiText });
+    messages.push({ role: 'assistant', content: aiText, _anthropicBlocks: (callResult as any).rawBlocks });
 
     const filesTouched = agentCtx.modifiedFiles?.size ?? 0;
     const nudge = executionNudge(!!agentCtx.requiresExecution, ranCommands, wroteUnrunScript, guardNudges, filesTouched);

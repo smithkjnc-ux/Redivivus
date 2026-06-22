@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 22, 2026 — Dynamic AI router (routingEngine.ts replaces hardcoded AI_RANK), Groq/Kimi 32K context pruning (pruneMessages + msgsFor), DeepSeek added to chat routing. Rule 9 splits: agentNativeCall.ts (322->116 lines, 3 dialect files) + agentService.ts (254->87 lines + agentServiceLoop.ts). Full entry in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 22, 2026 — Extended thinking for Claude (interleaved-thinking beta, rawBlocks round-trip), reasoning_effort for OpenAI o-series, model registry expanded (gpt-4.1 family, llama-3.1-70b-versatile 128K, moonshot-v1-8k, thinking flags on Sonnet/Grok-3). Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* 2026-06-18 — Audit remediation: fixed C1/C2, H1–H4 (+degraded single-provider), M1–M4, M6, L2/L4; added integration tests (test-guardian-independence.cjs, test-update-and-debrand.cjs); remaining items triaged/flagged in AUDIT_REPORT.md.
 

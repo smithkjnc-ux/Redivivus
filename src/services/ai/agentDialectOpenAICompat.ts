@@ -46,7 +46,12 @@ export async function callOpenAICompat(
     messages: toOpenAIMessages(system, messages, isOSeries ? 'developer' : 'system'),
     tools: tools.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.parameters } })),
   };
-  if (isOSeries) { body.max_completion_tokens = 8192; } else { body.max_tokens = 8192; }
+  if (isOSeries) {
+    body.max_completion_tokens = 8192;
+    body.reasoning_effort = 'medium';  // 'low'|'medium'|'high' — medium balances cost and depth
+  } else {
+    body.max_tokens = 8192;
+  }
   if (!isOSeries && PROVIDERS_WITH_PARALLEL_FLAG.has(provider)) { body.parallel_tool_calls = false; }
 
   const res = await fetch(url, {
