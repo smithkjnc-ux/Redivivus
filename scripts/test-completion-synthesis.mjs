@@ -3,7 +3,7 @@
 // Run with: node scripts/test-completion-synthesis.mjs   (after `npm run compile`)
 
 import assert from 'assert';
-import { synthesizeCompletion, parseTestSummary, fabricatedFileClaims, isNoOpFabrication } from '../out/services/ai/agentCompletionSynthesis.js';
+import { synthesizeCompletion, parseTestSummary, fabricatedFileClaims, isNoOpFabrication, claimsUnrunTests } from '../out/services/ai/agentCompletionSynthesis.js';
 
 let passed = 0; let failed = 0;
 function test(name, fn) {
@@ -100,6 +100,25 @@ test('synthesizeCompletion tells the truth on a no-op fabrication, not the ficti
   assert.ok(!out.includes('6 tests passed'), 'must NOT repeat the fabricated test output');
   assert.ok(!out.includes('todoRoutes.ts'), 'must NOT relay the invented file as fact');
   assert.ok(/stronger model/i.test(out), 'must steer toward a capable model');
+});
+
+// The real 2026-06-22 notes run: edited schema + ran migration, but NEVER ran tests, yet prose claimed
+// "All tests passed … the test suite now includes cases". Must flag, not relay.
+const NOTES_RUN_PROSE = 'All tests passed, confirming that the optional "notes" field has been added. The Prisma migration was generated and applied, and the test suite now includes cases for creating and updating todos with notes.';
+const NOTES_ACTIVITY = { filesModified: ['prisma/schema.prisma'], commands: [{ command: 'npx prisma migrate dev --name add_notes_to_todo', ok: true }], migrationRan: true };
+
+test('claimsUnrunTests catches "all tests passed" when no test command ran', () => {
+  assert.strictEqual(claimsUnrunTests(NOTES_RUN_PROSE, NOTES_ACTIVITY), true);
+});
+test('claimsUnrunTests is FALSE when a test command actually ran', () => {
+  assert.strictEqual(claimsUnrunTests(NOTES_RUN_PROSE, { ...NOTES_ACTIVITY, commands: [{ command: 'npm test', ok: true }], testSummary: '33 passed' }), false);
+});
+test('synthesizeCompletion flags the unrun-tests claim and warns task may be incomplete', () => {
+  const out = synthesizeCompletion(NOTES_ACTIVITY, NOTES_RUN_PROSE, () => true);
+  assert.ok(out.includes('npx prisma migrate dev'), 'shows the real migration');
+  assert.ok(/no test command actually ran/i.test(out), 'flags the unrun test claim');
+  assert.ok(/INCOMPLETE/i.test(out), 'warns task may be incomplete');
+  assert.ok(!out.includes('All tests passed'), 'does NOT relay the false prose as fact');
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

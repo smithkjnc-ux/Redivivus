@@ -8,14 +8,18 @@
 // and take priority — not here.
 
 // Try, in order: XML-style <tool_call>/<tool_code> tags, then a fenced ```tool_code/```tool_call/```json block
-// that contains a "name" field. The trailing close-token anchors the non-greedy body so nested JSON (args
-// objects) is captured whole (it extends to the `}` right before the closing tag/fence).
+// that contains a "name" field. The body is NON-GREEDY and the trailing close-token anchors it, so it captures
+// exactly ONE tool call — the FIRST — and stops at the matching close tag. Two properties this guarantees:
+//   • nested JSON (an "args" object) is captured whole — lazy `}` backtracks to the `}` before the close tag.
+//   • when a model emits SEVERAL calls in one turn (and even fabricates the <tool_result>s between them, as
+//     Gemini does), we take only the first real call and let the loop run it; greedy matching here would span
+//     all of them into invalid JSON and the call would be silently dropped (the step-7 "formatting hiccup").
 export function matchToolCall(text: string): RegExpMatchArray | null {
   // 1) XML tags — tolerant of attributes/whitespace and of mismatched call/code open/close.
-  const xml = text.match(/<tool_(?:call|code)\b[^>]*>\s*(\{[\s\S]*\})\s*<\/tool_(?:call|code)>/);
+  const xml = text.match(/<tool_(?:call|code)\b[^>]*>\s*(\{[\s\S]*?\})\s*<\/tool_(?:call|code)>/);
   if (xml) { return xml; }
   // 2) Fenced code block used AS a tool call. Require a "name" key so a plain ```json data block isn't grabbed.
-  const fenced = text.match(/```(?:tool_code|tool_call|json)\s*\n?\s*(\{[\s\S]*"name"[\s\S]*\})\s*\n?\s*```/);
+  const fenced = text.match(/```(?:tool_code|tool_call|json)\s*\n?\s*(\{[\s\S]*?"name"[\s\S]*?\})\s*\n?\s*```/);
   if (fenced) { return fenced; }
   return null;
 }

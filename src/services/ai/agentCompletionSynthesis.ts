@@ -60,6 +60,23 @@ function claimsConcreteWork(modelAnswer: string): boolean {
     || /\ball\s+(?:\d+\s+)?tests?\s+pass/i.test(modelAnswer);
 }
 
+// Did a test command actually run this session (or did we parse a test summary)? Used to catch the prose
+// claiming "all tests passed" when no test runner was ever invoked.
+function ranATest(activity: AgentActivity): boolean {
+  return !!activity.testSummary
+    || activity.commands.some(c => /\b(test|vitest|jest|pytest|go\s+test|mocha|phpunit|rspec)\b/i.test(c.command));
+}
+
+// Prose claims the tests passed / a test was added, but NO test command ran. This is the residual confabulation
+// after the file-path check: the model did some real work (so there ARE facts) yet still narrates a test result
+// that never happened (observed 2026-06-22: Gemini edited the schema, never ran tests, then wrote "All tests
+// passed… the test suite now includes cases"). Returns true so the synthesizer suppresses+flags that prose.
+export function claimsUnrunTests(modelAnswer: string, activity: AgentActivity): boolean {
+  if (ranATest(activity)) { return false; }
+  return /\b(?:all\s+)?tests?\b[^.]{0,40}\b(?:pass(?:ed|ing)?|green|succeed|success)/i.test(modelAnswer)
+    || /\btest\s+suite\b[^.]{0,40}\b(?:pass|includes|now\s+include|added)/i.test(modelAnswer);
+}
+
 // THE loud fabrication signal: the harness observed NOTHING — no files touched, no commands run, no migration —
 // yet the model's answer claims it did concrete work (or cites files that don't exist). On weak models this is
 // the worst case (a 100%-confabulated success report, as Gemini Flash produced: invented .ts files + a fake
@@ -96,11 +113,14 @@ export function synthesizeCompletion(activity: AgentActivity, modelAnswer: strin
   if (activity.migrationRan) { lines.push('**Database** — migration actually executed ✅', ''); }
 
   const fabricated = fabricatedFileClaims(modelAnswer, activity.filesModified, existsOnDisk);
-  if (fabricated.length) {
-    // [WARN] The model narrated work on files that were neither touched nor exist — surface the discrepancy
-    // instead of the fiction. This is the whole point of the synthesizer.
-    const list = fabricated.map(f => `\`${f}\``).join(', ');
-    lines.push(`⚠️ _The agent's own summary referenced ${list}, which ${fabricated.length > 1 ? "weren't" : "wasn't"} part of this run — showing the verified actions above instead of that description._`);
+  const unrunTests = claimsUnrunTests(modelAnswer, activity);
+  if (fabricated.length || unrunTests) {
+    // [WARN] The prose narrated work that didn't happen — files never touched, or a test result with no test
+    // run. Surface the discrepancy instead of the fiction. This is the whole point of the synthesizer.
+    const notes: string[] = [];
+    if (fabricated.length) { notes.push(`referenced ${fabricated.map(f => `\`${f}\``).join(', ')}, which ${fabricated.length > 1 ? "weren't" : "wasn't"} part of this run`); }
+    if (unrunTests) { notes.push('claimed the tests passed, but **no test command actually ran** this session'); }
+    lines.push(`⚠️ _The agent's own summary ${notes.join('; and ')} — showing only the verified actions above. The task may be INCOMPLETE._`);
   } else if (modelAnswer.trim()) {
     // Prose checks out — include it as the readable summary beneath the facts.
     lines.push('---', '', modelAnswer.trim());

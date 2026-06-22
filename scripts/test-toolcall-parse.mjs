@@ -46,5 +46,17 @@ test('returns null for prose with no tool call', () => {
   assert.strictEqual(matchToolCall('I have completed the task and all tests pass.'), null);
 });
 
+// The step-7 regression: a turn with MULTIPLE tool calls (Gemini even fabricates the results between them).
+// Must return the FIRST call as valid JSON, not span all of them into an unparseable blob.
+test('takes the FIRST tool call when several are emitted in one turn', () => {
+  const multi = '<tool_call>\n{ "name": "edit_file", "args": { "filePath": "src/app.js", "search": "a", "replace": "b" } }\n</tool_call>\n'
+    + 'System:\n<tool_result>\nSuccessfully edited src/app.js.\n</tool_result>\n'
+    + 'Assistant:\n<tool_call>\n{ "name": "edit_file", "args": { "filePath": "src/app.js", "search": "c", "replace": "d" } }\n</tool_call>';
+  const d = parse(multi);
+  assert.strictEqual(d.name, 'edit_file');
+  assert.strictEqual(d.args.search, 'a');   // FIRST call, not the second
+  assert.strictEqual(d.args.replace, 'b');
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed ? 1 : 0);
