@@ -12,6 +12,7 @@ export const NETWORK_TOOLS: AgentTool[] = [
     name: 'search_web',
     description: 'Searches the web and returns top search results. Use this to find documentation, APIs, or solutions.',
     parameters: '{ "query": "string" }',
+    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Search query' } }, required: ['query'] },
     execute: async (args: any, ctx: any) => {
       ctx.log(`🌐 Searching the web for: \`${args.query}\``);
       try {
@@ -40,6 +41,7 @@ export const NETWORK_TOOLS: AgentTool[] = [
     name: 'read_url',
     description: 'Reads and extracts text content from a web page URL. Use this to read documentation after searching.',
     parameters: '{ "url": "string" }',
+    inputSchema: { type: 'object', properties: { url: { type: 'string', description: 'URL to fetch and extract text from' } }, required: ['url'] },
     execute: async (args: any, ctx: any) => {
       ctx.log(`📄 Reading webpage: \`${args.url}\``);
       try {
@@ -60,6 +62,7 @@ export const NETWORK_TOOLS: AgentTool[] = [
     name: 'search_code',
     description: 'Searches the entire workspace for a specific keyword or regex pattern.',
     parameters: '{ "query": "string (keyword or regex)" }',
+    inputSchema: { type: 'object', properties: { query: { type: 'string', description: 'Keyword or regex pattern to search for in the workspace' } }, required: ['query'] },
     execute: async (args: any, ctx: any) => {
       ctx.log(`🔍 Searching codebase for: \`${args.query}\``);
       try {

@@ -42,6 +42,12 @@ test('fabricatedFileClaims does NOT flag the real schema it edited', () => {
   const fab = fabricatedFileClaims(GEMINI_ANSWER, REAL_FILES_TOUCHED, existsOnDisk);
   assert.ok(!fab.includes('prisma/schema.prisma'), 'real edited file must not be flagged');
 });
+test('fabricatedFileClaims handles long extensions (.prisma, .graphql) without truncating', () => {
+  const prose = 'I edited prisma/schema.prisma and api/schema.graphql to add the field.';
+  const fab = fabricatedFileClaims(prose, ['prisma/schema.prisma', 'api/schema.graphql'], (r) => ['prisma/schema.prisma','api/schema.graphql'].includes(r));
+  assert.ok(!fab.includes('prisma/schema.prism'), 'must not truncate .prisma to .prism');
+  assert.strictEqual(fab.length, 0, 'both real long-extension files must be recognized, not flagged');
+});
 
 test('synthesizeCompletion reports verified facts, not the fiction', () => {
   const out = synthesizeCompletion(

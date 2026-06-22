@@ -2,7 +2,7 @@
 // <tool_code>, which was being silently dropped. Run with: node scripts/test-toolcall-parse.mjs (after compile)
 
 import assert from 'assert';
-import { matchToolCall } from '../out/services/ai/agentToolCallParse.js';
+import { matchToolCall, countToolCalls } from '../out/services/ai/agentToolCallParse.js';
 
 let passed = 0, failed = 0;
 const test = (n, fn) => { try { fn(); console.log(`  ✓ ${n}`); passed++; } catch (e) { console.log(`  ✗ ${n}\n    ${e.message}`); failed++; } };
@@ -56,6 +56,18 @@ test('takes the FIRST tool call when several are emitted in one turn', () => {
   assert.strictEqual(d.name, 'edit_file');
   assert.strictEqual(d.args.search, 'a');   // FIRST call, not the second
   assert.strictEqual(d.args.replace, 'b');
+});
+
+test('countToolCalls counts a single call as 1', () => {
+  assert.strictEqual(countToolCalls('<tool_call>{"name":"read_file","args":{}}</tool_call>'), 1);
+});
+test('countToolCalls counts the step-8 batch (6 edits + 1 command)', () => {
+  const batch = Array(6).fill('<tool_call>{"name":"edit_file","args":{}}</tool_call>').join('\n')
+    + '\n<tool_call>{"name":"run_command","args":{}}</tool_call>';
+  assert.strictEqual(countToolCalls(batch), 7);
+});
+test('countToolCalls is 0 for prose', () => {
+  assert.strictEqual(countToolCalls('All done, tests pass.'), 0);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

@@ -981,6 +981,25 @@ Auto-managed by Redivivus. Append-only session history.
 - Rules added to: .windsurfrules (Rules 13-17), .chassis/rules.md (Rules 13-17), CLAUDE.md (Rules 13-17)
 - These rules were learned the hard way during the May 8 2026 Architecture Map Timeline debugging session — see CHASSIS_ROADMAP.md Recent Fixes for full history.
 
+## [2026-06-22]
+- **Session: Native Function Calling Overhaul — cross-AI reliability fix**
+- Root cause identified: agent loop was using a custom `<tool_call>` XML text protocol that no model was trained on. Every AI had to "guess" the format from the system prompt, causing hallucinations, silent drops, and divergent output (Gemini emitting `<tool_code>`, DeepSeek ignoring tools, etc.). Windsurf uses native APIs and had no issues — Redivivus had to match that.
+- **New file: `src/services/ai/agentNativeCall.ts`** — three dialect callers (Anthropic, Gemini, OpenAI-compat) + message converters + `AgentMessage`/`ToolSchema`/`NativeCallResult` types
+- **`agentTools.ts` + `agentToolsNetwork.ts`** — added `inputSchema` (JSON Schema) to all 10 tools (7 built-in + 3 network)
+- **`agentService.ts`** — rewired to use `nativeAgentCall` + structured `AgentMessage[]` history; all guards adapted to use `appendUserNote()`; token ledger recording restored
+- **`agentPrompt.ts`** — removed the embedded `<tool_call>` XML tool protocol section; added [DEAD] annotation explaining why
+
+### Model-specific fixes shipped this session:
+1. **OpenAI o3/o4-mini** — `developer` role (not `system`), `max_completion_tokens` (not `max_tokens`), no `parallel_tool_calls`
+2. **DeepSeek R1 (`deepseek-reasoner`)** — fail-fast before API call so failover moves to `deepseek-chat`
+3. **Gemini SAFETY/MALFORMED_FUNCTION_CALL** — `finishReason` checked before reading `parts` to avoid silent empty-text loop
+4. **`parallel_tool_calls: false`** — only sent to openai/xai/groq; omitted for kimi/deepseek to avoid 422
+5. **Gemini 2.5 Pro thinking budget** — capped at 1024 tokens/turn (was dynamic, up to 24K); Flash set to 0
+6. **Token usage tracking** — all three dialects now parse and return `usage`; Gemini includes `thoughtsTokenCount`; ledger records on every turn
+
+### Known remaining issue:
+- **Groq 32K context wall** — Llama 3.3 70B will hit the context limit around step 10-15 on file-heavy runs; failover catches it but wastes setup. Fix requires message pruning (keep first user msg + most recent N turn pairs, drop middle).
+
 ## [2026-05-13]
 - Action: Critical iteration loop bug fixes (Session 4)
 - **Bug 1 fixed:** Free-text follow-up after build was consumed by stale scope question resolver

@@ -14,6 +14,17 @@
 //   • when a model emits SEVERAL calls in one turn (and even fabricates the <tool_result>s between them, as
 //     Gemini does), we take only the first real call and let the loop run it; greedy matching here would span
 //     all of them into invalid JSON and the call would be silently dropped (the step-7 "formatting hiccup").
+// How many tool calls did this turn contain? Models like Gemini batch SEVERAL per turn (and fabricate the
+// <tool_result>s between them), but the loop runs ONE per turn — so the rest silently don't execute and the
+// model finalizes believing they ran (observed 2026-06-22: 6 edit_file + npm test in one turn → only the first
+// edit ran → app.js half-done). The loop uses this to tell the model the others did NOT run. Counts wrapper
+// openings (XML tags or fenced blocks) that contain a JSON object.
+export function countToolCalls(text: string): number {
+  const xml = (text.match(/<tool_(?:call|code)\b[^>]*>\s*\{/g) || []).length;
+  const fenced = (text.match(/```(?:tool_code|tool_call)\s*\n?\s*\{/g) || []).length;
+  return xml + fenced;
+}
+
 export function matchToolCall(text: string): RegExpMatchArray | null {
   // 1) XML tags — tolerant of attributes/whitespace and of mismatched call/code open/close.
   const xml = text.match(/<tool_(?:call|code)\b[^>]*>\s*(\{[\s\S]*?\})\s*<\/tool_(?:call|code)>/);

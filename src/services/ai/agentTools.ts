@@ -9,6 +9,21 @@ import { resolveToolGap } from './toolGapEscalation.js';
 import { buildToolGapDeps, noteToolGapOnFailure } from './agentToolGap.js';
 import { runShell, trimForModel, IDLE_MS, HARD_MS } from './agentToolsExec.js';
 
+// [PHANTOM-GUARD] A weak model often invents a CONVENTIONAL layout (src/routes/, src/utils/validation.ts,
+// controllers/…) that THIS project doesn't use, then edits/reads files that don't exist and gives up. When a
+// file isn't found, append the project's REAL file list so the model corrects to reality instead of guessing
+// another phantom. Best-effort; returns '' if the lister isn't available.
+async function realFilesHint(root: string): Promise<string> {
+  try {
+    const { listSourceFiles } = await import('../workspace/codebaseSearch.js');
+    const files = listSourceFiles(root, false, 30).map((f: any) => f.rel);
+    if (files.length) {
+      return ` This project's ACTUAL files are: ${files.join(', ')}. Do NOT assume a conventional layout — there is no routes/, controllers/, or utils/ here unless listed above. Read REAL paths only (list_dir / read_file).`;
+    }
+  } catch { /* lister unavailable — fall back to the plain error */ }
+  return '';
+}
+
 export interface AgentContext {
   root: string;
   task: string;
@@ -37,7 +52,13 @@ export interface AgentContext {
 export interface AgentTool {
   name: string;
   description: string;
-  parameters: string; // JSON schema or description of args
+  parameters: string; // [LEGACY] text description kept for fallback rendering
+  // [NATIVE] JSON Schema used for native API function calling (Anthropic/Gemini/OpenAI dialects).
+  inputSchema: {
+    type: 'object';
+    properties: Record<string, { type: string; description: string }>;
+    required?: string[];
+  };
   execute: (args: any, context: AgentContext) => Promise<string>;
 }
 
@@ -80,9 +101,10 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     name: 'read_file',
     description: 'Reads the contents of a file in the workspace.',
     parameters: '{ "filePath": "string (relative path)" }',
+    inputSchema: { type: 'object', properties: { filePath: { type: 'string', description: 'Relative path to the file within the project' } }, required: ['filePath'] },
     execute: async (args: any, ctx: AgentContext) => {
       const absPath = path.join(ctx.root, args.filePath);
-      if (!fs.existsSync(absPath)) { return `Error: File ${args.filePath} does not exist.`; }
+      if (!fs.existsSync(absPath)) { return `Error: File ${args.filePath} does not exist.${await realFilesHint(ctx.root)}`; }
       try {
         const content = fs.readFileSync(absPath, 'utf8');
         return content;
@@ -95,6 +117,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     name: 'write_file',
     description: 'Writes or overwrites a file in the workspace with new content. Use this to create new files or completely replace existing ones.',
     parameters: '{ "filePath": "string (relative path)", "content": "string (file content)" }',
+    inputSchema: { type: 'object', properties: { filePath: { type: 'string', description: 'Relative path to write the file to' }, content: { type: 'string', description: 'Full content to write to the file' } }, required: ['filePath', 'content'] },
     execute: async (args: any, ctx: AgentContext) => {
       const absPath = path.join(ctx.root, args.filePath);
       try {
@@ -160,6 +183,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     name: 'run_command',
     description: 'Executes a shell command in the project directory and returns the output (e.g. npm install, gcc).',
     parameters: '{ "command": "string (shell command)" }',
+    inputSchema: { type: 'object', properties: { command: { type: 'string', description: 'Shell command to execute in the project root directory' } }, required: ['command'] },
     execute: async (args: any, ctx: AgentContext) => {
       const requested: string = args.command || '';
       // [TOOL-GAP] Before running, check the command against the Supervisor's approved plan. In-plan →
@@ -255,6 +279,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     name: 'ask_user',
     description: 'Pauses the agent loop and asks the user for clarification or permission.',
     parameters: '{ "question": "string" }',
+    inputSchema: { type: 'object', properties: { question: { type: 'string', description: 'The question or clarification to ask the user' } }, required: ['question'] },
     execute: async (args: any, ctx: AgentContext) => {
       // This is a special tool. In the real agent loop, this might just yield the question back to chat.
       // For now, we return a system message indicating the loop should pause.
@@ -265,6 +290,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     name: 'list_dir',
     description: 'Lists all files and subdirectories in a directory.',
     parameters: '{ "dirPath": "string (relative path, e.g. \'.\' for root)" }',
+    inputSchema: { type: 'object', properties: { dirPath: { type: 'string', description: "Relative directory path to list, e.g. '.' for the project root" } }, required: ['dirPath'] },
     execute: async (args: any, ctx: AgentContext) => {
       const absPath = path.join(ctx.root, args.dirPath || '.');
       if (!fs.existsSync(absPath)) { return `Error: Directory ${args.dirPath} does not exist.`; }
@@ -281,6 +307,7 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     name: 'read_file_lines',
     description: 'Reads a specific range of lines from a file. Use this instead of cat|tail when a file is large and you only need part of it.',
     parameters: '{ "filePath": "string (relative path)", "startLine": "number (1-based)", "endLine": "number (1-based, inclusive)" }',
+    inputSchema: { type: 'object', properties: { filePath: { type: 'string', description: 'Relative path to the file' }, startLine: { type: 'number', description: '1-based line number to start reading from' }, endLine: { type: 'number', description: '1-based inclusive line number to stop reading at' } }, required: ['filePath', 'startLine', 'endLine'] },
     execute: async (args: any, ctx: AgentContext) => {
       const absPath = path.join(ctx.root, args.filePath);
       if (!fs.existsSync(absPath)) { return `Error: File ${args.filePath} does not exist.`; }
@@ -301,11 +328,12 @@ export const BUILT_IN_TOOLS: AgentTool[] = [
     name: 'edit_file',
     description: 'PREFERRED for changing an EXISTING file: replaces one exact snippet with new text (a surgical SEARCH/REPLACE) and leaves the rest of the file untouched. Always use this instead of write_file when the file already exists — it cannot accidentally drop other code and works even for large files. `search` must match the current file text EXACTLY (read the file first; include enough surrounding lines to be unique). To DELETE code, set replace to "". For a brand-NEW file, use write_file.',
     parameters: '{ "filePath": "string (relative path)", "search": "string (exact existing snippet to find)", "replace": "string (text to put in its place; \\"\\" to delete)" }',
+    inputSchema: { type: 'object', properties: { filePath: { type: 'string', description: 'Relative path of the existing file to edit' }, search: { type: 'string', description: 'Exact snippet from the current file to find — read the file first, copy character-for-character including indentation' }, replace: { type: 'string', description: 'New text to put in place of the search snippet; empty string to delete the snippet' } }, required: ['filePath', 'search', 'replace'] },
     execute: async (args: any, ctx: AgentContext) => {
       const rel = (args.filePath || '').trim();
       const absPath = path.join(ctx.root, rel);
       if (!rel) { return 'Error: filePath is required.'; }
-      if (!fs.existsSync(absPath)) { return `Error: ${rel} does not exist. To create a new file use write_file; edit_file only changes existing files.`; }
+      if (!fs.existsSync(absPath)) { return `Error: ${rel} does not exist. To create a new file use write_file; edit_file only changes existing files.${await realFilesHint(ctx.root)}`; }
       if (typeof args.search !== 'string' || args.search === '') { return 'Error: "search" must be a non-empty exact snippet copied from the current file (read it first).'; }
       try {
         const before = fs.readFileSync(absPath, 'utf8');

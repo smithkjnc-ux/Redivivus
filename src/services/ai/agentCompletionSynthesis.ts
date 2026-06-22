@@ -37,8 +37,10 @@ export function fabricatedFileClaims(modelAnswer: string, filesModified: string[
   const norm = (p: string) => p.replace(/^\.\//, '').replace(/^\/+/, '');
   const touched = new Set(filesModified.map(norm));
   const claimed = new Set<string>();
-  // path-like: at least one slash, ends in a 1-5 char extension; strip surrounding backticks/quotes
-  const re = /[`'"(]?([A-Za-z0-9_.-]*\/[A-Za-z0-9_./-]*\.[A-Za-z0-9]{1,5})[`'")]?/g;
+  // path-like: at least one slash, ends in a 1-8 char extension; strip surrounding backticks/quotes.
+  // [WARN] The cap MUST cover real extensions like `.prisma` (6) and `.graphql` (7) — a {1,5} cap truncated
+  // `schema.prisma` to `schema.prism`, which then didn't match the real file and was wrongly flagged phantom.
+  const re = /[`'"(]?([A-Za-z0-9_.-]*\/[A-Za-z0-9_./-]*\.[A-Za-z0-9]{1,8})[`'")]?/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(modelAnswer)) !== null) { claimed.add(norm(m[1])); }
   const fabricated: string[] = [];

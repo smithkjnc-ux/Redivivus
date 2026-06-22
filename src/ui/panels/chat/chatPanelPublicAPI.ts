@@ -91,14 +91,14 @@ export function restoreConversation(panel: any): void {
       ctx.globalState.update('redivivus.skipConversationRestore', undefined);
       return;
     }
-    // Priority 3: saved per-project history.
-    const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) { return; }
-    const saved = ctx.globalState.get<string>(chatHistoryKey(root));
-    if (saved) {
-      const msgs: ChatMessage[] = JSON.parse(saved);
-      if (Array.isArray(msgs) && msgs.length > 0) { panel.state.conversation = msgs; }
-    }
+    // [FIX] Priority 3 (saved per-project history) is DELIBERATELY not restored on a normal reload — a reload
+    // should give a CLEAN screen. This restore was silently dead for ages (the old pid-keyed chatHistoryKey
+    // never matched after a restart); fixing the key "un-broke" it and surfaced the unwanted behavior: reload
+    // re-loaded the old conversation while the project context resets, leaving an orphaned chat with no project.
+    // An in-progress build still survives via the pendingRescueConversation rescue (Priority 1) above.
+    // [DEAD] was: const saved = ctx.globalState.get(chatHistoryKey(root)); if (saved) panel.state.conversation =
+    // JSON.parse(saved); — re-enable only behind an explicit "restore last conversation" user action.
+    return;
   } catch { /* never block panel creation */ }
 }
 
