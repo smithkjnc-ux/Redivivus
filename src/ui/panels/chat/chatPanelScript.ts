@@ -22,7 +22,9 @@ export function buildChatScript(): string {
     const vscode = acquireVsCodeApi();
     const input = document.getElementById('message-input');
     const conv = document.getElementById('conversation');
-    const clearBtn = document.getElementById('clear-btn');
+    // [FIX] clearBtn captured via getElementById breaks after panelRefresh replaces #header-right innerHTML
+    // (the old element is detached; the new #clear-btn never gets the listener). Use document-level delegation
+    // so it works regardless of how many times the header is surgically re-rendered. See chatPanelHeaderRender.ts.
     const sendBtn = document.getElementById('send-btn');
     input.focus();
     function autoGrow() { input.style.height = 'auto'; input.style.height = Math.min(input.scrollHeight, 160) + 'px'; }
@@ -136,7 +138,7 @@ export function buildChatScript(): string {
         if (action === 'toggle-auto-open-popover') { var pop = document.getElementById('launcher-auto-popover'); if (pop) { pop.style.display = pop.style.display === 'none' ? 'block' : 'none'; } return; }
       }
     });
-    clearBtn.addEventListener('click', () => vscode.postMessage({ type: 'clear-chat' }));
+    document.addEventListener('click', function(e) { var t = e.target; if (t && t.closest && t.closest('#clear-btn')) { vscode.postMessage({ type: 'clear-chat' }); } });
     // [DEAD] ID-based listeners for save-point-btn, map-btn, blueprint-btn removed --
     // those element IDs no longer exist; all header buttons now use data-cmd (handled above).
 

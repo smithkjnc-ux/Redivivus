@@ -269,6 +269,13 @@ export function activate(context: vscode.ExtensionContext) {
         if (closedByUser) {
           context.globalState.update('redivivus.userClosedProject', undefined);
           if (panel?.state) { panel.state.conversation = []; }
+          // [FIX] Clearing conversation in-memory wasn't enough — saveConversation() had already written
+          // it to globalState, so a second reload would restore it. Sweep all chatHistory keys here so
+          // the cleared state is permanent across restarts.
+          try {
+            const keys: readonly string[] = (context.globalState as any).keys?.() ?? [];
+            for (const k of keys) { if (k.startsWith('redivivus.chatHistory.')) { context.globalState.update(k, undefined); } }
+          } catch { /* keys() may be unavailable on older VS Code API — non-fatal */ }
           (panel as any)._initialized = false;
           panel?.refresh?.();
         }
