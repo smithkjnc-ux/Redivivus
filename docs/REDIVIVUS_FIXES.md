@@ -3,6 +3,50 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 22, 2026: Project Category Classification — AI Classifier Replaces Keyword Regex
+
+**File changed:** `src/core/build/chatPanelBuildAutoCreate.ts`
+**What changed:** Replaced `classifyCategory()` regex call with an AI-first category classifier in `autoCreateProject()`. Classifier receives the full task description AND extracted blueprint (`what` + `why`), returns one of: `games / video / web / utilities / tools / apps / NONE`. `classifyCategory()` kept as `catch`-block fallback. `organizeProjects.ts` still uses the regex (no routing available there).
+**Why:** `classifyCategory()` only matched projects with explicit keywords ("game", "website", "api", etc.). "Create a hello file" matched nothing → project landed in the root instead of `utilities/`. AI understands "this is a script that creates a file" without requiring the word "script".
+**Risk:** Low — classifier failure falls back to `classifyCategory()`. If both fail, project lands at root (same as before).
+
+---
+
+## Fix — Jun 22, 2026: Rule 18 Sweep — Regex Intent Detection Replaced with AI Classifiers (4 sites)
+
+**Files changed:**
+- `src/core/routing/chatPanelProjectContextGuard.ts`
+- `src/core/routing/chatPanelMsgSendConfirmCheck.ts`
+- `src/core/routing/chatPanelMsgSendPreCloud.ts`
+
+**What changed:**
+
+1. **`checkProjectContextGuard()` — new build vs fix-existing routing** (highest stakes).
+   Made function `async`, added `routing: RoutingService` param. Replaced `isConfidentNewBuild()` + `isConfidentFixRequest()` regex calls with a single 4-way AI classifier: `NEW_BUILD / FIX_EXISTING / QUESTION / OTHER`. Regex helpers kept as `catch`-block fallback. Caller in `chatPanelMsgSendPreCloud.ts` updated to `await` and pass `deps.routing`. Fixed bug where "make the vehicles look more real" was blocked as a new-build inside an open project.
+
+2. **`checkBuildConfirmation()` — "yes/ok/sure" build confirmation** (high stakes).
+   Replaced `_BUILD_CONFIRM` + `_AGREEMENT` regex gate with AI classifier that includes the last assistant message as context. The model now understands "ok" after a non-build exchange is NOT a confirmation. Regex kept as `catch`-block fallback. Length gate (`< 80 chars`) retained as structural pre-filter.
+
+3. **`looksLikeBugReport` — pre-cloudChat bug detection** (high stakes).
+   Replaced 3-line regex block (matched "issue", "problem", "weird", "strange" — extremely broad) with AI classifier: "Is this describing a bug they want fixed? YES/NO." On classifier failure, falls through to cloudChat. Eliminates false positives on "I have an issue understanding X" or "what's the problem with PHP?".
+
+4. **cloudChat-null fallback routing** (medium stakes).
+   Replaced 3 regex variables (`_isQuestion`, `_hasFixSignal`, `_isImperativeChange`) with single AI classifier returning `FIX / BUILD / CHAT`. Regex block moved into `catch` — only fires when both cloudChat AND `routing.prompt()` are simultaneously unavailable.
+
+**Why:** Rule 18 — regex was simulating language understanding. All four sites could produce wrong routing on paraphrases, non-English phrasing, or tool names embedded in questions.
+**Risk:** Low — every site has a regex catch-block fallback. Classifier failure is always safe (falls through to next stage).
+
+---
+
+## Fix — Jun 22, 2026: Intent Router — File Explainer Trigger Replaced with AI Classifier
+
+**File changed:** `src/core/routing/chatPanelMsgSendKeywords.ts`
+**What changed:** Replaced the entire regex-based file-explainer trigger with a `routing.prompt()` classifier call (~50 tokens). Classifier asks: "Does this message ask to see, list, or have explained the files/folders in the current project? Do not answer YES for questions about specific tools, code, or concepts." On YES → `explainProjectFiles()`. On NO or failure → falls through to AI chat. Also destructured `routing` from `deps`.
+**Why:** Rule 18 — regex was simulating language understanding. The original pattern `what.*files?` matched "What does the **write_file** tool do..." because `file` appears inside `write_file`. The word-boundary patch (interim fix, same session) reduced the surface but could not handle future tool names or phrasing variations. A classifier call understands intent; regex pattern-matches characters.
+**Risk:** Low. Classifier failure falls through silently — the question reaches the AI chat path and gets answered normally. Groq-first (cheapest/free). No regression on "what are these files" — those are clear YES answers.
+
+---
+
 ## Fix — Jun 22, 2026: AI Used Card — HTML Entity Double-Escape in Supervisor Error
 
 **File changed:** `src/core/build/chatPanelBuildBreakdown.ts`

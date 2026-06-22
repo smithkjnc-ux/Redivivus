@@ -6,13 +6,31 @@ import * as path from 'path';
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 
+// Regex fallbacks — used only when AI classifier is unavailable.
 const _BUILD_CONFIRM = /\b(build\s+it|lets\s+(build|do)\s+it|go\s+ahead|make\s+it|start\s+building|lets\s+go)\b/i;
-const _AGREEMENT = /^\s*(yes|yeah|yep|do it|proceed|go ahead|sure|ok|okay|sounds good)\s*[.!]?$|\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
+const _AGREEMENT     = /^\s*(yes|yeah|yep|do it|proceed|go ahead|sure|ok|okay|sounds good)\s*[.!]?$|\b(sounds?\s+(good|great|perfect|awesome)|that('s|\s+is)?\s+(good|great|perfect|awesome)|love\s+it|exactly|yes.*build)\b/i;
 
-// [RULE 18] Structural fast-path only — regex matches short agreement phrases, not intent.
-// The cloud classifier cannot reach back into conversation history so this stays as code.
+// [Rule 18] AI classifier determines whether the user is confirming a build.
+// Length gate (< 80 chars) stays as a structural pre-filter — short messages only.
+// Regex patterns are kept as catch-block fallback when the classifier is unavailable.
 export async function checkBuildConfirmation(lowerText: string, userText: string, deps: MessageHandlerDeps, conversation: any[], refresh: () => void): Promise<boolean> {
-  if (!(_BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText)) || lowerText.length >= 80) { return false; }
+  if (lowerText.length >= 80) { return false; }
+
+  // AI classifier — include last assistant message as context so the model knows what they're confirming.
+  let looksLikeAgreement = false;
+  try {
+    const lastAssistant = [...conversation].reverse().find((m: any) => m.role === 'assistant')?.content?.slice(0, 400) || '';
+    const prompt = `Reply with YES or NO only. The user just sent a very short message. Is the user agreeing or confirming to proceed with building or creating something?
+${lastAssistant ? `What the assistant just said: "${lastAssistant}"\n` : ''}User message: "${userText}"
+Answer YES only if the user is clearly confirming a pending build/create request. A casual "ok" or "sure" responding to a non-build exchange should be NO.`;
+    const result = await deps.routing.prompt(prompt, 12_000);
+    looksLikeAgreement = result.success && !!result.text?.trim().toUpperCase().startsWith('YES');
+  } catch {
+    looksLikeAgreement = _BUILD_CONFIRM.test(lowerText) || _AGREEMENT.test(lowerText);
+  }
+
+  if (!looksLikeAgreement) { return false; }
+
   let foundRequest = '';
   for (let i = conversation.length - 2; i >= 0; i--) {
     if (conversation[i].role === 'user') {

@@ -65,13 +65,18 @@ export async function runPreCloudRouting(
   const hasWorkspace = !!effectiveRoot;
 
   // ── Bug-report pre-classifier: skip cloudChat for clear fix signals ──
-  // [RULE 18] This is a structural signal check (not language understanding). The AI classifier
-  // below handles nuanced intent; this only catches unambiguous failure keywords.
-  const looksLikeBugReport = hasWorkspace && (
-    /\b(blank|empty|not working|broken|error|crash|freeze|hang|slow|weird|strange|bug|issue|problem|fix|correct|repair)\b/i.test(lowerText) ||
-    /\b(preview|browser|screen|display|render|show|load|fetch)\b.*\b(broken|fail|error|blank|empty|not)/i.test(lowerText) ||
-    /\b(game|app|page|site|project)\b.*\b(broken|not working|blank|empty|weird)/i.test(lowerText)
-  );
+  // [Rule 18] AI classifier replaced regex keyword matching — catches bug reports the regex missed
+  // (paraphrases, non-English signals) and avoids false positives on words like "issue" or "problem".
+  let looksLikeBugReport = false;
+  if (hasWorkspace) {
+    try {
+      const bugPrompt = `Reply with YES or NO only. Is this message describing a bug, error, or something that is not working correctly — something the user wants fixed in their project?
+Do NOT answer YES for: general questions, requests to build something new from scratch, or questions about how something works.
+Message: "${userText.slice(0, 300)}"`;
+      const bugResult = await deps.routing.prompt(bugPrompt, 12_000);
+      looksLikeBugReport = bugResult.success && !!bugResult.text?.trim().toUpperCase().startsWith('YES');
+    } catch { /* classifier unavailable — fall through to cloudChat */ }
+  }
   if (looksLikeBugReport) {
     fixLog(`[PRE-CLASSIFY] Bug report detected, routing to fix pipeline: "${userText.slice(0, 60)}..."`);
     await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
@@ -79,7 +84,7 @@ export async function runPreCloudRouting(
   }
 
   // ── Project context guard ──
-  const _ctxBlock = checkProjectContextGuard(userText, conversation, refresh, effectiveRoot);
+  const _ctxBlock = await checkProjectContextGuard(userText, conversation, refresh, deps.routing, effectiveRoot);
   if (_ctxBlock) {
     conversation.push({ role: 'assistant', content: _ctxBlock, timestamp: Date.now() });
     refresh();
@@ -121,14 +126,33 @@ export async function runPreCloudRouting(
 
   // ── cloudChat null: backend unavailable / all providers capped ──
   // [WARN] Do NOT go to handleAIChat for fix/feature requests — it uses promptCheap which silently fails for code.
+  // [Rule 18] AI classifier (routing.prompt, user's own keys) routes intent when cloudChat is down.
+  // Regex is kept as catch-block fallback for when all AI is unavailable simultaneously.
   if (!chatResult) {
     const _ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const _hasProject = !!_ws && !isProjectsContainer(getActiveProjectRoot() || _ws);
-    const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
-    const _hasFixSignal = /\b(cannot|can't|cant|won't|wont|doesn't|doesnt|not working|broken|fails|failing|stuck|wrong|missing|error|crash|freeze|hang|glitch|bug|issue|problem|blank|empty)\b/i.test(userText);
-    const _isImperativeChange = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
-    if (_hasFixSignal || (_hasProject && !_isQuestion && _isImperativeChange)) {
-      fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null -> fix pipeline (project=${_hasProject}, fixSignal=${_hasFixSignal}, imperative=${_isImperativeChange})`);
+    let _routeToFix = false;
+    try {
+      const nullFallbackPrompt = `Reply with FIX, BUILD, or CHAT only.
+- FIX: user describes a bug, error, or broken behavior they want repaired in an existing project
+- BUILD: user wants to create a brand-new project, app, game, or website from scratch
+- CHAT: user is asking a question or having a general conversation
+
+Message: "${userText.slice(0, 300)}"`;
+      const nullResult = await deps.routing.prompt(nullFallbackPrompt, 12_000);
+      if (nullResult.success && nullResult.text) {
+        const t = nullResult.text.trim().toUpperCase();
+        _routeToFix = t.startsWith('FIX') || (t.startsWith('BUILD') && _hasProject);
+      }
+    } catch {
+      // Regex fallback — only fires when both cloudChat AND routing.prompt are unavailable
+      const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
+      const _hasFixSignal = /\b(cannot|can't|cant|won't|wont|doesn't|doesnt|not working|broken|fails|failing|stuck|wrong|missing|error|crash|freeze|hang|glitch|bug|issue|problem|blank|empty)\b/i.test(userText);
+      const _isImperativeChange = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
+      _routeToFix = _hasFixSignal || (_hasProject && !_isQuestion && _isImperativeChange);
+    }
+    if (_routeToFix) {
+      fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null -> fix pipeline (project=${_hasProject})`);
       await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
       return { outcome: 'done' };
     }

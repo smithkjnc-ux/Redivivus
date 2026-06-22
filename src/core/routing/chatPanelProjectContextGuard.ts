@@ -7,10 +7,11 @@
 //   Compound escape:   "open X and build Y", "close project then do Z" — detected and passed through.
 //
 // [WARN] This guard runs BEFORE cloudChat so misroutes never reach the AI pre-pass.
-// [WARN] Only hard-blocks on HIGH-confidence actions. Ambiguous messages pass through unchanged.
+// [Rule 18] AI classifier replaced regex-based intent detection. Regex helpers are catch-block fallback only.
 
 import * as vscode from 'vscode';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
+import type { RoutingService } from '../../services/ai/routingService';
 
 // ── Compound-command detection (user explicitly mentions switching context) ──────────────────────
 // These are allowed through regardless of current project state.
@@ -25,35 +26,28 @@ export function isCompoundContextCommand(text: string): boolean {
   return COMPOUND_PATTERNS.some(p => p.test(text));
 }
 
-// ── Confident build-intent detection (client-side, zero tokens) ──────────────────────────────────
-// Only fires on CLEAR imperative build requests — not "can you" questions, not fix requests.
+// ── Regex fallbacks — used only when AI classifier is unavailable ─────────────────────────────────
 const BUILD_VERBS_RE   = /\b(build|make|create|generate|write|code( up)?|implement|scaffold|start( a| an| the)?)\b/i;
 const FIX_VERBS_RE     = /\b(fix|debug|repair|update|change|improve|edit|modify|refactor|add to|remove from|cannot|broken|not working|fails|error|crash|blank)\b/i;
 const QUESTION_RE      = /^(how|what|why|when|where|who|can you|could you|would you|should|is there|are there|does|do you|will|explain|tell me|show me)\b/i;
-// [FIX] A NEW build names a NEW, indefinite object ("a tetris game", "me a login screen", "a new app"). A request
-// that points at EXISTING content with a definite reference ("the vehicles", "it", "the game", "them") is a
-// MODIFICATION of the open project, not a new build — it must NOT trip the new-build guard. (Caused "make the
-// vehicles look more real" to be wrongly blocked as a build inside frogger — Jun 13, 2026.)
 const NEW_OBJECT_RE    = /\b(a|an|me a|me an|new|another)\b/i;
 const DEFINITE_REF_RE  = /\b(the|this|that|these|those|it|its|them|their|they)\b/i;
 
-// Returns true ONLY when the message is unambiguously a "create something new" request.
 export function isConfidentNewBuild(text: string): boolean {
   const t = text.trim();
-  if (QUESTION_RE.test(t)) { return false; }        // questions never trigger
-  if (FIX_VERBS_RE.test(t)) { return false; }        // fix/repair/update = not a new build
-  if (!BUILD_VERBS_RE.test(t)) { return false; }     // must have a build verb
-  if (t.split(/\s+/).length < 3) { return false; }   // too short to be confident
-  if (!NEW_OBJECT_RE.test(t)) { return false; }      // a new build names a NEW object ("a X", "me a X", "new X")
-  if (DEFINITE_REF_RE.test(t) && !/\bnew\b/i.test(t)) { return false; } // definite ref = modify existing, not new
+  if (QUESTION_RE.test(t)) { return false; }
+  if (FIX_VERBS_RE.test(t)) { return false; }
+  if (!BUILD_VERBS_RE.test(t)) { return false; }
+  if (t.split(/\s+/).length < 3) { return false; }
+  if (!NEW_OBJECT_RE.test(t)) { return false; }
+  if (DEFINITE_REF_RE.test(t) && !/\bnew\b/i.test(t)) { return false; }
   return true;
 }
 
-// Returns true ONLY when the message is clearly a fix/edit/modify request.
 export function isConfidentFixRequest(text: string): boolean {
   const t = text.trim();
-  if (QUESTION_RE.test(t)) { return false; }          // questions pass through
-  if (BUILD_VERBS_RE.test(t) && !FIX_VERBS_RE.test(t)) { return false; } // pure build = not fix
+  if (QUESTION_RE.test(t)) { return false; }
+  if (BUILD_VERBS_RE.test(t) && !FIX_VERBS_RE.test(t)) { return false; }
   return FIX_VERBS_RE.test(t);
 }
 
@@ -75,48 +69,69 @@ function getProjectContext(effectiveRoot?: string): { hasProject: boolean; proje
 // ── Main guard function ───────────────────────────────────────────────────────────────────────────
 // Returns null = no guard fired, proceed normally.
 // Returns a string = block message to show the user.
-export function checkProjectContextGuard(
+// [Rule 18] AI classifier determines intent. Regex helpers are catch-block fallback only.
+export async function checkProjectContextGuard(
   userText: string,
   conversation: ChatMessage[],
   refresh: () => void,
+  routing: RoutingService,
   effectiveRoot?: string
-): string | null {
-  // Compound commands always pass through — user is explicitly managing context
+): Promise<string | null> {
   if (isCompoundContextCommand(userText)) { return null; }
 
   const { hasProject, projectName, isContainer } = getProjectContext(effectiveRoot);
 
+  // AI classifier — ~60 token call, Groq-first. Falls back to regex on failure.
+  let intent: 'new_build' | 'fix_existing' | 'question' | 'other' = 'other';
+  try {
+    const prompt = `Classify this message into exactly one category. Reply with ONLY the category name.
+- NEW_BUILD: creating a brand-new project, app, game, or website from scratch
+- FIX_EXISTING: modifying, fixing, updating, or adding to something that already exists
+- QUESTION: asking a question (how, what, why, explain, tell me, etc.)
+- OTHER: does not clearly fit the above
+
+Message: "${userText.slice(0, 300)}"
+Reply with ONE of: NEW_BUILD, FIX_EXISTING, QUESTION, OTHER`;
+    const result = await routing.prompt(prompt, 12_000);
+    if (result.success && result.text) {
+      const t = result.text.trim().toUpperCase();
+      if (t.includes('NEW_BUILD')) { intent = 'new_build'; }
+      else if (t.includes('FIX_EXISTING')) { intent = 'fix_existing'; }
+      else if (t.includes('QUESTION')) { intent = 'question'; }
+    }
+  } catch {
+    if (QUESTION_RE.test(userText.trim())) { intent = 'question'; }
+    else if (isConfidentNewBuild(userText)) { intent = 'new_build'; }
+    else if (isConfidentFixRequest(userText)) { intent = 'fix_existing'; }
+  }
+
+  if (intent === 'question' || intent === 'other') { return null; }
+
   // ── Guard A: New build attempted while a project is open ─────────────────────────────────────
-  // The user is inside an existing project. A "build me a X" request is almost certainly
-  // an ADDITION to the project (not a completely new project). The fix pipeline handles additions.
-  // We block the standalone new-build path and tell the user their options.
-  // [WARN] Only block on confident new-build signals — ambiguous messages pass through to cloudChat.
-  if (hasProject && isConfidentNewBuild(userText)) {
+  if (hasProject && intent === 'new_build') {
     const name = projectName ? `**${projectName}**` : 'your current project';
     return (
-      `\u{1F6AB} **You\u2019re inside ${name}.**\n\n` +
-      `Builds create a new standalone project \u2014 that can\u2019t be done inside an open project.\n\n` +
+      `\u{1F6AB} **You’re inside ${name}.**\n\n` +
+      `Builds create a new standalone project — that can’t be done inside an open project.\n\n` +
       `**What you can do:**\n` +
-      `- \u201CAdd a login screen to this project\u201D \u2192 I\u2019ll add it here\n` +
-      `- \u201CClose this project, then build me a X\u201D \u2192 I\u2019ll open the projects folder and build\n` +
-      `- \u201COpen the projects folder\u201D \u2192 then ask me to build from there`
+      `- “Add a login screen to this project” → I’ll add it here\n` +
+      `- “Close this project, then build me a X” → I’ll open the projects folder and build\n` +
+      `- “Open the projects folder” → then ask me to build from there`
     );
   }
 
   // ── Guard B: Fix/edit attempted with no project open ────────────────────────────────────────
-  // The user is at the projects container or no folder at all. There's no code to fix.
-  // [WARN] Only block on confident fix signals — Q&A always passes through.
-  if (!hasProject && isConfidentFixRequest(userText)) {
+  if (!hasProject && intent === 'fix_existing') {
     const containerHint = isContainer
-      ? `You\u2019re in the projects folder \u2014 open a specific project first.`
+      ? `You’re in the projects folder — open a specific project first.`
       : `No project is open right now.`;
     return (
       `\u{1F6AB} **No project is open.**\n\n` +
       `${containerHint}\n\n` +
       `**What you can do:**\n` +
-      `- \u201COpen [project name]\u201D \u2192 I\u2019ll switch to it, then you can ask me to fix\n` +
-      `- \u201CBuild me a X\u201D \u2192 create a new project from scratch\n` +
-      `- Ask me any question \u2192 always works without a project`
+      `- “Open [project name]” → I’ll switch to it, then you can ask me to fix\n` +
+      `- “Build me a X” → create a new project from scratch\n` +
+      `- Ask me any question → always works without a project`
     );
   }
 
