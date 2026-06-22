@@ -20,7 +20,7 @@ export interface ModelDef {
 export const MODEL_REGISTRY: ModelDef[] = [
   // ── Claude (Anthropic) ──────────────────────────────────────────────────
   { provider: 'claude', modelId: 'claude-opus-4-8',         label: 'Claude Opus 4.8',    capability: 10, costTier: 9, contextK: 200,  outputK: 32,  thinking: true,  roles: ['ultra'],          strengths: ['deep reasoning', 'architecture', 'security review', 'complex refactor'] },
-  { provider: 'claude', modelId: 'claude-sonnet-4-6',       label: 'Claude Sonnet 4.6',  capability: 8,  costTier: 5, contextK: 200,  outputK: 64,  roles: ['ultra', 'pro'],    strengths: ['code generation', 'multi-file', 'planning', 'review'] },
+  { provider: 'claude', modelId: 'claude-sonnet-4-6',       label: 'Claude Sonnet 4.6',  capability: 8,  costTier: 5, contextK: 200,  outputK: 64,  thinking: true,  roles: ['ultra', 'pro'],    strengths: ['code generation', 'multi-file', 'planning', 'review'] },
   { provider: 'claude', modelId: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', capability: 5,  costTier: 2, contextK: 200,  outputK: 8,   roles: ['flash'],           strengths: ['fast edits', 'simple tasks', 'structured output'] },
 
   // ── Gemini (Google) ─────────────────────────────────────────────────────
@@ -31,20 +31,25 @@ export const MODEL_REGISTRY: ModelDef[] = [
   // ── OpenAI ──────────────────────────────────────────────────────────────
   { provider: 'openai', modelId: 'o3',                      label: 'OpenAI o3',          capability: 10, costTier: 10, contextK: 200, outputK: 32,  thinking: true,  roles: ['ultra'],           strengths: ['logical reasoning', 'math', 'architecture', 'complex debugging'] },
   { provider: 'openai', modelId: 'o4-mini',                 label: 'OpenAI o4-mini',     capability: 7,  costTier: 4,  contextK: 200, outputK: 32,  thinking: true,  roles: ['pro'],             strengths: ['reasoning', 'structured planning', 'cost-effective thinking'] },
-  { provider: 'openai', modelId: 'gpt-4o',                  label: 'GPT-4o',             capability: 8,  costTier: 7,  contextK: 128, outputK: 16,  roles: ['ultra', 'pro'],    strengths: ['APIs', 'full-stack', 'documentation', 'data processing'] },
-  { provider: 'openai', modelId: 'gpt-4o-mini',             label: 'GPT-4o-mini',        capability: 5,  costTier: 1,  contextK: 128, outputK: 16,  roles: ['flash'],           strengths: ['fast completions', 'simple code', 'cheap'] },
+  { provider: 'openai', modelId: 'gpt-4.1',                  label: 'GPT-4.1',            capability: 9,  costTier: 7,  contextK: 1024, outputK: 32, roles: ['ultra', 'pro'],    strengths: ['large context', 'code generation', 'multimodal', 'complex tasks', 'APIs'] },
+  { provider: 'openai', modelId: 'gpt-4.1-mini',             label: 'GPT-4.1-mini',       capability: 7,  costTier: 2,  contextK: 1024, outputK: 32, roles: ['pro', 'flash'],    strengths: ['fast code gen', 'large context', 'cost-effective', 'full-stack'] },
+  { provider: 'openai', modelId: 'gpt-4.1-nano',             label: 'GPT-4.1-nano',       capability: 4,  costTier: 1,  contextK: 1024, outputK: 16, roles: ['flash'],           strengths: ['ultra-fast', 'cheap', 'simple tasks', 'structured output'] },
+  { provider: 'openai', modelId: 'gpt-4o',                   label: 'GPT-4o',             capability: 8,  costTier: 7,  contextK: 128, outputK: 16,  roles: ['ultra', 'pro'],    strengths: ['APIs', 'full-stack', 'documentation', 'data processing'] },
+  { provider: 'openai', modelId: 'gpt-4o-mini',              label: 'GPT-4o-mini',        capability: 5,  costTier: 1,  contextK: 128, outputK: 16,  roles: ['flash'],           strengths: ['fast completions', 'simple code', 'cheap'] },
 
   // ── xAI (Grok) ──────────────────────────────────────────────────────────
-  { provider: 'xai',    modelId: 'grok-3',                  label: 'Grok-3',             capability: 8,  costTier: 6, contextK: 131,  outputK: 32,  roles: ['ultra', 'pro'],    strengths: ['reasoning', 'web-aware', 'creative solutions'] },
-  { provider: 'xai',    modelId: 'grok-3-mini',             label: 'Grok-3-mini',        capability: 5,  costTier: 2, contextK: 131,  outputK: 32,  roles: ['flash'],           strengths: ['fast', 'cost-effective'] },
+  { provider: 'xai',    modelId: 'grok-3',                  label: 'Grok-3',             capability: 8,  costTier: 6, contextK: 131,  outputK: 32,  thinking: true,  roles: ['ultra', 'pro'],    strengths: ['reasoning', 'web-aware', 'creative solutions'] },
+  { provider: 'xai',    modelId: 'grok-3-mini',             label: 'Grok-3-mini',        capability: 5,  costTier: 2, contextK: 131,  outputK: 32,  thinking: true,  roles: ['flash'],           strengths: ['fast', 'cost-effective', 'reasoning'] },
 
   // ── Groq (hosted inference) ─────────────────────────────────────────────
   { provider: 'groq',   modelId: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B',      capability: 6,  costTier: 1, contextK: 32,   outputK: 8,   roles: ['pro', 'flash'],    strengths: ['fastest inference', 'simple code', 'quick answers'] },
+  { provider: 'groq',   modelId: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B (128K)', capability: 6, costTier: 1, contextK: 128, outputK: 8,   roles: ['pro', 'flash'],    strengths: ['large context', 'general coding', 'fast inference', 'quick answers'] },
   { provider: 'groq',   modelId: 'llama-3.1-8b-instant',    label: 'Llama 3.1 8B',       capability: 4,  costTier: 1, contextK: 128,  outputK: 8,   roles: ['flash'],           strengths: ['ultra-fast', 'structured output', 'simple completions'] },
 
   // ── Kimi (Moonshot) ─────────────────────────────────────────────────────
   { provider: 'kimi',   modelId: 'moonshot-v1-128k',        label: 'Kimi 128k',          capability: 6,  costTier: 5, contextK: 128,  outputK: 16,  roles: ['pro', 'flash'],    strengths: ['large context', 'document analysis', 'bulk annotation'] },
   { provider: 'kimi',   modelId: 'moonshot-v1-32k',         label: 'Kimi 32k',           capability: 5,  costTier: 3, contextK: 32,   outputK: 8,   roles: ['flash'],           strengths: ['standard tasks', 'cost-effective'] },
+  { provider: 'kimi',   modelId: 'moonshot-v1-8k',          label: 'Kimi 8k',            capability: 4,  costTier: 2, contextK: 8,    outputK: 4,   roles: ['flash'],           strengths: ['ultra-fast', 'simple tasks', 'lowest cost'] },
 
   // ── DeepSeek ────────────────────────────────────────────────────────────
   { provider: 'deepseek', modelId: 'deepseek-reasoner',     label: 'DeepSeek R1',        capability: 8,  costTier: 2, contextK: 64,   outputK: 8,   thinking: true, roles: ['ultra', 'pro'], strengths: ['deep reasoning', 'math', 'algorithms', 'step-by-step logic'] },

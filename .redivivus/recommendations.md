@@ -4,15 +4,9 @@
 
 ---
 
-## Active Priority: Groq 32K Context Pruning
+## [DONE 2026-06-22] Groq 32K Context Pruning
 
-**Problem:** `llama-3.3-70b-versatile` has a 32K token context window shared between input and output. An agent run that reads several medium files accumulates task description + tool call/result pairs and hits the limit around step 10-15 on file-heavy tasks. Groq returns a 400, failover catches it, but the setup work is wasted.
-
-**Fix needed:** A `pruneMessages(messages, maxTokens)` helper in `agentNativeCall.ts` that, when the estimated message size approaches 28K tokens, drops the oldest assistant+tool message pairs from the middle of the array while keeping:
-- The first user message (task description + context)
-- The most recent 4-6 turns (the model needs recent tool results)
-
-Only needs to run for `provider === 'groq'` (contextK 32). Other providers have 64K-200K+ so this is Groq-specific today.
+`pruneMessages()` is in `agentNativeCall.ts` and wired into `agentService.ts` via `msgsFor()`. Activated automatically for any model with contextK ≤ 32 (currently Groq llama-3.3-70b-versatile and Kimi moonshot-v1-32k). No further action needed.
 
 ---
 

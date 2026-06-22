@@ -1,29 +1,30 @@
 // [SCOPE] AI Routing Roster — determines active AIs, roles, and UI display.
-// Uses roleAssignmentService (model-tier-based) when available, falls back to AI_RANK (provider-based).
-// [WARN] invalidateRosterCache() must be called after any model failure or key change.
+// Uses roleAssignmentService (model-tier-based) when available, falls back to engine scoring (provider-based).
+// [DONE 2026-06-22] Replaced static AI_RANK fallback with dynamic scoreModels(DEFAULT_PROFILE) so the
+//   roster order reflects real capability/cost tradeoffs rather than a hardcoded provider ranking.
+// [WARN] invalidateRosterCache() retained as a no-op for callers — cache removed (scoring is fast, O(n) models).
 
 import * as vscode from 'vscode';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
-import { AI_RANK } from './guardianAI.js';
+import { scoreModels, DEFAULT_PROFILE } from './routingEngine.js';
 
 export interface SwPair { supervisor: string; worker: string | null; }
 
-let _swCache: { pair: SwPair; settingsKey: string } | null = null;
+/** No-op — retained for callers. Scoring is fast enough that caching is not needed. */
+export function invalidateRosterCache(): void { /* intentionally empty */ }
 
-// [FIX] Use key getter functions (which read from SecretStorage via getKeyCached) instead of
-// config.get() (which reads settings.json). Keys live in SecretStorage after migration, so
-// config.get() always returns empty — the cache key was always ",,,,,,|gemini" and never invalidated.
-function _settingsKey(): string {
-  const pairs: Array<[string, () => string | null]> = [
-    ['gemini', getGeminiKey], ['claude', getClaudeKey], ['openai', getOpenAIKey],
-    ['groq', getGroqKey], ['xai', getXAIKey], ['kimi', getKimiKey], ['deepseek', getDeepseekKey],
-  ];
-  return pairs.map(([p, fn]) => fn() ? p : '').join(',')
-    + '|' + (vscode.workspace.getConfiguration('redivivus').get<string>('defaultAI') || '');
+function _rankedProviders(keyMap: Record<string, () => string | null>): string[] {
+  const available: Record<string, boolean> = Object.fromEntries(
+    Object.entries(keyMap).map(([k, fn]) => [k, !!fn()])
+  );
+  const scored = scoreModels(DEFAULT_PROFILE, available);
+  const seen = new Set<string>();
+  const providers: string[] = [];
+  for (const m of scored) {
+    if (!seen.has(m.provider)) { seen.add(m.provider); providers.push(m.provider); }
+  }
+  return providers;
 }
-
-/** Clear the cached roster — call after model failure or key change. */
-export function invalidateRosterCache(): void { _swCache = null; }
 
 export function selectSupervisorAndWorker(keyMap: Record<string, () => string | null>): SwPair {
   // Use roleAssignmentService (model-tier-aware) when registrations are live
@@ -36,34 +37,23 @@ export function selectSupervisorAndWorker(keyMap: Record<string, () => string | 
         worker: assignment.workers[0]?.providerId ?? null,
       };
     }
-  } catch { /* fall through to legacy */ }
+  } catch { /* fall through to engine scoring */ }
 
-  // Legacy fallback: provider-level AI_RANK
-  const key = _settingsKey();
-  if (_swCache && _swCache.settingsKey === key) { return _swCache.pair; }
-  const ranked = Object.entries(AI_RANK)
-    .filter(([ai]) => keyMap[ai]?.())
-    .sort(([, a], [, b]) => (b as number) - (a as number))
-    .map(([ai]) => ai);
-  const pair: SwPair = { supervisor: ranked[0] || 'gemini', worker: ranked.length >= 2 ? ranked[1] : null };
-  _swCache = { pair, settingsKey: key };
-  return pair;
+  // [ENGINE] Score all available providers — replaces static AI_RANK ordering
+  const providers = _rankedProviders(keyMap);
+  return { supervisor: providers[0] || 'gemini', worker: providers.length >= 2 ? providers[1] : null };
 }
 
 export function buildRoster(keyMap: Record<string, () => string | null>): {
   supervisor: string; workers: string[]; guardian: string | null; singleModelMode?: boolean;
 } {
-  const ranked = Object.entries(AI_RANK)
-    .filter(([ai]) => keyMap[ai]?.())
-    .sort(([, a], [, b]) => b - a)
-    .map(([ai]) => ai);
-  if (ranked.length === 0) { return { supervisor: 'gemini', workers: [], guardian: null }; }
-  const singleModelMode = ranked.length === 1;
+  const providers = _rankedProviders(keyMap);
+  if (providers.length === 0) { return { supervisor: 'gemini', workers: [], guardian: null }; }
   return {
-    supervisor: ranked[0],
-    workers: ranked.slice(1),
-    guardian: ranked[0],
-    singleModelMode,
+    supervisor: providers[0],
+    workers: providers.slice(1),
+    guardian: providers[0],  // guardian = highest-scored provider (reviews lower-scored workers)
+    singleModelMode: providers.length === 1,
   };
 }
 

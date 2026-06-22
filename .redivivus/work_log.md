@@ -1000,6 +1000,12 @@ Auto-managed by Redivivus. Append-only session history.
 ### Known remaining issue:
 - **Groq 32K context wall** — Llama 3.3 70B will hit the context limit around step 10-15 on file-heavy runs; failover catches it but wastes setup. Fix requires message pruning (keep first user msg + most recent N turn pairs, drop middle).
 
+## [2026-06-22] Session 2 — Groq context pruning
+
+### Fix shipped:
+- **`agentNativeCall.ts`** — added `estimateTokens()` (private) and `pruneMessages()` (exported). Prunes the oldest middle turn pairs (keeping messages[0] + most recent `keepTurns*2` messages) when the estimated token count approaches a provider's input limit. Iterates tail size down in steps of 2 until it fits; hard-floors at 4 tail messages. Covers Groq `llama-3.3-70b-versatile` (contextK 32) AND Kimi `moonshot-v1-32k` (also contextK 32).
+- **`agentService.ts`** — added `msgsFor(modelId)` closure before the ReAct loop. Looks up `contextK` and `outputK` from `MODEL_REGISTRY`, calls `pruneMessages` only for `contextK ≤ 32`, returns the original `messages` array for all other providers. Applied at both the primary call site and the failover loop — original `messages` array is never mutated so failover to a larger-context provider gets full history.
+
 ## [2026-05-13]
 - Action: Critical iteration loop bug fixes (Session 4)
 - **Bug 1 fixed:** Free-text follow-up after build was consumed by stale scope question resolver

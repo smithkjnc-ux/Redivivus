@@ -3,6 +3,65 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 22, 2026: Model Registry — New Models + Thinking Flags
+
+**File changed:** `src/services/ai/modelRegistry.ts`
+**What changed:**
+- `thinking: true` added to `claude-sonnet-4-6`, `grok-3`, `grok-3-mini`
+- OpenAI `gpt-4.1` (capability 9, 1M ctx), `gpt-4.1-mini` (cap 7, 1M ctx), `gpt-4.1-nano` (cap 4, 1M ctx) added
+- Groq `llama-3.1-70b-versatile` added (128K context — distinct from llama-3.3-70b-versatile which has 32K)
+- Kimi `moonshot-v1-8k` added (8K context, lowest-cost Kimi tier)
+**Why:** Registry was missing the gpt-4.1 family (OpenAI's current main line), the 128K Groq model, and the cheapest Kimi tier. Thinking flags were absent on Sonnet and Grok-3 despite both supporting extended reasoning.
+**Risk:** Low — adds entries only, no existing entries modified except `thinking` flag additions.
+
+---
+
+## Session — Jun 22, 2026: Dynamic AI Router + Context Pruning + Rule 9 Splits
+
+### Groq/Kimi 32K context pruning
+**File changed:** `src/services/ai/agentNativeCall.ts`
+**What changed:** Added `estimateTokens()` (private) and `pruneMessages()` (exported). Keeps messages[0] + most recent N turn pairs; shrinks tail until it fits the provider's (contextK - outputK) * 1000 token budget.
+**Why:** Groq llama-3.3-70b and Kimi moonshot-v1-32k have 32K context windows. By step 10-15 on file-heavy runs the history exceeded the limit, causing HTTP 400 errors. Pruning creates a trimmed copy — original array untouched so failover providers get full history.
+**Risk:** Low — `msgsFor()` in agentService.ts only activates for models with contextK ≤ 32. All other providers receive unmodified messages.
+
+**File changed:** `src/services/ai/agentService.ts`
+**What changed:** Added `msgsFor(modelId)` closure that looks up the registry, returns pruned copy for constrained providers, full array for all others. Both nativeAgentCall sites (primary + failover) use msgsFor.
+**Why:** Same as above — prevents context overflow without mutating conversation history.
+**Risk:** None — pure read path; original `messages` array never modified.
+
+### Dynamic AI router — replaces static hardcoded ordering
+**File changed:** `src/services/ai/routingEngine.ts` (NEW)
+**What changed:** Created dynamic routing engine with `TaskProfile`, `ModelScore`, `scoreModels()`, `analyzeTask()`, `regexProfile()`, `DEFAULT_PROFILE`. Scores every available model against the task on capability, context window, domain fit, thinking support, and speed/cost tradeoffs.
+**Why:** The previous router used a static `AI_RANK` list and hardcoded `['gemini','claude','openai',...].find(has)`. It ignored all capability and domain data, made wrong picks for math/architecture tasks, and silently excluded DeepSeek.
+**Risk:** Low — fallback chain still used when scoring returns zero results.
+
+**File changed:** `src/services/ai/routingComplexity.ts` (REWRITE)
+**What changed:** Removed `aiClassifyComplexity()` (binary simple/complex) and hardcoded provider list. Now calls `analyzeTask()` + `scoreModels()`, deduplicates by provider, builds scored fallback chain. Added `deepseek: getDeepseekKey` to keyMap (was missing).
+**Why:** Binary classification ignored domain/context data. DeepSeek was silently excluded from all chat routing.
+**Risk:** Medium — core chat routing path changed. Smoke test confirmed correct ordering for 6 task types.
+
+**File changed:** `src/services/ai/routingServiceRoster.ts`
+**What changed:** Removed `AI_RANK` import. Added `_rankedProviders()` helper using `scoreModels(DEFAULT_PROFILE, available)`. `invalidateRosterCache()` retained as no-op (callers reference it).
+**Why:** Roster must reflect actual model capability, not a hardcoded list that becomes stale as new models are added.
+**Risk:** Low — roster path is non-critical; sync scoring replaces synchronous array lookup.
+
+### Rule 9 file splits (200-line enforcement)
+**Files changed:** `agentNativeCall.ts` → split into 4 files
+- `agentDialectAnthropic.ts` (61 lines) — toAnthropicMessages + callAnthropic
+- `agentDialectGemini.ts` (78 lines) — toGeminiContents + callGemini
+- `agentDialectOpenAICompat.ts` (69 lines) — constants + toOpenAIMessages + callOpenAICompat
+- `agentNativeCall.ts` trimmed to 116 lines — types + utilities + nativeAgentCall entry point
+**Why:** File reached 322 lines. CLAUDE.md Rule 9 — non-negotiable hard stop.
+**Risk:** None — TypeScript compile clean after split.
+
+**Files changed:** `agentService.ts` (254 lines) → split into 2
+- `agentServiceLoop.ts` (168 lines) — the ReAct while loop + all guard checks
+- `agentService.ts` trimmed to 87 lines — setup, chain build, msgsFor, calls runAgentLoop()
+**Why:** File reached 254 lines. Rule 9 enforcement.
+**Risk:** None — TypeScript compile clean, no logic changed.
+
+---
+
 ## Fix — Jun 17, 2026: Fix Chat Spinner Freezing on Auth Expiry
 
 **Symptom:** When a build failed due to an expired session, the chat UI "send" button spinner would spin indefinitely, preventing the user from interacting further without a full refresh.
