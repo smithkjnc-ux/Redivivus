@@ -18,6 +18,7 @@ import { callExecuteWithFailover } from './agentExecuteFailover.js';
 import { describeProviderError, isSustainedFailure } from './agentFailoverReason.js';
 import { packageManagerGuidance } from './agentPackageManager.js';
 import { synthesizeCompletion, parseTestSummary, isNoOpFabrication } from './agentCompletionSynthesis.js';
+import { matchToolCall } from './agentToolCallParse.js';
 import * as vscode from 'vscode';
 
 export interface AgentExecutionResult {
@@ -168,7 +169,9 @@ export async function executeAgentTask(
     // AI often outputs both in one response (write block + run_command verification call).
     // If we match tool_call first we execute the verification and skip the file write entirely.
     const rawWriteMatch = aiText.match(/<write_file\s+path="([^"]+)">([\s\S]*?)<\/write_file>/);
-    const toolMatch = !rawWriteMatch ? aiText.match(/<tool_call>\s*({[\s\S]*?})\s*<\/tool_call>/) : null;
+    // [TOOLCALL-PARSE] Accept <tool_call> AND <tool_code>/fenced variants — other models (Gemini/Gemma) emit
+    // their native wrapper, which was being silently dropped. See agentToolCallParse.
+    const toolMatch = !rawWriteMatch ? matchToolCall(aiText) : null;
     if (!rawWriteMatch && !toolMatch) {
       // [COMPLETION-GUARD] Refuse a premature "final answer" on an environment/verify task — nothing run, or
       // a script written but never run. See agentCompletionGuard (capped so an impossible task still finishes).
