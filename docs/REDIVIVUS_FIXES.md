@@ -3,7 +3,31 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 22, 2026: Rule 9 Split — extensionCommands.ts (228 → 148 lines)
+## Fix — Jun 23, 2026: Supervisor Software Constraint
+
+**Files changed:**
+- `src/lib/ai/routingServicePrompts.ts` (redivivus-backend) — Added strict software-only constraint to `generateSupervisorPrompt`.
+
+**What changed:** 
+Added a `PROJECT SCOPE CONSTRAINT` to the build Supervisor prompt, explicitly banning the generation of physical hardware, C++/Arduino firmware, and PCB layouts. If the user asks for a physical object like a "clock" or "calculator", the Supervisor is now forced to interpret it as a software application (e.g., a web-based digital clock using HTML/JS/CSS).
+
+**Why:** The Supervisor was taking requests like "make a nixie tube clock" literally and planning physical electronic projects, generating `.ino` firmware files and KiCad PCB instructions. Since Redivivus is a software IDE without physical hardware emulation or CAD tools, these builds were useless. The constraint ensures all builds remain within the domain of software engineering.
+
+**Risk:** Low. Refines the Supervisor boundaries without changing application logic.
+\n## Fix — Jun 23, 2026: Claude & OpenAI Fake Model ID Mapping
+
+**Files changed:**
+- `src/lib/ai/executor.ts` (redivivus-backend) — Map internal Claude/OpenAI capability IDs to real API model strings, remove temperature param for Claude
+- `src/lib/ai/modelHealthCheck.ts` (redivivus-backend) — Added same mappings to the startup probes
+
+**What changed:** 
+1. Added a `modelMap` in `executeClaude` and `executeOpenAI` (and their respective health probes) to translate internal model names like `claude-sonnet-4-6` to the real Anthropic/OpenAI API IDs (`claude-3-5-sonnet-20241022`, etc.).
+2. Removed the `temperature` parameter from `executeClaude`, as it causes 400 Invalid Request errors on Anthropic API for these models.
+
+**Why:** The model registry (`modelRegistry.ts`) uses internal capability-based model names for Claude and OpenAI (e.g. `claude-opus-4-8`, `gpt-4.1`). When the user selected Claude Opus 4.6, the backend passed this fake model name directly to the Anthropic SDK along with a temperature parameter. The Anthropic API returned a `400 invalid_request` error ("model not found"), causing Claude to drop. The failure cascaded because the fallback model (`claude-sonnet-4-6`) was also unmapped.
+
+**Risk:** Low. The mappings ensure the backend calls real endpoints. No change to the client UI.
+\n## Fix — Jun 22, 2026: Rule 9 Split — extensionCommands.ts (228 → 148 lines)
 
 **Files changed:**
 - `src/extensionCommands.ts` (228 → 148 lines)
