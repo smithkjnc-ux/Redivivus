@@ -73,7 +73,6 @@ export async function runFixFinalize(params: {
   finalizeFixLogger();
   const { presentFixResult } = await import('./chatPanelMsgFixOutput.js');
   await presentFixResult({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns, guardianNote, retryCount, escalated });
-  fixActFinish(written, failed); // [FIX-ACTIVITY] final marker on the Build Activity panel (green if fixed, red if not)
   if (written.length > 0) {
     try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch {}
   }
@@ -103,6 +102,8 @@ export async function runFixFinalize(params: {
     const ctx = { task: userText, root, blueprintContext: '', routing: deps.routing, conversation, refresh, logError: () => {}, vault: deps.vault, postToWebview: (m: any) => deps.panel?.webview?.postMessage(m) };
     await runCompileAutoFix(ctx as any, written);
   }
+
+  fixActFinish(written, failed); // [FIX-ACTIVITY] final marker — after verification + compile so all steps show
 
   // [PREVIEW-AUTOFIX Phase 2] Preview as truth — for a web project, actually RUN the result. Verify/Guardian
   // only READ the code; this proves it executes. If it still doesn't run, say so HONESTLY instead of leaving a

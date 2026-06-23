@@ -64,12 +64,17 @@ export const MAP_SCRIPT_ACTIONS = `
       (unhealthy.length?'FILES WITH HEALTH ISSUES:\\n'+unhealthy.map(n=>'  '+n.id+' ('+n.health+', '+n.todos+' TODOs)').join('\\n')+'\\n\\n':'') +
       (large.length?'OVERSIZED FILES (over 200 lines):\\n'+large.map(n=>'  '+n.id+' ('+n.lines+' lines)').join('\\n')+'\\n\\n':'') +
       (violations.length?'LAYER VIOLATIONS (service imports UI):\\n'+violations.slice(0,5).map(v=>'  '+v).join('\\n')+'\\n\\n':'') +
-      'Based on this topology data, provide:\\n' +
-      '1. Overall structure pattern and health (e.g. monolith, layered, hub-and-spoke)\\n' +
-      '2. Top structural problems with specific file names\\n' +
-      '3. Quick wins a developer could do today\\n' +
-      '4. Plain-English summary (1-2 sentences) for a non-programmer\\n' +
-      'Be direct. No filler.';
+      'Based on this topology data AND the actual file content below, provide a thorough architectural review:\\n\\n' +
+      '1. **Structure pattern and health** — identify the pattern (layered, monolith, hub-and-spoke, etc.), flow direction, and whether separation of concerns is clean.\\n' +
+      '2. **Coupling and dependency problems** — flag concrete classes instantiated inside constructors (tight coupling), missing interfaces or abstractions, and any file that imports more than it should.\\n' +
+      '3. **Input validation gaps** — list every public method or CLI command that accepts user input without validating it (empty strings, out-of-range values, wrong types).\\n' +
+      '4. **Error handling and resilience** — identify silent failures (errors swallowed without re-throw), missing error propagation, and places that could corrupt data on failure.\\n' +
+      '5. **Type safety issues** — flag use of "any", unsafe casts, or untyped parsed data (e.g. JSON.parse results used without a typed interface).\\n' +
+      '6. **Security concerns** — note side-effects on import, hardcoded paths, missing sanitization, or patterns that could be exploited.\\n' +
+      '7. **Testability** — flag classes that are hard to unit-test because of tight coupling, no dependency injection, or global mutable state.\\n' +
+      '8. **Prioritized quick-wins** — list 3-5 specific, concrete changes a developer could make today, each naming the exact file and line area. Order by impact.\\n' +
+      '9. **Plain-English summary** (2-3 sentences) for a non-programmer.\\n\\n' +
+      'Rules: be specific — name files and methods. Skip sections where there are no issues. No filler. No praise.';
     vs.postMessage({ type: 'architectReview', prompt: prompt });
   };
 
