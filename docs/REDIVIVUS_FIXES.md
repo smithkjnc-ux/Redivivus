@@ -3,6 +3,18 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 23, 2026: Blueprint Inference Software Constraint
+
+**Files changed:**
+- `src/services/blueprint/blueprintInference.ts` (redivivus) — Added SOFTWARE IDE CONSTRAINT to the 5Ws inference prompt.
+
+**What changed:** 
+The frontend prompt that breaks down the user request into the "5 Ws" (WHO, WHAT, WHERE, WHEN, WHY) was modified to explicitly ban the hallucination of physical hardware. The AI is now instructed: "You are in a software-only environment (web, node, python). If the user asks for a physical object (clock, calculator), assume it is a SOFTWARE simulation/application. NEVER assume 'Physical hardware device', 'Arduino', or 'Firmware'."
+
+**Why:** While the backend Supervisor was already constrained, the frontend inference AI was classifying ambiguous physical requests (like "Nixie tube clock") as physical hardware devices and propagating that assumption in the `WHERE` field. This polluted the context passed to the Supervisor, conflicting with the backend constraints and occasionally forcing the Supervisor into hardware hallucination.
+
+**Risk:** Low. Prevents context pollution at the earliest stage of the pipeline without affecting software/web build intents.
+
 ## Fix — Jun 23, 2026: Supervisor Planning File Limit Anchor
 
 **Files changed:**

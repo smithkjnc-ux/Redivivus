@@ -40,6 +40,7 @@ Confidence rules:
 - "unknown": genuinely cannot determine — reserve for cases with no reasonable default
 
 Specific rules (apply these always):
+- SOFTWARE IDE CONSTRAINT: You are in a software-only environment (web, node, python). If the user asks for a physical object (clock, calculator), assume it is a SOFTWARE simulation/application. NEVER assume "Physical hardware device", "Arduino", or "Firmware".
 - ANY game/app/tool with no stated deadline → when = "No hard deadline", confidence = "assumed"
 - ANY game/app/tool with no stated audience → who = "Anyone / general public", confidence = "assumed"
 - ANY game/app/tool with no stated reason → why = "Personal use / fun", confidence = "assumed"
