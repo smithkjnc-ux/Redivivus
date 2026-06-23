@@ -12,7 +12,7 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
   return `${header && header.hasProjectOpen ? `
       <button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>
       <button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>
-      <button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Build History">&#x1F4CB; History</button>
+      <button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Project History">&#x1F4CB; History</button>
       <button class="header-btn" data-cmd="redivivus.showBuildActivity" title="Build Activity — watch or replay the AI pipeline (Supervisor plans &rarr; Worker writes &rarr; Guardian validates), with each step's actual work expandable">&#x1F6E0;&#xFE0F; Activity</button>
       <button class="header-btn header-btn--preview" ${header.primaryAction?.actionAttr}="${header.primaryAction?.actionValue}" title="${header.primaryAction?.tooltip}">${header.primaryAction?.icon} ${header.primaryAction?.label}</button>
       <button class="header-btn header-btn--run" data-cmd="redivivus.runProject" title="Run your project standalone — opens it the way it really runs (web in your browser, scripts in a terminal)">&#x25B6; Run</button>

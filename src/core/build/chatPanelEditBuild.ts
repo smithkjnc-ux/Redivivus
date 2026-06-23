@@ -108,6 +108,14 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     return;
   }
 
+  // [FIX] Snapshot the original file BEFORE writing — enables proper rollback from History.
+  let snapshotId: string | undefined;
+  try {
+    const { SnapshotService } = await import('../../services/snapshotService.js');
+    const snap = new SnapshotService(root);
+    snapshotId = snap.prepare(`[EDIT] ${task.slice(0, 80)}`, [filePath]);
+  } catch { /* snapshot is best-effort */ }
+
   let tempOrigPath: string | undefined;
   try {
     tempOrigPath = path.join(os.tmpdir(), `redivivus-orig-${Date.now()}-${path.basename(absPath)}`);
@@ -125,6 +133,24 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   const added = newLines.filter(l => !oldLines.includes(l)).length;
   const removed = oldLines.filter(l => !newLines.includes(l)).length;
   const diffSummary = `(+${added} / -${removed} lines)`;
+
+  // [FIX] Record to project history so edits appear alongside builds and can be rolled back.
+  if (snapshotId) {
+    try {
+      const { BuildHistoryService, makeBuildHistoryEntry } = await import('../../services/build/buildHistoryService.js');
+      new BuildHistoryService(root).record(makeBuildHistoryEntry({
+        snapshotId,
+        task: `[EDIT] ${task.slice(0, 80)}`,
+        files: [filePath],
+        tokensUsed: 0,
+        costUSD: 0,
+        source: 'ai',
+        supervisor: 'edit',
+        worker: null,
+        resultCardToken: '',
+      }));
+    } catch { /* history is best-effort */ }
+  }
 
   if (tempOrigPath) {
     vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempOrigPath), vscode.Uri.file(absPath), `Redivivus Edit: ${path.basename(filePath)} ${diffSummary}`).then(undefined, () => {});

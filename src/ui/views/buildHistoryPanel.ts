@@ -1,5 +1,5 @@
-// [SCOPE] Redivivus Build History Panel — every build snapshotted; user can revert to any point.
-// [FIX] Removed Save Points tab — snapshots ARE the save points. Git handles major milestones.
+// [SCOPE] Redivivus Project History Panel — every code change snapshotted; user can revert to any point.
+// Records builds, edits (architect fixes, inline fixes), and any AI-driven code mutations.
 // [WARN] Panel posts undo-build message which calls SnapshotService.restore(), falling through to archive if needed.
 
 import * as vscode from 'vscode';
@@ -19,8 +19,9 @@ export function showBuildHistoryPanel(context: vscode.ExtensionContext): void {
 
   if (_panel) { _panel.reveal(vscode.ViewColumn.Beside); _panel.webview.postMessage({ type: 'refresh' }); return; }
 
+  const projectName = path.basename(root);
   _panel = vscode.window.createWebviewPanel(
-    'redivivusBuildHistory', 'Build History',
+    'redivivusBuildHistory', `${projectName} — History`,
     { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false },
     { enableScripts: true, retainContextWhenHidden: true }
   );

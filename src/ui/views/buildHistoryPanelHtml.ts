@@ -1,11 +1,11 @@
-// [SCOPE] Redivivus Build History Panel — HTML template string
+// [SCOPE] Redivivus Project History Panel — HTML template string
 // Extracted from buildHistoryPanel.ts to keep source file under 200 lines.
 // [FIX] Removed Save Points tab — snapshots ARE the save points now. Git handles major milestones.
 
 export function buildHistoryHtml(): string {
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Build History</title>
+<title>Project History</title>
 <style>
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;margin:0;padding:16px;background:var(--vscode-editor-background);color:var(--vscode-foreground);font-size:13px;}
   .panel-title{font-size:14px;font-weight:700;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid var(--vscode-panel-border);color:var(--vscode-foreground);}
@@ -33,9 +33,9 @@ export function buildHistoryHtml(): string {
 </style>
 </head>
 <body>
-<div class="panel-title">Build History</div>
+<div class="panel-title">Project History</div>
 <div class="legend">
-  Every build is snapshotted automatically. <strong>Undo</strong> reverts that specific build.
+  Every code change (builds, edits, architect fixes) is snapshotted automatically. <strong>Undo</strong> reverts that specific change.
   <strong style="color:#c98a00">Archived</strong> = compressed, still fully restorable.
   <strong style="color:#4ec959">First Build</strong> = original version, never removed.
 </div>
