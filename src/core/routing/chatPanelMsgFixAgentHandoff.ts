@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages';
+import { confirmAgentRun } from '../../services/ai/agentPermissionSummary.js';
 
 export async function executeAgentHandoff(
     deps: MessageHandlerDeps,
@@ -20,15 +21,29 @@ export async function executeAgentHandoff(
     // written is non-empty), and the diagnosis-time handoff (Worker never ran → Agent does the FULL task;
     // written is empty). The empty-written check distinguishes them without threading a new flag.
     const fromDiagnosis = written.length === 0;
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
+
+    // [AGENT-CONFIRM] Show plain English summary of what the Agent plans to do and wait for approval.
+    const { approved } = await confirmAgentRun(userText, deps, conversation, deps.refresh, fromDiagnosis);
+    if (!approved) {
+        conversation.push({
+            role: 'assistant',
+            content: `**Cancelled.** The code edits${written.length > 0 ? ` to ${written.map(f => `\`${f}\``).join(', ')} were already saved` : ' were not applied'}. To complete the task manually, run your project's dev/build command in the terminal.`,
+            timestamp: Date.now()
+        });
+        deps.refresh();
+        deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+        return;
+    }
+
     conversation.push({
         role: 'assistant',
         content: fromDiagnosis
-            ? `> 🔄 **Agent Handoff Initiated:** The Supervisor determined up-front that this task needs to run and verify in the environment (building, installing, starting a server, running checks) — something the direct editor can't do. Routing straight to the Agent, with no throwaway code first...`
-            : `> 🔄 **Agent Handoff Initiated:** Simple Pipeline applied the code edits, but the Guardian AI detected that this task requires environment testing (e.g. compiling, starting a server, running checks). Handing off to the Agent to complete verification...`,
+            ? `> 🔄 **Agent running...** Writing files and executing commands now.`
+            : `> 🔄 **Agent running...** Verifying the applied fix in your environment.`,
         timestamp: Date.now()
     });
     deps.refresh();
-    deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
 
     try {
         const { executeAgentTask } = await import('../../services/ai/agentService.js');

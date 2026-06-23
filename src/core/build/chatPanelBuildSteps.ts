@@ -18,6 +18,7 @@ import { writeProjectRoadmapEntry } from '../routing/chatPanelMsgFixUtils';
 import { runCompileAutoFix } from '../../services/build/compileAutoFix';
 import { runTestAutoFix } from '../../services/build/testAutoFix';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
+import { recordBuild } from '../../services/userMemoryService.js';
 
 export interface BuildTarget {
   relPath: string;
@@ -172,6 +173,7 @@ export async function runPostBuildActions(opts: {
   await runTestAutoFix(ctx, allFiles).catch(() => {});
   // [DONE] Extract decisions from this build's conversation and persist to learned.md.
   // Non-blocking — runs after build is complete so it never delays the response.
+  try { recordBuild(); } catch {}
   LearnedMemoryService.extractBuildDecisions(
     ctx.conversation.map(m => ({ role: m.role, content: m.content })),
     task,

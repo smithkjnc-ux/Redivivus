@@ -143,8 +143,8 @@ export async function represcribeAfterRejection(p: {
   if (attempt < maxRetries && userText) {
     fixLog(`[RE-PRESCRIBE] Guardian rejected attempt ${attempt + 1} — calling Supervisor for new prescription`);
     try {
-      const { collectSourceFiles } = await import('./chatPanelMsgFixContext.js');
-      const refreshedFiles = collectSourceFiles(root, userText);
+      const { resolveSourceFiles } = await import('./chatPanelMsgFixContext.js');
+      const refreshedFiles = await resolveSourceFiles(root, userText, deps);
       if (refreshedFiles && refreshedFiles.length > 0) {
         filesBlock = refreshedFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
         fixLog(`[RE-PRESCRIBE] Refreshed file contents for re-prescription (${refreshedFiles.length} files)`);

@@ -18,6 +18,7 @@ import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
 import { showBuildHistoryPanel } from './ui/views/buildHistoryPanel.js';
+import { MemoryPanel } from './commands/memoryPanel.js';
 import { registerInlineCommandsC } from './extensionInlineCommandsC.js';
 
 export function registerInlineCommandsB(
@@ -144,6 +145,10 @@ export function registerInlineCommandsB(
         setTimeout(() => { ChatPanel.currentPanel?.handleMessage({ type: 'send-message', text: `search for ${query}` }); }, 500);
       }
     })
+  );
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redivivus.showMemory', () => MemoryPanel.createOrShow())
   );
 
   registerInlineCommandsC(context, redivivusService, routingService, usageTracker, vaultService);

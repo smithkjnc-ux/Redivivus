@@ -14,6 +14,11 @@ export function getApiSetupHtml(): string {
   const [geminiKey, claudeKey, openaiKey, groqKey, xaiKey, kimiKey, deepseekKey] =
     ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi', 'deepseek'].map(p => getKeyCached(p) || '');
 
+  // [GUIDED MODE] If no key is configured yet, show a simple Gemini-first onboarding view.
+  // Once any key is saved the full panel renders automatically (no flag needed).
+  const hasAnyKey = [geminiKey, claudeKey, openaiKey, groqKey, xaiKey, kimiKey, deepseekKey].some(k => k.length > 0);
+  const guidedMode = !hasAnyKey;
+
   const disabledProviders = config.get<string[]>('disabledProviders') || [];
   const routing = new RoutingService();
   const roster = routing.buildRoster();
@@ -68,17 +73,43 @@ export function getApiSetupHtml(): string {
   };
 
   providers.sort((a, b) => getRank(a.id, a.val) - getRank(b.id, b.val));
-  const providerCards = buildProviderCards(providers, disabledProviders, roster);
+
+  // In guided mode: show only Gemini card up front; wrap others in a hidden section.
+  let providerCards: string;
+  if (guidedMode) {
+    const geminiProvider = providers.find(p => p.id === 'gemini')!;
+    const otherProviders = providers.filter(p => p.id !== 'gemini');
+    const geminiCard = buildProviderCards([geminiProvider], disabledProviders, roster);
+    const otherCards = buildProviderCards(otherProviders, disabledProviders, roster);
+    providerCards = `
+      <div class="guided-banner">
+        <div class="guided-title">&#x1F680; Start with one free key</div>
+        <div class="guided-body">Add a free Gemini key below and you&apos;re ready to build. No credit card needed.<br>You can add more AI providers later for better results on complex projects.</div>
+      </div>
+      ${geminiCard}
+      <div class="guided-more-wrap">
+        <button type="button" class="guided-more-btn" onclick="document.getElementById('other-providers').style.display='block';this.style.display='none';">&#x2795; Show all 6 other providers (optional)</button>
+        <div id="other-providers" style="display:none;">${otherCards}</div>
+      </div>`;
+  } else {
+    providerCards = buildProviderCards(providers, disabledProviders, roster);
+  }
 
   return `<!DOCTYPE html><html><head>
   <style>
     ${API_SETUP_CSS}
+    .guided-banner{background:linear-gradient(135deg,#1a4a2e,#1a3a4a);border:1px solid rgba(78,201,89,0.4);border-radius:12px;padding:20px 24px;margin-bottom:20px;}
+    .guided-title{font-size:18px;font-weight:700;color:#4ec959;margin-bottom:8px;}
+    .guided-body{font-size:13px;color:#cdd6f4;line-height:1.6;}
+    .guided-more-wrap{margin:16px 0;}
+    .guided-more-btn{background:transparent;border:1px solid rgba(255,255,255,0.2);color:#a6adc8;border-radius:8px;padding:10px 18px;font-size:13px;cursor:pointer;transition:all 0.2s;}
+    .guided-more-btn:hover{border-color:rgba(78,201,89,0.5);color:#4ec959;}
   </style></head><body>
   <h1>&#x1F510; Redivivus API Setup</h1>
-  <div class="subtitle">Configure your AI provider API keys -- you only need ONE to get started.</div>
-  <div class="free-tip">&#x1F4A1; <strong>Free options:</strong> Gemini (Google) and Groq both have free tiers -- no credit card needed. Start with either one and add others later.</div>
+  <div class="subtitle">${guidedMode ? 'Get started in 30 seconds &mdash; add one free key.' : 'Configure your AI provider API keys &mdash; you only need ONE to get started.'}</div>
+  ${guidedMode ? '' : '<div class="free-tip">&#x1F4A1; <strong>Free options:</strong> Gemini (Google) and Groq both have free tiers &mdash; no credit card needed. Start with either one and add others later.</div>'}
 
-  <div class="how-it-works">
+  <div class="how-it-works" ${guidedMode ? 'style="display:none;"' : ''}>
     <div class="how-header">&#x1F3AF; How Redivivus uses your AI keys</div>
     <div class="how-grid">
       <div class="how-item">

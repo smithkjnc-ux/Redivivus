@@ -9,6 +9,8 @@ import { fixCostByline, fixErrorHint } from './chatPanelMsgFixUsage.js';
 import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds.js';
 import { fixActFinish } from './fixActivityPanel.js';
 import { runFixFinalize } from './chatPanelMsgFixFinalize.js';
+import { explainFixFailure, formatELI5Block } from '../../services/ai/fixFailureELI5.js';
+import { progressApplying } from '../../services/ui/fixProgressStyle.js';
 
 export interface FixPhase23Params {
   subtasks: string[];
@@ -36,6 +38,7 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
 
   let finalResponse = ''; let workerLabel = 'AI'; let guardianLabel = 'AI'; let guardianNote = ''; let scopeNote = ''; let needsAgentHandoff = false;
   let written: string[] = []; let failed: string[] = []; let skipped: string[] = []; let fixSnapId: string | undefined;
+  let retryCount = 0; let escalated = false;
 
   try {
     if (subtasks.length > 0) {
@@ -54,6 +57,7 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       fixLog('Phase 2: Worker response received', { preview: finalResponse.substring(0, 500), totalLength: finalResponse.length, workerLabel });
       guardianLabel = escalation.guardianLabel; guardianNote = escalation.guardianNote;
       scopeNote = escalation.scopeNote; needsAgentHandoff = escalation.needsAgentHandoff;
+      retryCount = escalation.retryCount; escalated = escalation.escalated;
       if (escalation.retryCount > 0) {
         guardianNote += escalation.escalated ? ' (escalated to best model)' : ` (${escalation.retryCount} retries)`;
       }
@@ -61,7 +65,7 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       fixLog('Phase 3: Applying fix content...');
       const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
       const targetFiles = fileNames.split(', ').slice(0, 3).join(', ');
-      conversation[conversation.length - 1].content = `${supervisorLabel}: diagnosis done\nWorker: fix written\nVerify: done\nGuardian: approved\nWriting ${targetFiles}...`;
+      conversation[conversation.length - 1].content = progressApplying({ supervisorLabel, targetFiles });
       refresh();
       const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
       written = applyRes.written; failed = applyRes.failed; skipped = applyRes.skipped; fixSnapId = applyRes.fixSnapId;
@@ -81,8 +85,10 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
   } catch (err) {
     const _errMsg2 = err instanceof Error ? err.message : String(err);
     const _b642 = Buffer.from(userText, 'utf8').toString('base64');
+    const _eli5Err = await explainFixFailure({ userText, accumulatedCritiques: [], guardianNote: '', errorMessage: _errMsg2, deps }).catch(() => null);
+    const _eli5Block = _eli5Err ? formatELI5Block(_eli5Err) : '';
     conversation[conversation.length - 1].content =
-      `⚠️ **Something went wrong while writing the fix.** ${fixErrorHint(_errMsg2)}\n\n` +
+      `${_eli5Block}⚠️ **Something went wrong while writing the fix.** ${fixErrorHint(_errMsg2)}\n\n` +
       `_Details: ${_errMsg2.slice(0, 300)}_${fixCostByline(deps, root, costBefore)}\n\n` +
       `__RETRY_FIX__:${_b642}__END_RETRY__`;
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
@@ -107,6 +113,8 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       const deadEndNext = plain ? `Try: ${plain} -- use FULL FILE format` : 'Use FULL FILE format with complete file content';
       appendProjectDeadEnd(root, `fix-failed: ${userText.slice(0,80)}`, deadEndReason, deadEndWhat, deadEndNext);
       fixLog('FINAL FAILURE: no parseable output after retry', { plain, skipNote, failedErrors: failed });
+      const _eli5NoOut = await explainFixFailure({ userText, accumulatedCritiques: failed, guardianNote: guardianNote || '', deps }).catch(() => null);
+      const _eli5NoOutBlock = _eli5NoOut ? formatELI5Block(_eli5NoOut) : '';
       // [Stage 3] Extract failure pattern to global dead end vault
       try {
         const base3 = require('../../services/api/apiClient.js').getApiBase();
@@ -121,7 +129,8 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
         fixLog('[GLOBAL_VAULT] Failure extract response', { status: extractRes3.status });
       } catch (e) { fixLog('[GLOBAL_VAULT] Extract failed (non-blocking)', { error: String(e) }); }
       finalizeFixLogger();
-      let failMsg = plain ? `**What I found:** ${plain}\n\n` : '';
+      let failMsg = _eli5NoOutBlock;
+      if (plain) { failMsg += `**What I found:** ${plain}\n\n`; }
       if (prescriptionLines) { failMsg += `**What to do:**\n${prescriptionLines}\n\n`; }
       failMsg += `The fix didn't apply cleanly. Click the button to retry with a more specific prompt:\n\n__RETRY_FIX__:${_b64sug}__END_RETRY__${skipNote}${fixCostByline(deps, root, costBefore)}`;
       conversation[conversation.length - 1].content = failMsg;
@@ -131,5 +140,5 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
   }
 
   const guardianApproved = /approved|skipped/i.test(guardianNote || '');
-  await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels, guardianApproved });
+  await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels, guardianApproved, guardianNote, retryCount, escalated });
 }

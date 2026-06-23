@@ -7,6 +7,7 @@ import type { RedivivusService } from './redivivusService.js';
 import { runExitInterview } from './sessionInterview.js';
 import { generateId } from './sessionStorage.js';
 import { finalizeSession, parseEndSessionData } from './sessionServiceFinalize.js';
+import { generateAndPostSessionSummary } from './sessionSummary.js';
 
 export class SessionService {
   private currentSession: SessionInfo | null = null;
@@ -165,6 +166,8 @@ export class SessionService {
       }
     } catch { /* never block session end */ }
 
+    // Non-blocking session summary card — posts to chat + saves to session_notes.md
+    generateAndPostSessionSummary().catch(() => {});
     vscode.window.showInformationMessage('Redivivus session ended. Roadmap updated.');
   }
 

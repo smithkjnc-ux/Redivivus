@@ -26,9 +26,12 @@ export async function runFixFinalize(params: {
   refresh: () => void;
   allowedRels: Set<string>;
   guardianApproved?: boolean; // [FIX] true when the Guardian already approved — skip the redundant pattern-retry
+  guardianNote?: string;
+  retryCount?: number;
+  escalated?: boolean;
 }): Promise<void> {
   let { written, workerLabel } = params;
-  const { failed, skipped, fixSnapId, diagnosis, supervisorLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels } = params;
+  const { failed, skipped, fixSnapId, diagnosis, supervisorLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels, guardianNote, retryCount, escalated } = params;
 
   // [FIX] Auto-retry if known patterns survived — BUT skip it entirely when the Guardian already APPROVED the
   // fix. retryPatternFix re-runs a FULL escalation (Worker + Verify + Guardian) on its own pattern check; doing
@@ -68,7 +71,7 @@ export async function runFixFinalize(params: {
 
   finalizeFixLogger();
   const { presentFixResult } = await import('./chatPanelMsgFixOutput.js');
-  await presentFixResult({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns });
+  await presentFixResult({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns, guardianNote, retryCount, escalated });
   fixActFinish(written, failed); // [FIX-ACTIVITY] final marker on the Build Activity panel (green if fixed, red if not)
   if (written.length > 0) {
     try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch {}

@@ -8,6 +8,7 @@ import * as os from 'os';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import { deriveFileBase } from '../build/chatPanelBuildInference';
+import { confirmAgentRun } from '../../services/ai/agentPermissionSummary.js';
 
 /** Runs the Agent Mode loop — used by adaptive routing. */
 export async function runAgentMode(userText: string, deps: MessageHandlerDeps, conversation: ChatMessage[], refresh: () => void): Promise<void> {
@@ -70,6 +71,16 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
     projectContext += `\n\nPROJECT FILES:\n- ${files.map(f => vscode.workspace.asRelativePath(f)).slice(0, 100).join('\n- ')}\n\n(Use these exact paths.)`;
   } catch (_e) {}
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
+
+  // [AGENT-CONFIRM] Show plain English pre-run summary and wait for user approval before touching anything.
+  const { approved } = await confirmAgentRun(userText, deps, conversation, refresh, true);
+  if (!approved) {
+    conversation.push({ role: 'assistant', content: `**Cancelled.** No changes were made. Describe what you want differently and I\'ll try again.`, timestamp: Date.now() });
+    refresh();
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
+    return;
+  }
+
   const result = await executeAgentTask(userText, projectContext, deps.routing, agentCtx, agentCtx.log);
   deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' });
   if (!result.success && result.error) {

@@ -7,6 +7,7 @@
 import * as vscode from 'vscode';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
 import { scoreModels, DEFAULT_PROFILE } from './routingEngine.js';
+import { bestModelForRole } from './modelRegistry.js';
 
 export interface SwPair { supervisor: string; worker: string | null; }
 
@@ -97,10 +98,5 @@ export function getAvailableAI(): { ai: string; source: 'redivivus-settings' | '
 
 export function getModelName(): string {
   const ai = getAvailableAI().ai;
-  const modelMap: Record<string, string> = {
-    gemini: 'gemini-2.5-flash', claude: 'claude-sonnet-4-20250514',
-    openai: 'gpt-4o-mini', groq: 'llama-3.3-70b-versatile',
-    xai: 'grok-2-1212', kimi: 'moonshot-v1-8k', deepseek: 'deepseek-chat',
-  };
-  return modelMap[ai] || ai;
+  return bestModelForRole(ai, 'flash')?.modelId ?? ai;
 }

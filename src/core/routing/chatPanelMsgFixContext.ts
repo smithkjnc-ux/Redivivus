@@ -8,6 +8,7 @@ import { getRecentBuildContext } from './chatPanelMsgFixBuildCtx.js';
 import { getLastTerminalError } from '../../services/workspace/terminalErrorService';
 import { getPreviewErrors } from '../../services/workspace/previewErrorService';
 import { listSourceFiles } from '../../services/workspace/codebaseSearch';
+import { fixLog } from '../../services/logging/fixPipelineLogger';
 
 // [FIX] Smart file selection: when userText is provided, send only files relevant to the bug
 // rather than all 50 source files. Mentioned files + their importers come first; others fill to 12.
@@ -110,9 +111,51 @@ export function collectFixContext(root: string, sourceFiles: { rel: string; cont
   return parts.join('\n\n');
 }
 
-// [FIX] resolveSourceFiles is the new name used in chatPanelMsgFix.ts after refactor;
-//       collectSourceFiles is the original. Keep both so the file compiles.
-export { collectSourceFiles as resolveSourceFiles };
+/** AI-assisted file relevance selection — sends only filenames (not content) to a cheap model.
+ *  Returns the AI-ranked subset; falls back to the sync heuristic if the AI call fails.
+ *  [Rule 18] Replaces the keyword exclusion list with a real semantic judgment. */
+export async function resolveSourceFiles(
+  root: string,
+  userText: string,
+  deps?: { routing?: { promptCheap?: Function } },
+): Promise<{ rel: string; content: string }[]> {
+  const all = listSourceFiles(root, true, 50)
+    .filter(f => f.content)
+    .map(f => ({ rel: f.rel, content: f.content! }));
+  if (all.length <= 15 || !userText) { return all; }
+
+  // [Rule 18] Use cheap AI to pick relevant files by filename only — no file content sent.
+  const routing = deps?.routing;
+  if (routing?.promptCheap) {
+    try {
+      const fileList = all.map(f => f.rel).join('\n');
+      const selectionPrompt = `A developer is asking: "${userText.slice(0, 300)}"
+
+Project files:
+${fileList}
+
+Reply with ONLY the filenames most likely relevant to this request, one per line, no explanation. Max 12 files.`;
+      const aiResult = await (routing.promptCheap as Function)(selectionPrompt, 12_000);
+      if (aiResult.success && aiResult.text.trim()) {
+        const picked = aiResult.text.trim().split('\n')
+          .map((l: string) => l.trim().replace(/^[-*•\d.]+\s*/, ''))
+          .filter((l: string) => l.length > 0);
+        const pickedSet = new Set(picked);
+        const matched = all.filter(f => pickedSet.has(f.rel));
+        if (matched.length > 0) {
+          fixLog(`[FILE-SELECT] AI picked ${matched.length} files from ${all.length}: ${matched.map(f => f.rel).join(', ')}`);
+          return matched.slice(0, 12);
+        }
+      }
+    } catch {
+      fixLog('[FILE-SELECT] AI file selection failed — falling back to heuristic');
+    }
+  }
+
+  // Fallback: sync heuristic (no exclusion list for domain words)
+  fixLog('[FILE-SELECT] Using heuristic file selection');
+  return collectSourceFiles(root, userText);
+}
 // [FIX] collectAllFixContext — gathers build context, dead ends, and project rules for the fix pipeline.
 export async function collectAllFixContext(
   root: string,
@@ -120,10 +163,16 @@ export async function collectAllFixContext(
   _userText: string,
   _deps: any
 ): Promise<{ buildContext: string; projectDeadEnds: string; projectRules: string }> {
-  const { readProjectDeadEnds } = await import('./chatPanelMsgFixDeadEnds.js');
-  const { readProjectRules, getRecentBuildContext } = await import('./chatPanelMsgFixBuildCtx.js');
+  const [{ readProjectDeadEnds }, { readProjectRules, getRecentBuildContext }, { LearnedMemoryService }] = await Promise.all([
+    import('./chatPanelMsgFixDeadEnds.js'),
+    import('./chatPanelMsgFixBuildCtx.js'),
+    import('../../services/learnedMemoryService.js'),
+  ]);
   const buildContext = getRecentBuildContext(root, sourceFiles);
   const projectDeadEnds = readProjectDeadEnds(root) || '';
   const projectRules = readProjectRules(root);
-  return { buildContext, projectDeadEnds, projectRules };
+  // Append Guardian-caught never-do entries from knowledge.json (separate store from dead_ends.md)
+  const knowledgeNeverDo = root ? (() => { try { return new LearnedMemoryService(root).getNeverDoForPrompt(); } catch { return ''; } })() : '';
+  const combinedDeadEnds = [projectDeadEnds, knowledgeNeverDo].filter(Boolean).join('\n\n');
+  return { buildContext, projectDeadEnds: combinedDeadEnds, projectRules };
 }

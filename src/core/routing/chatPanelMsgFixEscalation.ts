@@ -5,6 +5,7 @@
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
 import { fixActStep, fixActCode } from './fixActivityPanel.js';
+import { progressEscalating, progressRetrying } from '../../services/ui/fixProgressStyle.js';
 import {
   updateStatus, enrichDepsWithCritiques, runVerifyStep, renderGuardianVerdict,
   represcribeAfterRejection, logExhaustedDeadEnd, isTruncationText,
@@ -173,7 +174,7 @@ export async function runEscalationLoop(params: {
       if (attempt === maxRetries && !escalated) {
         escalated = true;
         conversation[conversation.length - 1].content =
-          `Supervisor (${supervisorLabel}): done\nWorker: retries exhausted — escalating to best model...\nVerify: pending\nGuardian: pending`;
+          progressEscalating({ supervisorLabel });
         refresh();
         // One more attempt with the best model — the enriched deps will force supervisor-level prompting
         continue;
@@ -182,7 +183,7 @@ export async function runEscalationLoop(params: {
       // Log the retry in chat
       if (attempt < maxRetries) {
         conversation[conversation.length - 1].content =
-          `Supervisor (${supervisorLabel}): done\nWorker: rejected — "${critique.slice(0, 80)}" — retrying...\nVerify: pending\nGuardian: pending`;
+          progressRetrying({ supervisorLabel, retryCount: attempt, critique });
         refresh();
       }
     } catch {
@@ -192,7 +193,10 @@ export async function runEscalationLoop(params: {
   }
 
   // All retries + escalation exhausted
-  guardianNote = `Guardian (${guardianLabel}): Failed after ${retryCount} retries${escalated ? ' + escalation' : ''}. Applying best available fix.`;
-  logExhaustedDeadEnd(root, accumulatedCritiques, retryCount, maxRetries, escalated);
-  return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: maxRetries, escalated, forceSurgical, accumulatedCritiques };
+  // [FIX] Loop runs attempt 0..maxRetries inclusive = maxRetries+1 total attempts.
+  // Previously reported retryCount=maxRetries (e.g. "2 retries" when 3 attempts ran).
+  const totalAttempts = maxRetries + 1;
+  guardianNote = `Guardian (${guardianLabel}): Failed after ${totalAttempts} attempt${totalAttempts !== 1 ? 's' : ''}${escalated ? ' + escalation' : ''}. Applying best available fix.`;
+  logExhaustedDeadEnd(root, accumulatedCritiques, totalAttempts, maxRetries, escalated);
+  return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: totalAttempts, escalated, forceSurgical, accumulatedCritiques };
 }

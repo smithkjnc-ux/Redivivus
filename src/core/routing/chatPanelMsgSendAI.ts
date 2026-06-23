@@ -86,9 +86,12 @@ export async function handleAIChat(
           refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); clearPendingScopeQuestion(); return;
         }
         lastResponseModel = aiResponse.model;
-        estimatedTokens = Math.ceil(aiResponse.text.length / 4);
+        // [FIX] Use real API token counts when available; fall back to char-based estimate only if missing.
+        const _inTok = aiResponse.inputTokens ?? 0;
+        const _outTok = aiResponse.outputTokens ?? 0;
+        estimatedTokens = (_inTok + _outTok) > 0 ? (_inTok + _outTok) : Math.ceil(aiResponse.text.length / 4);
         estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
-        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, (lastResponseModel && lastResponseModel !== 'none') ? lastResponseModel : routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
+        await usageTracker?.recordUsage(estimatedTokens, estimatedCost, (lastResponseModel && lastResponseModel !== 'none') ? lastResponseModel : routing.getAvailableAI().ai, _inTok || undefined, _outTok || undefined, 'qa');
         finalText = aiResponse.text || '';
       }
     } else {
@@ -106,9 +109,12 @@ export async function handleAIChat(
         refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); clearPendingScopeQuestion(); return;
       }
       lastResponseModel = aiResponse.model;
-      estimatedTokens = Math.ceil(aiResponse.text.length / 4);
+      // [FIX] Use real API token counts when available; fall back to char-based estimate only if missing.
+      const _inTok = aiResponse.inputTokens ?? 0;
+      const _outTok = aiResponse.outputTokens ?? 0;
+      estimatedTokens = (_inTok + _outTok) > 0 ? (_inTok + _outTok) : Math.ceil(aiResponse.text.length / 4);
       estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
-      await usageTracker?.recordUsage(estimatedTokens, estimatedCost, (lastResponseModel && lastResponseModel !== 'none') ? lastResponseModel : routing.getAvailableAI().ai, aiResponse.inputTokens, aiResponse.outputTokens, 'qa');
+      await usageTracker?.recordUsage(estimatedTokens, estimatedCost, (lastResponseModel && lastResponseModel !== 'none') ? lastResponseModel : routing.getAvailableAI().ai, _inTok || undefined, _outTok || undefined, 'qa');
       finalText = aiResponse.text || '';
     }
 

@@ -8,6 +8,7 @@ import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds';
 import { parseFixResponse, takeSnapshot, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils';
 import { validateOutputFiles } from './chatPanelMsgFixPatterns';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../../services/build/buildHistoryService';
+import { recordFix, learnFromFile } from '../../services/userMemoryService.js';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
 
 function extractPlain(diagnosis: string): string {
@@ -18,12 +19,39 @@ function technicalOnly(diagnosis: string): string {
   return diagnosis.replace(/^PLAIN:.*\n?/m, '').trim();
 }
 
+function buildConfidenceBadge(guardianNote: string, retryCount: number, escalated: boolean): string {
+  const n = (guardianNote || '').toLowerCase();
+  if (/error|skipped \(error/.test(n)) {
+    return `🔴 **Confidence: Unverified** — Guardian encountered an error, fix was not reviewed\n\n`;
+  }
+  if (/no reviewer available/.test(n)) {
+    return `🟠 **Confidence: Unreviewed** — only one AI key configured, no independent review ran\n\n`;
+  }
+  if (escalated) {
+    return `🟠 **Confidence: Low — verify manually** — fix only passed after escalating to a stronger model\n\n`;
+  }
+  if (retryCount >= 2) {
+    return `🟡 **Confidence: Medium** — Guardian approved after ${retryCount} retries\n\n`;
+  }
+  if (retryCount === 1) {
+    return `🟡 **Confidence: Medium** — Guardian approved after 1 retry\n\n`;
+  }
+  if (/trivial/.test(n)) {
+    return `🟢 **Confidence: High** — trivial change, skipped review\n\n`;
+  }
+  if (/approved/.test(n)) {
+    return `🟢 **Confidence: High** — Guardian approved on first attempt\n\n`;
+  }
+  return '';
+}
+
 export async function presentFixResult(params: {
   written: string[]; failed: string[]; skipped: string[]; fixSnapId: string | undefined;
   diagnosis: string; supervisorLabel: string; workerLabel: string; guardianLabel: string;
   scopeNote: string; userText: string; root: string; deps: MessageHandlerDeps; activePatterns: any[];
+  guardianNote?: string; retryCount?: number; escalated?: boolean;
 }): Promise<void> {
-  const { written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns } = params;
+  const { written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, userText, root, deps, activePatterns, guardianNote = '', retryCount = 0, escalated = false } = params;
   const { conversation, refresh } = deps;
 
   const plainSummary = extractPlain(diagnosis);
@@ -57,6 +85,15 @@ export async function presentFixResult(params: {
   if (written.length > 0 && !deps.assistMode) {
     writeProjectRoadmapEntry(root, `AI fix: ${userText.slice(0, 60)}`, written.map(f => `Fixed \`${f}\``).concat([`Supervisor: ${supervisorLabel} Worker: ${workerLabel} Guardian: ${guardianLabel}`]));
     try { new BuildHistoryService(root).record(makeBuildHistoryEntry({ snapshotId: fixSnapId || `fix-${Date.now()}`, task: `[FIX] ${userText.slice(0, 80)}`, files: written, tokensUsed: 0, costUSD: 0, source: 'ai', supervisor: supervisorLabel, worker: workerLabel !== 'AI' ? workerLabel : null, resultCardToken: '' })); } catch {}
+    try { recordFix(); } catch {}
+    // Learn style from written files — capped at 5, non-blocking, zero AI tokens
+    written.slice(0, 5).forEach(rel => {
+      try {
+        const abs = path.join(root, rel);
+        const content = fs.readFileSync(abs, 'utf-8');
+        learnFromFile(abs, content);
+      } catch { /* never surface learning errors */ }
+    });
   }
 
   // Plain-language output
@@ -98,7 +135,9 @@ export async function presentFixResult(params: {
     }
   }
   
+  const confidenceBadge = buildConfidenceBadge(guardianNote, retryCount, escalated);
   conversation[conversation.length - 1].content =
+    confidenceBadge +
     (plainSummary ? `**What I found:** ${plainSummary}\n\n` : '') +
     `**What I changed:**\n${fileList}` +
     `${skipLine}${failLine}${configWarn}${instrWarn}${validWarn}${scopeNote}${previewToken}${aiLabels}${techBlock}${commitToken}`;

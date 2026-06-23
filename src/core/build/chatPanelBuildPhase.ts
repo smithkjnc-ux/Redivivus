@@ -12,6 +12,7 @@ import { formatInspectionReport } from '../inspector/phaseInspectorReport';
 import type { PhaseInspection } from '../inspector/phaseInspector';
 import { isValidBuildRoot } from './chatPanelBuildUtils';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
+import { buildPromptInjection } from '../../services/userMemoryService.js';
 
 // [FIX] Supervisor contract guidance — tells the Supervisor to produce explicit implementation
 // contracts for the Worker, not just problem diagnoses. Applies to ALL local build paths.
@@ -31,7 +32,9 @@ export function createBuildContext(task: string, deps: OrchestratorDeps): BuildC
   const root = isValidBuildRoot(rawRoot) ? rawRoot : '';
   // Enrich task with project-specific never_do rules + supervisor contract guidance
   const neverDo = root ? (() => { try { return new LearnedMemoryService(root).getNeverDoForPrompt(); } catch { return ''; } })() : '';
-  const enrichedTask = neverDo ? `${task}\n\n${neverDo}${SUPERVISOR_CONTRACT_GUIDANCE}` : `${task}${SUPERVISOR_CONTRACT_GUIDANCE}`;
+  const userProfile = (() => { try { return buildPromptInjection(); } catch { return ''; } })();
+  const profilePrefix = userProfile ? `${userProfile}\n\n` : '';
+  const enrichedTask = `${profilePrefix}${task}${neverDo ? `\n\n${neverDo}` : ''}${SUPERVISOR_CONTRACT_GUIDANCE}`;
   return {
     task: enrichedTask, root,
     blueprintContext: deps.blueprintContext,

@@ -33,10 +33,10 @@ export async function routeCloudChatResult(
   hasProjectOpen: boolean,
 ): Promise<void> {
 
-  // [DIAG] Direct write — fixLog is silent until initFixLogger() is called (only happens inside handleFixRequest).
-  // Use appendFileSync so this ALWAYS appears in ~/redivivus_debug.log regardless of pipeline state.
-  const _dbg = require('fs').appendFileSync.bind(null, require('os').homedir() + '/redivivus_debug.log');
-  _dbg(`[CLOUD-RESULT] action=${chatResult.action} conf=${chatResult.confidence ?? 'n/a'} text="${(chatResult.text ?? '').slice(0, 80)}" hasProject=${hasProjectOpen}\n`);
+  // [FIX][M3] Replaced appendFileSync (sync I/O on every message) with fixLog. fixLog is a no-op
+  // until initFixLogger() is called inside handleFixRequest — acceptable since this is routing context.
+  const _dbg = (s: string) => { try { fixLog(s); } catch { /* never block routing on log failure */ } };
+  _dbg(`[CLOUD-RESULT] action=${chatResult.action} conf=${chatResult.confidence ?? 'n/a'} text="${(chatResult.text ?? '').slice(0, 80)}" hasProject=${hasProjectOpen}`);
 
   const releaseInput = () => setTimeout(() => deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }), 200);
   if (chatResult.action === 'offtopic') { chatResult.action = 'answer'; }

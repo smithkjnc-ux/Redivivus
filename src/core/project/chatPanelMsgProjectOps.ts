@@ -104,6 +104,8 @@ export async function handleToggleSetting(msg: any, conversation: ChatMessage[],
     const behaviorText = msg.value === 'lastProject' ? 'always open your last project' : 'show the launcher screen';
     conversation.push({ role: 'assistant', content: `Setting saved: Redivivus will ${behaviorText} on startup.`, timestamp: Date.now() });
     refresh();
+  } else if (msg.setting === 'progressStyle' && (msg.value === 'plain' || msg.value === 'technical')) {
+    await vscode.workspace.getConfiguration('redivivus').update('progressStyle', msg.value, true);
   }
 }
 

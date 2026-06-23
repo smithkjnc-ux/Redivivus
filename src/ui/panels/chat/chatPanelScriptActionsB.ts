@@ -160,6 +160,17 @@ export function buildActionsScriptB(): string {
         if (b64) { try { const rawPath = decodeURIComponent(escape(atob(b64))); vscode.postMessage({ type: 'run-project', path: rawPath }); } catch(e) {} }
         return;
       }
+      // Progress style toggle button
+      const progressBtn = target.id === 'progress-style-btn' ? target : (target.closest ? target.closest('#progress-style-btn') : null);
+      if (progressBtn) {
+        const current = progressBtn.getAttribute('data-current-style') || 'plain';
+        const next = current === 'plain' ? 'technical' : 'plain';
+        progressBtn.setAttribute('data-current-style', next);
+        progressBtn.innerHTML = next === 'plain' ? '&#x1F4AC; Plain' : '&#x2699;&#xFE0F; Technical';
+        progressBtn.title = next === 'plain' ? 'Showing plain English progress. Click for technical (Supervisor/Worker/Guardian) mode.' : 'Showing technical progress. Click for plain English mode.';
+        try { vscode.postMessage({ type: 'toggle-setting', setting: 'progressStyle', value: next }); } catch(e) {}
+        return;
+      }
     });
   `;
 }

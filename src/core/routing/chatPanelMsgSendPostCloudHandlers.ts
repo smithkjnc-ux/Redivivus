@@ -36,21 +36,40 @@ export async function handleAnswerClarifyResult(
     return 'fall-through-build';
   }
 
-  const _isImperative = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
-  const _isBugReport = /\b(broken|bug|doesn't work|not working|error|crash|fail|fails|glitch|stuck|missing|wrong|nothing happens|does nothing|won't start)\b/i.test(userText);
-  const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
-  const _isRecoverableToFix = hasProjectOpen && (_isImperative || _isBugReport) && !_isQuestion;
-
-  if (_isRecoverableToFix) {
-    dbg(`[IMPERATIVE-RECOVERY] action=${chatResult.action} + open project + imperative → routing to fix\n`);
-    fixLog(`[IMPERATIVE-RECOVERY] ${chatResult.action} on imperative inside open project → routing to fix`);
-    await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
-    return 'handled';
+  // [Rule 18] Use a tiny AI call to decide recovery — no regex intent detection.
+  // cloudChat returned 'answer/clarify' but the project is open; ask a fast model whether
+  // this is really a code-change request (FIX) or a genuine question (CHAT).
+  // Regex kept only as catch fallback when all AI providers are unavailable simultaneously.
+  if (hasProjectOpen && !isProjectsContainer(effectiveRoot || '')) {
+    let _isRecoverableToFix = false;
+    try {
+      const recoveryPrompt = `A project is open in the editor. The user said: "${userText.slice(0, 300)}"
+The AI classified this as '${chatResult.action}' but may have been wrong.
+Reply with FIX if the user wants to change, add, remove, or repair something in their code.
+Reply with CHAT if the user is asking a question or having a conversation.
+Reply with only FIX or CHAT.`;
+      const recoveryResult = await deps.routing.promptCheap(recoveryPrompt, 12_000);
+      if (recoveryResult.success && recoveryResult.text) {
+        _isRecoverableToFix = recoveryResult.text.trim().toUpperCase().startsWith('FIX');
+      }
+    } catch {
+      // Regex fallback — only when all AI providers are down
+      const _isImperative = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
+      const _isBugReport = /\b(broken|bug|doesn't work|not working|error|crash|fail|fails|glitch|stuck|missing|wrong|nothing happens|does nothing|won't start)\b/i.test(userText);
+      const _isQuestion = /^\s*(how|what|why|when|where|who|which|can you|could you|would you|should|is there|are there|does|do you|did|will|explain|tell me|show me|list|describe)\b/i.test(userText) || userText.trim().endsWith('?');
+      _isRecoverableToFix = (_isImperative || _isBugReport) && !_isQuestion;
+    }
+    if (_isRecoverableToFix) {
+      dbg(`[IMPERATIVE-RECOVERY] action=${chatResult.action} + open project → AI confirmed fix`);
+      fixLog(`[IMPERATIVE-RECOVERY] ${chatResult.action} on imperative inside open project → routing to fix (AI-confirmed)`);
+      await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
+      return 'handled';
+    }
   }
 
   if (!chatResult.text) {
-    dbg(`[SILENT-DROP] no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})\n`);
-    fixLog(`[SILENT-DROP] answer/clarify empty text, no recovery (hasProject=${hasProjectOpen}, imperative=${_isImperative})`);
+    dbg(`[SILENT-DROP] no recovery (hasProject=${hasProjectOpen})`);
+    fixLog(`[SILENT-DROP] answer/clarify empty text, no recovery (hasProject=${hasProjectOpen})`);
     releaseInput();
     return 'handled';
   }

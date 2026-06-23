@@ -18,6 +18,7 @@ import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
 import { checkProjectContextGuard } from './chatPanelProjectContextGuard.js';
 import { getEffectiveProjectRoot } from '../../ui/panels/chat/chatPanelHeaderUtils.js';
 import { recordRoutingCost } from '../../services/build/buildRoutingCostTracker.js';
+import { applyRouteTier } from '../../services/ai/routeClassifier.js';
 
 // Return shape from runPreCloudRouting — either a terminal 'done' (early exit) or
 // 'continue' with the cloudChat result + resolved workspace context for post-cloud routing.
@@ -138,6 +139,9 @@ Message: "${userText.slice(0, 300)}"`;
     }
     if (_routeToFix) {
       fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null -> fix pipeline (project=${_hasProject})`);
+      // [FIX] cloudChat never ran so resolvedTier was never set — classify tier now so the
+      // Supervisor isn't forced to 'pro' for every null-fallback fix regardless of complexity.
+      await applyRouteTier(userText, _hasProject, deps);
       await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
       return { outcome: 'done' };
     }

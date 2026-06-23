@@ -34,6 +34,8 @@ export interface ChatContext {
   projectOpen?: boolean;
 }
 
+const CLOUD_CHAT_TIMEOUT_MS = 30_000;
+
 export async function cloudChat(
   message: string,
   context?: ChatContext,
@@ -42,7 +44,13 @@ export async function cloudChat(
   const token = await getAccountToken();
   const keyHeaders = collectKeyHeaders();
 
-  const res = await fetch(`${getApiBase()}/chat`, {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CLOUD_CHAT_TIMEOUT_MS);
+
+  // [FIX] Promise.race hard deadline — AbortController aborts the connection but Electron's fetch
+  // may not reliably abort body reads. The race guarantees we always throw within CLOUD_CHAT_TIMEOUT_MS
+  // so the input is never locked indefinitely. Matches the pattern in routingService.prompt().
+  const fetchPromise = fetch(`${getApiBase()}/chat`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -50,7 +58,20 @@ export async function cloudChat(
       ...keyHeaders,
     },
     body: JSON.stringify({ message, context, tier }),
+    signal: controller.signal,
   });
+
+  let res: Response;
+  try {
+    res = await Promise.race([
+      fetchPromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`cloudChat timed out after ${CLOUD_CHAT_TIMEOUT_MS}ms`)), CLOUD_CHAT_TIMEOUT_MS + 3_000)
+      ),
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText })) as any;

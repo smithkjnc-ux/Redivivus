@@ -222,6 +222,10 @@
         "title": "Redivivus: Fix Last Terminal Error"
       },
       {
+        "command": "redivivus.showMemory",
+        "title": "Redivivus: Show Memory Panel"
+      },
+      {
         "command": "redivivus.inspectElement",
         "title": "Redivivus: Inspect UI Element - Find Source Code"
       },
@@ -720,6 +724,21 @@
           "type": "boolean",
           "default": true,
           "description": "Guardian AI \u2014 when 2+ AI keys are configured, the higher-ranked AI silently reviews and corrects the worker AI's responses before they reach you. Disable to skip the review step."
+        },
+        "redivivus.eli5Explanations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Plain English failure explanations \u2014 when a fix fails after all retries, Redivivus uses a small AI call (~100 tokens) to explain what went wrong and what to try next in plain English. Turn off to save tokens (the technical error detail is still shown)."
+        },
+        "redivivus.progressStyle": {
+          "type": "string",
+          "default": "plain",
+          "enum": ["plain", "technical"],
+          "enumDescriptions": [
+            "Plain English \u2014 'Reading your code... figuring out what needs to change.' Best for non-technical users.",
+            "Technical \u2014 'Supervisor (Claude): done / Worker: fix written / Guardian: approved'. Best for developers who want pipeline visibility."
+          ],
+          "description": "Fix pipeline progress display style. Can also be toggled live with the button in the chat panel."
         },
         "redivivus.startupBehavior": {
           "type": "string",

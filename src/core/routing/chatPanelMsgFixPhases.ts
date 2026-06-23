@@ -7,6 +7,8 @@ import * as path from 'path';
 import type { MessageHandlerDeps } from './chatPanelMessages';
 import { modelLabel } from './chatPanelMsgFixUtils';
 import { buildSupervisorNotes, buildWorkerRules } from './chatPanelMsgFixPatterns';
+import { fixLog } from '../../services/logging/fixPipelineLogger';
+import { buildPromptInjection } from '../../services/userMemoryService.js';
 
 export async function runPhase1Supervisor(
   userText: string,
@@ -87,15 +89,13 @@ export async function runPhase1Supervisor(
     const k = keysPayload[p];
     return `${p}=${k ? k.slice(0,4)+'…('+k.length+'ch)' : 'MISSING'}`;
   }).join(', ');
-  require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-    `[SUP-KEYS] order=[${supProviderOrder.join(',')}] keys=${_keyDiag} tier=${supervisorTier}\n`);
+  fixLog(`[SUP-KEYS] order=[${supProviderOrder.join(',')}] keys=${_keyDiag} tier=${supervisorTier}`);
   for (const provider of supProviderOrder) {
     // [SUPERVISOR_TIER] Was hardcoded 'pro' — now sized to the request's complexity (see supervisorTier above).
     const pModel = bestModelForRole(provider, supervisorTier)?.modelId || provider;
     // [FIX] Groq has a 12K TPM limit — skip it when file context is too large to avoid 413.
     if (provider === 'groq' && totalSize > 30_000) {
-      require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-        `[SUP-SKIP] groq skipped: totalSize=${totalSize} > 30KB limit\n`);
+      fixLog(`[SUP-SKIP] groq skipped: totalSize=${totalSize} > 30KB limit`);
       continue;
     }
     try {
@@ -107,6 +107,7 @@ export async function runPhase1Supervisor(
           files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
           context: {
             blueprint: _bp || undefined,
+            userProfile: (() => { try { return buildPromptInjection() || undefined; } catch { return undefined; } })(),
             // [CAPABILITY-AWARE SUPERVISOR] The real crew (models + capabilities) the Supervisor can assign work to.
             workerRoster,
             // [LIVING BLUEPRINT Phase 3] The trail of accepted changes (how the project got to its present state),
@@ -126,18 +127,15 @@ export async function runPhase1Supervisor(
         })
       }, 120_000);
       const data = await res.json().catch(() => ({}));
-      require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-        `[SUP-ATTEMPT] provider=${provider} model=${pModel} status=${res.status} ok=${res.ok} err=${data?.error||''}\n`);
+      fixLog(`[SUP-ATTEMPT] provider=${provider} model=${pModel} status=${res.status} ok=${res.ok} err=${data?.error || ''}`);
       if (!res.ok) { supLastError = (data && data.error) || `Supervisor API ${res.status}`; continue; }
       if (!data || !data.diagnosis) {
-        require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-          `[SUP-NO-DIAG] provider=${provider} keys=${Object.keys(data||{}).join(',')} success=${data?.success} diagnosis=${JSON.stringify(data?.diagnosis||'').slice(0,120)}\n`);
+        fixLog(`[SUP-NO-DIAG] provider=${provider} keys=${Object.keys(data||{}).join(',')} success=${data?.success} diagnosis=${JSON.stringify(data?.diagnosis||'').slice(0,120)}`);
         supLastError = 'no diagnosis returned'; continue;
       }
       diagRes = data; supProviderUsed = provider; break; // success — this provider is the Supervisor for this fix
     } catch (err: any) {
-      require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log',
-        `[SUP-CATCH] provider=${provider} err=${err?.message||'unknown'}\n`);
+      fixLog(`[SUP-CATCH] provider=${provider} err=${err?.message||'unknown'}`);
       supLastError = err?.message || 'unknown'; continue;
     }
   }

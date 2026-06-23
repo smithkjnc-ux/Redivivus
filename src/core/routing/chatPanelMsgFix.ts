@@ -15,6 +15,7 @@ import { initFixLogger, fixLog, finalizeFixLogger } from '../../services/logging
 import { fixActStart, fixActSupervisor } from './fixActivityPanel.js';
 import { fixSessionCostBefore, fixCostByline, fixErrorHint } from './chatPanelMsgFixUsage.js';
 import { runFixPhase23 } from './chatPanelMsgFixPhase23.js';
+import { progressScanning } from '../../services/ui/fixProgressStyle.js';
 
 // [DEAD] _fixErrorHint moved to chatPanelMsgFixUsage.ts as fixErrorHint (Rule 9 split)
 // [DEAD] Phase 2+3 loop moved to chatPanelMsgFixPhase23.ts (Rule 9 split)
@@ -42,7 +43,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   initFixLogger(root);
   fixLog('=== Fix Request Started ===', { userText, root, imageProvided: !!imageBase64 });
 
-  const sourceFiles = resolveSourceFiles(root, userText);
+  const sourceFiles = await resolveSourceFiles(root, userText, deps);
   fixLog('File scan complete', { count: sourceFiles.length });
   // [FIX] Empty scaffold (no source files yet) — treat as a first build, not a fix.
   if (sourceFiles.length === 0) { await deps.handleBuildRequest(userText, true); return; }
@@ -82,7 +83,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   await (await import('../../services/ai/routeClassifier.js')).applyRouteTier(userText, true, deps);
 
   // Phase 1: Supervisor diagnoses ALL bugs
-  conversation.push({ role: 'assistant', content: `Scanning ${sourceFiles.length} file${sourceFiles.length !== 1 ? 's' : ''}...`, timestamp: Date.now() });
+  conversation.push({ role: 'assistant', content: progressScanning({ fileCount: sourceFiles.length }), timestamp: Date.now() });
   refresh();
   let diagnosis = ''; let supervisorLabel = 'AI'; let subtasks: string[] = []; let executionMode: 'parallel' | 'sequential' = 'sequential';
   try {

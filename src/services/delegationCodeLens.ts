@@ -8,11 +8,19 @@ import * as path from 'path';
 const TAG_RE = /(?:\/\/|#|--|<!--)\s*\[(TODO|WARN)\]\s*(.*?)(?:\s*-->)?$/;
 
 export class DelegationCodeLensProvider implements vscode.CodeLensProvider {
+  private readonly _onDidChangeCodeLenses = new vscode.EventEmitter<void>();
+  public readonly onDidChangeCodeLenses = this._onDidChangeCodeLenses.event;
+
+  constructor() {
+    vscode.languages.onDidChangeDiagnostics(() => this._onDidChangeCodeLenses.fire());
+  }
+
   provideCodeLenses(document: vscode.TextDocument): vscode.CodeLens[] {
     const lenses: vscode.CodeLens[] = [];
     const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
     const relPath = root ? path.relative(root, document.uri.fsPath) : path.basename(document.uri.fsPath);
 
+    // --- [TODO] / [WARN] tag lenses ---
     for (let i = 0; i < document.lineCount; i++) {
       const line = document.lineAt(i);
       const m = TAG_RE.exec(line.text);
@@ -36,6 +44,55 @@ export class DelegationCodeLensProvider implements vscode.CodeLensProvider {
         }));
       }
     }
+
+    // --- Diagnostic error lenses: 💡 Explain + ⚡ Fix above every Error-severity diagnostic ---
+    const diagnostics = vscode.languages.getDiagnostics(document.uri)
+      .filter(d => d.severity === vscode.DiagnosticSeverity.Error);
+
+    // Deduplicate by line — one pair of lenses per line even if multiple errors exist
+    const seenLines = new Set<number>();
+    for (const diag of diagnostics) {
+      const lineIdx = diag.range.start.line;
+      if (seenLines.has(lineIdx)) { continue; }
+      seenLines.add(lineIdx);
+
+      const range = new vscode.Range(lineIdx, 0, lineIdx, 0);
+      const errorMsg = diag.message.replace(/\n/g, ' ').slice(0, 200);
+      const source = diag.source ? `${diag.source}: ` : '';
+      const lineNo = lineIdx + 1;
+
+      // 3 lines of context around the error
+      const ctxStart = Math.max(0, lineIdx - 1);
+      const ctxEnd = Math.min(document.lineCount - 1, lineIdx + 1);
+      const ctxLines: string[] = [];
+      for (let l = ctxStart; l <= ctxEnd; l++) { ctxLines.push(document.lineAt(l).text); }
+      const context = ctxLines.join('\n');
+
+      const explainPrompt =
+        `Explain this error in plain English and tell me exactly how to fix it:\n\n` +
+        `**Error:** \`${source}${errorMsg}\`\n` +
+        `**File:** \`${relPath}\` line ${lineNo}\n\n` +
+        `**Code around the error:**\n\`\`\`\n${context}\n\`\`\``;
+
+      const fixPrompt =
+        `Fix this error in \`${relPath}\` at line ${lineNo}:\n\n` +
+        `**Error:** \`${source}${errorMsg}\`\n\n` +
+        `**Code around the error:**\n\`\`\`\n${context}\n\`\`\``;
+
+      lenses.push(new vscode.CodeLens(range, {
+        title: '$(lightbulb) Explain error',
+        command: 'redivivus.postToChat',
+        arguments: [explainPrompt],
+      }));
+      lenses.push(new vscode.CodeLens(range, {
+        title: '$(zap) Fix with Redivivus',
+        command: 'redivivus.postToChat',
+        arguments: [fixPrompt],
+      }));
+    }
+
     return lenses;
   }
+
+  dispose(): void { this._onDidChangeCodeLenses.dispose(); }
 }

@@ -21,7 +21,7 @@ export async function runSubtasksLoop(params: {
   const { subtasks, diagnosis, fileNames, activePatterns, allowedRels, deps, root, supervisorLabel, userText } = params;
   const { runEscalationLoop } = await import('./chatPanelMsgFixEscalation.js');
   const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
-  const { collectSourceFiles } = await import('./chatPanelMsgFixContext.js');
+  const { resolveSourceFiles } = await import('./chatPanelMsgFixContext.js');
 
   let currentFilesBlock = params.filesBlock;
   const allWritten = new Set<string>();
@@ -62,7 +62,7 @@ export async function runSubtasksLoop(params: {
       if (applyRes.fixSnapId) lastFixSnapId = applyRes.fixSnapId;
 
       if (applyRes.written.length > 0 && i < subtasks.length - 1) {
-        const sourceFiles = collectSourceFiles(root, userText);
+        const sourceFiles = await resolveSourceFiles(root, userText, deps);
         currentFilesBlock = sourceFiles.map((f: any) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
       }
     } catch (err) {

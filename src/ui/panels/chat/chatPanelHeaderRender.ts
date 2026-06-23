@@ -4,6 +4,7 @@
 // recognizes the project — WITHOUT replacing the whole webview.html, which risks a duplicate tab.
 // All buttons use document-level [data-cmd]/[data-action] delegation, so innerHTML replacement is safe.
 
+import * as vscode from 'vscode';
 import type { ChatHeaderInfo } from './chatPanelHtml';
 
 /** Inner HTML for the .header-right container (the top-right pill row). */
@@ -19,6 +20,7 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
       ` : ''}
       ${header && header.projectTokens ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
       <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
+      <button class="header-btn" data-cmd="redivivus.showMemory" title="Memory — what Redivivus has learned about you and this project">&#x1F9E0; Memory</button>
       <button class="header-btn" data-cmd="redivivus.showSystemHealth" title="Network, AI keys, account status, and build log stats" style="${header?.healthStatus === 'green' ? 'border-color:#4caf50;color:#4caf50;' : header?.healthStatus === 'yellow' ? 'border-color:#ff9800;color:#ff9800;' : header?.healthStatus === 'red' ? 'border-color:#f44336;color:#f44336;' : ''}">${header?.healthStatus ? '&#x25CF;' : '&#x25CE;'} Health</button>
       <button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.showChatGettingStarted' : 'redivivus.showCapabilities'}" title="${header && header.hasProjectOpen ? 'How to use Redivivus with your project' : 'What is Redivivus?'}">? Help</button>
       <button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">&#x1F41B; Report</button>`;
@@ -47,10 +49,18 @@ export function renderInputLeftInner(header?: ChatHeaderInfo): string {
     ? JSON.stringify(header.configuredProviders).replace(/"/g, '&quot;')
     : '[]';
 
+  const currentStyle = vscode.workspace.getConfiguration('redivivus').get<string>('progressStyle', 'plain');
+  const isPlain = currentStyle === 'plain';
+  const progressBtn = `<button id="progress-style-btn"
+    data-current-style="${currentStyle}"
+    title="${isPlain ? 'Showing plain English progress. Click for technical (Supervisor/Worker/Guardian) mode.' : 'Showing technical progress. Click for plain English mode.'}"
+    style="font-size:10px;padding:3px 9px;border-radius:99px;border:1px solid #3d3d3d;background:transparent;cursor:pointer;white-space:nowrap;transition:all 0.2s;font-family:inherit;color:#a6adc8;letter-spacing:0.01em;margin-left:6px;"
+  >${isPlain ? '&#x1F4AC; Plain' : '&#x2699;&#xFE0F; Technical'}</button>`;
+
   // Adaptive pill — starts neutral, JS in chatPanelScriptTier.ts drives all live updates.
   return `<button id="adaptive-pill"
     data-providers="${providersJson}"
     title="Adaptive: picks the right AI as you type. Click to lock a specific provider."
     style="font-size:11px;font-weight:600;padding:3px 10px 3px 10px;border-radius:99px;border:1px solid #4caf5055;background:transparent;cursor:pointer;white-space:nowrap;transition:all 0.2s;font-family:inherit;color:#4caf50;letter-spacing:0.01em;"
-  ><span style="font-size:10px;font-weight:700;letter-spacing:0.04em;opacity:0.7;">Adaptive</span></button>`;
+  ><span style="font-size:10px;font-weight:700;letter-spacing:0.04em;opacity:0.7;">Adaptive</span></button>${progressBtn}`;
 }
