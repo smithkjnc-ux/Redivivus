@@ -13,6 +13,37 @@ import { parseLineNum, extractExcerpt, spliceExcerpt,
 
 export type { EditBuildContext };
 
+/** Read the contents of files imported by the target file — gives the Worker awareness of existing
+ *  exports/interfaces so it doesn't invent nonexistent symbols. Limited to direct local imports. */
+function _gatherImportContext(absPath: string, root: string): string {
+  try {
+    const src = fs.readFileSync(absPath, 'utf-8');
+    const importRe = /(?:import|from)\s+['"](\.[^'"]+)['"]/g;
+    const seen = new Set<string>();
+    const chunks: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = importRe.exec(src)) !== null) {
+      const raw = m[1];
+      const dir = path.dirname(absPath);
+      // Try .ts, .js, /index.ts extensions
+      const candidates = [raw, raw + '.ts', raw + '.js', raw + '/index.ts'].map(c => path.resolve(dir, c));
+      for (const c of candidates) {
+        if (seen.has(c)) { break; }
+        if (fs.existsSync(c) && fs.statSync(c).isFile()) {
+          seen.add(c);
+          const content = fs.readFileSync(c, 'utf-8');
+          const relPath = path.relative(root, c);
+          // Limit to first 80 lines to control prompt size
+          const preview = content.split('\n').slice(0, 80).join('\n');
+          chunks.push(`--- RELATED FILE: ${relPath} ---\n\`\`\`\n${preview}\n\`\`\``);
+          break;
+        }
+      }
+    }
+    return chunks.length > 0 ? '\n\nRELATED FILES (these exist — reference their REAL exports, do NOT invent new ones):\n' + chunks.join('\n\n') + '\n' : '';
+  } catch { return ''; }
+}
+
 export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   const { filePath, task, issueType, root, blueprintContext, routing, vault, conversation } = ctx;
   const absPath = path.join(root, filePath);
@@ -57,6 +88,21 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
         `- Write real, working code — no placeholders\n` +
         `- If you must return a full file (e.g. file is tiny), that is also acceptable.`;
     }
+  } else if (issueType === 'refactor') {
+    // [FIX] Refactor edits get related-file context so the Worker knows what exports/interfaces
+    // actually exist in the project — prevents it from inventing nonexistent symbols or files.
+    const importCtx = _gatherImportContext(absPath, root);
+    editPrompt =
+      `Refactor this file \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
+      `TASK: ${task}${bpSection}${importCtx}\n` +
+      `Use SURGICAL EDITS. Output ONLY the changed parts:\n` +
+      `<<<SEARCH\n[exact existing code to find]\n===\n[replacement code]\nREPLACE>>>\n\n` +
+      `RULES:\n- Use <<<SEARCH...REPLACE>>> for each change. Do NOT return the full file.\n` +
+      `- Make REAL code changes — not comments, not placeholders, not annotations.\n` +
+      `- NEVER import from a module that does not exist. If you need a new interface or function, CREATE it in the appropriate existing file using a separate SEARCH/REPLACE block.\n` +
+      `- NEVER reference a symbol unless you can see it in the file content or RELATED FILES above.\n` +
+      `- You may emit multiple SEARCH/REPLACE blocks targeting DIFFERENT files by prefixing: FILE: <relativePath>\n` +
+      `- If you must return a full file (e.g. file is tiny), that is also acceptable.`;
   } else {
     editPrompt =
       `Add Redivivus annotation comments to \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
@@ -129,10 +175,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     return;
   }
 
-  const oldLines = originalContent.split('\n'); const newLines = newContent.split('\n');
-  const added = newLines.filter(l => !oldLines.includes(l)).length;
-  const removed = oldLines.filter(l => !newLines.includes(l)).length;
-  const diffSummary = `(+${added} / -${removed} lines)`;
+  const oldLines = originalContent.split('\n');
 
   // [FIX] Record to project history so edits appear alongside builds and can be rolled back.
   if (snapshotId) {
@@ -152,8 +195,52 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     } catch { /* history is best-effort */ }
   }
 
+  // [FIX] Compile verification for refactor edits — catches broken imports/missing symbols.
+  // If compile fails, attempt ONE auto-fix pass by sending errors back to the AI.
+  if (issueType === 'refactor') {
+    try {
+      const { runCompileCheck } = await import('../../services/build/compileRunner.js');
+      const compResult = runCompileCheck(root);
+      if (!compResult.success && compResult.command) {
+        updateLastMsg(ctx, `📂 Fixing compile errors in \`${filePath}\`...`);
+        const fixPrompt =
+          `The refactor of \`${filePath}\` introduced compile errors. Fix them.\n\n` +
+          `CURRENT FILE:\n\`\`\`\n${fs.readFileSync(absPath, 'utf-8')}\n\`\`\`\n\n` +
+          `COMPILE ERRORS:\n\`\`\`\n${compResult.output.slice(0, 3000)}\n\`\`\`\n\n` +
+          `Use SURGICAL EDITS (<<<SEARCH...REPLACE>>>). Fix ONLY the errors — do not refactor further.\n` +
+          `If a missing import/interface needs to be created in another file, prefix the block with: FILE: <relativePath>`;
+        const fixRes = await routing.routeByComplexity(task, fixPrompt, 60_000);
+        if (fixRes.success && fixRes.text) {
+          const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits } = await import('../../services/build/surgicalEditService.js');
+          if (detectResponseFormat(fixRes.text) === 'surgical') {
+            const edits = parseSurgicalEdits(fixRes.text).map(e => ({ ...e, filePath: e.filePath || filePath }));
+            applySurgicalEdits(edits, root);
+          } else {
+            // Full-file fallback
+            const cleaned = fixRes.text.replace(/^```[a-zA-Z]*\n?/m, '').replace(/\n?```$/m, '').trim();
+            if (cleaned.includes('{') || cleaned.includes('//')) {
+              fs.writeFileSync(absPath, cleaned, 'utf-8');
+            }
+          }
+          newContent = fs.readFileSync(absPath, 'utf-8');
+          const newNewLines = newContent.split('\n');
+          const newAdded = newNewLines.filter(l => !oldLines.includes(l)).length;
+          const newRemoved = oldLines.filter(l => !newNewLines.includes(l)).length;
+          // Update diffSummary references below
+        }
+      }
+    } catch { /* compile check is best-effort */ }
+  }
+
+  // Recompute diff summary from final file state
+  const finalContent = fs.existsSync(absPath) ? fs.readFileSync(absPath, 'utf-8') : newContent;
+  const finalLines = finalContent.split('\n');
+  const finalAdded = finalLines.filter(l => !oldLines.includes(l)).length;
+  const finalRemoved = oldLines.filter(l => !finalLines.includes(l)).length;
+  const finalDiff = `(+${finalAdded} / -${finalRemoved} lines)`;
+
   if (tempOrigPath) {
-    vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempOrigPath), vscode.Uri.file(absPath), `Redivivus Edit: ${path.basename(filePath)} ${diffSummary}`).then(undefined, () => {});
+    vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempOrigPath), vscode.Uri.file(absPath), `Redivivus Edit: ${path.basename(filePath)} ${finalDiff}`).then(undefined, () => {});
   }
 
   let vaultMsg = '';
@@ -162,6 +249,6 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     if (saved > 0) { vaultMsg = `\n💾 Saved **${saved}** new code block${saved !== 1 ? 's' : ''} to vault`; }
   }
 
-  updateLastMsg(ctx, `✅ Fixed \`${filePath}\` ${diffSummary}${vaultMsg}\n\n_Diff view opened — close it to dismiss._`);
+  updateLastMsg(ctx, `✅ Fixed \`${filePath}\` ${finalDiff}${vaultMsg}\n\n_Diff view opened — close it to dismiss._`);
   if (ctx.onBuildFinished) { ctx.onBuildFinished(task, [filePath]); }
 }
