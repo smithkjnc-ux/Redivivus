@@ -40,6 +40,11 @@ export async function panelRefresh(panel: any): Promise<void> {
   const state = panel.state;
   const usageTracker = panel.usageTracker;
   const headerInfo = buildHeaderInfo(panel.redivivus, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
+  // [PANEL-CONTEXT] Detect current conversation mode and filter pills accordingly
+  const lastMsg = state.conversation?.[state.conversation.length - 1];
+  if (lastMsg?.content?.includes('__ARCHITECT_ACTIONS__') || state.conversation?.some((m: any) => m.content?.includes('__ARCHITECT_ACTIONS__'))) {
+    headerInfo.panelContext = 'architect';
+  }
   try { const { getAccountToken } = await import('../../../services/api/apiClient.js'); headerInfo.isSignedIn = !!(await getAccountToken()); } catch {}
   const _panel = panel._panel;
   const _initialized = panel._initialized;
@@ -98,7 +103,9 @@ export async function panelRefresh(panel: any): Promise<void> {
   _panel.webview.postMessage({ type: 'update-conversation', html: htmlToInject });
   try {
     const { renderHeaderRightInner, renderInputLeftInner } = require('./chatPanelHeaderRender.js');
-    _panel.webview.postMessage({ type: 'update-header', headerRight: renderHeaderRightInner(headerInfo), inputLeft: renderInputLeftInner(headerInfo) });
+    const contextLabels: Record<string, string> = { architect: 'Architect Review', map: 'Architecture Map', history: 'Project History' };
+    const panelContextLabel = headerInfo.panelContext && headerInfo.panelContext !== 'chat' ? contextLabels[headerInfo.panelContext] || '' : '';
+    _panel.webview.postMessage({ type: 'update-header', headerRight: renderHeaderRightInner(headerInfo), inputLeft: renderInputLeftInner(headerInfo), panelContextLabel });
   } catch {}
   const root2 = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   saveConversation(state, root2);

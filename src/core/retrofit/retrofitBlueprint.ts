@@ -159,7 +159,7 @@ Return ONLY the JSON object. No markdown, no explanation.`;
         who: blueprint.who, what: blueprint.what,
         where: blueprint.where, when: blueprint.when, why: blueprint.why,
         health: { confirmed: 0, assumed: 5, unknown: 0, confidence: 'medium' },
-        locked: false, version: '1.0',
+        locked: false, version: '1.0', revision: 1,
       };
       fs.mkdirSync(path.dirname(cfgPath), { recursive: true });
       fs.writeFileSync(cfgPath, JSON.stringify(existing, null, 2), 'utf-8');

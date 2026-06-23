@@ -66,6 +66,8 @@ export function buildListenerScript(): string {
       }
       if (msg.type === 'update-header') {
         var hr = document.querySelector('.header-right'); if (hr && msg.headerRight !== undefined) { hr.innerHTML = msg.headerRight; }
+        var pcl = document.getElementById('panel-context-label');
+        if (pcl) { if (msg.panelContextLabel) { pcl.textContent = msg.panelContextLabel; pcl.style.display = ''; } else { pcl.style.display = 'none'; } }
         var il = document.getElementById('input-left'); if (il && msg.inputLeft !== undefined) {
           il.innerHTML = msg.inputLeft;
           // [FIX] Re-apply manual-lock state to the fresh pill — the closure _manualProvider survives

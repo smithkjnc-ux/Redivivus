@@ -24,7 +24,7 @@ export async function scaffoldAt(targetPath: string, projectName: string, bluepr
     when: blueprint.when || today, 
     why: blueprint.why || 'General utility or entertainment',
     health: { confirmed: 0, assumed: 0, unknown: 0, confidence: 'low' as const },
-    locked: false, version: '1.0',
+    locked: false, version: '1.0', revision: 1,
   } : {
     who: 'User', 
     what: projectName, 
@@ -32,7 +32,7 @@ export async function scaffoldAt(targetPath: string, projectName: string, bluepr
     when: today, 
     why: 'General utility or entertainment',
     health: { confirmed: 1, assumed: 4, unknown: 0, confidence: 'low' as const },
-    locked: false, version: '1.0',
+    locked: false, version: '1.0', revision: 1,
   };
 
   // If blueprint provided, compute health scores

@@ -50,6 +50,9 @@ export interface ChatHeaderInfo {
   isSignedIn?: boolean;
   healthStatus?: 'green' | 'yellow' | 'red';
   primaryAction?: { label: string; actionAttr: string; actionValue: string; tooltip: string; icon: string };
+  // [PANEL-CONTEXT] Controls which pills appear in the header. Default 'chat' shows all.
+  // Other contexts hide irrelevant pills (e.g. 'architect' hides Run/PWA/Activity).
+  panelContext?: 'chat' | 'architect' | 'map' | 'history' | 'minimal';
   // [ADAPTIVE-PILL] All configured providers for the manual-picker popover in the webview.
   // Each entry: id = provider key (claude/gemini/...), label = display name, emoji = icon char.
   configuredProviders?: Array<{ id: string; label: string; emoji: string }>;
@@ -86,6 +89,7 @@ export function buildChatHtml(conversation: ChatMessage[], header?: ChatHeaderIn
   <style nonce="${nonce}">${buildChatCss()}</style></head><body>
   <div class="header">
     <div class="header-left">
+      <div id="panel-context-label" style="font-size:10px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#a78bfa;margin-bottom:1px;${header?.panelContext && header.panelContext !== 'chat' ? '' : 'display:none;'}">${header?.panelContext === 'architect' ? 'Architect Review' : header?.panelContext === 'map' ? 'Architecture Map' : header?.panelContext === 'history' ? 'Project History' : ''}</div>
       <div id="project-name-label" style="font-size:12px;font-weight:700;color:var(--vscode-foreground);letter-spacing:0.02em;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;${header && header.hasProjectOpen && header.projectName ? '' : 'display:none;'}">${header && header.hasProjectOpen ? (header.projectName || '') : ''}</div>
       <span id="redivivus-status" style="font-size: 11px; color: var(--vscode-descriptionForeground);">${header && header.sessionActive ? '&#x25cf; working' : '&#x25cf; ready'}</span>
       <div style="text-align:right;line-height:1.35;">

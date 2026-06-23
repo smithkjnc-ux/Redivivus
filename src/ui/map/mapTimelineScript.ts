@@ -24,12 +24,14 @@ export const MAP_TIMELINE_SCRIPT = `
     var isSP   = spIds.has(entry.id);
     var isVault = entry.source === 'vault';
     var isFix  = entry.task && /^fix\\b/i.test(entry.task.trim());
+    var isEdit = entry.task && /^\\[EDIT\\]/i.test(entry.task.trim());
     var isUndone = !!entry.undone;
 
     var label, color, bg;
     if (isUndone)       { label = 'Undone';      color = '#6c7086'; bg = 'rgba(108,112,134,0.12)'; }
     else if (isSP)      { label = 'Save Point';  color = '#f5c400'; bg = 'rgba(245,196,0,0.12)'; }
     else if (isVault)   { label = 'Vault Build'; color = '#4ec959'; bg = 'rgba(78,201,89,0.12)'; }
+    else if (isEdit)    { label = 'Edit';        color = '#a78bfa'; bg = 'rgba(167,139,250,0.12)'; }
     else if (isFix)     { label = 'Fix';         color = '#fb923c'; bg = 'rgba(251,146,60,0.12)'; }
     else                { label = 'Build';       color = '#4a9eff'; bg = 'rgba(74,158,255,0.12)'; }
 
@@ -53,7 +55,7 @@ export const MAP_TIMELINE_SCRIPT = `
         + '</div>'
       : '';
 
-    var task = (entry.task || '(Unknown)').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    var task = (entry.task || '(Unknown)').replace(/^\[EDIT\]\s*/i, '').replace(/^\[FIX\]\s*/i, '').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
     var card = document.createElement('div');
     card.className = 'tl-card' + (isUndone ? ' tl-card-undone' : '');

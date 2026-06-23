@@ -62,5 +62,14 @@ export function registerSessionCommands(
       if (result.success) { vscode.window.showInformationMessage(`Save point created: ${description}`); }
     } catch { /* non-blocking */ }
     if (sessions.isActive) { sessions.recordChange(files.join(', '), task.slice(0, 80), 'worked', ''); }
+
+    // [AUTO-SETUP] Mark scan as done on first build so setup step 5 completes automatically
+    try {
+      const cfg = redivivus.loadConfig();
+      if (cfg && !cfg.lastScan) {
+        cfg.lastScan = new Date().toISOString();
+        redivivus.saveConfig(cfg);
+      }
+    } catch { /* non-blocking */ }
   });
 }

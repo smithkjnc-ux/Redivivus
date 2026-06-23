@@ -33,6 +33,7 @@ export async function initProject(paths: RedivivusPaths, projectName: string): P
     health: { confirmed: 1, assumed: 4, unknown: 0, confidence: 'low' },
     locked: false,
     version: '1.0',
+    revision: 1,
   };
 
   const config = {

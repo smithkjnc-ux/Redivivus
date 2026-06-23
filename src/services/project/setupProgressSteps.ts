@@ -6,7 +6,7 @@ import * as fs from 'fs/promises';
 import { execSync } from 'child_process';
 import type { RedivivusService } from '../redivivusService.js';
 import type { SetupStep } from './setupProgressService.js';
-import { getResolvedPaths } from '../resolvedItems.js';
+
 
 type Ctx = { redivivus: RedivivusService; root: string };
 
@@ -26,9 +26,10 @@ export async function checkStep2({ redivivus }: Ctx): Promise<SetupStep> {
 }
 
 export async function checkStep3({ redivivus }: Ctx): Promise<SetupStep> {
-  if (!redivivus.isInitialized()) { return { id: 3, title: 'Blueprint locked', completed: false, inProgress: false }; }
-  const locked = redivivus.loadConfig()?.blueprint?.locked === true;
-  return { id: 3, title: 'Blueprint locked', completed: locked, inProgress: false, action: locked ? undefined : 'Run "lock blueprint" to lock your blueprint' };
+  if (!redivivus.isInitialized()) { return { id: 3, title: 'Blueprint revision active', completed: false, inProgress: false }; }
+  const bp = redivivus.loadConfig()?.blueprint;
+  const hasRevision = !!(bp && bp.revision && bp.revision >= 1);
+  return { id: 3, title: 'Blueprint revision active', completed: hasRevision, inProgress: false, action: hasRevision ? undefined : 'Complete the blueprint interview to start revision tracking' };
 }
 
 export async function checkStep4({ root }: Ctx): Promise<SetupStep> {
@@ -45,25 +46,30 @@ export async function checkStep5({ redivivus }: Ctx): Promise<SetupStep> {
   return { id: 5, title: 'Project scanned', completed: hasScan, inProgress: false, action: hasScan ? undefined : 'Run "scan project" to analyze your codebase' };
 }
 
-export async function checkStep6({ redivivus }: Ctx): Promise<SetupStep> {
-  if (!redivivus.isInitialized()) { return { id: 6, title: 'All files under 200 lines', completed: false, inProgress: false }; }
-  const allLarge: Array<{ relativePath?: string } | string> = redivivus.loadConfig()?.scanResults?.largeFiles || [];
-  const resolvedSet = getResolvedPaths('largeFile');
-  const remaining = allLarge.filter(f => !resolvedSet.has(typeof f === 'string' ? f : (f.relativePath || '')));
-  const largeFiles = remaining.length;
-  return { id: 6, title: 'All files under 200 lines', completed: largeFiles === 0, inProgress: false, action: largeFiles === 0 ? undefined : `Split ${largeFiles} large file${largeFiles > 1 ? 's' : ''} into smaller files` };
+export async function checkStep6({ redivivus, root }: Ctx): Promise<SetupStep> {
+  // First build completed — at least one entry in build history
+  if (!redivivus.isInitialized()) { return { id: 6, title: 'First build completed', completed: false, inProgress: false }; }
+  let hasBuilds = false;
+  try {
+    const histPath = path.join(root, '.redivivus', 'build_history.json');
+    const content = await fs.readFile(histPath, 'utf-8');
+    const entries = JSON.parse(content);
+    hasBuilds = Array.isArray(entries) && entries.length > 0;
+  } catch { /* no history yet */ }
+  return { id: 6, title: 'First build completed', completed: hasBuilds, inProgress: false, action: hasBuilds ? undefined : 'Ask Redivivus to build something to complete this step' };
 }
 
-export async function checkStep7({ redivivus }: Ctx): Promise<SetupStep> {
-  if (!redivivus.isInitialized()) { return { id: 7, title: 'All files have [SCOPE] tags', completed: false, inProgress: false }; }
-  const uncommented = redivivus.loadConfig()?.scanResults?.uncommented?.length || 0;
-  return { id: 7, title: 'All files have [SCOPE] tags', completed: uncommented === 0, inProgress: false, action: uncommented === 0 ? undefined : `Add [SCOPE] tags to ${uncommented} file${uncommented > 1 ? 's' : ''}` };
+export async function checkStep7({ root }: Ctx): Promise<SetupStep> {
+  // Architecture map generated — .redivivus/map.json exists
+  const mapExists = await pathExists(path.join(root, '.redivivus', 'map.json'));
+  return { id: 7, title: 'Architecture map generated', completed: mapExists, inProgress: false, action: mapExists ? undefined : 'Open the Map panel to generate an architecture map' };
 }
 
 export async function checkStep8({ redivivus }: Ctx): Promise<SetupStep> {
-  if (!redivivus.isInitialized()) { return { id: 8, title: 'All TODOs converted to Redivivus format', completed: false, inProgress: false }; }
-  const todos = redivivus.loadConfig()?.scanResults?.todos?.length || 0;
-  return { id: 8, title: 'All TODOs converted to Redivivus format', completed: todos === 0, inProgress: false, action: todos === 0 ? undefined : `Convert ${todos} TODO${todos > 1 ? 's' : ''} to Redivivus format` };
+  // Code health baseline — scan has been run (file/scope/todo analysis done)
+  if (!redivivus.isInitialized()) { return { id: 8, title: 'Code health baseline established', completed: false, inProgress: false }; }
+  const hasScan = !!redivivus.loadConfig()?.scanResults;
+  return { id: 8, title: 'Code health baseline established', completed: hasScan, inProgress: false, action: hasScan ? undefined : 'Run "scan project" to establish a code health baseline' };
 }
 
 export async function checkStep9({ redivivus, root }: Ctx): Promise<SetupStep> {

@@ -98,6 +98,7 @@ export function buildActionsScript(): string {
         const rid = archEl.getAttribute('data-review-id') || '';
         const aidx = parseInt(archEl.getAttribute('data-action-index') || '0');
         if (action === 'fix-all') vscode.postMessage({type:'architect-fix-all',reviewId:rid});
+        else if (action === 'deep-fix') vscode.postMessage({type:'architect-deep-fix',reviewId:rid});
         else if (action === 'per-action') vscode.postMessage({type:'architect-per-action',reviewId:rid,actionIndex:aidx});
         else if (action === 'confirm') vscode.postMessage({type:'architect-action-confirm',reviewId:rid,actionIndex:aidx});
         else if (action === 'cancel') vscode.postMessage({type:'architect-action-cancel'});

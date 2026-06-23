@@ -54,7 +54,12 @@ export class BlueprintService {
     // calculate health (delegated to health module)
     const health = calculateHealth(blueprint as Pick<Blueprint, 'who' | 'what' | 'where' | 'when' | 'why'>);
 
-    const fullBlueprint: Blueprint = {
+    // [REVISIONS] If a blueprint already exists, snapshot it before overwriting.
+    // Previous revisions are locked; the current is always open for editing.
+    const config = this.redivivus.loadConfig();
+    const existing = config?.blueprint;
+
+    let fullBlueprint: Blueprint = {
       who: blueprint.who || '',
       what: blueprint.what || '',
       where: blueprint.where || '',
@@ -63,35 +68,39 @@ export class BlueprintService {
       health,
       locked: false,
       version: '1.0',
+      revision: 1,
     };
 
-    // ask to lock
+    if (existing && existing.who) {
+      // Snapshot the existing blueprint as a locked revision
+      const { snapshotBeforeUpdate } = await import('./blueprintRevisions.js');
+      const withHistory = snapshotBeforeUpdate(existing, 'Updated via Blueprint Interview');
+      fullBlueprint.revision = withHistory.revision;
+      fullBlueprint.revisions = withHistory.revisions;
+    }
+
+    // Show health summary (informational — no lock prompt)
     if (health.confidence === 'high') {
-      const lock = await vscode.window.showInformationMessage(
+      await vscode.window.showInformationMessage(
         `Blueprint Complete!`,
         {
           modal: true,
-          detail: `Health: ✅ ${health.confirmed} Confirmed · 🔶 ${health.assumed} Assumed · ❓ ${health.unknown} Unknown\n\nConfidence: HIGH — Ready to build.`
+          detail: `Health: ✅ ${health.confirmed} Confirmed · 🔶 ${health.assumed} Assumed · ❓ ${health.unknown} Unknown\n\nConfidence: HIGH — Ready to build.\n\nRevision: ${fullBlueprint.revision}${fullBlueprint.revisions?.length ? ` (${fullBlueprint.revisions.length} previous version${fullBlueprint.revisions.length !== 1 ? 's' : ''} preserved)` : ' (original)'}`
         },
-        'Lock Blueprint', 'Keep Editing'
+        'OK'
       );
-      if (lock === 'Lock Blueprint') {
-        fullBlueprint.locked = true;
-        fullBlueprint.lockedAt = new Date().toISOString();
-      }
     } else {
       await vscode.window.showWarningMessage(
         `Blueprint Needs Work`,
         {
           modal: true,
-          detail: `Health: ✅ ${health.confirmed} Confirmed · 🔶 ${health.assumed} Assumed · ❓ ${health.unknown} Unknown\n\nConfidence: ${health.confidence.toUpperCase()} — Consider adding more detail before building.`
+          detail: `Health: ✅ ${health.confirmed} Confirmed · 🔶 ${health.assumed} Assumed · ❓ ${health.unknown} Unknown\n\nConfidence: ${health.confidence.toUpperCase()} — Consider adding more detail before building.\n\nRevision: ${fullBlueprint.revision}`
         },
         'OK'
       );
     }
 
     // save to config
-    const config = this.redivivus.loadConfig();
     if (config) {
       config.blueprint = fullBlueprint;
       this.redivivus.saveConfig(config);
@@ -105,7 +114,7 @@ export class BlueprintService {
       `- Action: Blueprint Interview completed\n` +
       `- Health: ✅ ${health.confirmed} · 🔶 ${health.assumed} · ❓ ${health.unknown}\n` +
       `- Confidence: ${health.confidence}\n` +
-      `- Locked: ${fullBlueprint.locked ? 'YES' : 'no'}`
+      `- Revision: ${fullBlueprint.revision}`
     );
 
     return fullBlueprint;

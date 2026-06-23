@@ -109,13 +109,24 @@ export async function handleCoreMessage(
         let confidence: 'high'|'medium'|'low' = 'low';
         if (unknown === 0 && assumed <= 1) {confidence = 'high';}
         else if (unknown <= 1) {confidence = 'medium';}
+        let revision = 1;
+        let revisions = undefined as any;
+        if (cfg.blueprint && cfg.blueprint.who) {
+          try {
+            const { snapshotBeforeUpdate } = require('../services/blueprint/blueprintRevisions.js');
+            const snap = snapshotBeforeUpdate(cfg.blueprint, 'Updated via wizard');
+            revision = snap.revision;
+            revisions = snap.revisions;
+          } catch { revision = (cfg.blueprint.revision || 0) + 1; }
+        }
         cfg.blueprint = {
           who: msg.data.who||'', what: msg.data.what||'', where: msg.data.where||'',
           when: msg.data.when||'', why: msg.data.why||'',
           health: { confirmed, assumed, unknown, confidence },
-          locked: msg.data.lock || false,
-          lockedAt: msg.data.lock ? new Date().toISOString() : undefined,
+          locked: false,
           version: '1.0',
+          revision,
+          revisions,
         };
         redivivus.saveConfig(cfg);
         syncBlueprintMd(redivivus, cfg);

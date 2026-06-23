@@ -92,9 +92,20 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
     // [FIX] Refactor edits get related-file context so the Worker knows what exports/interfaces
     // actually exist in the project — prevents it from inventing nonexistent symbols or files.
     const importCtx = _gatherImportContext(absPath, root);
+    // [REVISIONS] Include blueprint evolution + dead ends so the Worker understands project history
+    // and never repeats approaches that have already failed. This is annotation-based understanding.
+    let projectHistoryCtx = '';
+    try {
+      const { getBlueprintEvolutionContext } = await import('../routing/chatPanelMsgFixBuildCtx.js');
+      const { readProjectDeadEnds } = await import('../routing/chatPanelMsgFixDeadEnds.js');
+      const bpEvolution = getBlueprintEvolutionContext(root);
+      const deadEnds = readProjectDeadEnds(root);
+      if (bpEvolution) { projectHistoryCtx += '\n\n' + bpEvolution; }
+      if (deadEnds) { projectHistoryCtx += '\n\nDEAD ENDS (approaches that failed — do NOT repeat these):\n' + deadEnds.slice(0, 2000); }
+    } catch { /* best-effort */ }
     editPrompt =
       `Refactor this file \`${filePath}\`:\n\`\`\`\n${originalContent}\n\`\`\`\n\n` +
-      `TASK: ${task}${bpSection}${importCtx}\n` +
+      `TASK: ${task}${bpSection}${importCtx}${projectHistoryCtx}\n` +
       `Use SURGICAL EDITS. Output ONLY the changed parts:\n` +
       `<<<SEARCH\n[exact existing code to find]\n===\n[replacement code]\nREPLACE>>>\n\n` +
       `RULES:\n- Use <<<SEARCH...REPLACE>>> for each change. Do NOT return the full file.\n` +
@@ -180,10 +191,15 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   // [FIX] Record to project history so edits appear alongside builds and can be rolled back.
   if (snapshotId) {
     try {
+      // Extract a human-readable description: prefer PRESCRIPTION section or fall back to first meaningful line
+      let historyDesc = task.slice(0, 80);
+      const prescMatch = task.match(/PRESCRIPTION:\s*\n(.+)/);
+      if (prescMatch) { historyDesc = prescMatch[1].trim().slice(0, 120); }
+      else if (task.includes('`' + filePath + '`')) { historyDesc = `Edit ${filePath}`; }
       const { BuildHistoryService, makeBuildHistoryEntry } = await import('../../services/build/buildHistoryService.js');
       new BuildHistoryService(root).record(makeBuildHistoryEntry({
         snapshotId,
-        task: `[EDIT] ${task.slice(0, 80)}`,
+        task: `[EDIT] ${historyDesc}`,
         files: [filePath],
         tokensUsed: 0,
         costUSD: 0,

@@ -29,6 +29,9 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
   let bpStr = 'No blueprint set.';
   if (bp) {
     bpStr = ['who','what','where','when','why'].map(f => `${f.toUpperCase()}: ${String(bp[f as keyof typeof bp] || '(not set)').trim()}`).join('\n');
+    if (bp.revision && bp.revision > 1 && bp.revisions?.length) {
+      bpStr += `\n(Revision ${bp.revision} — ${bp.revisions.length} previous version${bp.revisions.length !== 1 ? 's' : ''} preserved)`;
+    }
   }
 
   // [Redivivus] If user mentions a specific file, find and inject it — never make the user paste content.

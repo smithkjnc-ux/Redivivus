@@ -159,20 +159,23 @@ Reply with ONLY the filenames most likely relevant to this request, one per line
   fixLog('[FILE-SELECT] Using heuristic file selection');
   return collectSourceFiles(root, userText);
 }
-// [FIX] collectAllFixContext — gathers build context, dead ends, and project rules for the fix pipeline.
+// [FIX] collectAllFixContext — gathers build context, dead ends, blueprint evolution, and project rules for the fix pipeline.
 export async function collectAllFixContext(
   root: string,
   sourceFiles: { rel: string }[],
   _userText: string,
   _deps: any
 ): Promise<{ buildContext: string; projectDeadEnds: string; projectRules: string; verificationCommand: string | null }> {
-  const [{ readProjectDeadEnds }, { readProjectRules, getRecentBuildContext }, { LearnedMemoryService }, { inferVerificationCommand }] = await Promise.all([
+  const [{ readProjectDeadEnds }, { readProjectRules, getRecentBuildContext, getBlueprintEvolutionContext }, { LearnedMemoryService }, { inferVerificationCommand }] = await Promise.all([
     import('./chatPanelMsgFixDeadEnds.js'),
     import('./chatPanelMsgFixBuildCtx.js'),
     import('../../services/learnedMemoryService.js'),
     import('../../services/workspace/postFixVerification.js'),
   ]);
-  const buildContext = getRecentBuildContext(root, sourceFiles);
+  const recentBuildCtx = getRecentBuildContext(root, sourceFiles);
+  const blueprintCtx = getBlueprintEvolutionContext(root);
+  // Combine blueprint evolution + recent build causation into a single build context block
+  const buildContext = [blueprintCtx, recentBuildCtx].filter(Boolean).join('\n\n');
   const projectDeadEnds = readProjectDeadEnds(root) || '';
   const projectRules = readProjectRules(root);
   // Append Guardian-caught never-do entries from knowledge.json (separate store from dead_ends.md)

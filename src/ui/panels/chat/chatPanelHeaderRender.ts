@@ -7,23 +7,57 @@
 import * as vscode from 'vscode';
 import type { ChatHeaderInfo } from './chatPanelHtml';
 
-/** Inner HTML for the .header-right container (the top-right pill row). */
+/** Inner HTML for the .header-right container (the top-right pill row).
+ *  Pills are filtered by panelContext so each screen only shows relevant actions.
+ *  Universal pills (Usage, Clear, Memory, Health, Help, Report) always appear. */
 export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
-  return `${header && header.hasProjectOpen ? `
-      <button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>
-      <button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>
-      <button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Project History">&#x1F4CB; History</button>
-      <button class="header-btn" data-cmd="redivivus.showBuildActivity" title="Build Activity — watch or replay the AI pipeline (Supervisor plans &rarr; Worker writes &rarr; Guardian validates), with each step's actual work expandable">&#x1F6E0;&#xFE0F; Activity</button>
-      <button class="header-btn header-btn--preview" ${header.primaryAction?.actionAttr}="${header.primaryAction?.actionValue}" title="${header.primaryAction?.tooltip}">${header.primaryAction?.icon} ${header.primaryAction?.label}</button>
-      <button class="header-btn header-btn--run" data-cmd="redivivus.runProject" title="Run your project standalone — opens it the way it really runs (web in your browser, scripts in a terminal)">&#x25B6; Run</button>
-      <button class="header-btn header-btn--phone" data-cmd="redivivus.addToPhone" title="Convert to PWA — make this project an installable app on any device (phone, tablet, or computer); get a QR + link to install">&#128230; Convert to PWA</button>
-      ` : ''}
-      ${header && header.projectTokens ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>` : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`}
-      <button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>
-      <button class="header-btn" data-cmd="redivivus.showMemory" title="Memory — what Redivivus has learned about you and this project">&#x1F9E0; Memory</button>
-      <button class="header-btn" data-cmd="redivivus.showSystemHealth" title="Network, AI keys, account status, and build log stats" style="${header?.healthStatus === 'green' ? 'border-color:#4caf50;color:#4caf50;' : header?.healthStatus === 'yellow' ? 'border-color:#ff9800;color:#ff9800;' : header?.healthStatus === 'red' ? 'border-color:#f44336;color:#f44336;' : ''}">${header?.healthStatus ? '&#x25CF;' : '&#x25CE;'} Health</button>
-      <button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.showChatGettingStarted' : 'redivivus.showCapabilities'}" title="${header && header.hasProjectOpen ? 'How to use Redivivus with your project' : 'What is Redivivus?'}">? Help</button>
-      <button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">&#x1F41B; Report</button>`;
+  const ctx = header?.panelContext || 'chat';
+
+  // Context pills — only show when relevant to the current panel mode
+  const showBlueprint = ctx === 'chat' || ctx === 'architect' || ctx === 'map';
+  const showMap       = ctx === 'chat' || ctx === 'architect';
+  const showHistory   = ctx === 'chat' || ctx === 'architect' || ctx === 'history';
+  const showActivity  = ctx === 'chat';
+  const showPreview   = ctx === 'chat';
+  const showRun       = ctx === 'chat';
+  const showPWA       = ctx === 'chat';
+
+  let pills = '';
+  if (header && header.hasProjectOpen) {
+    if (showBlueprint) {
+      pills += `<button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>`;
+    }
+    if (showMap) {
+      pills += `<button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>`;
+    }
+    if (showHistory) {
+      pills += `<button class="header-btn" data-cmd="redivivus.showBuildHistory" title="Project History">&#x1F4CB; History</button>`;
+    }
+    if (showActivity) {
+      pills += `<button class="header-btn" data-cmd="redivivus.showBuildActivity" title="Build Activity — watch or replay the AI pipeline (Supervisor plans &rarr; Worker writes &rarr; Guardian validates), with each step's actual work expandable">&#x1F6E0;&#xFE0F; Activity</button>`;
+    }
+    if (showPreview && header.primaryAction) {
+      pills += `<button class="header-btn header-btn--preview" ${header.primaryAction.actionAttr}="${header.primaryAction.actionValue}" title="${header.primaryAction.tooltip}">${header.primaryAction.icon} ${header.primaryAction.label}</button>`;
+    }
+    if (showRun) {
+      pills += `<button class="header-btn header-btn--run" data-cmd="redivivus.runProject" title="Run your project standalone — opens it the way it really runs (web in your browser, scripts in a terminal)">&#x25B6; Run</button>`;
+    }
+    if (showPWA) {
+      pills += `<button class="header-btn header-btn--phone" data-cmd="redivivus.addToPhone" title="Convert to PWA — make this project an installable app on any device (phone, tablet, or computer); get a QR + link to install">&#128230; Convert to PWA</button>`;
+    }
+  }
+
+  // Universal pills — always show regardless of context
+  pills += header && header.projectTokens
+    ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>`
+    : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`;
+  pills += `<button class="header-btn" id="clear-btn" title="Clear Chat">&#x1F5D1;&#xFE0F;</button>`;
+  pills += `<button class="header-btn" data-cmd="redivivus.showMemory" title="Memory — what Redivivus has learned about you and this project">&#x1F9E0; Memory</button>`;
+  pills += `<button class="header-btn" data-cmd="redivivus.showSystemHealth" title="Network, AI keys, account status, and build log stats" style="${header?.healthStatus === 'green' ? 'border-color:#4caf50;color:#4caf50;' : header?.healthStatus === 'yellow' ? 'border-color:#ff9800;color:#ff9800;' : header?.healthStatus === 'red' ? 'border-color:#f44336;color:#f44336;' : ''}">${header?.healthStatus ? '&#x25CF;' : '&#x25CE;'} Health</button>`;
+  pills += `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.showChatGettingStarted' : 'redivivus.showCapabilities'}" title="${header && header.hasProjectOpen ? 'How to use Redivivus with your project' : 'What is Redivivus?'}">? Help</button>`;
+  pills += `<button class="header-btn" data-cmd="redivivus.reportIssue" title="Report a bug or request a feature">&#x1F41B; Report</button>`;
+
+  return pills;
 }
 
 /** Inner HTML for the #input-left container (the bottom-left pill row).

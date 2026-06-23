@@ -61,3 +61,41 @@ export function getRecentBuildsContext(root: string): string {
     return 'RECENTLY BUILT (already in this project -- build on top of these, do not recreate):\n' + lines.join('\n');
   } catch { return ''; }
 }
+
+/** Blueprint revision context — gives the Supervisor awareness of how the project has evolved.
+ *  Returns the current blueprint + a condensed history of previous revisions. ~200-400 tokens total.
+ *  This is the annotation-based alternative to loading the full codebase into memory. */
+export function getBlueprintEvolutionContext(root: string): string {
+  try {
+    const cfgPath = path.join(root, '.redivivus', 'config.json');
+    if (!fs.existsSync(cfgPath)) { return ''; }
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    const bp = cfg.blueprint;
+    if (!bp || !bp.what) { return ''; }
+
+    const lines: string[] = [];
+    lines.push('PROJECT BLUEPRINT (current — revision ' + (bp.revision || 1) + '):');
+    lines.push(`  WHO: ${bp.who || '?'}`);
+    lines.push(`  WHAT: ${bp.what}`);
+    lines.push(`  WHERE: ${bp.where || '?'}`);
+    lines.push(`  WHEN: ${bp.when || '?'}`);
+    lines.push(`  WHY: ${bp.why || '?'}`);
+    if (bp.mechanics) { lines.push(`  MECHANICS: ${bp.mechanics}`); }
+
+    // Include revision history (condensed) — shows how the project evolved
+    if (bp.revisions && bp.revisions.length > 0) {
+      lines.push('');
+      lines.push('BLUEPRINT EVOLUTION (previous revisions — locked, for context only):');
+      for (const rev of bp.revisions.slice(-5)) { // last 5 revisions max
+        const changes: string[] = [];
+        if (rev.what !== bp.what) { changes.push(`WHAT: "${rev.what.slice(0, 60)}"`); }
+        if (rev.who !== bp.who) { changes.push(`WHO: "${rev.who.slice(0, 40)}"`); }
+        if (rev.why !== bp.why) { changes.push(`WHY: "${rev.why.slice(0, 60)}"`); }
+        const changeSummary = changes.length > 0 ? changes.join(', ') : 'minor update';
+        lines.push(`  Rev ${rev.revision} (${rev.lockedAt?.slice(0, 10) || '?'}): ${rev.changeNote || changeSummary}`);
+      }
+    }
+
+    return lines.join('\n');
+  } catch { return ''; }
+}

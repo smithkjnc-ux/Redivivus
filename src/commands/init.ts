@@ -43,7 +43,7 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
           who: answers['who'] || '', what: answers['what'] || '',
           where: answers['where'] || '', when: answers['when'] || '', why: answers['why'] || '',
           health: { confirmed: 3, assumed: 1, unknown: 1, confidence: 'medium' },
-          locked: false, version: '1.0',
+          locked: false, version: '1.0', revision: 1,
         };
         redivivus.saveConfig(config);
       }
@@ -157,7 +157,7 @@ export async function runAutoInit(
                 who: pending.blueprint.who || '', what: pending.blueprint.what || '',
                 where: pending.blueprint.where || '', when: pending.blueprint.when || '', why: pending.blueprint.why || '',
                 health: { confirmed, assumed, unknown, confidence },
-                locked: false, version: '1.0',
+                locked: false, version: '1.0', revision: 1,
               };
               redivivus.saveConfig(config);
               const md = '# Blueprint\n\n## WHO\n' + config.blueprint.who + '\n\n## WHAT\n' + config.blueprint.what + '\n\n## WHERE\n' + config.blueprint.where + '\n\n## WHEN\n' + config.blueprint.when + '\n\n## WHY\n' + config.blueprint.why + '\n';

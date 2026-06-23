@@ -71,6 +71,7 @@ Reply with ONE of: games, video, web, utilities, tools, apps, NONE`;
     health: { confirmed: 0, assumed: 0, unknown: 5, confidence: 'low' as const },
     locked: false,
     version: '1.0',
+    revision: 1,
   };
 
   // Full scaffold: .redivivus/{config,blueprint,work_log,dead_ends,sessions/},

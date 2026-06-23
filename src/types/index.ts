@@ -11,9 +11,27 @@ export interface Blueprint {
   // Behavioral only (no file/function names) so it never goes stale on a refactor. See REDIVIVUS_LIVING_BLUEPRINT.md.
   mechanics?: string;
   health: BlueprintHealth;
-  locked: boolean;
-  lockedAt?: string;
+  locked: boolean;      // [DEPRECATED] kept for back-compat reads — use revision system instead
+  lockedAt?: string;    // [DEPRECATED]
   version: string;
+  // [REVISIONS] Blueprint versioning — the current blueprint is always open (editable).
+  // When the user updates the blueprint, the previous state is snapshotted into `revisions` and locked.
+  // revision 1 = the original project blueprint, always preserved and immutable.
+  revision: number;
+  revisions?: BlueprintRevision[];
+}
+
+export interface BlueprintRevision {
+  revision: number;
+  who: string;
+  what: string;
+  where: string;
+  when: string;
+  why: string;
+  mechanics?: string;
+  health: BlueprintHealth;
+  lockedAt: string;      // ISO timestamp when this revision was locked
+  changeNote?: string;   // what changed from previous revision
 }
 
 export interface BlueprintHealth {
