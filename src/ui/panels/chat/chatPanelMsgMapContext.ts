@@ -30,7 +30,12 @@ export async function handleMapContext(msg: any, deps: MessageHandlerDeps): Prom
   try {
     panel.webview.postMessage({ type: 'set-status', status: 'working' });
     const aiResponse = await routing.prompt(prefix + prompt);
-    const estimatedTokens = Math.ceil(aiResponse.text.length / 4);
+    if (!aiResponse.text && !aiResponse.success) {
+      const errDetail = aiResponse.error || 'AI returned an empty response';
+      conversation.push({ role: 'assistant', content: `❌ ${errDetail}`, timestamp: Date.now() });
+      refresh(); return;
+    }
+    const estimatedTokens = Math.ceil((aiResponse.text || '').length / 4);
     const estimatedCost = (estimatedTokens / 1_000_000) * 0.30;
     await deps.usageTracker?.recordUsage(estimatedTokens, estimatedCost, routing.getAvailableAI().ai);
     let mapText = aiResponse.text || '';
