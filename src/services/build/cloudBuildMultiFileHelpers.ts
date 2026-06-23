@@ -71,7 +71,12 @@ export async function buildSingleFileViaBuildEndpoint(
   while (true) { const { done, value } = await reader.read(); if (done) { break; } drain(decoder.decode(value, { stream: true }), false); }
   drain('', true);
   if (!payloadResult) { throw Object.assign(new Error(`Failed on ${filePath}: Build stream ended without a result payload`), { _failureSource: 'cloud' }); }
-  if (payloadResult.error) { throw Object.assign(new Error(`Failed on ${filePath}: ${payloadResult.error}`), { _failureSource: 'cloud' }); }
+  if (payloadResult.error) {
+    // Server may forward raw Anthropic JSON — extract the human message so looksLikeQuotaError matches
+    let _payErr = payloadResult.error;
+    try { const j = typeof _payErr === 'string' ? _payErr.indexOf('{') : -1; if (j !== -1) { const p = JSON.parse(_payErr.slice(j)); _payErr = p?.error?.message || p?.message || _payErr; } } catch { /* keep raw */ }
+    throw Object.assign(new Error(`Failed on ${filePath}: ${_payErr}`), { _failureSource: 'cloud' });
+  }
   return payloadResult as SingleFileResult;
 }
 
