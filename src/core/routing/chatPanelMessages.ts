@@ -143,7 +143,7 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     await handleArchitectFixAll(msg, conversation, refresh, panel);
 
   } else if (msg.type === 'architect-deep-fix') {
-    const { handleArchitectDeepFix } = await import('../../ui/panels/chat/chatPanelMsgArchitectFix.js');
+    const { handleArchitectDeepFix } = await import('../../ui/panels/chat/chatPanelMsgArchitectDeepFix.js');
     await handleArchitectDeepFix(msg, conversation, refresh, deps, panel);
 
   } else if (msg.type === 'architect-fix-one') {

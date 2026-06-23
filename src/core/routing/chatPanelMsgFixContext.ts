@@ -160,6 +160,11 @@ Reply with ONLY the filenames most likely relevant to this request, one per line
   return collectSourceFiles(root, userText);
 }
 // [FIX] collectAllFixContext — gathers build context, dead ends, blueprint evolution, and project rules for the fix pipeline.
+// [PERF] Static context (blueprint, dead ends, rules) is cached for 30s so batch operations (Deep Fix)
+// don't re-read the same files per fix. Per-file context (build causation, verification cmd) is always fresh.
+let _staticCtxCache: { root: string; ts: number; blueprintCtx: string; combinedDeadEnds: string; projectRules: string } | null = null;
+const STATIC_CTX_TTL_MS = 30_000;
+
 export async function collectAllFixContext(
   root: string,
   sourceFiles: { rel: string }[],
@@ -172,15 +177,27 @@ export async function collectAllFixContext(
     import('../../services/learnedMemoryService.js'),
     import('../../services/workspace/postFixVerification.js'),
   ]);
+
+  // Static context — cached across rapid sequential calls (batch fixes)
+  let blueprintCtx: string;
+  let combinedDeadEnds: string;
+  let projectRules: string;
+  if (_staticCtxCache && _staticCtxCache.root === root && (Date.now() - _staticCtxCache.ts) < STATIC_CTX_TTL_MS) {
+    blueprintCtx = _staticCtxCache.blueprintCtx;
+    combinedDeadEnds = _staticCtxCache.combinedDeadEnds;
+    projectRules = _staticCtxCache.projectRules;
+  } else {
+    blueprintCtx = getBlueprintEvolutionContext(root);
+    const projectDeadEnds = readProjectDeadEnds(root) || '';
+    projectRules = readProjectRules(root);
+    const knowledgeNeverDo = root ? (() => { try { return new LearnedMemoryService(root).getNeverDoForPrompt(); } catch { return ''; } })() : '';
+    combinedDeadEnds = [projectDeadEnds, knowledgeNeverDo].filter(Boolean).join('\n\n');
+    _staticCtxCache = { root, ts: Date.now(), blueprintCtx, combinedDeadEnds, projectRules };
+  }
+
+  // Per-file context — always fresh
   const recentBuildCtx = getRecentBuildContext(root, sourceFiles);
-  const blueprintCtx = getBlueprintEvolutionContext(root);
-  // Combine blueprint evolution + recent build causation into a single build context block
   const buildContext = [blueprintCtx, recentBuildCtx].filter(Boolean).join('\n\n');
-  const projectDeadEnds = readProjectDeadEnds(root) || '';
-  const projectRules = readProjectRules(root);
-  // Append Guardian-caught never-do entries from knowledge.json (separate store from dead_ends.md)
-  const knowledgeNeverDo = root ? (() => { try { return new LearnedMemoryService(root).getNeverDoForPrompt(); } catch { return ''; } })() : '';
-  const combinedDeadEnds = [projectDeadEnds, knowledgeNeverDo].filter(Boolean).join('\n\n');
   // Capture the failing command BEFORE the fix so we can re-run it after to verify
   const { getLastFailingCommand } = await import('../../services/workspace/terminalErrorService.js');
   const capturedCmd = getLastFailingCommand();

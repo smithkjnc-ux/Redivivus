@@ -40,9 +40,10 @@ export async function panelRefresh(panel: any): Promise<void> {
   const state = panel.state;
   const usageTracker = panel.usageTracker;
   const headerInfo = buildHeaderInfo(panel.redivivus, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
-  // [PANEL-CONTEXT] Detect current conversation mode and filter pills accordingly
-  const lastMsg = state.conversation?.[state.conversation.length - 1];
-  if (lastMsg?.content?.includes('__ARCHITECT_ACTIONS__') || state.conversation?.some((m: any) => m.content?.includes('__ARCHITECT_ACTIONS__'))) {
+  // [PANEL-CONTEXT] Detect current conversation mode and filter pills accordingly.
+  // Only check the last few messages (O(1)) instead of scanning the full conversation (O(n)).
+  const recentMsgs = state.conversation?.slice(-3) || [];
+  if (recentMsgs.some((m: any) => m.content?.includes('__ARCHITECT_ACTIONS__'))) {
     headerInfo.panelContext = 'architect';
   }
   try { const { getAccountToken } = await import('../../../services/api/apiClient.js'); headerInfo.isSignedIn = !!(await getAccountToken()); } catch {}

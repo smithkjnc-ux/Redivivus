@@ -63,11 +63,20 @@ export function registerSessionCommands(
     } catch { /* non-blocking */ }
     if (sessions.isActive) { sessions.recordChange(files.join(', '), task.slice(0, 80), 'worked', ''); }
 
-    // [AUTO-SETUP] Mark scan as done on first build so setup step 5 completes automatically
+    // [AUTO-SETUP] Run a real lightweight scan on first build so setup steps 5+8 complete honestly
     try {
       const cfg = redivivus.loadConfig();
       if (cfg && !cfg.lastScan) {
+        const { scanDirectory, buildAnalysis } = await import('../ui/panels/analyzer/analyzerScanner.js');
+        const scanFiles: any[] = [];
+        scanDirectory(root, root, scanFiles);
+        const result = buildAnalysis(scanFiles);
         cfg.lastScan = new Date().toISOString();
+        cfg.scanResults = {
+          largeFiles: result.largeFiles.map((f: any) => ({ relativePath: f.relativePath, lines: f.lines })),
+          todos: result.todoItems.map((t: any) => ({ file: t.file, line: t.line })),
+          uncommented: result.uncommentedFiles.map((f: any) => ({ relativePath: f.relativePath, lines: f.lines })),
+        };
         redivivus.saveConfig(cfg);
       }
     } catch { /* non-blocking */ }
