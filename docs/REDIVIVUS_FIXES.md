@@ -10176,3 +10176,18 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 2. Panel context detection now checks only the last 3 messages instead of scanning the full conversation.
 **Why:** Both were wasteful computation that scaled linearly with conversation length or fix count.
 **Risk:** None — both are additive performance improvements with no behavioral change.
+
+---
+
+## Fix — Jun 23, 2026: Gemini Empty Response Routing
+
+**Files changed:**
+- `src/lib/ai/executor.ts` (redivivus-backend) — Force JSON mode for Gemini and throw on empty responses
+
+**What changed:** 
+1. Added `responseMimeType: "application/json"` to `generationConfig` in `executeGemini` for non-streaming calls when the system prompt expects JSON.
+2. Added a check to explicitly throw an error if Gemini returns an empty or whitespace-only text string.
+
+**Why:** The AI intent router (Supervisor) was misclassifying valid build intents (like "make a Nixie tube clock") as chat answers because Gemini sometimes outputs an empty string when constrained to output JSON without the explicit MIME type. The empty response bypassed the backend JSON parser and caused a silent fallback to a generic "I can help with that..." chat response, preventing the build pipeline from starting.
+
+**Risk:** Low. `responseMimeType` guarantees compliant JSON output from Gemini, improving reliability for all supervisor tasks. Throwing on empty responses ensures the built-in provider failover logic can catch the error and retry with another model (like GPT-4o) instead of silently failing.
