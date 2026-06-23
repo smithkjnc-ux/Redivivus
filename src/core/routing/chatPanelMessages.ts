@@ -140,10 +140,10 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     handleArchitectAddTodos(msg, conversation, refresh);
 
   } else if (msg.type === 'architect-fix-all') {
-    await handleArchitectFixAll(msg, conversation, refresh);
+    await handleArchitectFixAll(msg, conversation, refresh, panel);
 
   } else if (msg.type === 'architect-fix-one') {
-    await handleArchitectFixOne(msg, conversation, refresh);
+    await handleArchitectFixOne(msg, conversation, refresh, panel);
 
   } else if (msg.type === 'architect-per-action') {
     await handleArchitectPerAction(msg, conversation, refresh);
