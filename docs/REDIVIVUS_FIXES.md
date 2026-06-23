@@ -10179,15 +10179,16 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 
 ---
 
-## Fix — Jun 23, 2026: Gemini Empty Response Routing
+## Fix — Jun 23, 2026: Gemini Empty Response → Prepass-Rescue Routing
 
 **Files changed:**
-- `src/lib/ai/executor.ts` (redivivus-backend) — Force JSON mode for Gemini and throw on empty responses
+- `src/app/api/v1/chat/route.ts` (redivivus-backend) — Pre-pass rescue: when main model returns empty, use the flash pre-pass classification instead of defaulting to "answer"
+- `src/lib/ai/executor.ts` (redivivus-backend) — Throw on empty/blocked Gemini responses so provider failover fires
 
-**What changed:** 
-1. Added `responseMimeType: "application/json"` to `generationConfig` in `executeGemini` for non-streaming calls when the system prompt expects JSON.
-2. Added a check to explicitly throw an error if Gemini returns an empty or whitespace-only text string.
+**What changed:**
+1. **Chat route prepass-rescue**: When the main model (Phase 2) returns empty/unparseable output, the route now falls back to the pre-pass (Phase 1 flash classifier) action instead of blindly setting `action: "answer"`. If the pre-pass said `build`, the response is synthesized as a build action with the rewritten prompt as the task.
+2. **Gemini executor**: `executeGemini` now catches `result.text()` exceptions (thrown when Gemini safety filters block output) and throws a descriptive error. Empty responses also throw. Both trigger the provider failover loop instead of returning empty strings.
 
-**Why:** The AI intent router (Supervisor) was misclassifying valid build intents (like "make a Nixie tube clock") as chat answers because Gemini sometimes outputs an empty string when constrained to output JSON without the explicit MIME type. The empty response bypassed the backend JSON parser and caused a silent fallback to a generic "I can help with that..." chat response, preventing the build pipeline from starting.
+**Why:** "make a Nixie tube clock" was misrouted because: (1) Gemini returned 0 output tokens (likely safety-filtered on "Nixie"), (2) the empty response was unparseable as JSON, (3) the fallback defaulted to `action: "answer"` with a generic message, (4) the client displayed "I can help with that…" instead of starting the build pipeline. On retry, `cloudChat` returned null (all providers failed), causing the client to fall through to the Q&A path (`handleAIChat`), which built a massive prompt and triggered 429 rate limits across Grok/Groq/GPT-4o.
 
-**Risk:** Low. `responseMimeType` guarantees compliant JSON output from Gemini, improving reliability for all supervisor tasks. Throwing on empty responses ensures the built-in provider failover logic can catch the error and retry with another model (like GPT-4o) instead of silently failing.
+**Risk:** Low. The prepass-rescue only fires when the main model produces nothing — it can never override a valid main-model classification. The Gemini throw ensures failover fires early rather than propagating empty output through the pipeline.
