@@ -79,9 +79,12 @@ export async function runBuildPlanStep(
       const plan = (planResult ?? { files: [] }) as { files: Array<{ path: string; description: string; isNew: boolean }>; prescription?: any[]; supervisorModel?: string; supervisorProvider?: string; supervisorInputTokens?: number; supervisorOutputTokens?: number };
       _planLog(`ok files=${plan.files?.length ?? 0} supervisor=${plan.supervisorModel ?? 'none'}`);
       const supervisor: PlanSupervisorMeta = { provider: plan.supervisorProvider, model: plan.supervisorModel, inputTokens: plan.supervisorInputTokens, outputTokens: plan.supervisorOutputTokens };
+      // [FIX] If the Supervisor fell back to a different provider, use that provider for Worker files too.
+      // Otherwise preferred='claude' goes in the /build body and the server retries the failed provider.
+      const effectivePreferred = plan.supervisorProvider || preferred || '';
       if (plan.files && plan.files.length > 1) {
-        _planLog(`-> multi-file path (executeMultiFileBuild)`);
-        const early = await executeMultiFileBuild(task, root, context, keyHeaders, token, base, preferred ?? '', plan.files, deps, plan.prescription ?? null, plan.supervisorModel ?? null, plan.supervisorProvider ?? null, plan.supervisorInputTokens ?? 0, plan.supervisorOutputTokens ?? 0, opts.onProgress, opts.onStep, opts.onCode, opts.onFileComplete);
+        _planLog(`-> multi-file path (executeMultiFileBuild) preferred=${effectivePreferred}`);
+        const early = await executeMultiFileBuild(task, root, context, keyHeaders, token, base, effectivePreferred, plan.files, deps, plan.prescription ?? null, plan.supervisorModel ?? null, plan.supervisorProvider ?? null, plan.supervisorInputTokens ?? 0, plan.supervisorOutputTokens ?? 0, opts.onProgress, opts.onStep, opts.onCode, opts.onFileComplete);
         return { early };
       }
       _planLog(`-> single-file path (plan returned <=1 file)`);
