@@ -15,6 +15,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - **Kimi endpoint auto-detection** (`services/ai/kimiEndpoint.ts`, new): Moonshot runs two non-interchangeable platforms — `api.moonshot.ai` (international) and `api.moonshot.cn` (China). New helper probes both, caches the working base per-key, and is used by chat, streaming, balance, validation, and diagnostics. Handles both key types with zero configuration.
 
 ### Fixed
+- **Build Activity failover errors** (`chatPanelBuildRunner.ts`): Backend failover steps carried raw truncated JSON error blobs (e.g. `400 {"type":"error"...`). The `onStep` callback now detects failover status and replaces the raw label with a clean human reason via `describeProviderError()`. User sees "out of API credits" instead of unreadable JSON.
 - **Setup step 5 scan honesty** (`session.ts`): Instead of faking `lastScan` with a timestamp, the first build now runs a real `scanDirectory` + `buildAnalysis` so `scanResults` actually exist when the step shows "complete".
 - **Fix context caching** (`chatPanelMsgFixContext.ts`): Added 30s TTL cache on static fix context (blueprint evolution, dead ends, project rules). Batch operations (Deep Fix) no longer re-read the same files per fix.
 - **Panel context O(n) scan** (`chatPanelPublicAPIRefresh.ts`): Replaced full-conversation scan with `slice(-3)` — O(1) bounded check on every refresh.

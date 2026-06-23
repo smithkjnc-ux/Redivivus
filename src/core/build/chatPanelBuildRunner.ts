@@ -121,7 +121,19 @@ export async function runBuildAfterGates(
   // worker -> continuations -> failover -> guardian) instead of just the bubble. Failures are non-fatal.
   let activity: BuildActivityPanel | undefined;
   try { activity = BuildActivityPanel.start(task); } catch { /* panel optional — never block a build */ }
-  const onStep = (step: any) => { try { activity?.step(step); } catch {} };
+  const { describeProviderError } = require('../../services/ai/agentFailoverReason.js');
+  const onStep = (step: any) => {
+    try {
+      // [FIX] Backend failover steps carry raw JSON error blobs (e.g. "400 {\"type\":\"error\"...").
+      // Replace the truncated/raw label with a clean human reason so the user sees "out of API credits"
+      // instead of an unreadable JSON snippet.
+      if (step && step.status === 'failover' && step.label) {
+        const cleanReason = describeProviderError(step.label);
+        step = { ...step, label: `${step.label.split(' ')[0] || 'Provider'} unavailable — ${cleanReason}` };
+      }
+      activity?.step(step);
+    } catch {}
+  };
   const onCode = (text: string) => { try { activity?.code(text); } catch {} };
 
   // [FIX] Removed injecting file code into the chat bubble since the user watches the Build Activity Panel.

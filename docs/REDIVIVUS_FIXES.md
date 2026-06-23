@@ -10154,6 +10154,17 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 
 ---
 
+## Fix — Jun 23, 2026: Build Activity Failover Error Cleanup
+
+**Files changed:**
+- `src/core/build/chatPanelBuildRunner.ts` — Intercepts failover steps and cleans up raw JSON error labels
+
+**What changed:** Backend failover steps carry raw truncated JSON error blobs (e.g. `400 {"type":"error","error":{"type":"invalid_reque...`). The `onStep` callback now detects `status === 'failover'` and replaces the raw label with a clean human reason via `describeProviderError()`. User sees "claude unavailable — out of API credits" instead of unreadable JSON.
+**Why:** Raw JSON errors in the Build Activity panel are unreadable and look like a bug.
+**Risk:** None — additive cleanup only; falls back to original label if parsing fails.
+
+---
+
 ## Fix — Jun 23, 2026: Performance Audit Fixes
 
 **Files changed:**
