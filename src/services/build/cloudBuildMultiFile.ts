@@ -9,6 +9,17 @@ import { getApiBase } from '../api/apiClient.js';
 import type { BuildRequestDeps } from '../../core/ai/chatPanelIntent';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
 import { buildSingleFileViaBuildEndpoint, finalizeMultiFileBuild } from './cloudBuildMultiFileHelpers.js';
+import { looksLikeQuotaError, markProviderUnavailable, isProviderUnavailable } from '../ai/providerTierState.js';
+import { AI_RANK } from '../ai/guardianAI.js';
+
+/** Pick the next available provider from AI_RANK, skipping unavailable ones and the current one. */
+function nextAvailableProvider(current: string, keyHeaders: Record<string, string>): string | null {
+  const keyPresent = (p: string) => Object.keys(keyHeaders).some(h => h.toLowerCase().includes(p));
+  return Object.entries(AI_RANK)
+    .sort(([, a], [, b]) => b - a)
+    .map(([p]) => p)
+    .find(p => p !== current && keyPresent(p) && !isProviderUnavailable(p)) ?? null;
+}
 
 export async function executeMultiFileBuild(
   task: string,
@@ -151,7 +162,34 @@ export async function executeMultiFileBuild(
         return { success: false, error: `Timed out on ${file.path} — try a simpler request.`, failureSource: 'cloud' };
       }
       if (e?._authError) return { success: false, error: 'NOT_AUTHENTICATED' };
-      return { success: false, error: e?.message ?? 'Network error', failureSource: 'cloud' };
+      const errMsg = e?.message ?? 'Network error';
+      // [PROVIDER-FALLBACK] If this file failed due to credit/quota error, mark provider unavailable
+      // and retry once with the next ranked available provider — same logic as fix pipeline failover.
+      if (looksLikeQuotaError(errMsg) && preferred) {
+        markProviderUnavailable(preferred, errMsg.slice(0, 200));
+        const fallback = nextAvailableProvider(preferred, keyHeaders);
+        if (fallback) {
+          try {
+            onStep?.({ label: `${preferred} unavailable — retrying ${file.path} with ${fallback}`, model: fallback, status: 'running', index: i, total: planFiles.length, updateLatest: true });
+            const retryBody = JSON.stringify({ task, context: { ...context, existingFiles: [...(context?.existingFiles ?? []), ...builtSoFar] }, preferred: fallback, targetFile: { path: file.path, description: file.description, isNew: file.isNew, fileIndex: i, totalFiles: planFiles.length, siblings }, prescription, supervisorProvider });
+            const retryData = await buildSingleFileViaBuildEndpoint(base, token, keyHeaders, retryBody, file.path, onStep, onCode);
+            const normalised = (retryData.files ?? []).map(f => ({ ...f, path: f.path.startsWith(slug + '/') ? f.path.slice(slug.length + 1) : f.path }));
+            allFiles.push(...normalised);
+            builtSoFar.push(...normalised.map(f => ({ path: f.path, content: f.content })));
+            workerInputTokens += retryData.inputTokens ?? 0;
+            workerOutputTokens += retryData.outputTokens ?? 0;
+            lastModel = retryData.model ?? lastModel;
+            lastWorkerProvider = retryData.workerProvider ?? lastWorkerProvider;
+            onStep?.({ label: `Built ${file.path} (via ${fallback})`, model: fallback, status: 'success', detail: normalised.map(f => f.content).join('\n\n'), kind: 'code', index: i, total: planFiles.length, updateLatest: true });
+            for (const nf of normalised) { onFileComplete?.(nf.path, nf.content); }
+            preferred = fallback; // use fallback for remaining files too
+            continue;
+          } catch (retryErr: any) {
+            return { success: false, error: retryErr?.message ?? 'Fallback provider also failed', failureSource: 'cloud' };
+          }
+        }
+      }
+      return { success: false, error: errMsg, failureSource: 'cloud' };
     }
   }
 

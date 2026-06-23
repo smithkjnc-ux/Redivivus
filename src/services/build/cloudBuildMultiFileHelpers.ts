@@ -43,7 +43,11 @@ export async function buildSingleFileViaBuildEndpoint(
   }
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: res.statusText })) as any;
-    throw Object.assign(new Error(`Failed on ${filePath}: ${err.error || res.statusText}`), { _failureSource: 'cloud' });
+    // err.error may be a nested object (Anthropic: {type, message}) — extract the string message
+    const errDetail = typeof err.error === 'object'
+      ? (err.error?.message || err.error?.type || JSON.stringify(err.error).slice(0, 200))
+      : (err.error || res.statusText);
+    throw Object.assign(new Error(`Failed on ${filePath}: ${errDetail}`), { _failureSource: 'cloud' });
   }
   if (!res.body) {
     throw Object.assign(new Error(`Failed on ${filePath}: No response body`), { _failureSource: 'cloud' });
