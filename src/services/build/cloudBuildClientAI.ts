@@ -104,8 +104,15 @@ export async function runTwoPhaseBuild(
   if (instructions.supervisorInstructions) {
     const si = instructions.supervisorInstructions;
     onProgress?.('Supervisor planning your build...');
+    // [FIX] Build fallback list from available keys ranked by capability (same logic as fix pipeline).
+    // Previously hardcoded [] — when Claude ran out of credits, Supervisor failed with no fallback.
+    const { AI_RANK } = require('../ai/guardianAI.js');
+    const _supFallbacks: string[] = Object.entries(AI_RANK as Record<string, number>)
+      .filter(([p]) => p !== si.selectedProvider && keys[p])
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .map(([p]) => p);
     const supRouting = {
-      selectedProvider: si.selectedProvider, fallbackProviders: [] as string[],
+      selectedProvider: si.selectedProvider, fallbackProviders: _supFallbacks,
       systemMessage: si.systemMessage, model: si.model, maxTokens: si.maxTokens,
       temperature: 0.3, tier: 'pro' as const,
     };
@@ -144,7 +151,9 @@ export async function runTwoPhaseBuild(
       }
     } else {
       // Supervisor failed — strip the placeholder and let the worker build solo, but keep the reason.
-      supervisor.error = supRes.error || 'Supervisor returned an empty or too-short prescription';
+      let _supErrRaw = supRes.error || 'Supervisor returned an empty or too-short prescription';
+      try { const j = _supErrRaw.indexOf('{'); if (j !== -1) { const p = JSON.parse(_supErrRaw.slice(j)); _supErrRaw = p?.error?.message || p?.message || _supErrRaw; } } catch { /* keep raw */ }
+      supervisor.error = _supErrRaw;
       console.warn(`[Redivivus] Supervisor failed, worker running solo. Error: ${supervisor.error}`);
       workerPrompt = workerPrompt.replace('\nSUPERVISOR PRESCRIPTION — implement this exactly, do not deviate:\n{{PRESCRIPTION}}\n\n', '\n');
       onProgress?.('Building your project...');

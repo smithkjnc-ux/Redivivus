@@ -84,7 +84,9 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       }
     }
   } catch (err) {
-    const _errMsg2 = err instanceof Error ? err.message : String(err);
+    const _raw2 = err instanceof Error ? err.message : String(err);
+    let _errMsg2 = _raw2;
+    try { const j = _raw2.indexOf('{'); if (j !== -1) { const p = JSON.parse(_raw2.slice(j)); _errMsg2 = p?.error?.message || p?.message || _raw2; } } catch { /* keep raw */ }
     const _b642 = Buffer.from(userText, 'utf8').toString('base64');
     const _eli5Err = await explainFixFailure({ userText, accumulatedCritiques: [], guardianNote: '', errorMessage: _errMsg2, deps }).catch(() => null);
     const _eli5Block = _eli5Err ? formatELI5Block(_eli5Err) : '';

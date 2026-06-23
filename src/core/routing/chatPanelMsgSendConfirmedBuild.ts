@@ -105,7 +105,18 @@ export async function runConfirmedLocalBuild(
   try {
     await runSingleFileBuild(ctx as any);
   } catch (e: any) {
-    const errMsg = e?.message || 'Build failed';
+    const raw = e?.message || String(e) || 'Build failed';
+    // Parse JSON API error responses (Anthropic, OpenAI, etc.) to extract human-readable message
+    let errMsg = raw;
+    try {
+      const jsonStart = raw.indexOf('{');
+      if (jsonStart !== -1) {
+        const parsed = JSON.parse(raw.slice(jsonStart));
+        errMsg = parsed?.error?.message || parsed?.message || parsed?.error?.error || raw;
+      }
+    } catch { /* keep raw */ }
+    // Truncate to avoid wall-of-text
+    errMsg = errMsg.slice(0, 300);
     conversation.push({ role: 'assistant', content: `❌ **Build failed:** ${errMsg}\n\n_Try rephrasing your request or check your AI keys._`, timestamp: Date.now() });
     refresh();
   } finally {
