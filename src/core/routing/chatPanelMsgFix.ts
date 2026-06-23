@@ -104,6 +104,24 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     fixLog('Phase 1: Supervisor diagnosis received', { diagnosisPreview: diagnosis.substring(0, 500) });
     const _locLines = (diagnosis.match(/^.*\b(TARGET REGION|DO NOT TOUCH|WORKER_TIER|FULL FILE)\b.*$/gim) || []).map(l => l.trim()).slice(0, 8);
     if (_locLines.length) { fixLog('Phase 1: Region localization', { lines: _locLines }); }
+    // [FIX] If the Supervisor's diagnosis mentions files not in allowedRels (e.g. prescribes editing
+    // js/constants.js but it wasn't scanned), add them now so applyFixContent doesn't silently skip them.
+    // Pattern: backtick paths, `path/to/file.ext`, or bare relative paths ending in a known extension.
+    const diagMentionedFiles = [...diagnosis.matchAll(/`([^`\s]+\.[a-zA-Z0-9]{1,6})`|(?:^|\s)([\w./\\-]+\.[a-zA-Z0-9]{1,6})(?=\s|:|,|$)/gm)]
+      .flatMap(m => [m[1], m[2]]).filter((f): f is string => !!f && !f.startsWith('http') && f.length < 100)
+      .map(f => f.replace(/^\.\//, ''));
+    for (const rel of diagMentionedFiles) {
+      if (!allowedRels.has(rel)) {
+        const absPath = require('path').join(root, rel);
+        if (require('fs').existsSync(absPath)) {
+          allowedRels.add(rel);
+          const content = require('fs').readFileSync(absPath, 'utf-8');
+          filesBlock += `\n\n// === FILE: ${rel} ===\n${content}`;
+          fileNames = [...allowedRels].join(', ');
+          fixLog(`[DIAG-EXPAND] Added Supervisor-prescribed file to allowedRels: ${rel}`);
+        }
+      }
+    }
     supervisorLabel = p1.supervisorLabel;
     fixActSupervisor(diagnosis, supervisorLabel);
   } catch (err) {
