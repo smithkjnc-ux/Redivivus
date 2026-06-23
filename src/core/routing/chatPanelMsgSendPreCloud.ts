@@ -118,6 +118,7 @@ export async function runPreCloudRouting(
     const _ws = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const _hasProject = !!_ws && !isProjectsContainer(getActiveProjectRoot() || _ws);
     let _routeToFix = false;
+    let _routeToBuild = false;
     try {
       const nullFallbackPrompt = `Reply with FIX, BUILD, or CHAT only.
 - FIX: user describes a bug, error, or broken behavior they want repaired in an existing project
@@ -129,6 +130,11 @@ Message: "${userText.slice(0, 300)}"`;
       if (nullResult.success && nullResult.text) {
         const t = nullResult.text.trim().toUpperCase();
         _routeToFix = t.startsWith('FIX') || (t.startsWith('BUILD') && _hasProject);
+        // [FIX] BUILD with no project open must route to the build pipeline, not Q&A chat.
+        // Previously this fell through to handleAIChat which returned generic Q&A responses
+        // like "I'm ready to build — what would you like me to make?" instead of starting
+        // the build pipeline. Synthesize a ChatResult so post-cloud routing handles it. (Jun 23, 2026)
+        _routeToBuild = t.startsWith('BUILD') && !_hasProject;
       }
     } catch {
       // Regex fallback — only fires when both cloudChat AND routing.prompt are unavailable
@@ -136,6 +142,8 @@ Message: "${userText.slice(0, 300)}"`;
       const _hasFixSignal = /\b(cannot|can't|cant|won't|wont|doesn't|doesnt|not working|broken|fails|failing|stuck|wrong|missing|error|crash|freeze|hang|glitch|bug|issue|problem|blank|empty)\b/i.test(userText);
       const _isImperativeChange = /\b(add|make|change|update|fix|repair|remove|delete|set|move|put|give|turn|adjust|increase|decrease|reduce|raise|lower|replace|rename|enable|disable|hide|show|style|color|colour|resize|swap|connect|wire|implement|write|build|generate)\b/i.test(userText);
       _routeToFix = _hasFixSignal || (_hasProject && !_isQuestion && _isImperativeChange);
+      // Regex fallback for BUILD: imperative create/build/make verb + not a question + no project open
+      _routeToBuild = !_hasProject && !_isQuestion && _isImperativeChange && !_hasFixSignal;
     }
     if (_routeToFix) {
       fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null -> fix pipeline (project=${_hasProject})`);
@@ -144,6 +152,17 @@ Message: "${userText.slice(0, 300)}"`;
       await applyRouteTier(userText, _hasProject, deps);
       await handleFixRequest(userText, deps, msg.imageBase64, msg.imageType);
       return { outcome: 'done' };
+    }
+    if (_routeToBuild) {
+      fixLog(`[CLOUD-NULL-FALLBACK] cloudChat null -> build pipeline (no project open)`);
+      await applyRouteTier(userText, false, deps);
+      // Synthesize a ChatResult so post-cloud routing handles the build dispatch normally
+      const syntheticResult: ChatResult = {
+        action: 'build', text: 'Building your project now.', task: userText,
+        model: 'local-fallback', provider: 'local', inputTokens: 0, outputTokens: 0,
+        confidence: 0.8, resolvedTier: (deps as any).supervisorTierHint || 'pro',
+      };
+      return { outcome: 'continue', chatResult: syntheticResult, effectiveRoot, hasProjectOpen };
     }
     await handleAIChat(msg, userText, deps, conversation, refresh, { manualProvider: (msg.manualProvider as string) || undefined });
     return { outcome: 'done' };
