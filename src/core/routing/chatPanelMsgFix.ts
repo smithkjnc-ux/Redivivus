@@ -75,7 +75,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   let filesBlock = sourceFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
   const activePatterns = detectPatterns(filesBlock, userText);
 
-  const { buildContext, projectDeadEnds, projectRules } = await collectAllFixContext(root, sourceFiles, userText, deps);
+  const { buildContext, projectDeadEnds, projectRules, verificationCommand } = await collectAllFixContext(root, sourceFiles, userText, deps);
 
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
   fixActStart(userText, sourceFiles.length);
@@ -159,5 +159,5 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   }
 
   // Phase 2+3: Worker generates fix → Guardian reviews → retry/escalate if rejected
-  await runFixPhase23({ subtasks, executionMode, diagnosis, fileNames, filesBlock, activePatterns, allowedRels, deps, root, supervisorLabel, userText, forceSurgical: gateResult.forceSurgical, approvedPlan, costBefore: _costBefore, projectDeadEnds, projectRules, buildContext });
+  await runFixPhase23({ subtasks, executionMode, diagnosis, fileNames, filesBlock, activePatterns, allowedRels, deps, root, supervisorLabel, userText, forceSurgical: gateResult.forceSurgical, approvedPlan, costBefore: _costBefore, projectDeadEnds, projectRules, buildContext, verificationCommand });
 }

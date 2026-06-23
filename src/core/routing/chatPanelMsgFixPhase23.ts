@@ -30,6 +30,7 @@ export interface FixPhase23Params {
   projectDeadEnds: string;
   projectRules: string;
   buildContext: string;
+  verificationCommand?: string | null;
 }
 
 export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
@@ -140,5 +141,5 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
   }
 
   const guardianApproved = /approved|skipped/i.test(guardianNote || '');
-  await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels, guardianApproved, guardianNote, retryCount, escalated });
+  await runFixFinalize({ written, failed, skipped, fixSnapId, diagnosis, supervisorLabel, workerLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels, guardianApproved, guardianNote, retryCount, escalated, verificationCommand: p.verificationCommand ?? null });
 }

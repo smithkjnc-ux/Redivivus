@@ -92,6 +92,9 @@ export function collectFixContext(root: string, sourceFiles: { rel: string; cont
     const t = getLastTerminalError();
     if (t?.errorBlock?.trim()) {
       parts.push(`LAST TERMINAL ERROR (${t.terminalName}):\n${t.fullContext.slice(0, 600)}`);
+      if (t.failingCommand) {
+        parts.push(`FAILING COMMAND: ${t.failingCommand}`);
+      }
     }
   } catch {}
 
@@ -162,11 +165,12 @@ export async function collectAllFixContext(
   sourceFiles: { rel: string }[],
   _userText: string,
   _deps: any
-): Promise<{ buildContext: string; projectDeadEnds: string; projectRules: string }> {
-  const [{ readProjectDeadEnds }, { readProjectRules, getRecentBuildContext }, { LearnedMemoryService }] = await Promise.all([
+): Promise<{ buildContext: string; projectDeadEnds: string; projectRules: string; verificationCommand: string | null }> {
+  const [{ readProjectDeadEnds }, { readProjectRules, getRecentBuildContext }, { LearnedMemoryService }, { inferVerificationCommand }] = await Promise.all([
     import('./chatPanelMsgFixDeadEnds.js'),
     import('./chatPanelMsgFixBuildCtx.js'),
     import('../../services/learnedMemoryService.js'),
+    import('../../services/workspace/postFixVerification.js'),
   ]);
   const buildContext = getRecentBuildContext(root, sourceFiles);
   const projectDeadEnds = readProjectDeadEnds(root) || '';
@@ -174,5 +178,9 @@ export async function collectAllFixContext(
   // Append Guardian-caught never-do entries from knowledge.json (separate store from dead_ends.md)
   const knowledgeNeverDo = root ? (() => { try { return new LearnedMemoryService(root).getNeverDoForPrompt(); } catch { return ''; } })() : '';
   const combinedDeadEnds = [projectDeadEnds, knowledgeNeverDo].filter(Boolean).join('\n\n');
-  return { buildContext, projectDeadEnds: combinedDeadEnds, projectRules };
+  // Capture the failing command BEFORE the fix so we can re-run it after to verify
+  const { getLastFailingCommand } = await import('../../services/workspace/terminalErrorService.js');
+  const capturedCmd = getLastFailingCommand();
+  const verificationCommand = inferVerificationCommand(root, capturedCmd?.command || undefined);
+  return { buildContext, projectDeadEnds: combinedDeadEnds, projectRules, verificationCommand };
 }

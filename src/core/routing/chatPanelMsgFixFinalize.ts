@@ -29,6 +29,7 @@ export async function runFixFinalize(params: {
   guardianNote?: string;
   retryCount?: number;
   escalated?: boolean;
+  verificationCommand?: string | null;
 }): Promise<void> {
   let { written, workerLabel } = params;
   const { failed, skipped, fixSnapId, diagnosis, supervisorLabel, guardianLabel, scopeNote, needsAgentHandoff, userText, root, deps, activePatterns, conversation, refresh, allowedRels, guardianNote, retryCount, escalated } = params;
@@ -75,6 +76,25 @@ export async function runFixFinalize(params: {
   fixActFinish(written, failed); // [FIX-ACTIVITY] final marker on the Build Activity panel (green if fixed, red if not)
   if (written.length > 0) {
     try { await vscode.window.showTextDocument(vscode.Uri.file(path.join(root, written[0])), { preview: false, viewColumn: vscode.ViewColumn.Beside, preserveFocus: true }); } catch {}
+  }
+
+  // [POST-FIX VERIFICATION] Re-run the command that originally failed to confirm the fix worked
+  if (written.length > 0 && params.verificationCommand) {
+    try {
+      const { runPostFixVerification } = await import('../../services/workspace/postFixVerification.js');
+      const { fixActStep } = await import('./fixActivityPanel.js');
+      fixActStep({ phase: 'verify', status: 'running', label: `Verifying: ${params.verificationCommand}` });
+      const pfResult = await runPostFixVerification(params.verificationCommand, root);
+      fixActStep({
+        phase: 'verify',
+        status: pfResult.passed ? 'pass' : 'fail',
+        label: pfResult.passed ? `✅ Verified: \`${params.verificationCommand}\` passed` : `⚠️ Post-fix check failed: \`${params.verificationCommand}\``,
+        detail: pfResult.passed ? undefined : [pfResult.stderr || pfResult.stdout].filter(Boolean).join('\n').slice(0, 500),
+      });
+      fixLog(`[POST-FIX] ${pfResult.summary}`);
+    } catch (e) {
+      fixLog(`[POST-FIX] Verification error: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 
   // Compiler as truth — real execution feedback Guardian AI cannot provide

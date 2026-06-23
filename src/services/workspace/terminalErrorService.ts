@@ -20,6 +20,10 @@ const _buffers = new Map<vscode.Terminal, TerminalBuffer>();
 // Error-indicating line patterns — match any of these to consider a block an error
 const ERROR_LINE_RE = /\b(error|Error|ERROR|exception|Exception|EXCEPTION|fatal|Fatal|FATAL|failed|Failed|FAILED|SyntaxError|TypeError|ReferenceError|RangeError|Cannot find|Cannot read|Unexpected token|undefined is not|null is not|is not a function|ENOENT|EACCES|EADDRINUSE|npm ERR!|tsc.*error|TS[0-9]{4}|command not found|ModuleNotFoundError|ImportError|AttributeError|NameError|KeyError|IndexError|ZeroDivisionError|AssertionError|Segmentation fault|Traceback)\b/;
 
+// Shell prompt patterns — lines ending in $ or > preceded by path/user, or plain $ > prompts
+// Also matches common CI/script invocation patterns like `> script-name`
+const PROMPT_RE = /(?:^|\s)[\w.~/@-]*[$#>]\s+(.+)$|^>\s+([\w][\w:/@.-]*)\s*$/;
+
 export function registerTerminalErrorService(context: vscode.ExtensionContext): void {
   // onDidWriteTerminalData is a proposed API — accessing the property throws in VS Code 1.110+
   // if the extension hasn't declared "terminalDataWriteEvent" in enabledApiProposals.
@@ -46,6 +50,13 @@ export interface TerminalError {
   terminalName: string;
   errorBlock: string;   // The extracted error lines (trimmed)
   fullContext: string;  // Up to 20 lines around the error for AI context
+  failingCommand?: string; // The command that was running when the error occurred
+}
+
+export interface FailingCommand {
+  command: string;      // e.g. "npm run build", "python main.py", "tsc"
+  terminalName: string;
+  cwd?: string;         // working directory if detectable
 }
 
 /** Extract the last error block from all known terminal buffers.
@@ -83,11 +94,44 @@ export function getLastTerminalError(): TerminalError | null {
     }
     const errorLines = lines.slice(firstErrorIdx, end).filter(l => l.trim().length > 0);
 
+    const failingCommand = extractCommandBeforeError(lines, firstErrorIdx);
     return {
       terminalName: buf.name || terminal.name || 'Terminal',
       errorBlock: errorLines.slice(0, 15).join('\n').trim(),
       fullContext: contextLines.slice(0, 30).join('\n').trim(),
+      failingCommand: failingCommand || undefined,
     };
   }
   return null;
+}
+
+/** Scan backwards from errorIdx to find the shell command that triggered the error. */
+function extractCommandBeforeError(lines: string[], errorIdx: number): string | null {
+  // Look back up to 50 lines for a prompt line
+  const searchStart = Math.max(0, errorIdx - 50);
+  for (let i = errorIdx - 1; i >= searchStart; i--) {
+    const line = lines[i].trim();
+    if (!line) { continue; }
+    const m = PROMPT_RE.exec(line);
+    if (m) {
+      const cmd = (m[1] || m[2] || '').trim();
+      if (cmd.length > 1 && cmd.length < 200) { return cmd; }
+    }
+    // npm/yarn/pnpm script lines: "> script-name" or "$ npm run ..."
+    if (/^\$?\s*(npm|yarn|pnpm|npx|node|python3?|ruby|go|cargo|tsc|make|gradle|mvn|pytest|jest|vitest)\s+/.test(line)) {
+      return line.replace(/^\$\s*/, '').trim();
+    }
+  }
+  return null;
+}
+
+/** Returns the command that was running when the last terminal error occurred.
+ *  Returns null if no terminal error exists or command cannot be determined. */
+export function getLastFailingCommand(): FailingCommand | null {
+  const err = getLastTerminalError();
+  if (!err?.failingCommand) { return null; }
+  return {
+    command: err.failingCommand,
+    terminalName: err.terminalName,
+  };
 }
