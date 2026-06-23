@@ -48,6 +48,20 @@
 - `redivivusSidebar` visibility: `hidden` → `collapsed`; postcompile deploy now syncs `~/.redivivus/extensions`
 - Export Keys (.env) button moved to Setup Hub panel; save-dialog flow
 
+### Jun 23, 2026 — Session 17: Blueprint Revisions & Setup Rework
+
+**Blueprint Revision System** replaces the old "lock blueprint" boolean. Every save snapshots the previous version as a locked `BlueprintRevision`. Current blueprint is always open. Reversions create new revisions — history is never destroyed.
+
+**Setup Progress Rework**: Steps 6-8 moved from code-health metrics to meaningful milestones (first build, architecture map, health baseline). Steps 1, 2, 3, 4, 5, 6, 8, and 10 now auto-complete on first build. Only step 7 (map) and step 9 (session) require user action.
+
+**Hybrid Deep Fix**: Architect Review now offers "Fix All" (light edit pipeline, fast) and "Deep Fix" (full Supervisor→Worker→Guardian with retry loop, high quality). Extracted to own file per Rule 9.
+
+**Blueprint Evolution Context**: Fix, edit, and Q&A pipelines now feed the AI the current blueprint + last 5 revision summaries (~200 tokens). Annotation-based understanding vs. loading raw codebase.
+
+**Performance Audit**: 30s TTL cache on static fix context; O(n) conversation scan replaced with O(1) `slice(-3)`.
+
+Full entries in `docs/REDIVIVUS_FIXES.md`.
+
 ### Jun 3 – May 29, 2026 — Sessions 11DD–16 (archived)
 Full entries in `docs/REDIVIVUS_FIXES.md`. Highlights: adaptive blueprint completion, AI breakdown card, auto-continuation on token limit, duplicate panel fix, static validators, full security audit, auth repair, sidebar fixes, cloud build local fallback.
 

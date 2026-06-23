@@ -2,6 +2,7 @@
 
 import * as vscode from 'vscode';
 import { ChatPanel } from './ui/panels/chat/chatPanel';
+import { consolidatePanelLayout } from './ui/panels/chat/chatPanelShow.js';
 import { wasProjectClosedRecently } from './services/project/closeMarker.js';
 
 export function registerPanelSerializer(
@@ -23,6 +24,7 @@ export function registerPanelSerializer(
         if ((ChatPanel as any)._instance !== SENTINEL) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
         const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
         (ChatPanel as any)._instance = panel;
+        consolidatePanelLayout(); // prevent "split screen on restart" — close other editor groups
         const closedByUser = wasProjectClosedRecently() || context.globalState.get<boolean>('redivivus.userClosedProject');
         if (closedByUser) {
           context.globalState.update('redivivus.userClosedProject', undefined);

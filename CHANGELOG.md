@@ -7,10 +7,17 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [Unreleased]
 
 ### Added
+- **Blueprint Revision System** (`src/types/index.ts`, `blueprintRevisions.ts`, `blueprintService.ts`): Replaced the old "lock blueprint" boolean with a full revision history. Every blueprint save snapshots the previous state as a locked `BlueprintRevision`. The current blueprint is always editable. Reverting a fix creates a new revision — history is never destroyed.
+- **Hybrid Deep Fix** (`chatPanelMsgArchitectDeepFix.ts`, `chatPanelRendererArchitect.ts`): Architect Review now offers **Fix All** (light edit pipeline, fast) and **Deep Fix** (full Supervisor→Worker→Guardian with retry loop, high quality). Users choose speed vs. correctness per review.
+- **Blueprint Evolution Context** (`chatPanelMsgFixBuildCtx.ts`, `chatPanelEditBuild.ts`, `chatPanelAI.ts`): Fix, edit, and Q&A pipelines now feed the AI the current blueprint plus a condensed history of the last 5 revisions. Annotation-based understanding: ~200 tokens of structured metadata vs. 50K+ tokens of raw codebase.
+- **Setup Progress Auto-Completion** (`setupProgressSteps.ts`, `session.ts`): After first build, 8 of 10 setup steps auto-complete (project init, blueprint, rules, scan, build, health baseline, save point). Only architecture map and first session require user action.
 - **Test All Keys** (`apiSetup.ts`, `apiSetupScript.ts`, `apiSetupHtml.ts`): API Setup panel now has a "🔍 Test All Keys" button that pings each configured provider's `/v1/models` endpoint (no tokens consumed) and shows per-provider ✓/✗ status in real time.
 - **Kimi endpoint auto-detection** (`services/ai/kimiEndpoint.ts`, new): Moonshot runs two non-interchangeable platforms — `api.moonshot.ai` (international) and `api.moonshot.cn` (China). New helper probes both, caches the working base per-key, and is used by chat, streaming, balance, validation, and diagnostics. Handles both key types with zero configuration.
 
 ### Fixed
+- **Setup step 5 scan honesty** (`session.ts`): Instead of faking `lastScan` with a timestamp, the first build now runs a real `scanDirectory` + `buildAnalysis` so `scanResults` actually exist when the step shows "complete".
+- **Fix context caching** (`chatPanelMsgFixContext.ts`): Added 30s TTL cache on static fix context (blueprint evolution, dead ends, project rules). Batch operations (Deep Fix) no longer re-read the same files per fix.
+- **Panel context O(n) scan** (`chatPanelPublicAPIRefresh.ts`): Replaced full-conversation scan with `slice(-3)` — O(1) bounded check on every refresh.
 - **OpenAI key truncation on re-entry**: the masked API-key field (shown as `••••`) was not cleared on focus, so re-typed keys appended to bullets and saved truncated → silent 401s. Added a focus-to-clear handler (`apiSetupScript.ts`) and `.trim()` on save.
 - **Key validation read source** (`core/diagnostics/selfDiagnosticChecks.ts`): `checkApiKey`/`checkProviderReachable` read from old `settings.json` instead of SecretStorage, so every provider falsely reported "No API key configured". Now reads from SecretStorage.
 - **Validation network layer**: switched the provider ping from `fetch` to Node's `https`/`http` module for reliable behaviour in the extension host.

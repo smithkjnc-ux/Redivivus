@@ -10,6 +10,15 @@ import type { RoutingService } from '../../../services/ai/routingService';
 import type { UsageTracker } from '../../../services/usageTracker';
 import type { VaultService } from '../../../services/vault/vaultService';
 
+/** After reload, VS Code may restore the chat panel in a split group alongside other webviews.
+ *  This closes all other editor groups so the chat panel takes the full width. */
+export function consolidatePanelLayout(): void {
+  // Close editors in other groups (keeps the active group intact).
+  // This prevents the "split screen on restart" bug where the chat panel
+  // shares the editor area with an empty webview or logo panel.
+  vscode.commands.executeCommand('workbench.action.closeEditorsInOtherGroups');
+}
+
 export function doShowChatPanel(
   redivivus: RedivivusService,
   routing: RoutingService,
@@ -19,6 +28,7 @@ export function doShowChatPanel(
   if ((ChatPanel as any)._instance) {
     const existing = (ChatPanel as any)._instance;
     existing._panel.reveal(existing._panel.viewColumn ?? vscode.ViewColumn.One, false);
+    consolidatePanelLayout();
     if (vault) { existing.vault = vault; }
 
     // Sync in-memory assistMode with file system — catches Assist → Full Redivivus conversion
@@ -48,6 +58,7 @@ export function doShowChatPanel(
     panel.iconPath = vscode.Uri.joinPath(extCtx.extensionUri, 'resources', 'redivivus-icon-v2.svg');
   }
   const instance = new (ChatPanel as any)(panel, redivivus, routing, usageTracker, vault);
+  consolidatePanelLayout();
   const ctx = ChatPanel.extensionContext;
   const startupBehavior = vscode.workspace.getConfiguration('redivivus').get<string>('startupBehavior') || 'launcher';
   if (ctx && !vscode.workspace.workspaceFolders?.length && startupBehavior === 'lastProject') {
