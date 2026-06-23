@@ -46,10 +46,25 @@ export function updateStatus(conversation: any[], supervisorLabel: string, phase
 /** Creates a copy of deps with accumulated Guardian critiques injected into the routing context */
 export function enrichDepsWithCritiques(deps: MessageHandlerDeps, critiques: string[]): MessageHandlerDeps {
   const critiqueBlock = critiques.map((c, i) => `Attempt ${i + 1} failed: ${c}`).join('\n');
+
+  // Extract explicit file prohibitions from critiques — surface as hard constraints at the TOP
+  // so the Worker can't bury them at the end and ignore them.
+  const forbiddenFiles: string[] = [];
+  for (const c of critiques) {
+    // Match patterns like: "only involve style.css, leaving index.html unchanged"
+    // or "should NOT modify index.html" or "do not touch index.html"
+    const notPatterns = c.matchAll(/(?:leaving|unchanged|do not (?:touch|modify)|should not (?:touch|modify)|must not (?:touch|modify))\s+[`']?([\w./\\-]+\.[a-zA-Z0-9]{1,6})[`']?/gi);
+    for (const m of notPatterns) { if (!forbiddenFiles.includes(m[1])) { forbiddenFiles.push(m[1]); } }
+  }
+  const forbiddenBlock = forbiddenFiles.length > 0
+    ? `⛔ FORBIDDEN — DO NOT MODIFY THESE FILES (previous attempts failed because they changed them):\n${forbiddenFiles.map(f => `- ${f}`).join('\n')}\n\n`
+    : '';
+
   const enrichedRouting = Object.create(deps.routing);
   const originalPrompt = deps.routing.prompt.bind(deps.routing);
   enrichedRouting.prompt = async (text: string, timeoutMs?: number, imageBase64?: string, imageType?: string) => {
-    const enriched = `${text}\n\nPREVIOUS GUARDIAN REJECTIONS (your fix MUST address ALL of these):\n${critiqueBlock}`;
+    // Forbidden files go FIRST (highest priority), critique block goes BEFORE the task (not after)
+    const enriched = `${forbiddenBlock}PREVIOUS ATTEMPTS FAILED — read carefully before writing:\n${critiqueBlock}\n\n${text}`;
     return originalPrompt(enriched, timeoutMs, imageBase64, imageType);
   };
   return { ...deps, routing: enrichedRouting };

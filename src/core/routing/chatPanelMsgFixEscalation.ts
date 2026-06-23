@@ -161,6 +161,21 @@ export async function runEscalationLoop(params: {
       const rp = await represcribeAfterRejection({ attempt, maxRetries, userText, root, filesBlock, currentDiagnosis, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, deps });
       filesBlock = rp.filesBlock;
       currentDiagnosis = rp.diagnosis;
+      // [FIX] Inject hard DO_NOT_MODIFY constraints into the diagnosis itself — files the Verify/Guardian
+      // said to leave untouched. This lives inside the diagnosis (the Worker's primary instruction source)
+      // rather than as a separate appended block, so it carries Supervisor-level authority.
+      {
+        const doNotFiles: string[] = [];
+        for (const c of accumulatedCritiques) {
+          const matches = c.matchAll(/(?:leaving|unchanged|do not (?:touch|modify)|should not (?:touch|modify)|must not (?:touch|modify)|only involve[^,]+,\s*leaving)\s+[`']?([\w./\\-]+\.[a-zA-Z0-9]{1,6})[`']?/gi);
+          for (const m of matches) { if (!doNotFiles.includes(m[1])) { doNotFiles.push(m[1]); } }
+        }
+        if (doNotFiles.length > 0) {
+          const constraint = `\n\n[WORKER CONSTRAINTS — ABSOLUTE]\nDO NOT MODIFY: ${doNotFiles.join(', ')}\nPrevious fix attempts failed because the Worker incorrectly modified these files. Your fix MUST leave them completely unchanged.`;
+          currentDiagnosis = currentDiagnosis + constraint;
+          fixLog(`[DIAG-CONSTRAINT] Injected DO_NOT_MODIFY into diagnosis: ${doNotFiles.join(', ')}`);
+        }
+      }
       // [FIX] Re-prescription may return [AGENT_HANDOFF] — the outer guard in chatPanelMsgFix.ts only
       // checks the original diagnosis, so this path was missed. The Worker receiving [AGENT_HANDOFF] as
       // its prescription produces garbage on the next attempt. Break out and signal agent handoff instead.
