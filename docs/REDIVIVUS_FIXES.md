@@ -3,7 +3,18 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 23, 2026: Supervisor Software Constraint
+## Fix — Jun 23, 2026: Supervisor Planning File Limit Anchor
+
+**Files changed:**
+- `src/lib/ai/routingServicePrompts.ts` (redivivus-backend) — Adjusted module scale anchoring to allow up to 40 modules.
+
+**What changed:** 
+Modified the Supervisor prompt size calibration. Changed the anchor text "a complex app is 6-10 small modules" to "a complex app is 10-40 small modules".
+
+**Why:** The user noted that despite upping the project build limits to 40 files, the AI kept returning exactly 10 files (like the Nixie tube clock build which had exactly 10 files). AI models are highly suggestible to hard numbers in their system prompts. By telling the AI a complex app has "6-10 modules", it anchored on 10 as an absolute ceiling. This change releases the artificial cognitive cap, allowing the Supervisor to actually plan up to 40 files for large builds.
+
+**Risk:** Low. The maximum token limit on the API responses already acts as a hard limit for runaway planning.
+\n## Fix — Jun 23, 2026: Supervisor Software Constraint
 
 **Files changed:**
 - `src/lib/ai/routingServicePrompts.ts` (redivivus-backend) — Added strict software-only constraint to `generateSupervisorPrompt`.
