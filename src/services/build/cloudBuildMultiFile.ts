@@ -21,6 +21,18 @@ function nextAvailableProvider(current: string, keyHeaders: Record<string, strin
     .find(p => p !== current && keyPresent(p) && !isProviderUnavailable(p)) ?? null;
 }
 
+/** Return a copy of keyHeaders with unavailable providers removed from X-Provider-Keys. */
+function filterKeyHeaders(keyHeaders: Record<string, string>): Record<string, string> {
+  const raw = keyHeaders['X-Provider-Keys'];
+  if (!raw) { return keyHeaders; }
+  try {
+    const keys = JSON.parse(raw) as Record<string, string>;
+    const filtered = Object.fromEntries(Object.entries(keys).filter(([p]) => !isProviderUnavailable(p)));
+    if (Object.keys(filtered).length === Object.keys(keys).length) { return keyHeaders; } // nothing to filter
+    return { ...keyHeaders, 'X-Provider-Keys': JSON.stringify(filtered) };
+  } catch { return keyHeaders; }
+}
+
 export async function executeMultiFileBuild(
   task: string,
   root: string,
@@ -78,6 +90,9 @@ export async function executeMultiFileBuild(
         ],
       };
 
+      // [FIX] Exclude unavailable providers (e.g. Claude out of credits) from keyHeaders so the
+      // server cannot pick them — server ignores `preferred` and chooses from available keys.
+      const activeKeyHeaders = filterKeyHeaders(keyHeaders);
       const body = JSON.stringify({
         task,
         context: contextWithBuilt,
@@ -88,7 +103,7 @@ export async function executeMultiFileBuild(
       });
 
       // [DONE] buildOnce moved to cloudBuildMultiFileHelpers.ts as buildSingleFileViaBuildEndpoint (Rule 9 split)
-      const buildOnce = () => buildSingleFileViaBuildEndpoint(base, token, keyHeaders, body, file.path, onStep, onCode);
+      const buildOnce = () => buildSingleFileViaBuildEndpoint(base, token, activeKeyHeaders, body, file.path, onStep, onCode);
 
       // [FIX] Raised from 240s → 600s. Guardian retries and Supervisor splits on oversized files (like index.html
       // generated as a flat 700-line monolith) can take up to 4 sequential AI calls, which easily exceeds 4 minutes.
@@ -163,16 +178,22 @@ export async function executeMultiFileBuild(
       }
       if (e?._authError) return { success: false, error: 'NOT_AUTHENTICATED' };
       const errMsg = e?.message ?? 'Network error';
-      // [PROVIDER-FALLBACK] If this file failed due to credit/quota error, mark provider unavailable
-      // and retry once with the next ranked available provider — same logic as fix pipeline failover.
-      if (looksLikeQuotaError(errMsg) && preferred) {
-        markProviderUnavailable(preferred, errMsg.slice(0, 200));
-        const fallback = nextAvailableProvider(preferred, keyHeaders);
+      // [PROVIDER-FALLBACK] If this file failed due to credit/quota error, detect which provider
+      // actually failed (from the error text), mark it unavailable, and retry with filtered keys.
+      if (looksLikeQuotaError(errMsg)) {
+        // Identify the failed provider by scanning error text for known provider names
+        const _failedProvider = ['claude', 'anthropic'].some(k => errMsg.toLowerCase().includes(k)) ? 'claude'
+          : ['openai', 'gpt'].some(k => errMsg.toLowerCase().includes(k)) ? 'openai'
+          : ['gemini', 'google'].some(k => errMsg.toLowerCase().includes(k)) ? 'gemini'
+          : preferred;
+        markProviderUnavailable(_failedProvider, errMsg.slice(0, 200));
+        const fallback = nextAvailableProvider(_failedProvider, keyHeaders);
         if (fallback) {
           try {
-            onStep?.({ label: `${preferred} unavailable — retrying ${file.path} with ${fallback}`, model: fallback, status: 'running', index: i, total: planFiles.length, updateLatest: true });
+            onStep?.({ label: `${_failedProvider} unavailable — retrying ${file.path} with ${fallback}`, model: fallback, status: 'running', index: i, total: planFiles.length, updateLatest: true });
+            const retryKeyHeaders = filterKeyHeaders(keyHeaders); // exclude failed provider
             const retryBody = JSON.stringify({ task, context: { ...context, existingFiles: [...(context?.existingFiles ?? []), ...builtSoFar] }, preferred: fallback, targetFile: { path: file.path, description: file.description, isNew: file.isNew, fileIndex: i, totalFiles: planFiles.length, siblings }, prescription, supervisorProvider });
-            const retryData = await buildSingleFileViaBuildEndpoint(base, token, keyHeaders, retryBody, file.path, onStep, onCode);
+            const retryData = await buildSingleFileViaBuildEndpoint(base, token, retryKeyHeaders, retryBody, file.path, onStep, onCode);
             const normalised = (retryData.files ?? []).map(f => ({ ...f, path: f.path.startsWith(slug + '/') ? f.path.slice(slug.length + 1) : f.path }));
             allFiles.push(...normalised);
             builtSoFar.push(...normalised.map(f => ({ path: f.path, content: f.content })));
@@ -183,6 +204,7 @@ export async function executeMultiFileBuild(
             onStep?.({ label: `Built ${file.path} (via ${fallback})`, model: fallback, status: 'success', detail: normalised.map(f => f.content).join('\n\n'), kind: 'code', index: i, total: planFiles.length, updateLatest: true });
             for (const nf of normalised) { onFileComplete?.(nf.path, nf.content); }
             preferred = fallback; // use fallback for remaining files too
+            keyHeaders = retryKeyHeaders; // keep failed provider excluded for remaining files
             continue;
           } catch (retryErr: any) {
             return { success: false, error: retryErr?.message ?? 'Fallback provider also failed', failureSource: 'cloud' };
