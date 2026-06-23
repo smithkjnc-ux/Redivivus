@@ -89,7 +89,7 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
     const _eli5Block = _eli5Err ? formatELI5Block(_eli5Err) : '';
     conversation[conversation.length - 1].content =
       `${_eli5Block}⚠️ **Something went wrong while writing the fix.** ${fixErrorHint(_errMsg2)}\n\n` +
-      `_Details: ${_errMsg2.slice(0, 300)}_${fixCostByline(deps, root, costBefore)}\n\n` +
+      `_Details: ${_errMsg2.slice(0, 600)}_${fixCostByline(deps, root, costBefore)}\n\n` +
       `__RETRY_FIX__:${_b642}__END_RETRY__`;
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }

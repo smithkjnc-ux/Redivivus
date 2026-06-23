@@ -129,7 +129,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     const _b64 = Buffer.from(userText, 'utf8').toString('base64');
     conversation[conversation.length - 1].content =
       `⚠️ **Something went wrong while analysing your fix.** ${fixErrorHint(_errMsg)}\n\n` +
-      `_Details: ${_errMsg.slice(0, 300)}_${fixCostByline(deps, root, _costBefore)}\n\n` +
+      `_Details: ${_errMsg.slice(0, 600)}_${fixCostByline(deps, root, _costBefore)}\n\n` +
       `__RETRY_FIX__:${_b64}__END_RETRY__`;
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
