@@ -3,7 +3,18 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 23, 2026: Extended Anti-Hallucination Constraints (15d-15g)
+## Fix — Jun 23, 2026: Pre-Cloud Confirmation Misclassification (Stalled Chat UI)
+
+**Files changed:**
+- `src/core/routing/chatPanelMsgSendConfirmCheck.ts` (redivivus) — Updated the AI classifier prompt for build confirmations.
+
+**What changed:** 
+Modified the pre-cloud confirmation classifier prompt to explicitly answer NO if the user provides new instructions on what to build (e.g., "make a clock", "build a website"). Previously, the AI was asked if the user was "agreeing or confirming to proceed with building or creating something," which caused it to say YES to new requests (interpreting "make" as agreeing to build). 
+
+**Why:** Because new requests were misclassified as confirmations, the system attempted to find a prior pending request. Finding none, it fell back to pushing the generic "what would you like me to make" prompt. Since the UI deduplicates consecutive identical messages, the user saw no response and the chat UI appeared completely stalled, swallowing the build request.
+
+**Risk:** Low. Tightens the definition of an "agreement" to prevent the fast-path from swallowing explicit intents.
+\n## Fix — Jun 23, 2026: Extended Anti-Hallucination Constraints (15d-15g)
 
 **Files changed:**
 - `src/lib/ai/redivivusWorkerRules.ts` (redivivus-backend) — Appended sub-rules 15d through 15g to the existing Worker rules.

@@ -20,9 +20,9 @@ export async function checkBuildConfirmation(lowerText: string, userText: string
   let looksLikeAgreement = false;
   try {
     const lastAssistant = [...conversation].reverse().find((m: any) => m.role === 'assistant')?.content?.slice(0, 400) || '';
-    const prompt = `Reply with YES or NO only. The user just sent a very short message. Is the user agreeing or confirming to proceed with building or creating something?
+    const prompt = `Reply with YES or NO only. The user just sent a very short message. Is the user ONLY agreeing or confirming to proceed (e.g. "yes", "do it", "looks good")?
 ${lastAssistant ? `What the assistant just said: "${lastAssistant}"\n` : ''}User message: "${userText}"
-Answer YES only if the user is clearly confirming a pending build/create request. A casual "ok" or "sure" responding to a non-build exchange should be NO.`;
+Answer YES ONLY if the user is confirming a pending request WITHOUT providing any new instructions on what to build. If the user is telling you WHAT to build (e.g. "make a clock", "build a website"), answer NO.`;
     const result = await deps.routing.prompt(prompt, 12_000);
     looksLikeAgreement = result.success && !!result.text?.trim().toUpperCase().startsWith('YES');
   } catch {
