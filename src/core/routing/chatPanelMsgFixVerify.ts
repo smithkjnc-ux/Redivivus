@@ -26,6 +26,7 @@ VERIFICATION RULES:
 - Compare each bug in your diagnosis to the Worker's edit. Did it actually fix the root cause, or just paper over the symptom?
 - Check: Are the variable names, function calls, and logic paths correct for what you intended?
 - Check: Did the Worker misunderstand your diagnosis and fix the wrong thing?
+- CRITICAL: Your diagnosis may describe what existing code DOES as part of the analysis (e.g. "the current value is X" or "this currently works by doing Y"). Do NOT treat a description of existing behavior as a directive to preserve it. Only the explicit prescription — what you told the Worker TO DO — is what you check against. If the Worker changed code that your diagnosis described but did NOT explicitly say to keep, that is NOT a failure.
 - If the Worker got it right: respond with ONLY the word PASS
 - If the Worker got it wrong: respond with FAIL followed by a brief explanation of what is logically wrong and what the correct fix should be.`;
 
