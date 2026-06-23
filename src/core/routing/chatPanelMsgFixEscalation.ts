@@ -41,6 +41,7 @@ export async function runEscalationLoop(params: {
 
   let workerResponse = '';
   let workerLabel = 'AI';
+  let originalWorkerProvider = ''; // tracks the Worker's provider before self-fix overrides workerLabel
   let guardianLabel = 'AI';
   let guardianNote = '';
   let scopeNote = '';
@@ -59,6 +60,9 @@ export async function runEscalationLoop(params: {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // ── Phase 2: Worker generates fix ──
+    if (!escalated && !originalWorkerProvider) {
+      try { originalWorkerProvider = deps.routing.selectSupervisorAndWorker().worker || ''; } catch { /* ignore */ }
+    }
     updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated);
     refresh();
     // [FIX-ACTIVITY] Live Worker row — its code streams into this row's code block (live:true).
@@ -114,22 +118,22 @@ export async function runEscalationLoop(params: {
         escalated = true;
         logExhaustedDeadEnd(root, accumulatedCritiques, attempt, maxRetries, false);
         try {
-          const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
+          const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
           const failureSummary = accumulatedCritiques
             .filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'))
             .map((c, i) => `Attempt ${i + 1} failed: ${c.slice(0, 200)}`).join('\n');
           const verifySuggestions = accumulatedCritiques
             .filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'))
             .map(c => c.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 400)).join('\n');
-          const selfFixInstruction = `${userText || 'Fix the issue'}\n\n[SELF-FIX MODE: DO NOT produce a diagnosis for a Worker. Write the complete code fix directly using SEARCH/REPLACE surgical edit format.]\n\nWorker failed all Verify checks:\n${failureSummary}${verifySuggestions ? `\n\nVerify AI suggested the correct approach:\n${verifySuggestions}` : ''}`;
-          const enrichedDeadEnds = [projectDeadEnds, failureSummary].filter(Boolean).join('\n\n');
+          // Build a diagnosis that IS the correct approach — Worker prompt on Supervisor model
+          const selfFixDiagnosis = `${currentDiagnosis}\n\n[SELF-FIX — SUPERVISOR MODEL WRITING DIRECTLY]\nWORKER_TIER: ultra\nAll previous Worker attempts failed. You are the Supervisor model writing the fix yourself.\nUse SURGICAL SEARCH/REPLACE edits ONLY — do NOT rewrite entire files.\nPrevious attempts failed because:\n${failureSummary}${verifySuggestions ? `\n\nThe correct approach (from Verify analysis):\n${verifySuggestions}\nImplement this exactly using surgical edits.` : ''}`;
           fixActStep({ phase: 'supervisor', status: 'running', label: 'Worker exhausted — Supervisor writing fix directly' });
           conversation[conversation.length - 1].content = progressEscalating({ supervisorLabel });
           refresh();
-          const selfFix = await runPhase1Supervisor(selfFixInstruction, filesBlock, buildContext || '', activePatterns, enrichedDeadEnds, projectRules || '', deps, root, undefined, undefined, true);
-          if (selfFix?.diagnosis && selfFix.diagnosis.length > 50) {
-            workerResponse = selfFix.diagnosis;
-            workerLabel = selfFix.supervisorLabel;
+          const selfFix = await runPhase2Worker(selfFixDiagnosis, fileNames, filesBlock, activePatterns, deps, root, undefined, true /* escalated=Supervisor model */, forceSurgical);
+          if (selfFix?.workerResponse && selfFix.workerResponse.length > 50) {
+            workerResponse = selfFix.workerResponse;
+            workerLabel = selfFix.workerLabel || supervisorLabel;
             fixActStep({ phase: 'worker', status: 'pass', label: 'Supervisor wrote fix directly', model: workerLabel });
             fixLog(`[SUPERVISOR-SELF-FIX] Supervisor produced fix after Verify exhaustion (${workerResponse.length} chars)`);
             guardianNote = `⚠️ Written by Supervisor directly after ${maxRetries + 1} Worker failures — please verify the fix worked as expected. If not, retry and past failures are logged.`;
@@ -156,7 +160,10 @@ export async function runEscalationLoop(params: {
       fixLog(`Guardian review (attempt ${attempt + 1}): Starting...`);
       fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
       // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
-      const guardianResult = await routing.guardianReview(guardianContext, workerResponse, workerLabel.toLowerCase(), '', deps.routingOverrides?.guardian);
+      // [SELF-FIX] When escalated, workerLabel is the Supervisor — use originalWorkerProvider so
+      // Guardian excludes the Worker (not the Supervisor that wrote the fix).
+      const guardianWorkerHint = escalated && originalWorkerProvider ? originalWorkerProvider : workerLabel.toLowerCase();
+      const guardianResult = await routing.guardianReview(guardianContext, workerResponse, guardianWorkerHint, '', deps.routingOverrides?.guardian);
       fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
       // [FIX] Distinguish a REAL guardian verdict from the "couldn't run on any provider" fallback. routingGuardian
       // returns guardianAI:'none' when EVERY provider failed — that is NOT an approval, it's an unreviewed pass.
@@ -192,6 +199,14 @@ export async function runEscalationLoop(params: {
       const critique = guardianResult.issues?.join('; ') || 'Unknown issue';
       accumulatedCritiques.push(critique);
       fixLog(`Guardian REJECTED the fix (attempt ${attempt + 1})`, { critique: critique.substring(0, 300) });
+
+      // [SELF-FIX] If escalated (Supervisor wrote this fix), don't re-enter the Worker loop —
+      // the Worker already failed; retrying it makes no sense. Return with the warning note.
+      if (escalated) {
+        fixLog(`[SUPERVISOR-SELF-FIX] Guardian rejected Supervisor fix — returning with user warning`);
+        guardianNote = `⚠️ Written by Supervisor directly after Worker failures, but Guardian flagged issues: ${critique.slice(0, 200)}. Please review manually or retry.`;
+        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical };
+      }
 
       // [FIX] Detect truncation errors and force surgical format on retry
       if (isTruncationText(critique) && attempt < maxRetries) {
@@ -239,25 +254,24 @@ export async function runEscalationLoop(params: {
         // persist even if the Supervisor self-fix passes Guardian and the loop returns success.
         logExhaustedDeadEnd(root, accumulatedCritiques, attempt, maxRetries, false);
         try {
-          const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
+          const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
           const failureSummary = accumulatedCritiques
             .filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'))
             .map((c, i) => `Attempt ${i + 1} failed: ${c.slice(0, 200)}`).join('\n');
           const verifySuggestions = accumulatedCritiques
             .filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'))
-            .map(c => c.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 300)).join('\n');
-          const selfFixInstruction = `${userText || 'Fix the issue'}\n\n[SELF-FIX MODE: DO NOT produce a diagnosis for a Worker. Write the complete code fix directly in your response using SEARCH/REPLACE surgical edit format.]\n\nPrevious Worker attempts all failed:\n${failureSummary}${verifySuggestions ? `\n\nVerify AI suggested approaches:\n${verifySuggestions}` : ''}`;
-          const enrichedDeadEnds = [projectDeadEnds, failureSummary].filter(Boolean).join('\n\n');
-          const selfFix = await runPhase1Supervisor(selfFixInstruction, filesBlock, buildContext || '', activePatterns, enrichedDeadEnds, projectRules || '', deps, root, undefined, undefined, true);
-          if (selfFix?.diagnosis && selfFix.diagnosis.length > 50) {
-            workerResponse = selfFix.diagnosis; // Supervisor output IS the fix
-            workerLabel = selfFix.supervisorLabel;
+            .map(c => c.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 400)).join('\n');
+          // Use the Worker endpoint with escalated=true (Supervisor model) + a diagnosis that
+          // embeds the correct approach. Worker prompt is designed for surgical code output.
+          const selfFixDiagnosis = `${currentDiagnosis}\n\n[SELF-FIX — SUPERVISOR MODEL WRITING DIRECTLY]\nWORKER_TIER: ultra\nAll previous Worker attempts failed. You are the Supervisor model writing the fix yourself.\nUse SURGICAL SEARCH/REPLACE edits ONLY — do NOT rewrite entire files.\nPrevious attempts failed because:\n${failureSummary}${verifySuggestions ? `\n\nThe correct approach (from Verify analysis):\n${verifySuggestions}\nImplement this exactly using surgical edits.` : ''}`;
+          const selfFix = await runPhase2Worker(selfFixDiagnosis, fileNames, filesBlock, activePatterns, deps, root, undefined, true /* escalated=Supervisor model */, forceSurgical);
+          if (selfFix?.workerResponse && selfFix.workerResponse.length > 50) {
+            workerResponse = selfFix.workerResponse;
+            workerLabel = selfFix.workerLabel || supervisorLabel;
             fixActStep({ phase: 'worker', status: 'pass', label: 'Supervisor wrote fix directly', model: workerLabel });
             fixLog(`[SUPERVISOR-SELF-FIX] Supervisor produced fix (${workerResponse.length} chars)`);
-            // Flag for the result card — user should manually verify this fix
             guardianNote = `⚠️ Written by Supervisor directly after ${maxRetries + 1} Worker failures — please verify the fix worked as expected. If not, retry and past failures are logged.`;
-            // Skip re-prescription — go straight to Guardian (Verify skipped via escalated flag)
-            continue;
+            continue; // go straight to Guardian (Verify skipped via escalated flag)
           }
         } catch (sfErr) {
           fixLog(`[SUPERVISOR-SELF-FIX] Failed: ${sfErr instanceof Error ? sfErr.message : String(sfErr)}`);
