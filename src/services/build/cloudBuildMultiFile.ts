@@ -14,11 +14,16 @@ import { AI_RANK } from '../ai/guardianAI.js';
 
 /** Pick the next available provider from AI_RANK, skipping unavailable ones and the current one. */
 function nextAvailableProvider(current: string, keyHeaders: Record<string, string>): string | null {
-  const keyPresent = (p: string) => Object.keys(keyHeaders).some(h => h.toLowerCase().includes(p));
+  // X-Provider-Keys header value is a JSON object of { provider: key } — check inside it
+  let availableProviders: Set<string>;
+  try {
+    const parsed = JSON.parse(keyHeaders['X-Provider-Keys'] || '{}') as Record<string, string>;
+    availableProviders = new Set(Object.keys(parsed).filter(p => !!parsed[p]));
+  } catch { availableProviders = new Set(); }
   return Object.entries(AI_RANK)
     .sort(([, a], [, b]) => b - a)
     .map(([p]) => p)
-    .find(p => p !== current && keyPresent(p) && !isProviderUnavailable(p)) ?? null;
+    .find(p => p !== current && availableProviders.has(p) && !isProviderUnavailable(p)) ?? null;
 }
 
 /** Return a copy of keyHeaders with unavailable providers removed from X-Provider-Keys. */
