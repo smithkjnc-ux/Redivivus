@@ -165,7 +165,15 @@ export async function represcribeAfterRejection(p: {
         fixLog(`[RE-PRESCRIBE] Refreshed file contents for re-prescription (${refreshedFiles.length} files)`);
       }
       const sessionDeadEnds = accumulatedCritiques
-        .map((c, i) => `## Attempt ${i + 1} failed\n- What was tried: ${currentDiagnosis.slice(0, 100).replace(/\n/g, ' ')}...\n- Why it failed: ${c}\n- Do NOT repeat this approach`)
+        .map((c, i) => {
+          // Extract prescriptive guidance from the critique — sentences that tell us WHAT TO DO.
+          // These come from Verify/Guardian explanations like "The correct fix should...", "The canvas needs..."
+          const prescriptiveLines = c.split(/(?<=[.!])\s+/)
+            .filter(s => /correct fix should|should (?:instead|only|be)|needs? (?:a |to )|use .+instead|canvas itself needs|try instead|correct approach/i.test(s))
+            .join(' ').trim();
+          const hintBlock = prescriptiveLines ? `\n- CORRECT APPROACH HINT (from Verify): ${prescriptiveLines.slice(0, 400)}` : '';
+          return `## Attempt ${i + 1} failed\n- What was tried: ${currentDiagnosis.slice(0, 100).replace(/\n/g, ' ')}...\n- Why it failed: ${c.slice(0, 400)}\n- Do NOT repeat this approach${hintBlock}`;
+        })
         .join('\n\n');
       const enrichedDeadEnds = [projectDeadEnds, sessionDeadEnds].filter(Boolean).join('\n\n---\n\n');
 
