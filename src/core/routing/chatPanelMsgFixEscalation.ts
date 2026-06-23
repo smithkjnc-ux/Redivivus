@@ -86,7 +86,7 @@ export async function runEscalationLoop(params: {
     }
 
     // ── Check for Trivial Fast-Path ──
-    const isTrivial = diagnosis.includes('[TRIVIAL: SKIP REVIEW]');
+    const isTrivial = currentDiagnosis.includes('[TRIVIAL: SKIP REVIEW]');
     if (isTrivial) {
       fixLog(`Supervisor flagged fix as trivial — skipping Verify and Guardian`);
       guardianNote = `Guardian: Skipped (trivial fix)`;
@@ -96,7 +96,7 @@ export async function runEscalationLoop(params: {
     // ── Phase 2.5: Supervisor verifies Worker logic ──
     updateStatus(conversation, supervisorLabel, 'verify', attempt, escalated);
     refresh();
-    const verify = await runVerifyStep({ diagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques: accumulatedCritiques });
+    const verify = await runVerifyStep({ diagnosis: currentDiagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques: accumulatedCritiques });
     if (verify.forceSurgical) { forceSurgical = true; }
     if (verify.action === 'fail') {
       throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${verify.message}`);
@@ -109,7 +109,7 @@ export async function runEscalationLoop(params: {
 
     try {
       const userRequest = conversation.map(m => m.role === 'user' ? m.content : '').filter(Boolean).pop() || 'Fix the issue';
-      const guardianContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${diagnosis}`;
+      const guardianContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${currentDiagnosis}`;
       fixLog(`Guardian review (attempt ${attempt + 1}): Starting...`);
       fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
       // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
