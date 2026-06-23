@@ -165,10 +165,12 @@ export async function represcribeAfterRejection(p: {
         filesBlock = refreshedFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
         fixLog(`[RE-PRESCRIBE] Refreshed file contents for re-prescription (${refreshedFiles.length} files)`);
       }
-      const sessionDeadEnds = accumulatedCritiques
+      // Separate positive Verify suggestions from failure critiques — treat them differently
+      const verifySuggestions = accumulatedCritiques.filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'));
+      const failureCritiques = accumulatedCritiques.filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'));
+      const sessionDeadEnds = failureCritiques
         .map((c, i) => {
           // Extract prescriptive guidance from the critique — sentences that tell us WHAT TO DO.
-          // These come from Verify/Guardian explanations like "The correct fix should...", "The canvas needs..."
           const prescriptiveLines = c.split(/(?<=[.!])\s+/)
             .filter(s => /correct fix should|should (?:instead|only|be)|needs? (?:a |to )|use .+instead|canvas itself needs|try instead|correct approach/i.test(s))
             .join(' ').trim();
@@ -176,7 +178,10 @@ export async function represcribeAfterRejection(p: {
           return `## Attempt ${i + 1} failed\n- What was tried: ${currentDiagnosis.slice(0, 100).replace(/\n/g, ' ')}...\n- Why it failed: ${c.slice(0, 400)}\n- Do NOT repeat this approach${hintBlock}`;
         })
         .join('\n\n');
-      const enrichedDeadEnds = [projectDeadEnds, sessionDeadEnds].filter(Boolean).join('\n\n---\n\n');
+      const verifyHintBlock = verifySuggestions.length > 0
+        ? `## Verify AI suggested these approaches (use as guidance):\n${verifySuggestions.map(s => `- ${s.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 300)}`).join('\n')}`
+        : '';
+      const enrichedDeadEnds = [projectDeadEnds, sessionDeadEnds, verifyHintBlock].filter(Boolean).join('\n\n---\n\n');
 
       const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
       const rePrescription = await runPhase1Supervisor(
@@ -199,14 +204,36 @@ export async function represcribeAfterRejection(p: {
 /** Writes the accumulated Guardian rejection reasons to dead_ends.md when all retries are exhausted. */
 export function logExhaustedDeadEnd(root: string, accumulatedCritiques: string[], retryCount: number, maxRetries: number, escalated: boolean): void {
   if (accumulatedCritiques.length === 0) { return; }
-  const critiqueText = accumulatedCritiques.join('; ');
-  const prescriptionAttempts = `Original + ${retryCount} re-prescription(s)`;
+  const failureCritiques = accumulatedCritiques.filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'));
+  const verifySuggestions = accumulatedCritiques.filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'));
+  const critiqueText = failureCritiques.join('; ');
+  const prescriptionAttempts = `Original + ${retryCount} re-prescription(s)${escalated ? ' + Supervisor self-fix' : ''}`;
+  // What to try instead: prefer Verify's own suggestions, else generic advice
+  const doInstead = verifySuggestions.length > 0
+    ? verifySuggestions.map(s => s.replace('[VERIFY SUGGESTED APPROACH] ', '')).join('; ').slice(0, 300)
+    : 'Try FULL FILE format instead of surgical edits, or rephrase the fix request more specifically';
   appendProjectDeadEnd(
     root,
     `guardian-rejected: ${critiqueText.slice(0, 80)}`,
     critiqueText,
-    `Guardian rejected after ${maxRetries + 1} attempts${escalated ? ' including escalation' : ''} with ${prescriptionAttempts}`,
-    'Try FULL FILE format instead of surgical edits, or rephrase the fix request more specifically',
+    `Guardian rejected after ${maxRetries + 1} attempts (${prescriptionAttempts})`,
+    doInstead,
   );
+  // Also write to knowledge.json as never_do entries so future Supervisor prompts are informed
+  try {
+    const { LearnedMemoryService } = require('../../services/learnedMemoryService.js');
+    const mem = new LearnedMemoryService(root);
+    for (const critique of failureCritiques) {
+      if (critique.length > 20 && !critique.startsWith('[FORMAT CHANGE]')) {
+        mem.addNeverDo(
+          critique.slice(0, 200),
+          `Auto-logged: Guardian rejected after ${maxRetries + 1} attempts. ${doInstead.slice(0, 150)}`
+        );
+      }
+    }
+    fixLog('[DEAD END] Wrote Guardian rejection reasons to knowledge.json never_do entries', { count: failureCritiques.length });
+  } catch (e) {
+    fixLog('[DEAD END] Could not write to knowledge.json', { err: e instanceof Error ? e.message : String(e) });
+  }
   fixLog('[DEAD END] Wrote Guardian rejection reasons to dead_ends.md', { critiques: accumulatedCritiques, prescriptionAttempts });
 }

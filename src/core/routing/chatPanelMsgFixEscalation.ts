@@ -94,22 +94,26 @@ export async function runEscalationLoop(params: {
     }
 
     // ── Phase 2.5: Supervisor verifies Worker logic ──
-    updateStatus(conversation, supervisorLabel, 'verify', attempt, escalated);
-    refresh();
-    const verify = await runVerifyStep({ diagnosis: currentDiagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques: accumulatedCritiques });
-    if (verify.forceSurgical) { forceSurgical = true; }
-    if (verify.action === 'fail') {
-      throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${verify.message}`);
-    }
-    if (verify.action === 'retry') {
-      // [FIX] If Verify provided a suggestion (the correct approach), inject it directly into
-      // currentDiagnosis now — before re-prescription — so the Worker's next attempt is guided
-      // by Verify's answer, not just told what went wrong.
-      if (verify.verifySuggestion && verify.verifySuggestion.length > 20) {
-        currentDiagnosis = currentDiagnosis + `\n\n[VERIFIED CORRECT APPROACH — from Supervisor review]\n${verify.verifySuggestion.slice(0, 600)}\nImplement this approach exactly.`;
-        fixLog(`[VERIFY-HINT] Injected Verify suggestion into diagnosis (${verify.verifySuggestion.length} chars)`);
+    // [SELF-FIX] Skip Verify when escalated — Supervisor wrote this fix itself, so Verify
+    // would be grading its own homework. Guardian is the only independent gate here.
+    if (!escalated) {
+      updateStatus(conversation, supervisorLabel, 'verify', attempt, escalated);
+      refresh();
+      const verify = await runVerifyStep({ diagnosis: currentDiagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques: accumulatedCritiques });
+      if (verify.forceSurgical) { forceSurgical = true; }
+      if (verify.action === 'fail') {
+        throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${verify.message}`);
       }
-      refresh(); continue;
+      if (verify.action === 'retry') {
+        // Store verifySuggestion in accumulatedCritiques as a positive hint for re-prescription,
+        // but do NOT inject it into currentDiagnosis — Verify is stateless and would contradict
+        // its own prior suggestion when judging the next attempt.
+        if (verify.verifySuggestion && verify.verifySuggestion.length > 20) {
+          accumulatedCritiques.push(`[VERIFY SUGGESTED APPROACH] ${verify.verifySuggestion.slice(0, 500)}`);
+          fixLog(`[VERIFY-HINT] Stashed Verify suggestion into critiques for re-prescription (${verify.verifySuggestion.length} chars)`);
+        }
+        refresh(); continue;
+      }
     }
 
     // ── Phase 3: Guardian reviews the fix ──
@@ -194,14 +198,42 @@ export async function runEscalationLoop(params: {
         return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote: 'Re-prescription routed to Agent pipeline', scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated };
       }
 
-      // If we've exhausted retries, escalate to supervisor model
+      // If we've exhausted Worker retries — have the Supervisor write the fix directly
       if (attempt === maxRetries && !escalated) {
         escalated = true;
-        conversation[conversation.length - 1].content =
-          progressEscalating({ supervisorLabel });
+        fixLog(`[SUPERVISOR-SELF-FIX] Worker failed ${maxRetries + 1} times — Supervisor writing fix directly`);
+        fixActStep({ phase: 'supervisor', status: 'running', label: `Worker exhausted — Supervisor writing fix directly` });
+        conversation[conversation.length - 1].content = progressEscalating({ supervisorLabel });
         refresh();
-        // One more attempt with the best model — the enriched deps will force supervisor-level prompting
-        continue;
+        // Log Worker failures to dead_ends + knowledge.json NOW — before self-fix — so they
+        // persist even if the Supervisor self-fix passes Guardian and the loop returns success.
+        logExhaustedDeadEnd(root, accumulatedCritiques, attempt, maxRetries, false);
+        try {
+          const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
+          const failureSummary = accumulatedCritiques
+            .filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'))
+            .map((c, i) => `Attempt ${i + 1} failed: ${c.slice(0, 200)}`).join('\n');
+          const verifySuggestions = accumulatedCritiques
+            .filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'))
+            .map(c => c.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 300)).join('\n');
+          const selfFixInstruction = `${userText || 'Fix the issue'}\n\n[SELF-FIX MODE: DO NOT produce a diagnosis for a Worker. Write the complete code fix directly in your response using SEARCH/REPLACE surgical edit format.]\n\nPrevious Worker attempts all failed:\n${failureSummary}${verifySuggestions ? `\n\nVerify AI suggested approaches:\n${verifySuggestions}` : ''}`;
+          const enrichedDeadEnds = [projectDeadEnds, failureSummary].filter(Boolean).join('\n\n');
+          const selfFix = await runPhase1Supervisor(selfFixInstruction, filesBlock, buildContext || '', activePatterns, enrichedDeadEnds, projectRules || '', deps, root, undefined, undefined, true);
+          if (selfFix?.diagnosis && selfFix.diagnosis.length > 50) {
+            workerResponse = selfFix.diagnosis; // Supervisor output IS the fix
+            workerLabel = selfFix.supervisorLabel;
+            fixActStep({ phase: 'worker', status: 'pass', label: 'Supervisor wrote fix directly', model: workerLabel });
+            fixLog(`[SUPERVISOR-SELF-FIX] Supervisor produced fix (${workerResponse.length} chars)`);
+            // Flag for the result card — user should manually verify this fix
+            guardianNote = `⚠️ Written by Supervisor directly after ${maxRetries + 1} Worker failures — please verify the fix worked as expected. If not, retry and past failures are logged.`;
+            // Skip re-prescription — go straight to Guardian (Verify skipped via escalated flag)
+            continue;
+          }
+        } catch (sfErr) {
+          fixLog(`[SUPERVISOR-SELF-FIX] Failed: ${sfErr instanceof Error ? sfErr.message : String(sfErr)}`);
+        }
+        // Self-fix failed or returned nothing — fall through to exhausted
+        break;
       }
 
       // Log the retry in chat
