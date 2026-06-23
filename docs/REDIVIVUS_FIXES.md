@@ -3,7 +3,55 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
-## Fix — Jun 23, 2026: Blueprint Inference Software Constraint
+## Fix — Jun 23, 2026: Extended Anti-Hallucination Constraints (15d-15g)
+
+**Files changed:**
+- `src/lib/ai/redivivusWorkerRules.ts` (redivivus-backend) — Appended sub-rules 15d through 15g to the existing Worker rules.
+
+**What changed:** 
+Extended the anti-hallucination guardrails to cover four more specific vectors common in training data bias:
+- **15d. Year and Date Anchoring:** Enforces dynamic date generation (e.g. `new Date().getFullYear()`) over hardcoded training-era assumptions.
+- **15e. Package Versions:** Prevents hallucinating package version numbers from memory, enforcing "latest" or user verification.
+- **15f. Modern Code Patterns Only:** Bans "time travel" regressions to older code structures (e.g., React class components) that dominate legacy web data.
+- **15g. No Empty Catch Blocks:** Forbids empty error traps (`catch(e) {}`), enforcing structured error handling.
+
+**Why:** The user requested explicitly cataloged constraints to combat "time travel" hallucinations and boilerplate errors that arise naturally from LLM training sets.
+
+**Risk:** Low. Tightens output quality standards for Worker AI pipelines.
+\n## Fix — Jun 23, 2026: Anti-Hallucination Data Constraints
+
+**Files changed:**
+- `src/lib/ai/redivivusWorkerRules.ts` (redivivus-backend) — Added Rule 15 (NO FAKE DATA OR PLACEHOLDERS).
+
+**What changed:** 
+Added a strict rule to the AI Worker context forbidding the generation of generic placeholder data. The AI is now explicitly banned from using "John Doe", "Acme Corp", "example.com", or `via.placeholder.com` image links unless the user explicitly requests a mockup. It is instructed to either generate contextually realistic data that fits the domain, or leave descriptive constant variables (like `API_ENDPOINT = "YOUR_API_URL_HERE"`).
+
+**Why:** To prevent the AI from filling generated codebases with useless or confusing generic tutorial boilerplate when actual functionality or realistic domain data is needed.
+
+**Risk:** Low. Refines the quality of generated data without breaking functional requirements.
+\n## Fix — Jun 23, 2026: Expanded Worker Context (Date, Time, Timezone)
+
+**Files changed:**
+- `src/lib/ai/redivivusWorkerRules.ts` (redivivus-backend) — Expanded Rule 14 to include full ISO date and local time.
+
+**What changed:** 
+Expanded the dynamic context rule to provide the AI with the exact calendar date and server time (`new Date().toISOString().split("T")[0]` and `toLocaleTimeString`). 
+
+**Why:** The user requested that we provide full temporal context (date, time, timezone) so the AI has grounding when generating mock data, scheduling logic, or timestamps.
+
+**Risk:** Low. Provides accurate dynamic temporal context without altering build pipeline logic.
+\n## Fix — Jun 23, 2026: Worker Rules Dynamic Year Context
+
+**Files changed:**
+- `src/lib/ai/redivivusWorkerRules.ts` (redivivus-backend) — Injected `new Date().getFullYear()` into Rule 14.
+
+**What changed:** 
+Added Rule 14 to the shared `Redivivus_WORKER_RULES` prompt. The rule explicitly provides the current year to the AI context: "CURRENT DATE CONTEXT: The current year is 2026. When generating boilerplate, copyrights, or mock data, ALWAYS use the current year. Never hallucinate past years like 2023 or 2024." Because the prompt uses a template literal, the backend will dynamically evaluate the current year at runtime.
+
+**Why:** The AI was reliably generating static footers reading "© 2023 Nixie Tube Clock Simulator" because it was leaning on generic web templates from its training data, which often peak around 2023/2024. Providing the explicit year forces the AI to break from its training boilerplate and use the real present date.
+
+**Risk:** Low. Applies to all worker pipelines (build and fix) and prevents stale date hallucination.
+\n## Fix — Jun 23, 2026: Blueprint Inference Software Constraint
 
 **Files changed:**
 - `src/services/blueprint/blueprintInference.ts` (redivivus) — Added SOFTWARE IDE CONSTRAINT to the 5Ws inference prompt.
