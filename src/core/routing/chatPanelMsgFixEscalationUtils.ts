@@ -76,7 +76,7 @@ export function enrichDepsWithCritiques(deps: MessageHandlerDeps, critiques: str
 export async function runVerifyStep(p: {
   diagnosis: string; workerResponse: string; deps: MessageHandlerDeps; root: string;
   conversation: any[]; supervisorLabel: string; attempt: number; maxRetries: number; critiques: string[];
-}): Promise<{ action: 'pass' | 'retry' | 'fail'; message?: string; forceSurgical: boolean }> {
+}): Promise<{ action: 'pass' | 'retry' | 'fail'; message?: string; forceSurgical: boolean; verifySuggestion?: string }> {
   const { diagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques } = p;
   let forceSurgical = false;
   try {
@@ -88,6 +88,7 @@ export async function runVerifyStep(p: {
 
     if (!verifyResult.passed) {
       const logicIssue = verifyResult.issues.join('; ') || 'Logic does not match intent';
+      const verifySuggestion = verifyResult.suggestion;
       critiques.push(`[SUPERVISOR LOGIC CHECK] ${logicIssue}`);
       fixLog(`Supervisor REJECTED Worker logic (attempt ${attempt + 1})`, { issue: logicIssue.substring(0, 300) });
       fixActStep({ phase: 'supervisor', status: 'fix', label: "Checked the fix — it didn't match the intent, retrying", detail: logicIssue });
@@ -101,12 +102,12 @@ export async function runVerifyStep(p: {
       if (attempt < maxRetries) {
         conversation[conversation.length - 1].content =
           `Supervisor (${supervisorLabel}): done\nWorker: rejected — "${logicIssue.slice(0, 80)}" — retrying...\nVerify: pending\nGuardian: pending`;
-        return { action: 'retry', forceSurgical };
+        return { action: 'retry', forceSurgical, verifySuggestion };
       }
-      return { action: 'fail', message: logicIssue, forceSurgical };
+      return { action: 'fail', message: logicIssue, forceSurgical, verifySuggestion };
     }
     fixActStep({ phase: 'supervisor', status: 'pass', label: 'Checked — the fix matches what you asked for' });
-    return { action: 'pass', forceSurgical };
+    return { action: 'pass', forceSurgical, verifySuggestion: undefined };
   } catch (e: any) {
     if (e.message?.startsWith('Supervisor rejected Worker output')) { throw e; }
     fixLog(`Supervisor verify skipped (error): ${e?.message || e}`);

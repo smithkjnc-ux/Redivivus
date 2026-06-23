@@ -101,7 +101,16 @@ export async function runEscalationLoop(params: {
     if (verify.action === 'fail') {
       throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${verify.message}`);
     }
-    if (verify.action === 'retry') { refresh(); continue; }
+    if (verify.action === 'retry') {
+      // [FIX] If Verify provided a suggestion (the correct approach), inject it directly into
+      // currentDiagnosis now — before re-prescription — so the Worker's next attempt is guided
+      // by Verify's answer, not just told what went wrong.
+      if (verify.verifySuggestion && verify.verifySuggestion.length > 20) {
+        currentDiagnosis = currentDiagnosis + `\n\n[VERIFIED CORRECT APPROACH — from Supervisor review]\n${verify.verifySuggestion.slice(0, 600)}\nImplement this approach exactly.`;
+        fixLog(`[VERIFY-HINT] Injected Verify suggestion into diagnosis (${verify.verifySuggestion.length} chars)`);
+      }
+      refresh(); continue;
+    }
 
     // ── Phase 3: Guardian reviews the fix ──
     updateStatus(conversation, supervisorLabel, 'guardian', attempt, escalated);
