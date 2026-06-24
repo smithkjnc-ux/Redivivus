@@ -1,6 +1,19 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: Live Preview Auto-Install Dependencies
+**Files changed:**
+- `src/ui/panels/chat/chatPanelPreview.ts` (redivivus) — Updated `startPreviewServer`
+
+**What changed:** 
+Modified the live preview dev server launcher to check `needsNodeInstall(root)` before executing the dev command in the terminal. If a `package.json` exists but `node_modules` does not, it will now inject `npm install && ` before the `npm run dev` command.
+
+**Why:** After the Supervisor architecture hardening successfully started generating build tools (Vite/React package.json) for AI-scaffolded projects, Redivivus's automated Preview logic would immediately run `npm run dev` in the terminal to show the user the result. However, because it's a fresh build, `node_modules` doesn't exist yet, causing the terminal to instantly fail with `vite: command not found` before the user could even see the app.
+
+**Risk:** Low. Re-uses the existing `needsNodeInstall` helper already proven in the AutoFix pipeline.
+
+---
+
 ## Fix — Jun 23, 2026: Supervisor Architecture Hardening (Build Tools)
 **Files changed:**
 - `src/core/build/chatPanelBuildRunnerHelpers.ts` (redivivus) — Updated `SUPERVISOR_CONTRACT_GUIDANCE`.

@@ -138,7 +138,14 @@ export async function startPreviewServer(root: string, info: DevServerInfo): Pro
   }
   stopPreviewServer();
   const terminal = vscode.window.createTerminal({ name: 'Redivivus Preview', cwd: root });
-  terminal.sendText(info.command);
+  
+  const { needsNodeInstall } = require('../../services/build/runtimeRunner.js');
+  if (needsNodeInstall(root)) {
+    terminal.sendText('npm install && ' + info.command);
+  } else {
+    terminal.sendText(info.command);
+  }
+
   terminal.show(true);
   _devTerminal = terminal;
   return { port: info.port, stop: stopPreviewServer, alreadyRunning: false };
