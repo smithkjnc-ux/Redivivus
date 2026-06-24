@@ -7,9 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 23, 2026 — AI Behavior Panel UI implementation: completed 5-domain thermometer drag-to-set controls with per-session overriding and automatic clearing logic on new sessions. Full entries in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 23, 2026 — AI Behavior Panel Button Visibility: moved the Behavior Panel button to the universal pill section so users can configure temperatures for brand new builds. Full entries in docs/REDIVIVUS_FIXES.md.
 
-*Prior:* June 23, 2026 — Gemini routing fix: forced JSON mode and empty response throw to prevent valid builds from being misclassified as generic answers. Full entries in docs/REDIVIVUS_FIXES.md.
+*Prior:* June 23, 2026 — AI Behavior Panel UI implementation: completed 5-domain thermometer drag-to-set controls with per-session overriding and automatic clearing logic on new sessions. Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* 2026-06-18 — Audit remediation: fixed C1/C2, H1–H4 (+degraded single-provider), M1–M4, M6, L2/L4; added integration tests (test-guardian-independence.cjs, test-update-and-debrand.cjs); remaining items triaged/flagged in AUDIT_REPORT.md.
 

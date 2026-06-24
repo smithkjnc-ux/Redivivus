@@ -26,7 +26,6 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
   if (header && header.hasProjectOpen) {
     if (showBlueprint) {
       pills += `<button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>`;
-      pills += `<button class="header-btn" id="header-behavior-btn" title="AI Behavior Panel (Session Overrides)">&#x1F39B;&#xFE0F;</button>`;
     }
     if (showMap) {
       pills += `<button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>`;
@@ -49,6 +48,7 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
   }
 
   // Universal pills — always show regardless of context
+  pills += `<button class="header-btn" id="header-behavior-btn" title="AI Behavior Panel (Session Overrides)">&#x1F39B;&#xFE0F;</button>`;
   pills += header && header.projectTokens
     ? `<button class="header-btn" data-cmd="redivivus.viewProjectUsage" title="Project: ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tokens -- $${header.projectTokens.cost.toFixed(3)} spent -- click for AI breakdown">&#x1F4CA; ${header.projectTokens.tokens >= 1000 ? (header.projectTokens.tokens/1000).toFixed(0)+'K' : header.projectTokens.tokens} tok</button>`
     : `<button class="header-btn" data-cmd="${header && header.hasProjectOpen ? 'redivivus.viewProjectUsage' : 'redivivus.viewUsage'}" title="Token Usage &amp; Cost">&#x1F4CA; Usage</button>`;

@@ -1,7 +1,18 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
-> See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
-> **Rule:** Every change — no matter how small — gets an entry here before the session ends.
+## Fix — Jun 23, 2026: AI Behavior Panel Button Visibility
+
+**Files changed:**
+- `src/ui/panels/chat/chatPanelHeaderRender.ts` (redivivus) — Extracted behavior panel button from `hasProjectOpen` guard into universal pills section.
+
+**What changed:** 
+Moved the 🎛️ Behavior Panel icon from the project-context pill group to the universal pill group.
+
+**Why:** The user pointed out that the Behavior Panel could not be used to configure temperatures for brand new builds because the icon was hidden on the "Start" screen. Moving it to the universal section ensures it is always visible, allowing the user to set session overrides before initializing a project.
+
+**Risk:** Low. The behavior panel operates via isolated message posting and interacts with the singleton `RedivivusService` which is always active.
+
+---
 
 ## Fix — Jun 23, 2026: AI Behavior Panel (UI + Session Override)
 
