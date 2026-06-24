@@ -97,7 +97,20 @@ export function detectDevServer(root: string): DevServerInfo | null {
       const scripts: Record<string, string> = pkg.scripts || {};
       // Framework dev servers — these own their port
       if (deps['next'])          { return { port: 3000, command: 'npm run dev', type: 'next',    loadingMsg: 'Starting Next.js dev server...' }; }
-      if (deps['vite'])          { return { port: 5173, command: 'npm run dev', type: 'vite',    loadingMsg: 'Starting Vite dev server...' }; }
+      if (deps['vite'])          {
+        // [FIX] Read the actual port from vite.config.js — AI-generated projects often set server.port
+        // to 3000 instead of Vite's default 5173, causing the preview to wait on the wrong port forever.
+        let vitePort = 5173;
+        try {
+          const viteCfgPath = path.join(root, 'vite.config.js');
+          if (fs.existsSync(viteCfgPath)) {
+            const viteCfg = fs.readFileSync(viteCfgPath, 'utf-8');
+            const portMatch = viteCfg.match(/port\s*:\s*(\d+)/);
+            if (portMatch) { vitePort = parseInt(portMatch[1], 10); }
+          }
+        } catch {}
+        return { port: vitePort, command: 'npm run dev', type: 'vite', loadingMsg: 'Starting Vite dev server...' };
+      }
       if (deps['react-scripts']) { return { port: 3000, command: 'npm start',   type: 'cra',     loadingMsg: 'Starting React dev server...' }; }
       // Static HTML project with package.json (TypeScript tooling, etc.) — serve files directly.
       // Must come before generic dev/start checks so "tsc -w" or "http-server -p 8080" projects

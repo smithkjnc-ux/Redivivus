@@ -1,6 +1,33 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: Vite Port Detection from Config
+**Files changed:**
+- `src/ui/panels/chat/chatPanelPreview.ts` (redivivus) — Updated `detectDevServer`
+
+**What changed:** 
+Modified the Vite dev server detection to read the actual `server.port` value from `vite.config.js` instead of hardcoding port 5173. Uses a regex to extract the port number, falling back to 5173 if no config file exists or no port is specified.
+
+**Why:** AI-generated React/Vite projects frequently set `server.port: 3000` in their `vite.config.js` (mimicking Express conventions). The preview system was hardcoded to wait for port 5173, so it would spin forever on "Starting Vite dev server..." while Vite actually started on port 3000. The `waitForPort` timeout would expire and the preview would show a white screen.
+
+**Risk:** Low. Falls back to Vite's default port (5173) if the config file is missing or unreadable.
+
+---
+
+## Fix — Jun 23, 2026: Backend Build Failover — Undefined Variable (`currentProvider`)
+**Files changed:**
+- `src/app/api/v1/build/route.ts` (redivivus-backend) — Fixed variable reference in failover loop
+- `src/app/api/v1/plan/route.ts` (redivivus-backend) — Simplified failover label format
+
+**What changed:** 
+Fixed a `Cannot find name 'currentProvider'` TypeScript error that broke Cloud Run deployment. The variable was introduced during the failover label format change (same session) but never existed in scope. Changed to capture `failedProvider` from `instructions.workerInstructions.selectedProvider` before reassigning it.
+
+**Why:** The Cloud Run build type-checks before deploying. The undefined variable caused a hard build failure, blocking the backend from deploying.
+
+**Risk:** Low. The variable was already available, just referenced by the wrong name.
+
+---
+
 ## Fix — Jun 23, 2026: Live Preview Auto-Install Dependencies
 **Files changed:**
 - `src/ui/panels/chat/chatPanelPreview.ts` (redivivus) — Updated `startPreviewServer`
