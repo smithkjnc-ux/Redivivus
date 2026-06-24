@@ -129,31 +129,32 @@ export function detectDevServer(root: string): DevServerInfo | null {
   return null;
 }
 
-export async function startPreviewServer(root: string, info: DevServerInfo): Promise<{ port: number; stop: () => void; alreadyRunning: boolean }> {
+export async function startPreviewServer(root: string, info: DevServerInfo): Promise<{ port: number; stop: () => void; alreadyRunning: boolean; needsInstall: boolean }> {
   if (info.type === 'static') {
     const webRoot = info.webRoot || root;
     // [FIX] Our static server already serving THIS root → reuse. If it's serving a DIFFERENT project's root
     // (e.g. asteroids), RE-ROOT it. The old code reused any server on port 5500 without checking the root,
     // so after previewing one project, every other project's preview kept serving the first one.
     if (_staticServer && _staticRoot === webRoot) {
-      return { port: info.port, stop: stopPreviewServer, alreadyRunning: true };
+      return { port: info.port, stop: stopPreviewServer, alreadyRunning: true, needsInstall: false };
     }
     stopPreviewServer(); // closes our stale-root server (frees the port for the new root)
     clearRuntimeReports(); // [PREVIEW-AUTOFIX] fresh runtime signals for this project's preview
     _staticServer = buildStaticServer(webRoot, info.port, _runtimeReports);
     _staticRoot = webRoot;
     _staticServer.listen(info.port, 'localhost');
-    return { port: info.port, stop: stopPreviewServer, alreadyRunning: false };
+    return { port: info.port, stop: stopPreviewServer, alreadyRunning: false, needsInstall: false };
   }
   // Non-static dev server (npm/vite/next) — reuse if already up on its port; these own their port.
   if (await isPortOpen(info.port)) {
-    return { port: info.port, stop: () => {}, alreadyRunning: true };
+    return { port: info.port, stop: () => {}, alreadyRunning: true, needsInstall: false };
   }
   stopPreviewServer();
   const terminal = vscode.window.createTerminal({ name: 'Redivivus Preview', cwd: root });
   
   const { needsNodeInstall } = require('../../services/build/runtimeRunner.js');
-  if (needsNodeInstall(root)) {
+  const _needsInstall = needsNodeInstall(root);
+  if (_needsInstall) {
     terminal.sendText('npm install && ' + info.command);
   } else {
     terminal.sendText(info.command);
@@ -161,7 +162,7 @@ export async function startPreviewServer(root: string, info: DevServerInfo): Pro
 
   terminal.show(true);
   _devTerminal = terminal;
-  return { port: info.port, stop: stopPreviewServer, alreadyRunning: false };
+  return { port: info.port, stop: stopPreviewServer, alreadyRunning: false, needsInstall: _needsInstall };
 }
 
 export function stopPreviewServer(): void {

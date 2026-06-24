@@ -38,8 +38,13 @@ export async function handlePreviewMessages(panel: any, msg: any): Promise<boole
       return true;
     }
     _panel.webview.postMessage({ type: 'preview-loading', message: info.loadingMsg });
-    const { port, alreadyRunning } = await startPreviewServer(root, info);
-    const timeout = (info.type === 'static' || alreadyRunning) ? 2_000 : 30_000;
+    const { port, alreadyRunning, needsInstall } = await startPreviewServer(root, info);
+    // [FIX] npm install on a fresh AI-generated project takes 30-120s; the old 30s timeout expired before
+    // the dev server even started. Give install+boot a full 180s; normal boots still get 30s.
+    if (needsInstall) {
+      _panel.webview.postMessage({ type: 'preview-loading', message: 'Installing dependencies — this may take a minute...' });
+    }
+    const timeout = (info.type === 'static' || alreadyRunning) ? 2_000 : (needsInstall ? 180_000 : 30_000);
     const ready = await waitForPort(port, timeout);
     if (ready) {
       _panel.webview.postMessage({ type: 'preview-ready', port });
