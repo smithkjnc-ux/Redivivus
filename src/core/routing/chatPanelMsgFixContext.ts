@@ -49,7 +49,7 @@ export function collectSourceFiles(root: string, userText?: string): { rel: stri
 }
 
 /** Collect all available context signals: build history + live editor diagnostics + last terminal error. */
-export function collectFixContext(root: string, sourceFiles: { rel: string; content: string }[]): string {
+export function collectFixContext(root: string, sourceFiles: { rel: string }[]): string {
   const parts: string[] = [];
 
   // Provide the full project file tree so the Supervisor doesn't hallucinate that files are missing
@@ -220,8 +220,8 @@ export async function collectAllFixContext(
   }
 
   // Per-file context — always fresh
-  const recentBuildCtx = getRecentBuildContext(root, sourceFiles);
-  const buildContext = [blueprintCtx, recentBuildCtx].filter(Boolean).join('\n\n');
+  const fullDiagnosticCtx = collectFixContext(root, sourceFiles);
+  const buildContext = [blueprintCtx, fullDiagnosticCtx].filter(Boolean).join('\n\n');
   // Capture the failing command BEFORE the fix so we can re-run it after to verify
   const { getLastFailingCommand } = await import('../../services/workspace/terminalErrorService.js');
   const capturedCmd = getLastFailingCommand();

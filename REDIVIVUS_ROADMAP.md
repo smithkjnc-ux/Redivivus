@@ -7,9 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 23, 2026 — Pre-flight Preview Run: injected headless app execution before Fix context collection to guarantee fresh runtime errors. Full entries in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 23, 2026 — Orphaned Diagnostic Context Restoration: wired `collectFixContext` back into `collectAllFixContext` to restore the primary diagnostic engine (File Tree, Terminal Errors, Browser Runtime Errors) that was disconnected during a Rule 9 file split. Full entries in docs/REDIVIVUS_FIXES.md.
 
-*Prior:* June 23, 2026 — AI Context Truncation & Preview Errors: injected full project file tree and runtime HTTP beacons into the Fix Supervisor's context to prevent missing-file hallucinations and expose browser SyntaxErrors. Full entries in docs/REDIVIVUS_FIXES.md.
+*Prior:* June 23, 2026 — Pre-flight Preview Run: injected headless app execution before Fix context collection to guarantee fresh runtime errors. Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* June 23, 2026 — Claude API Temperature Parameter Rejection: stripped the `temperature` parameter from Claude execution calls in `redivivus-backend` to prevent `invalid_request_error` crashes. Full entries in docs/REDIVIVUS_FIXES.md.
 

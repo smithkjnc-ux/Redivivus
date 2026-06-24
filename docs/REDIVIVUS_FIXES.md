@@ -1,6 +1,21 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: Orphaned Diagnostic Context Restoration
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixContext.ts` (redivivus) — Wired `collectFixContext` back into `collectAllFixContext`.
+
+**What changed:** 
+Discovered that when the context files were split to satisfy the 200-line limit (Rule 9), the primary diagnostic engine (`collectFixContext`) was orphaned. It was never being called inside the newly extracted `collectAllFixContext` method. This means the AI Supervisor was flying completely blind during fixes: it was not receiving the File Tree, the Editor Diagnostics, the Terminal Errors, OR the newly injected Browser Runtime Errors!
+
+The function has been wired back in, and its output is now correctly appended to the `buildContext` string sent to the backend.
+
+**Why:** The AI hallucinated a CSS z-index fix instead of catching the `SyntaxError` (the 404 HTML fallback) because it never actually received the execution diagnostics. Now, the context pipeline is fully restored.
+
+**Risk:** Medium. Re-injects massive amounts of diagnostic context into the AI prompt. This should drastically improve fix accuracy but might push the token limits on very large projects.
+
+---
+
 ## Fix — Jun 23, 2026: Pre-flight Preview Run for Fix Diagnostics
 **Files changed:**
 - `src/core/routing/chatPanelMsgFix.ts` (redivivus) — Injected `verifyPreviewRuns` before context collection.
