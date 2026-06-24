@@ -1,6 +1,19 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: Pre-flight Preview Run for Fix Diagnostics
+**Files changed:**
+- `src/core/routing/chatPanelMsgFix.ts` (redivivus) — Injected `verifyPreviewRuns` before context collection.
+
+**What changed:** 
+Added a "Pre-flight Run-Check" at the very beginning of the Fix Pipeline. Before the Supervisor runs and diagnoses a problem, Redivivus now automatically boots the preview server headlessly, runs the application for ~2.8 seconds, and captures fresh runtime errors (like `SyntaxError` or blank canvases) via the HTTP beacon.
+
+**Why:** The previous fix wired the HTTP beacons into the context, but if the user hadn't explicitly opened the preview recently, the error buffer was empty. By forcing the app to load headlessly *before* gathering context, the AI is guaranteed to see any fatal runtime errors that occur during boot, preventing it from hallucinating the cause of a white screen.
+
+**Risk:** Low. Adds a ~3-second blocking delay to the start of the fix request, but vastly improves the accuracy of the resulting diagnosis.
+
+---
+
 ## Fix — Jun 23, 2026: Preview Error Capture Visibility
 **Files changed:**
 - `src/core/routing/chatPanelMsgFixContext.ts` (redivivus) — Injected runtime HTTP beacons into the fix context.

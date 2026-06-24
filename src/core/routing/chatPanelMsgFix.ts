@@ -75,6 +75,19 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   let filesBlock = sourceFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
   const activePatterns = detectPatterns(filesBlock, userText);
 
+  // [PREVIEW-AUTOFIX Phase 1] Pre-flight Run-Check
+  // If the user hasn't explicitly opened the preview, the runtime reports buffer is empty.
+  // We must actually load the app headlessly so the AI can see the real errors before diagnosing.
+  try {
+    const { verifyPreviewRuns } = await import('../../ui/panels/chat/chatPanelPreviewVerify.js');
+    deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
+    conversation.push({ role: 'assistant', content: 'Running the app to check for runtime errors...', timestamp: Date.now() });
+    refresh();
+    await verifyPreviewRuns(root, 2800);
+    // Remove the temporary message
+    conversation.pop();
+  } catch {}
+
   const { buildContext, projectDeadEnds, projectRules, verificationCommand } = await collectAllFixContext(root, sourceFiles, userText, deps);
 
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
