@@ -1,6 +1,19 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: AI Intent Classifier Hardening
+**Files changed:**
+- `src/core/routing/chatPanelMsgSendPostCloudHandlers.ts` (redivivus) — Hardened the `recoveryPrompt`.
+
+**What changed:** 
+Modified the AI Intent Classifier's recovery prompt to explicitly define bug reports, commands, and instructions as `FIX`. 
+
+**Why:** The primary AI classifier (`cloudChat`) occasionally misclassifies imperative commands like "fix the white screen" as a conversational question (`answer`). This caused the pipeline to bypass the Fix Pipeline completely and ask the user to "open their developer console" instead of running the automated diagnostics. The hardened recovery prompt ensures that imperative code-modification requests are strictly recovered and routed to the Fix Pipeline.
+
+**Risk:** Low. Refines the routing heuristics without changing any core logic.
+
+---
+
 ## Fix — Jun 23, 2026: Orphaned Diagnostic Context Restoration
 **Files changed:**
 - `src/core/routing/chatPanelMsgFixContext.ts` (redivivus) — Wired `collectFixContext` back into `collectAllFixContext`.

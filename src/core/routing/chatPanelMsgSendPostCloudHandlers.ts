@@ -45,9 +45,9 @@ export async function handleAnswerClarifyResult(
     try {
       const recoveryPrompt = `A project is open in the editor. The user said: "${userText.slice(0, 300)}"
 The AI classified this as '${chatResult.action}' but may have been wrong.
-Reply with FIX if the user wants to change, add, remove, or repair something in their code.
-Reply with CHAT if the user is asking a question or having a conversation.
-Reply with only FIX or CHAT.`;
+Reply with FIX if the user is giving an instruction, command, or bug report (e.g. "fix this", "make that", "it is broken").
+Reply with CHAT only if the user is explicitly asking a question or having a conversational exchange.
+Reply with exactly one word: FIX or CHAT.`;
       const recoveryResult = await deps.routing.promptCheap(recoveryPrompt, 12_000);
       if (recoveryResult.success && recoveryResult.text) {
         _isRecoverableToFix = recoveryResult.text.trim().toUpperCase().startsWith('FIX');
