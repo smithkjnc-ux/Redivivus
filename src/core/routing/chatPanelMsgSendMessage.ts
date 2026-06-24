@@ -39,7 +39,14 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   // [FIX] fromBlueprintCard: skip the verbose enriched-task user bubble — card is already the context
   if (!msg.fromBlueprintCard) {
     const _lastSm = conversation[conversation.length - 1];
-    if (!_lastSm || _lastSm.role !== 'user' || _lastSm.content !== userText) { conversation.push({ role: 'user', content: userText, timestamp: Date.now() }); }
+    if (!_lastSm || _lastSm.role !== 'user' || _lastSm.content !== userText) {
+      conversation.push({ 
+        role: 'user', 
+        content: userText, 
+        timestamp: Date.now(),
+        ...(msg.imageBase64 ? { imageBase64: msg.imageBase64, imageType: msg.imageType } : {})
+      });
+    }
     refresh();
     if (!/\bdone.*session\b|\bstart.*session\b/i.test(userText)) { try { const _CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; const ss = (_CP as any).startSessionSilent; if (ss) { ss(userText); } } catch {} }
   }

@@ -1,16 +1,38 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
-## Fix — Jun 23, 2026: Vite Port Detection from Config
+## Fix — Jun 23, 2026: End-to-End Image Pasting Support
 **Files changed:**
-- `src/ui/panels/chat/chatPanelPreview.ts` (redivivus) — Updated `detectDevServer`
+- `src/core/routing/chatPanelMsgSendMessage.ts` (redivivus)
+- `src/core/routing/chatPanelMsgSendPreCloud.ts` (redivivus)
+- `src/services/api/apiClientChat.ts` (redivivus)
+- `src/app/api/v1/chat/route.ts` (redivivus-backend)
+- `src/lib/ai/executor.ts` (redivivus-backend)
 
 **What changed:** 
-Modified the Vite dev server detection to read the actual `server.port` value from `vite.config.js` instead of hardcoding port 5173. Uses a regex to extract the port number, falling back to 5173 if no config file exists or no port is specified.
+1. `chatPanelMsgSendMessage.ts` now correctly pushes `imageBase64` and `imageType` into the `conversation` array when a user pastes an image, so it persists across turns.
+2. `apiClientChat.ts` (`cloudChat`) signature updated to accept and send `imageBase64` and `imageType` in its JSON payload to the backend.
+3. `chatPanelMsgSendPreCloud.ts` now passes the image payloads to `cloudChat()`.
+4. The `redivivus-backend` `/chat` endpoint now correctly parses the image fields and forwards them to `executeAI`.
+5. `executeOpenAI` in the backend was updated to support standard OpenAI image vision payloads (`image_url` data URIs).
 
-**Why:** AI-generated React/Vite projects frequently set `server.port: 3000` in their `vite.config.js` (mimicking Express conventions). The preview system was hardcoded to wait for port 5173, so it would spin forever on "Starting Vite dev server..." while Vite actually started on port 3000. The `waitForPort` timeout would expire and the preview would show a white screen.
+**Why:** The UI was successfully capturing Ctrl+V images but the extension dropped the data when pushing the user bubble into history, and the `cloudChat` endpoint didn't support images anyway. This caused the AI to receive the text but silently drop the image, resulting in "I can't see the screen" responses.
 
-**Risk:** Low. Falls back to Vite's default port (5173) if the config file is missing or unreadable.
+**Risk:** Low. If no image is provided, the payload is omitted and the behavior is identical to before. OpenAI o-series models intentionally strip the image as they do not support vision yet.
+
+---
+**Files changed:**
+- `src/ui/panels/chat/chatPanelPreview.ts` (redivivus) — Updated `detectDevServer` & `startPreviewServer`
+- `src/core/routing/chatPanelMessageRouterPreview.ts` (redivivus) — Updated `handlePreviewMessages`
+
+**What changed:** 
+1. Modified the Vite dev server detection to read the actual `server.port` value from `vite.config.js` instead of hardcoding port 5173.
+2. Fixed a silent promise rejection in `startPreviewServer`: a `require()` call to `runtimeRunner.js` had the wrong relative path (`../../` instead of `../../../`), causing the preview startup to crash before creating the terminal.
+3. Added a `needsInstall` flag return to `startPreviewServer`, allowing the preview message router to extend its `waitForPort` timeout from 30s to 180s when a fresh project needs `npm install` (which takes ~30-40s on this machine). The loading message now says "Installing dependencies — this may take a minute...".
+
+**Why:** AI-generated React/Vite projects frequently set `server.port: 3000` in their `vite.config.js`. The preview system was hardcoded to wait for port 5173, so it would spin forever on "Starting Vite dev server..." while Vite actually started on port 3000. Additionally, the recent auto-install fix introduced a pathing error that caused silent failures, leaving the webview stuck in a loading state. The 30s timeout was also insufficient for `npm install`.
+
+**Risk:** Low. Timeouts are now dynamic based on whether the `node_modules` folder is missing.
 
 ---
 

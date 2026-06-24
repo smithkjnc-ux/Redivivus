@@ -40,6 +40,8 @@ export async function cloudChat(
   message: string,
   context?: ChatContext,
   tier?: 'flash' | 'pro' | 'ultra',
+  imageBase64?: string,
+  imageType?: string,
 ): Promise<ChatResult> {
   const token = await getAccountToken();
   const keyHeaders = collectKeyHeaders();
@@ -57,7 +59,7 @@ export async function cloudChat(
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...keyHeaders,
     },
-    body: JSON.stringify({ message, context, tier }),
+    body: JSON.stringify({ message, context, tier, image: imageBase64, imageType }),
     signal: controller.signal,
   });
 

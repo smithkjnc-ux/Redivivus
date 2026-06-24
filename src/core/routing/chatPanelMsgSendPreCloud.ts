@@ -94,7 +94,7 @@ export async function runPreCloudRouting(
     fileList: effectiveRoot ? getWorkspaceFileList(effectiveRoot) : undefined,
     preferred: (msg.manualProvider as string | undefined) || undefined,
     projectOpen: hasProjectOpen,
-  }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined).catch(() => null);
+  }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined, msg.imageBase64, msg.imageType).catch(() => null);
 
   // [COST] Record the cloudChat intent pre-pass usage — runs a real model on every message but is
   // never returned by /build, so it was invisible in the build card and causing billing discrepancies.
