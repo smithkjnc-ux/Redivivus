@@ -42,18 +42,31 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
       activeFileContext = mentioned.map(f => `\n--- FILE: ${f.relPath} (${f.content.split('\n').length} lines) ---\n\`\`\`\n${f.content.slice(0, 10000)}\n\`\`\``).join('\n') + '\n';
     }
   }
-  if (!activeFileContext) {
+  // [FIX] If no file was explicitly mentioned, use AI file-picker (resolveSourceFiles) to inject
+  // the most relevant project source files for the question. The previous fallback used
+  // activeTextEditor which points at the chat panel webview — not the user's code — so the AI
+  // answered generically instead of auditing the actual project. (Jun 24, 2026)
+  if (!activeFileContext && workspaceRoot !== 'none' && userText) {
     try {
-      const editor = vscode.window.activeTextEditor;
-      if (editor) {
-        const filePath = editor.document.uri.fsPath;
-        const relPath = workspaceRoot !== 'none' ? path.relative(workspaceRoot, filePath) : filePath;
-        const lines = editor.document.getText().split('\n');
-        const maxLines = Math.min(lines.length, 500);
-        const truncNote = lines.length > maxLines ? `\n(truncated: showing ${maxLines} of ${lines.length} lines)` : '';
-        activeFileContext = `\n--- ACTIVE FILE: ${relPath} (${lines.length} lines) ---\n\`\`\`\n${lines.slice(0, maxLines).join('\n')}\n\`\`\`${truncNote}\n`;
+      const { resolveSourceFiles } = await import('../routing/chatPanelMsgFixContext.js');
+      const files = await resolveSourceFiles(workspaceRoot, userText, { routing });
+      if (files.length > 0) {
+        activeFileContext = files.slice(0, 5).map(f => `\n--- FILE: ${f.rel} ---\n\`\`\`\n${f.content.slice(0, 8000)}\n\`\`\``).join('\n') + '\n';
       }
-    } catch {}
+    } catch {
+      // Fallback: active editor (may be chat panel, best-effort)
+      try {
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          const filePath = editor.document.uri.fsPath;
+          const relPath = path.relative(workspaceRoot, filePath);
+          const lines = editor.document.getText().split('\n');
+          const maxLines = Math.min(lines.length, 500);
+          const truncNote = lines.length > maxLines ? `\n(truncated: showing ${maxLines} of ${lines.length} lines)` : '';
+          activeFileContext = `\n--- ACTIVE FILE: ${relPath} (${lines.length} lines) ---\n\`\`\`\n${lines.slice(0, maxLines).join('\n')}\n\`\`\`${truncNote}\n`;
+        }
+      } catch {}
+    }
   }
 
   let conversationContext = '';
