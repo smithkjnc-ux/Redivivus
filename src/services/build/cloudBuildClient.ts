@@ -27,7 +27,8 @@ export async function callCloudBuild(
   }
 
   const vault = (deps as any).vault as VaultService | undefined;
-  const context = await collectBuildContext(root, task, vault, opts.targetFile, opts.isFix, deps.conversation);
+  const sessionAiTemperature = deps.redivivus?.getSessionAiTemperature();
+  const context = await collectBuildContext(root, task, vault, opts.targetFile, opts.isFix, deps.conversation, sessionAiTemperature);
   const keyHeaders = collectKeyHeaders();
   const base = getApiBase();
   const preferred = getPreferred();

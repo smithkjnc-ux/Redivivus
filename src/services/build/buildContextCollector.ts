@@ -20,6 +20,7 @@ export interface CloudBuildContext {
   targetFile?: string
   isFix?: boolean
   recentChat?: string
+  aiTemperature?: any
 }
 
 export async function collectBuildContext(
@@ -29,9 +30,11 @@ export async function collectBuildContext(
   targetFileHint?: string,
   isFix?: boolean,
   conversation?: Array<{ role: string; content: string; timestamp?: number }>,
+  sessionAiTemperature?: any
 ): Promise<CloudBuildContext> {
-  // Blueprint
+  // Blueprint and settings
   let blueprint: CloudBuildContext['blueprint'] | undefined;
+  let aiTemperature: CloudBuildContext['aiTemperature'] | undefined;
   try {
     const cfg = JSON.parse(readFileSafe(path.join(root, '.redivivus', 'config.json')));
     if (cfg.blueprint || cfg.projectName) {
@@ -40,6 +43,9 @@ export async function collectBuildContext(
       blueprint = { projectName: cfg.projectName, what: cfg.blueprint?.what, who: cfg.blueprint?.who,
         where: cfg.blueprint?.where, when: cfg.blueprint?.when, why: cfg.blueprint?.why,
         mechanics: cfg.blueprint?.mechanics || undefined };
+    }
+    if (cfg.aiTemperature || sessionAiTemperature) {
+      aiTemperature = { ...(cfg.aiTemperature || {}), ...(sessionAiTemperature || {}) };
     }
   } catch {}
 
@@ -78,17 +84,28 @@ export async function collectBuildContext(
     if (turns.length > 0) { recentChat = turns; }
   }
 
-  return {
-    blueprint, existingFiles, vaultItems,
-    deadEnds:     readFileSafe(path.join(root, '.redivivus', 'dead_ends.md'))  || undefined,
-    projectRules: getRecentBuilds(root).length > 0
-      ? (readFileSafe(path.join(root, '.redivivus', 'rules.md')) || undefined) : undefined,
-    recentBuilds: getRecentBuilds(root),
-    gitContext:   buildGitContext(root) || undefined,
-    projectMap:   buildProjectMap(root) || undefined,
-    targetFile:   targetFileHint,
-    isFix, recentChat,
+  const deadEnds = readFileSafe(path.join(root, '.redivivus', 'dead_ends.md'))  || undefined;
+  const projectRules = getRecentBuilds(root).length > 0
+      ? (readFileSafe(path.join(root, '.redivivus', 'rules.md')) || undefined) : undefined;
+  const recentBuilds = getRecentBuilds(root);
+  const gitContext = buildGitContext(root) || undefined;
+  const projectMap = buildProjectMap(root) || undefined;
+
+  const assembled: CloudBuildContext = {
+    blueprint,
+    existingFiles,
+    vaultItems,
+    deadEnds,
+    projectRules,
+    recentBuilds,
+    gitContext,
+    projectMap,
+    targetFile: targetFileHint,
+    isFix,
+    recentChat: recentChat || undefined,
+    aiTemperature,
   };
+  return assembled;
 }
 
 function findLikelyTargets(root: string, task: string): string[] {

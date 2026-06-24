@@ -17,6 +17,7 @@ import { handleBlueprintCardConfirm, handleBlueprintCardSkip } from './chatPanel
 import { handleMapContext } from '../../ui/panels/chat/chatPanelMsgMapContext';
 import { handleExpandedInterviewSubmit } from '../../ui/panels/chat/chatPanelMsgExpandedInterview';
 import { handleToolGapCopy, handleToolGapTerminal, handleCheckReadiness, handleGithubCommit, handlePlanApproval, handleFileSizeGateChoice, handleScopeSubmit, handleScopeCancel, handleTemplateWizard } from './chatPanelMsgTools';
+import { handlePlacementAction } from './chatPanelMsgPlacement';
 
 import type { MessageHandlerDeps } from './chatPanelMessageDeps.js';
 export type { MessageHandlerDeps };
@@ -75,6 +76,7 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     await handleRunCommand(msg, deps, panel);
 
   } else if (msg.type === 'start-session') {
+    deps.redivivus.setSessionAiTemperature(undefined);
     if (deps.onStartSession) { await deps.onStartSession(msg.goal || '', msg.ai || 'Unknown'); }
   } else if (msg.type === 'switch-ai') {
     if (deps.onSwitchAI) { await deps.onSwitchAI(msg.ai || 'gemini'); }
@@ -112,14 +114,8 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   } else if (msg.type === 'build-anyway') {
     if (msg.hitId) { resolveVaultHit(msg.hitId, false); }
 
-  } else if (msg.type === 'placement-add-here') {
-    if (msg.placementId) { resolvePlacement(msg.placementId, 'here'); }
-
-  } else if (msg.type === 'placement-new-project') {
-    if (msg.placementId) { resolvePlacement(msg.placementId, 'new-project'); }
-
-  } else if (msg.type === 'placement-cancel') {
-    if (msg.placementId) { resolvePlacement(msg.placementId, 'cancel'); }
+  } else if (msg.type.startsWith('placement-')) {
+    await handlePlacementAction(msg);
 
   } else if (msg.type === 'filesize-gate-choice') {
     await handleFileSizeGateChoice(msg);
@@ -195,8 +191,20 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   } else if (msg.type === 'toolgap-terminal') {
     await handleToolGapTerminal(msg);
 
-  // [READINESS] Run the production-readiness preflight on the active project and post the plain-English checklist.
   } else if (msg.type === 'check-readiness') {
     await handleCheckReadiness(msg, deps);
+
+  } else if (msg.type === 'save-ai-temperature') {
+    // [FIX] Read existing config from root, update aiTemperature, and save back using deps.redivivus.saveConfig()
+    try {
+      if (deps.onSaveAiTemperature) {
+        deps.onSaveAiTemperature(msg.temperature);
+      }
+    } catch {}
+
+  } else if (msg.type === 'session-override-temperature') {
+    deps.redivivus.setSessionAiTemperature(msg.temperature);
+    // Reflect back to UI
+    panel.webview.postMessage({ type: 'update-behavior-panel', temperature: msg.temperature });
   }
 }

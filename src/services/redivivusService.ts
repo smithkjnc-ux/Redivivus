@@ -11,10 +11,16 @@ import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from './
 
 export class RedivivusService {
   private paths: RedivivusPaths;
+  private sessionAiTemperature?: any;
 
   constructor(root?: string) {
     this.paths = new RedivivusPaths(root);
   }
+
+  // ── Session state (in memory)
+
+  setSessionAiTemperature(temp: any) { this.sessionAiTemperature = temp; }
+  getSessionAiTemperature() { return this.sessionAiTemperature; }
 
   // ── path helpers (delegated to RedivivusPaths)
 

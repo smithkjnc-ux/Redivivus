@@ -36,6 +36,9 @@ export function renderFilesTab(
       <div class="card" data-action="showApiKeysForm">
         <div class="card-icon">🔑</div><div class="card-body"><div class="card-title">API Keys</div><div class="card-sub">Connect your AI accounts (Gemini is free to start)</div></div>
       </div>
+      <div class="card" data-action="showBehaviorPanel">
+        <div class="card-icon">🎛️</div><div class="card-body"><div class="card-title">AI Behavior Panel</div><div class="card-sub">Tune creativity and logic across 5 domains</div></div>
+      </div>
     </div>
     <div class="section-title">History & Help</div>
     <div class="cards">
@@ -127,7 +130,7 @@ export function renderFilesTab(
 export function renderSwitchForm(currentAI: string): string {
   // [WARN] Building complex HTML via string concatenation is fragile and error-prone.
   // [WARN] Ensure all user-provided data is properly escaped to prevent XSS.
-  return `
+  let html = `
     <div id="switch-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
       <h3 style="margin:0 0 8px 0; font-size:14px;">Pick your AI engine</h3>
       <p style="margin:0 0 12px 0; font-size:12px; color:var(--vscode-descriptionForeground);">Currently using: <strong>${(currentAI || 'None').toUpperCase()}</strong></p>
@@ -144,4 +147,47 @@ export function renderSwitchForm(currentAI: string): string {
         <button id="switch-cancel-btn" style="padding:8px 20px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:13px;">Cancel</button>
       </div>
     </div>`;
+
+  html += `
+    <div id="behavior-panel-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
+      <h3 style="margin:0 0 4px 0; font-size:14px;">🎛️ AI Behavior Panel</h3>
+      <p style="margin:0 0 14px 0; font-size:11px; color:var(--vscode-descriptionForeground);">Configure the temperature settings for specific architectural domains. Settings are saved to the project blueprint.</p>
+      
+      <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:16px; align-items:flex-end;">
+        <div style="display:flex; flex-direction:column; justify-content:space-between; height:150px; font-size:9px; color:var(--vscode-descriptionForeground); text-align:right; padding-right:4px; padding-bottom:24px;">
+          <div>🔥 Experimental</div>
+          <div>Creative</div>
+          <div>Balanced</div>
+          <div>Stable</div>
+          <div>❄️ Consistent</div>
+        </div>
+        ${renderThermometer('visual', '🎨', 'Visual', '0.75')}
+        ${renderThermometer('mechanics', '⚙️', 'Mechanics', '0.5')}
+        ${renderThermometer('logic', '🧠', 'Logic', '0.25')}
+        ${renderThermometer('data', '🗄️', 'Data', '0.1')}
+        ${renderThermometer('security', '🔒', 'Security', '0.0', true)}
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button id="behavior-save-btn" style="padding:8px 20px; background:#238636; color:#fff; border:none; border-radius:4px; cursor:pointer; font-size:13px; font-weight:bold;">Save Profile</button>
+        <button id="behavior-close-btn" style="padding:8px 20px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:13px;">Close</button>
+      </div>
+    </div>`;
+
+  function renderThermometer(id: string, icon: string, label: string, defaultVal: string, locked: boolean = false): string {
+    const lockedStyle = locked ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;';
+    const tooltip = locked ? 'title="Fixed for project safety"' : '';
+    return `
+      <div class="thermometer-col" style="display:flex; flex-direction:column; align-items:center; flex:1;" ${tooltip}>
+        <div class="thermometer-track" data-domain="${id}" style="position:relative; width:20px; height:150px; background:var(--input-bg, #0d1117); border-radius:10px; border:1px solid var(--border, #334455); overflow:hidden; ${lockedStyle}; margin-bottom:8px;">
+          <div class="thermometer-fill" id="therm-${id}" data-val="${defaultVal}" style="position:absolute; bottom:0; left:0; width:100%; height:${parseFloat(defaultVal)*100}%; background:linear-gradient(to top, #3b82f6, #ef4444); transition:height 0.2s ease, background 0.2s ease;"></div>
+        </div>
+        <div style="font-size:16px; margin-bottom:2px;">${icon}</div>
+        <div style="font-size:10px; font-weight:bold;">${label}</div>
+        <div style="font-size:9px; color:var(--vscode-descriptionForeground);" id="therm-label-${id}">${defaultVal}</div>
+      </div>
+    `;
+  }
+
+  return html;
 }

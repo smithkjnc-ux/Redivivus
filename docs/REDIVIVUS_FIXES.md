@@ -3,6 +3,27 @@
 > See REDIVIVUS_ROADMAP.md for the index. See REDIVIVUS_FEATURES.md for planned work.
 > **Rule:** Every change — no matter how small — gets an entry here before the session ends.
 
+## Fix — Jun 23, 2026: AI Behavior Panel (UI + Session Override)
+
+**Files changed:**
+- `src/ui/panels/chat/chatPanelScriptBehaviorPanel.ts` (new) — Contains logic for initializing and handling Behavior Panel interactions.
+- `src/ui/panels/chat/chatPanelScriptBehaviorPopover.ts` (new) — Contains rendering logic for the behavior panel popover UI.
+- `src/ui/panels/chat/chatPanelHeaderRender.ts` (redivivus) — Added behavior panel 🎛️ button to header.
+- `src/ui/panels/chat/chatPanelScript.ts` (redivivus) — Injected the behavior panel and popover scripts.
+- `src/ui/views/filesTab.ts` (redivivus) — Fixed compilation error on string concatenation without declaration.
+- `src/core/routing/chatPanelMessages.ts` (redivivus) — Handles the `session-override-temperature` message to set in-memory session overrides and clear them on `start-session`.
+- `src/services/build/buildContextCollector.ts` (redivivus) — Merges the `config.json` `aiTemperature` with the session override when collecting context for the Cloud Build Client.
+- `src/services/build/cloudBuildClient.ts` (redivivus) — Extracts the session overrides from the `redivivusService` and passes it to the `buildContextCollector`.
+
+**What changed:** 
+Implemented the UI portion of the 5-domain AI Behavior Panel. Added the drag-to-set vertical thermometer UI supporting real-time adjustments for `Visual`, `Mechanics`, `Logic`, `Data`, and `Security` (locked at 0.0) with an automatic 0.05 step snap. The overrides are dispatched to the backend logic via `session-override-temperature` messages, merged with existing configuration values before sending to the cloud build orchestrator, and explicitly cleared when a user starts a new chat session. Included fixes for the missing `html` variable TypeScript compilation error.
+
+**Why:** The user requested an AI Behavior panel mapping the 5 primary domains to adjustable temperature settings. Per-session adjustments must override global project settings without persisting permanently, and they must immediately reset when a new project/session is spawned.
+
+**Risk:** Low. The architecture follows existing configuration persistence and message routing. The 200-line Rule 9 was adhered to by splitting the behavior panel component into view and script files.
+
+---
+
 ## Fix — Jun 23, 2026: Pre-Cloud Confirmation Misclassification (Stalled Chat UI)
 
 **Files changed:**
@@ -10298,3 +10319,6 @@ Full template registry is operational. `fetchTemplate()` in `templateRegistry.ts
 **Why:** "make a Nixie tube clock" was misrouted because: (1) Gemini returned 0 output tokens (likely safety-filtered on "Nixie"), (2) the empty response was unparseable as JSON, (3) the fallback defaulted to `action: "answer"` with a generic message, (4) the client displayed "I can help with that…" instead of starting the build pipeline. On retry, `cloudChat` returned null (all providers failed), causing the client to fall through to the Q&A path (`handleAIChat`), which built a massive prompt and triggered 429 rate limits across Grok/Groq/GPT-4o.
 
 **Risk:** Low. The prepass-rescue only fires when the main model produces nothing — it can never override a valid main-model classification. The Gemini throw ensures failover fires early rather than propagating empty output through the pipeline.
+- `src/core/routing/chatPanelMessages.ts`: Split file by moving placement handlers to `chatPanelMsgPlacement.ts` to respect the 200-line limit (Condition 1). Added `save-ai-temperature` handler.
+- `src/core/routing/chatPanelMsgPlacement.ts`: Created new file for placement handlers.
+- `src/core/routing/chatPanelMessageDeps.ts`: Added `onSaveAiTemperature` dependency.

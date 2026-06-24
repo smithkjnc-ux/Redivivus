@@ -17,6 +17,8 @@ import { buildPreviewScript } from './chatPanelPreviewScript';
 import { buildVEScript } from './chatPanelVisualEditorScript';
 import { buildBlueprintCardScript } from './chatPanelScriptBlueprintCard';
 import { buildPanelsScript } from './chatPanelScriptPanels';
+import { buildBehaviorPanelScript } from './chatPanelScriptBehaviorPanel';
+import { buildBehaviorPopoverScript } from './chatPanelScriptBehaviorPopover';
 
 export function buildChatScript(): string {
   return `
@@ -142,5 +144,7 @@ export function buildChatScript(): string {
     ${buildImageScript()}
     ${buildTierScript()}
     ${buildRoutingScript()}
+    ${buildBehaviorPanelScript()}
+    ${buildBehaviorPopoverScript()}
   `;
 }

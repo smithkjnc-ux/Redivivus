@@ -26,6 +26,7 @@ export function renderHeaderRightInner(header?: ChatHeaderInfo): string {
   if (header && header.hasProjectOpen) {
     if (showBlueprint) {
       pills += `<button class="header-btn" data-cmd="redivivus.blueprintInterview" title="Edit Blueprint" style="${header.blueprintStatus === 'complete' ? 'border-color:#4caf50;color:#4caf50;' : header.blueprintStatus === 'incomplete' ? 'border-color:#ff9800;color:#ff9800;' : 'border-color:#f44336;color:#f44336;'}">&#x1F4CB; Blueprint</button>`;
+      pills += `<button class="header-btn" id="header-behavior-btn" title="AI Behavior Panel (Session Overrides)">&#x1F39B;&#xFE0F;</button>`;
     }
     if (showMap) {
       pills += `<button class="header-btn" data-cmd="redivivus.showMap" title="Map">🗺️ Map</button>`;
