@@ -7,6 +7,7 @@ import type { ChatResult } from '../../services/api/apiClientChat';
 import { handleFixRequest } from './chatPanelMsgFix';
 import { fixLog } from '../../services/logging/fixPipelineLogger';
 import { isProjectsContainer } from '../../services/project/redivivusPaths.js';
+import { cloudChat } from '../../services/api/apiClientChat.js';
 
 export async function handleAnswerClarifyResult(
   msg: any,
@@ -43,13 +44,16 @@ export async function handleAnswerClarifyResult(
   if (hasProjectOpen && !isProjectsContainer(effectiveRoot || '')) {
     let _isRecoverableToFix = false;
     try {
-      const recoveryPrompt = `A project is open in the editor. The user said: "${userText.slice(0, 300)}"
-The AI classified this as '${chatResult.action}' but may have been wrong.
-Reply with FIX if the user is giving an instruction, command, or bug report (e.g. "fix this", "make that", "it is broken").
-Reply with CHAT only if the user is explicitly asking a question or having a conversational exchange.
-Reply with exactly one word: FIX or CHAT.`;
-      const recoveryResult = await deps.routing.promptCheap(recoveryPrompt, 12_000);
-      if (recoveryResult.success && recoveryResult.text) {
+      // [THIN-CLIENT] Route the recovery classification to the backend /chat endpoint instead of
+      // calling provider APIs directly from the extension via promptCheap.
+      const recoveryResult = await cloudChat(
+        `A project is open. The user said: "${userText.slice(0, 300)}". ` +
+        `The AI classified this as '${chatResult.action}' but may be wrong. ` +
+        `Reply FIX if this is an instruction/bug report. Reply CHAT if it is a question. One word only.`,
+        undefined,
+        'flash',
+      );
+      if (recoveryResult.text) {
         _isRecoverableToFix = recoveryResult.text.trim().toUpperCase().startsWith('FIX');
       }
     } catch {

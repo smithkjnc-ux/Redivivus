@@ -5,7 +5,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { BuildContext} from '../../core/build/chatPanelBuildHelpers';
 import { updateLastMsg, appendMsg } from '../../core/build/chatPanelBuildHelpers';
-import { runTests } from './testRunner.js';
+import { runTests, detectTestCommand } from './testRunner.js';
+import { generateAndRunSmokeTest } from './smokeTestGenerator.js';
 
 const MAX_RETRIES = 3;
 // Matches file:line patterns in test output (Jest, pytest, Go, Rust all use this format)
@@ -41,14 +42,60 @@ async function aiFixTestFailure(ctx: BuildContext, relPath: string, testOutput: 
 
 /** Run test → fix → re-run loop after a build. Appends status to ctx.conversation. Never throws. */
 export async function runTestAutoFix(ctx: BuildContext, builtFiles: string[]): Promise<void> {
+  // [SMOKE] No existing test suite — generate and run a minimal smoke test first.
+  // If it passes we're done. If it fails, feed the output into the normal fix loop below.
+  if (!detectTestCommand(ctx.root)) {
+    const smoke = await generateAndRunSmokeTest(ctx, builtFiles).catch(() => null);
+    if (!smoke || smoke.passed || !smoke.testFile || !smoke.output) { return; }
+    // Proceed into the fix loop using the smoke test output as the failure report.
+    const preFixSnapshots = new Map<string, string>();
+    for (const relPath of builtFiles) {
+      const absPath = require('path').join(ctx.root, relPath);
+      try { if (require('fs').existsSync(absPath)) { preFixSnapshots.set(relPath, require('fs').readFileSync(absPath, 'utf8')); } } catch { }
+    }
+    for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+      updateLastMsg(ctx, `Smoke test fix attempt ${attempt}/${MAX_RETRIES}...`);
+      const files = parseFailedFiles(smoke.output, ctx.root, builtFiles);
+      let fixed = 0;
+      for (const relPath of files) {
+        const corrected = await aiFixTestFailure(ctx, relPath, smoke.output);
+        if (corrected) {
+          try { require('fs').writeFileSync(require('path').join(ctx.root, relPath), corrected, 'utf8'); fixed++; } catch { }
+        }
+      }
+      if (fixed === 0) {
+        for (const [relPath, content] of preFixSnapshots) {
+          try { require('fs').writeFileSync(require('path').join(ctx.root, relPath), content, 'utf8'); } catch { }
+        }
+        updateLastMsg(ctx, `Could not auto-fix smoke test failures. Paste the error in chat and I will look deeper:\n\`\`\`\n${smoke.output.slice(0, 800)}\n\`\`\``);
+        return;
+      }
+      // Re-run the smoke test
+      const rerun = require('child_process').spawnSync(smoke.runCommand!, [], {
+        cwd: ctx.root, shell: true, timeout: 60_000, encoding: 'utf8',
+        env: { ...process.env, FORCE_COLOR: '0', NO_COLOR: '1', CI: 'true' },
+      });
+      if (rerun.status === 0) {
+        updateLastMsg(ctx, `✅ Smoke test passing after ${attempt} attempt${attempt > 1 ? 's' : ''}.`);
+        return;
+      }
+      smoke.output = [(rerun.stdout || ''), (rerun.stderr || '')].join('\n').replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').trim();
+    }
+    for (const [relPath, content] of preFixSnapshots) {
+      try { require('fs').writeFileSync(require('path').join(ctx.root, relPath), content, 'utf8'); } catch { }
+    }
+    updateLastMsg(ctx, `After ${MAX_RETRIES} attempts, smoke test still failing. Paste the error in chat and I will dig deeper:\n\`\`\`\n${smoke.output.slice(0, 1200)}\n\`\`\``);
+    return;
+  }
+
   let result = runTests(ctx.root);
   if (result.success || !result.command) { return; }
 
   // Snapshot built files before any AI writes — restored if all retries fail
-  const preFixSnapshots = new Map<string, string>();
+  const existingTestSnapshots = new Map<string, string>();
   for (const relPath of builtFiles) {
     const absPath = path.join(ctx.root, relPath);
-    try { if (fs.existsSync(absPath)) { preFixSnapshots.set(relPath, fs.readFileSync(absPath, 'utf8')); } } catch { }
+    try { if (fs.existsSync(absPath)) { existingTestSnapshots.set(relPath, fs.readFileSync(absPath, 'utf8')); } } catch { }
   }
 
   const n = result.failureCount;
@@ -66,7 +113,7 @@ export async function runTestAutoFix(ctx: BuildContext, builtFiles: string[]): P
     }
     if (fixed === 0) {
       // Roll back any partial fixes from prior attempts before giving up
-      for (const [relPath, content] of preFixSnapshots) {
+      for (const [relPath, content] of existingTestSnapshots) {
         try { fs.writeFileSync(path.join(ctx.root, relPath), content, 'utf8'); } catch { }
       }
       updateLastMsg(ctx, `Could not auto-fix test failures. Paste the error in chat and I will look deeper:\n\`\`\`\n${result.output.slice(0, 800)}\n\`\`\``);
@@ -81,7 +128,7 @@ export async function runTestAutoFix(ctx: BuildContext, builtFiles: string[]): P
 
   // All retries exhausted — roll back to the original build output
   let restoredCount = 0;
-  for (const [relPath, content] of preFixSnapshots) {
+  for (const [relPath, content] of existingTestSnapshots) {
     try { fs.writeFileSync(path.join(ctx.root, relPath), content, 'utf8'); restoredCount++; } catch { }
   }
   const rollbackNote = restoredCount > 0 ? ` Restored ${restoredCount} file${restoredCount !== 1 ? 's' : ''} to post-build state.` : '';

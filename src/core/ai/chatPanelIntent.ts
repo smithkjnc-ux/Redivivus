@@ -17,7 +17,6 @@ import { BuildOrchestrator, BuildBlueprint, BuildPhase } from '../../services/bu
 import { BUILD_PHASES } from '../../services/build/buildPhaseDefinitions';
 import { generateVagueWarning, getQuestionsForTier, organizeByCategory } from '../../services/blueprint/expandedInterview';
 import { isVagueProjectRequest, askScopeQuestions, parseScopeAnswer, hasPendingScopeQuestion, resolveScopeQuestion } from '../../services/project/templateScopeService';
-import { handleComplexityRoutedBuild, OrchestratorDeps } from '../build/chatPanelOrchestrator';
 import { runBuildAfterGates } from '../build/chatPanelBuildRunner';
 import { autoCreateProject } from '../build/chatPanelBuildAutoCreate';
 import { estimateBuild } from './costEstimatorService';
