@@ -49,18 +49,13 @@ export async function collectBuildContext(
     }
   } catch {}
 
-  // Vault items — all relevant ones, no arbitrary cap
+  // Vault items — use findSimilar for better scoring (name double-weight, partial word overlap,
+  // description match) and a top-5 cap so we never bloat the build request with stale matches.
   let vaultItems: CloudBuildContext['vaultItems'] | undefined;
   if (vault) {
     try {
-      const all = vault.listItems() as Array<{ name: string; code: string; language?: string; tags?: string[] }>;
-      const scored = all.map(item => {
-        const words = (item.name + ' ' + (item.tags ?? []).join(' ')).toLowerCase();
-        const score = task.toLowerCase().split(/\W+/).filter(w => w.length > 3).filter(w => words.includes(w)).length;
-        return { item, score };
-      });
-      const matched = scored.filter(s => s.score > 0).sort((a, b) => b.score - a.score);
-      vaultItems = matched.length > 0 ? matched.map(s => s.item) : undefined;
+      const matches = vault.findSimilar(task, 0.2);
+      vaultItems = matches.length > 0 ? matches.map(({ score: _s, ...item }) => item) : undefined;
     } catch {}
   }
 
