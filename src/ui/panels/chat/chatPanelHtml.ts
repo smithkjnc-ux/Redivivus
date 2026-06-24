@@ -16,6 +16,8 @@ export interface ChatMessage {
   timestamp: number;
   tokens?: number;
   cost?: number;
+  imageBase64?: string;
+  imageType?: string;
 }
 
 export interface ChatHeaderInfo {

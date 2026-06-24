@@ -26,15 +26,18 @@ export async function callProvider(
     case 'claude':
       return executeClaude(text, fetchWithTimeout, tier, imageBase64, imageType, systemMessage);
     case 'openai':
-      return executeOpenAI(text, fetchWithTimeout, systemMessage, tier);
+      return executeOpenAI(text, fetchWithTimeout, systemMessage, tier, imageBase64, imageType);
     case 'groq':
-      return executeGroq(text, fetchWithTimeout, systemMessage, tier);
     case 'xai':
-      return executeXAI(text, fetchWithTimeout, systemMessage, tier);
     case 'kimi':
-      return executeKimi(text, fetchWithTimeout, systemMessage, tier);
-    case 'deepseek':
+    case 'deepseek': {
+      // [VISION-WARN] These providers are text-only in the extension-side path. Image silently dropped.
+      if (imageBase64) { console.warn(`[Redivivus] ${ai} does not support vision — image attachment ignored. Switch to Claude, OpenAI, or Gemini to analyze images.`); }
+      if (ai === 'groq') { return executeGroq(text, fetchWithTimeout, systemMessage, tier); }
+      if (ai === 'xai')  { return executeXAI(text, fetchWithTimeout, systemMessage, tier); }
+      if (ai === 'kimi') { return executeKimi(text, fetchWithTimeout, systemMessage, tier); }
       return executeDeepseek(text, fetchWithTimeout, systemMessage, tier);
+    }
     default:
       return { text: '', model: 'none', success: false, error: 'Unknown AI provider: ' + ai };
   }

@@ -25,7 +25,11 @@ export function renderMessages(conversation: ChatMessage[]): string {
           .replace(/\n\nVISUAL CONTRACT \(locked[^)]*\):[\s\S]*?(?=\n\n[A-Z]|\n*$)/g, '')
           .trim()
       : msg.content;
-    let html = escapeHtml(displayContent);
+    // [VISION] Show a thumbnail in the user bubble so the user can see the image was received.
+    const imageThumbnail = (isUser && msg.imageBase64)
+      ? `<div style="margin-bottom:6px;"><img src="data:${msg.imageType || 'image/png'};base64,${msg.imageBase64}" alt="Attached image" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid rgba(255,255,255,0.15);display:block;" /></div>`
+      : '';
+    let html = imageThumbnail + escapeHtml(displayContent);
     html = html.replace(/ ?__BUILD_WORKING__/g, '');
     html = html.replace(/GUARDIAN_PASS\s*/g, '');
     html = html.replace(/📝 (.+)/g, (_m, t) => `<div class="story-line"><span class="story-dot">✅</span><span>${escapeHtml(t)}</span></div>`);

@@ -14,7 +14,13 @@ export function saveConversation(state: any, root?: string): void {
     const ctx = ChatPanel.extensionContext;
     if (!ctx || !root || !state.conversation.length) { return; }
     const { chatHistoryKey } = require('./chatPanelPublicAPI.js');
-    ctx.globalState.update(chatHistoryKey(root), JSON.stringify(state.conversation.filter((m: any) => !m.content?.includes('__BUILD_WORKING__')).slice(-100)));
+    // [VISION] Strip imageBase64 before persisting — a 500KB screenshot serializes to ~670KB of base64.
+    // Keeping it would rapidly bloat globalState and chat_history.md. The AI already processed it.
+    const toSave = state.conversation
+      .filter((m: any) => !m.content?.includes('__BUILD_WORKING__'))
+      .slice(-100)
+      .map(({ imageBase64: _img, imageType: _imgT, ...rest }: any) => rest);
+    ctx.globalState.update(chatHistoryKey(root), JSON.stringify(toSave));
     const fs = require('fs');
     const path = require('path');
     const redDir = path.join(root, '.redivivus');
@@ -24,7 +30,8 @@ export function saveConversation(state: any, root?: string): void {
       for (const m of state.conversation) {
         const key = `${m.timestamp}_${m.role}`;
         if (!_writtenMessages.has(key)) {
-          toAppend += `### ${m.role === 'user' ? 'User' : 'Redivivus'} (${new Date(m.timestamp || Date.now()).toLocaleString()})\n\n${m.content}\n\n---\n\n`;
+          const imageNote = m.imageBase64 ? '\n\n*[Image attached — not stored in history]*' : '';
+          toAppend += `### ${m.role === 'user' ? 'User' : 'Redivivus'} (${new Date(m.timestamp || Date.now()).toLocaleString()})\n\n${m.content}${imageNote}\n\n---\n\n`;
           _writtenMessages.add(key);
         }
       }
