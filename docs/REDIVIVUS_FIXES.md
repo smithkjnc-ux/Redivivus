@@ -1,6 +1,21 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: Image Context for File Selection (resolveSourceFiles)
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixContext.ts` (redivivus)
+- `src/core/routing/chatPanelMsgFix.ts` (redivivus)
+
+**What changed:**
+1. Modified `resolveSourceFiles` to accept `imageBase64` and `imageType` and pass them down into the `routing.promptCheap` call.
+2. Updated `handleFixRequest` in `chatPanelMsgFix.ts` to pass the image parameters into `resolveSourceFiles`.
+
+**Why:** The Supervisor received the screenshot, but the file-selection AI that prepares the source context (`resolveSourceFiles`) did *not* have access to the screenshot. Because the prompt was just "I am getting this screen", the file-selection AI didn't know which files to pick, so it omitted `AuthForm.jsx`. When the Supervisor finally received the prompt, it saw the screenshot but didn't see `AuthForm.jsx` in its context window, causing it to hallucinate that the file didn't exist at all.
+
+**Risk:** Low. If no image is provided, `undefined` is passed as before, maintaining the original behavior.
+
+---
+
 ## Fix — Jun 23, 2026: Agent Handoff Diagnosis & Detached Servers
 **Files changed:**
 - `src/core/routing/chatPanelMsgFixAgentHandoff.ts` (redivivus)

@@ -43,7 +43,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   initFixLogger(root);
   fixLog('=== Fix Request Started ===', { userText, root, imageProvided: !!imageBase64 });
 
-  const sourceFiles = await resolveSourceFiles(root, userText, deps);
+  const sourceFiles = await resolveSourceFiles(root, userText, deps, imageBase64, imageType);
   fixLog('File scan complete', { count: sourceFiles.length });
   // [FIX] Empty scaffold (no source files yet) — treat as a first build, not a fix.
   if (sourceFiles.length === 0) { await deps.handleBuildRequest(userText, true); return; }

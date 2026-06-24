@@ -145,6 +145,8 @@ export async function resolveSourceFiles(
   root: string,
   userText: string,
   deps?: { routing?: { promptCheap?: Function } },
+  imageBase64?: string,
+  imageType?: string
 ): Promise<{ rel: string; content: string }[]> {
   const all = listSourceFiles(root, true, 50)
     .filter(f => f.content)
@@ -162,7 +164,7 @@ Project files:
 ${fileList}
 
 Reply with ONLY the filenames most likely relevant to this request, one per line, no explanation. Max 12 files.`;
-      const aiResult = await (routing.promptCheap as Function)(selectionPrompt, 12_000);
+      const aiResult = await (routing.promptCheap as Function)(selectionPrompt, 12_000, imageBase64, imageType);
       if (aiResult.success && aiResult.text.trim()) {
         const picked = aiResult.text.trim().split('\n')
           .map((l: string) => l.trim().replace(/^[-*•\d.]+\s*/, ''))
