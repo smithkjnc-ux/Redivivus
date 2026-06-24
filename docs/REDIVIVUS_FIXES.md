@@ -1,6 +1,22 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: Agent Handoff Diagnosis & Detached Servers
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixAgentHandoff.ts` (redivivus)
+- `src/core/routing/chatPanelMsgFix.ts` (redivivus)
+
+**What changed:**
+1. Modified `chatPanelMsgFix.ts` to pass the `diagnosis` string from the Supervisor to `executeAgentHandoff`.
+2. Updated `executeAgentHandoff` to accept the `diagnosis` string and inject it into the task prompt for the agent.
+3. Updated the agent prompts in `executeAgentHandoff.ts` to explicitly instruct the agent to run web servers or dev servers detached (e.g., `npm run dev &` or `npx serve . &`) so they don't block the execution pipeline for 3 minutes before hitting the idle timeout.
+
+**Why:** The agent was originally missing the Supervisor's diagnosis, so when a user said something vague like "I am getting this screen", the agent didn't know what to do and blindly started generating a generic HTML template. Additionally, when it ran a server command like `npx serve .`, the `runShell` utility blocked the agent pipeline, making the user think the UI was stuck "Running" forever.
+
+**Risk:** Low. The diagnosis string provides crucial context, and instructing the agent to background servers prevents long-running commands from hanging the execution loop.
+
+---
+
 ## Fix — Jun 23, 2026: End-to-End Image Pasting Support
 **Files changed:**
 - `src/core/routing/chatPanelMsgSendMessage.ts` (redivivus)

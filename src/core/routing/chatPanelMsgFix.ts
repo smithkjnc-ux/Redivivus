@@ -167,7 +167,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   if (/\[AGENT_HANDOFF\]/i.test(diagnosis)) {
     fixLog('Supervisor routed to Agent at diagnosis time — skipping Worker/Verify/Guardian');
     const { executeAgentHandoff } = await import('./chatPanelMsgFixAgentHandoff.js');
-    await executeAgentHandoff(deps, root, userText, [], undefined, conversation, approvedPlan);
+    await executeAgentHandoff(deps, root, userText, [], undefined, conversation, approvedPlan, diagnosis);
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
 
