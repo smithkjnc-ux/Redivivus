@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import type { ChatMessage } from '../../ui/panels/chat/chatPanelHtml';
 import type { MessageHandlerDeps } from './chatPanelMessages';
-import { buildAIPrefix, processAIResponse } from '../ai/chatPanelAI';
+import { buildAIPrefix, processAIResponse, getPreviewSnapshot } from '../ai/chatPanelAI';
 import { clearPendingScopeQuestion } from '../../services/project/templateScopeService';
 import { LearnedMemoryService } from '../../services/learnedMemoryService';
 import { _architectReviews } from '../../ui/panels/chat/chatPanelMsgArchitect';
@@ -96,10 +96,15 @@ export async function handleAIChat(
       }
     } else {
       // Question / answer path — use cheap models first (Groq/Gemini), save expensive models for code gen
+      // [FIX] Attach live preview snapshot so the AI can SEE what is rendering, not just read code.
+      // User-attached image takes priority; fall back to preview snapshot if no image was attached.
+      const snap = (!msg.imageBase64) ? getPreviewSnapshot() : undefined;
+      const qaImageBase64 = msg.imageBase64 || snap?.data;
+      const qaImageType = msg.imageType || snap?.mimeType;
       // [ADAPTIVE-PILL] Manual lock: only the locked provider is called, no failover.
       const aiResponse = manualProvider
-        ? await (routing as any).promptWithProvider(manualProvider, prefix + userText, 60_000, msg.imageBase64, msg.imageType).catch((e: any) => ({ success: false, error: e?.message || 'provider error', text: '' }))
-        : await routing.promptCheap(prefix + userText, 60_000, msg.imageBase64, msg.imageType);
+        ? await (routing as any).promptWithProvider(manualProvider, prefix + userText, 60_000, qaImageBase64, qaImageType).catch((e: any) => ({ success: false, error: e?.message || 'provider error', text: '' }))
+        : await routing.promptCheap(prefix + userText, 60_000, qaImageBase64, qaImageType);
       if (!aiResponse.success) {
         // NO_API_KEY: show guardian setup message as a normal reply, not an error wrapper
         const content = aiResponse.error === 'NO_API_KEY'

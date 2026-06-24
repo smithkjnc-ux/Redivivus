@@ -53,6 +53,29 @@ export function getCaptureScript(): string {
         if(blank && !loopSeen){ send('probe','canvas is blank and no animation loop started - the game is not running', b64); }
         else if(!loopSeen){ send('probe','no animation loop (requestAnimationFrame/setInterval) ever started', b64); }
         else if(b64){ send('snapshot','visual snapshot', b64); }
+      } else {
+        // No canvas — HTML-rendered page (div/span UI, chess boards, DOM games).
+        // Use html2canvas to capture the visible DOM as a JPEG and beacon it back.
+        try{
+          var s=document.createElement('script');
+          s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+          s.onload=function(){
+            try{
+              (window as any).html2canvas(document.body,{
+                scale:0.5, useCORS:true, allowTaint:true,
+                width:Math.min(document.body.scrollWidth,900),
+                height:Math.min(document.body.scrollHeight,700),
+                logging:false
+              }).then(function(cv){
+                try{
+                  var img=cv.toDataURL('image/jpeg',0.6);
+                  send('snapshot','html visual snapshot',img);
+                }catch(e){}
+              }).catch(function(){});
+            }catch(e){}
+          };
+          document.head.appendChild(s);
+        }catch(e){}
       }
     }catch(e){}
   }, 1500);

@@ -77,6 +77,7 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
     if (selected) { conversationContext = '\n--- HISTORY ---\n' + selected + '\n'; }
   }
 
+  const previewSnapshot = getPreviewSnapshot();
   const prompt = getSystemPrompt(bpStr);
   // [Redivivus] Inject annotation-driven project context — the AI sees [SCOPE] from ALL files
   // in ~200 tokens instead of loading 50,000 tokens of raw code. This is the Redivivus advantage.
@@ -84,7 +85,24 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
   // [FIX] Inject user memory profile (~30 tokens, 0 AI cost to learn)
   let userProfileCtx = '';
   try { const { buildPromptInjection } = require('../../services/userMemoryService.js'); userProfileCtx = buildPromptInjection(); } catch {}
-  return `${prompt}\n${userProfileCtx ? userProfileCtx + '\n' : ''}${projectContext}${activeFileContext}${conversationContext}\nUser:`;
+  // Attach snapshot note to prompt if we have a visual — multimodal models will see the image alongside
+  const snapshotNote = previewSnapshot ? '\n[VISUAL CONTEXT: A screenshot of the running preview is attached. Use it to answer visual questions accurately.]\n' : '';
+  return `${prompt}\n${userProfileCtx ? userProfileCtx + '\n' : ''}${projectContext}${activeFileContext}${conversationContext}${snapshotNote}\nUser:`;
+}
+
+/** Returns the most recent visual snapshot from the live preview server, if any.
+ *  Used by Q&A path to attach a screenshot to the AI call so it can reason visually. */
+export function getPreviewSnapshot(): { data: string; mimeType: string } | undefined {
+  try {
+    const { getRuntimeReports } = require('../../ui/panels/chat/chatPanelPreview.js');
+    const reports: Array<{ kind: string; msg: string; image?: string }> = getRuntimeReports();
+    const snap = [...reports].reverse().find(r => (r.kind === 'snapshot' || r.kind === 'probe') && r.image);
+    if (snap?.image) {
+      const raw = snap.image.replace(/^data:[^;]+;base64,/, '');
+      if (raw.length > 100) { return { data: raw, mimeType: 'image/jpeg' }; }
+    }
+  } catch { /* preview not running — non-fatal */ }
+  return undefined;
 }
 
 // [SCOPE] Focused code generation prompt — bypasses Redivivus identity noise entirely
