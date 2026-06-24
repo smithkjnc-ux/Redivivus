@@ -112,12 +112,26 @@ export function collectFixContext(root: string, sourceFiles: { rel: string; cont
   // These are gold: they tell the Supervisor exactly what failed at runtime, not just what the code says.
   try {
     const previewErrs = getPreviewErrors();
+    const runtimeLines: string[] = [];
+    
     if (previewErrs.length > 0) {
-      const lines = previewErrs.map(e => {
+      previewErrs.forEach(e => {
         const loc = e.source ? ` (${e.source}${e.line ? ':' + e.line : ''})` : '';
-        return `  [${e.type.toUpperCase()}]${loc} ${e.message}`;
-      }).join('\n');
-      parts.push(`BROWSER RUNTIME ERRORS (captured from live preview -- these are what the user actually sees):\n${lines}`);
+        runtimeLines.push(`  [${e.type.toUpperCase()}]${loc} ${e.message}`);
+      });
+    }
+
+    // [PREVIEW-AUTOFIX] Read from the local HTTP server's beacon receiver
+    const { getRuntimeReports } = require('../../ui/panels/chat/chatPanelPreview.js');
+    const reports = getRuntimeReports();
+    if (reports && reports.length > 0) {
+      reports.forEach((r: { kind: string; msg: string }) => {
+        runtimeLines.push(`  [${r.kind.toUpperCase()}] ${r.msg}`);
+      });
+    }
+
+    if (runtimeLines.length > 0) {
+      parts.push(`BROWSER RUNTIME ERRORS (captured from live preview -- these are what the user actually sees):\n${runtimeLines.join('\n')}`);
     }
   } catch {}
 

@@ -1,5 +1,32 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
+
+## Fix — Jun 23, 2026: Preview Error Capture Visibility
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixContext.ts` (redivivus) — Injected runtime HTTP beacons into the fix context.
+
+**What changed:** 
+Modified `collectFixContext` to pull runtime errors from `getRuntimeReports()` (which reads from the HTTP server's `/__rdv_runtime` beacons) in addition to the IPC `getPreviewErrors()` function.
+
+**Why:** The preview iframe's capture script sends errors via HTTP POST beacons (`/__rdv_runtime`), not IPC. Because the Fix Pipeline only checked the IPC pipeline, it was completely blind to browser runtime errors, meaning it never saw the `SyntaxError` that broke the React app when the worker generated JSX inside a plain `.js` file.
+
+**Risk:** Low. Just adds extra context to the AI prompt.
+
+---
+
+## Fix — Jun 23, 2026: AI Context Truncation Hallucination (White Screen Loop)
+**Files changed:**
+- `src/core/routing/chatPanelMsgFixContext.ts` (redivivus) — Injected `buildFileTree(root)` into the Supervisor's context.
+
+**What changed:** 
+Added the full `PROJECT FILE TREE` into the text payload sent to the Supervisor during Phase 1 diagnosis.
+
+**Why:** The `resolveSourceFiles` function caps the number of files sent to the Supervisor to a maximum of 12 files to save tokens. When diagnosing an application-wide bug (like a white screen), the Supervisor saw `App.js` importing components but didn't see the component files themselves because they were excluded from the 12-file limit. The Supervisor assumed the files "were missing from the project" and destructively stripped their imports out of `App.js`. Injecting the file tree prevents this hallucination by proving to the Supervisor that the files *do* exist on disk, even if their contents are hidden.
+
+**Risk:** Low. Only adds a file tree list to the prompt, costing a negligible amount of tokens but saving entire projects from destructive AI edits.
+
+---
+
 ## Fix — Jun 23, 2026: Claude API Temperature Parameter Rejection
 
 **Files changed:**
