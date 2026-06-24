@@ -1,6 +1,19 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
 
+## Fix — Jun 23, 2026: Supervisor Architecture Hardening (Build Tools)
+**Files changed:**
+- `src/core/build/chatPanelBuildRunnerHelpers.ts` (redivivus) — Updated `SUPERVISOR_CONTRACT_GUIDANCE`.
+
+**What changed:** 
+Modified the Supervisor to Worker Contract Requirement to enforce the generation of complete build systems. If the Supervisor prescribes a frontend framework like React, it must now explicitly prescribe a `package.json` and build tool configuration (e.g. `vite.config.js`) and place the `index.html` at the project root.
+
+**Why:** When users asked Redivivus to "Build a React app" (without using exact scaffold keywords), the Supervisor would prescribe the React code but completely omit the build system. The Worker would dutifully execute this, generating raw JSX files and placing them in an HTML file that browsers natively cannot parse. This resulted in silent `SyntaxError` failures and "white screen" bugs that the AI Fix pipeline struggled to resolve because the entire architecture was missing.
+
+**Risk:** Low. Tightens the contract rules without modifying pipeline orchestration logic.
+
+---
+
 ## Fix — Jun 23, 2026: AI Intent Classifier Hardening
 **Files changed:**
 - `src/core/routing/chatPanelMsgSendPostCloudHandlers.ts` (redivivus) — Hardened the `recoveryPrompt`.

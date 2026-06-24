@@ -47,6 +47,7 @@ Your analysis is the Worker's only instruction set. The Worker executes what you
 - For every function that must exist: name it, state what it calls, state what it returns
 - For every rendering concern: explicitly list every entity the draw loop must render
 - For every state transition: specify the exact sequence of operations
+- Build Systems: If using a frontend framework (e.g. React), you MUST prescribe a complete build system (e.g. package.json, vite.config.js) and place index.html at the project root.
 - Do not describe problems — prescribe solutions with enough precision that a junior developer could implement them without asking a follow-up question
 The Worker has no context beyond your instructions. Ambiguity becomes missing code.`;
 
