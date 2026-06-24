@@ -51,7 +51,8 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
       const { resolveSourceFiles } = await import('../routing/chatPanelMsgFixContext.js');
       const files = await resolveSourceFiles(workspaceRoot, userText, { routing });
       if (files.length > 0) {
-        activeFileContext = files.slice(0, 5).map(f => `\n--- FILE: ${f.rel} ---\n\`\`\`\n${f.content.slice(0, 8000)}\n\`\`\``).join('\n') + '\n';
+        activeFileContext = '\n--- CURRENT PROJECT SOURCE FILES (READ THESE to answer questions about behavior, appearance, rendering, bugs) ---'
+          + files.slice(0, 5).map(f => `\n--- FILE: ${f.rel} ---\n\`\`\`\n${f.content.slice(0, 8000)}\n\`\`\``).join('\n') + '\n';
       }
     } catch {
       // Fallback: active editor (may be chat panel, best-effort)
