@@ -1,8 +1,50 @@
 # Redivivus — Fix Log & Session History
 > [SCOPE] Chronological record of all bug fixes, session changes, and technical decisions.
-## Fix — Jun 23, 2026: AI Behavior Panel Button Visibility
+## Fix — Jun 23, 2026: Claude API Temperature Parameter Rejection
 
 **Files changed:**
+- `src/lib/ai/executor.ts` (redivivus-backend) — Stripped `temperature` from Anthropic Claude API calls.
+
+**What changed:** 
+Removed the `temperature: opts.temperature` parameter from both the standard and streaming Claude execution paths in the backend. 
+
+**Why:** Anthropic deprecated the `temperature` parameter on Claude 3.5 Sonnet (and newer) models. While this was previously caught and fixed in the `modelHealthCheck.ts` startup probe, it was missed in the main `executor.ts` path. With the new Behavior Panel actively injecting specific temperature floats into the build context, Claude began immediately rejecting requests with a `400 Bad Request (invalid_request_error)`, triggering fallback cascades.
+
+**Risk:** Medium. Fixes a critical provider failure but locks Claude responses to their default internal temperature behavior.
+
+---
+
+## Fix — Jun 23, 2026: Plain English API Error Extraction
+
+**Files changed:**
+- `src/app/api/v1/plan/route.ts` (redivivus-backend) — Added regex extraction for nested JSON error payloads.
+- `src/app/api/v1/build/route.ts` (redivivus-backend) — Added same extraction to the Worker failover loop.
+
+**What changed:** 
+When an AI provider crashes (e.g. Claude out of credits, OpenAI rate limit), the backend streams the failover event to the IDE. Previously, the backend naively sliced the first 50 chars of the SDK exception, which often resulted in a raw stringified JSON chunk like `claude unavailable (400 {"type":"error","error":{)`. Now, the backend uses a regex to sniff out the nested JSON string, parses it, and surfaces the actual human-readable `error.message` (e.g. `credit balance is too low`).
+
+**Why:** To ensure users understand exactly why a model failed in plain English, instead of confusing them with raw SDK network error structures.
+
+**Risk:** Low. Try-catch block gracefully falls back to the raw string if the payload is malformed.
+
+---
+
+## Fix — Jun 23, 2026: Behavior Panel UI Layout and Reset Button
+
+**Files changed:**
+- `src/ui/panels/chat/chatPanelScriptBehaviorPopover.ts` (redivivus) — Updated flex container layout properties and added a reset button.
+
+**What changed:** 
+1. Added a "↺ Reset" button to the top-right corner of the behavior popover which immediately resets all slider values back to their defaults (Visual: 0.75, Mechanics: 0.50, Logic: 0.25, Data: 0.10, Security: 0.00). 
+2. Increased the `flex` container height from `120px` to `140px` and adjusted margins to prevent the top of the columns and labels from overflowing and overlapping the "Session Overrides" description text.
+
+**Why:** The user noted that the slider components were overlapping the header text inside the popover layout, making it visually unappealing. They also requested a quick way to restore the original baseline defaults without dragging every slider back into place.
+
+**Risk:** Low. Pure UI and client-side event updates.
+
+---
+
+## Fix — Jun 23, 2026: AI Behavior Panel Button Visibility
 - `src/ui/panels/chat/chatPanelHeaderRender.ts` (redivivus) — Extracted behavior panel button from `hasProjectOpen` guard into universal pills section.
 
 **What changed:** 

@@ -8,10 +8,15 @@ export function buildBehaviorPopoverScript(): string {
       behaviorPopover.style.cssText = 'display:none;position:absolute;top:40px;right:10px;background:var(--vscode-editor-background);border:1px solid var(--vscode-focusBorder);border-radius:8px;padding:12px;box-shadow:0 8px 32px rgba(0,0,0,0.35);z-index:9999;width:320px;';
       
       const content = \`
-        <div style="font-size:12px; font-weight:bold; margin-bottom:4px;">🎛️ AI Behavior Panel</div>
-        <div style="font-size:10px; color:var(--vscode-descriptionForeground); margin-bottom:12px;">Session Overrides (resets on new chat)</div>
-        <div style="display:flex; justify-content:space-between; gap:4px; height:120px; align-items:flex-end;">
-          <div style="display:flex; flex-direction:column; justify-content:space-between; height:100%; font-size:9px; color:var(--vscode-descriptionForeground); text-align:right; padding-right:4px; padding-bottom:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+          <div>
+            <div style="font-size:12px; font-weight:bold; margin-bottom:4px;">🎛️ AI Behavior Panel</div>
+            <div style="font-size:10px; color:var(--vscode-descriptionForeground); margin-bottom:12px;">Session Overrides (resets on new chat)</div>
+          </div>
+          <button id="pop-therm-reset" title="Reset to defaults" style="background:transparent; border:none; color:var(--vscode-descriptionForeground); cursor:pointer; font-size:12px; padding:2px; opacity:0.8;">↺ Reset</button>
+        </div>
+        <div style="display:flex; justify-content:space-between; gap:4px; height:140px; align-items:flex-end;">
+          <div style="display:flex; flex-direction:column; justify-content:space-between; height:100px; font-size:9px; color:var(--vscode-descriptionForeground); text-align:right; padding-right:4px; margin-bottom:28px;">
             <div>🔥 Experimental</div>
             <div>Creative</div>
             <div>Balanced</div>
@@ -19,10 +24,10 @@ export function buildBehaviorPopoverScript(): string {
             <div>❄️ Consistent</div>
           </div>
           \${renderPopTherm('visual', '🎨', 'Visual', '0.75')}
-          \${renderPopTherm('mechanics', '⚙️', 'Mechanics', '0.5')}
+          \${renderPopTherm('mechanics', '⚙️', 'Mechanics', '0.50')}
           \${renderPopTherm('logic', '🧠', 'Logic', '0.25')}
-          \${renderPopTherm('data', '🗄️', 'Data', '0.1')}
-          \${renderPopTherm('security', '🔒', 'Security', '0.0', true)}
+          \${renderPopTherm('data', '🗄️', 'Data', '0.10')}
+          \${renderPopTherm('security', '🔒', 'Security', '0.00', true)}
         </div>
       \`;
       
@@ -49,6 +54,20 @@ export function buildBehaviorPopoverScript(): string {
       const btn = e.target.closest('#header-behavior-btn');
       if (btn) {
         behaviorPopover.style.display = behaviorPopover.style.display === 'none' ? 'block' : 'none';
+        return;
+      }
+      if (e.target.closest('#pop-therm-reset')) {
+        const defaults = { visual: 0.75, mechanics: 0.50, logic: 0.25, data: 0.10, security: 0.00 };
+        Object.keys(defaults).forEach(d => {
+          const fill = document.getElementById('pop-therm-' + d);
+          const label = document.getElementById('pop-therm-label-' + d);
+          if (fill && label) {
+            fill.style.height = (defaults[d] * 100) + '%';
+            fill.dataset.val = defaults[d].toFixed(2);
+            label.innerText = defaults[d].toFixed(2);
+          }
+        });
+        vscode.postMessage({ type: 'session-override-temperature', temperature: defaults });
         return;
       }
       if (!e.target.closest('#behavior-popover')) {
