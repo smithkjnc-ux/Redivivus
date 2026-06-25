@@ -69,6 +69,17 @@ export async function routeCloudChatResult(
     if (turnCtx?.hint) { turnCtx.hint.action = 'fix'; }
   }
 
+  // [FIX] Low-confidence build guard: if the classifier is not confident this is a build request
+  // (confidence < 0.75), treat it as a clarify instead of launching the build pipeline immediately.
+  // Prevents casual questions that sound vaguely buildable from triggering a full blueprint+build.
+  // High-confidence builds (explicit 'build me a X', 'create a Y') pass straight through.
+  if (chatResult.action === 'build' && typeof chatResult.confidence === 'number' && chatResult.confidence < 0.75) {
+    fixLog(`[LOW-CONF-BUILD] confidence=${chatResult.confidence} < 0.75 — routing to clarify instead of build`);
+    chatResult.action = 'clarify';
+    chatResult.text = chatResult.text || `Just to confirm — did you want me to build something? If so, what would you like me to create?`;
+    if (turnCtx?.hint) { turnCtx.hint.action = 'clarify'; }
+  }
+
   // ── Cost / byline helpers ──
   const PROVIDER_LABEL: Record<string, string> = { claude: 'Claude', gemini: 'Gemini', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };
   const _m = chatResult.model || '', _pr = PROVIDER_LABEL[chatResult.provider] ?? 'Claude';
