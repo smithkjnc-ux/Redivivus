@@ -31,8 +31,7 @@ export function renderArchitectActions(reviewId: string): string {
     + `<div style="font-size:10px;font-weight:700;margin-bottom:8px;color:var(--vscode-descriptionForeground);">ARCHITECT REVIEW</div>`
     + perActionBtns
     + `<div style="display:flex;gap:6px;flex-wrap:wrap;">`
-    + `<button style="${btn}background:#0e639c;color:#fff;border-color:#0e639c;" data-arch-action="fix-all" data-review-id="${rid}">Fix All</button>`
-    + `<button style="${btn}background:rgba(168,85,247,0.12);color:#a855f7;border-color:rgba(168,85,247,0.4);" data-arch-action="deep-fix" data-review-id="${rid}" title="Routes each fix through the full Supervisor→Worker→Guardian pipeline with retry logic">Deep Fix</button>`
+    + `<button style="${btn}background:#0e639c;color:#fff;border-color:#0e639c;" data-arch-action="fix-all" data-review-id="${rid}">Fix</button>`
     + `<button style="${btn}background:transparent;color:var(--vscode-descriptionForeground);border-color:transparent;" data-arch-action="dismiss">Dismiss</button>`
     + `</div></div>`;
 }
