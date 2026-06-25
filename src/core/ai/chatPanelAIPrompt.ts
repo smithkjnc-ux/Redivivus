@@ -98,6 +98,8 @@ Vault: The user's personal code library. Every time Redivivus builds something, 
 
 Save Point: A complete snapshot of all project files at a moment in time. The user can click "Save Point" before making risky changes. Redivivus also creates automatic save points before every AI build.
 
+Undo Build: After every AI build, a "Undo Build" button appears in chat. Clicking it restores all files to their state before that build. Powered by the build_history.json log. Use this if the AI broke something.
+
 Quality Review: Every piece of code Redivivus generates is reviewed by a second AI pass before it is written to disk. This internal review checks for bugs, broken imports, hallucinations, and scope drift. Nothing lands on disk until it passes.
 
 Tokens: The unit AI services use to measure text. Roughly 750 words equals 1000 tokens. Commercial AI APIs (Claude, Gemini, GPT-4o) charge per token -- typically fractions of a cent. Redivivus shows the token count and dollar cost of every operation in the status bar. Groq is free for simple tasks.
@@ -107,6 +109,34 @@ Sessions: A tracked work period with a goal. When the user starts a session ("I'
 AI Behavior Panel: A panel in the Redivivus chat header (the thermometer icon) that lets the user tune how creative or conservative the AI is for different parts of their project. There are five domains — Visual, Mechanics, Logic, Data, and Security — each with a slider from 0 (fully consistent, deterministic) to 1 (highly creative, experimental). Visual controls UI, colors, animations and layout. Mechanics controls game logic, physics and interaction. Logic controls algorithms and data flow. Data controls data structures and persistence. Security is always locked at 0 — security code must be fully deterministic with zero creativity. These session overrides reset on each new chat. The full panel is also accessible from the Files tab.
 
 Multi-AI routing: Redivivus ranks AI providers by capability and cost. It automatically selects the best available AI for each task and falls back to the next one if the preferred AI is out of credits, rate-limited, or slow. The user never has to manually switch AIs.
+
+Adaptive AI pill: The pill in the bottom-left of the chat input shows which AI will handle the next message, assessed live as the user types. Clicking it opens a picker to manually lock a specific provider for the session.
+
+Build Mode: Two modes for building — Guided (full blueprint interview before any code is written, best for new projects) and Auto (AI starts building immediately with no questions, best for quick tasks). The current mode shows as a badge in the header. Click it to switch.
+
+Assist Mode: A lightweight mode for existing projects that were not created with Redivivus. In Assist Mode, Redivivus runs silently — no code annotations, no roadmap injected, no blueprint required. Shown as an "Assist Mode" badge. The user can upgrade to full Redivivus Mode at any time.
+
+Preview panel: A live browser preview embedded in the Redivivus panel. When a web project is open, a Preview button appears in the header. The preview has device switching (mobile 390px, tablet 768px, desktop full width), a URL bar, a refresh button, and three special modes: Inspect (click any element to select it, then describe changes to Redivivus in plain English), Hidden (reveals display:none elements for selection), and Move (drag elements to reorder within the same container). A Visual Editor drawer (Edit button) lets the user change colors, text and layout inline with Plain or Pro mode.
+
+Convert to PWA: A button that converts any web project into an installable Progressive Web App. After conversion, the user gets a QR code and a link to install the app on any device — phone, tablet, or computer.
+
+Run: Runs the project the way it really runs — web projects open in the default browser, scripts and backend code open in a terminal. The Run button is context-aware: it shows "Preview" for web projects and "Run" for backend/script projects.
+
+Activity: Shows a log of the AI pipeline steps for the most recent build — what was planned, what was written, what was reviewed. Each step is expandable to see the actual work done.
+
+Health: Monitors the status of Redivivus's connections — network, AI provider keys, account status, and build log statistics. The Health button turns green (all good), yellow (degraded), or red (something is down).
+
+Memory: Shows what Redivivus has learned about the user and the current project — preferences, code style, naming conventions, past decisions. This context is injected into every AI call so responses stay consistent.
+
+Usage: Tracks token counts and dollar cost per-project and per-session. The Usage button in the header shows the project's running total. Click for a breakdown by AI provider.
+
+Progress style: A toggle pill in the chat input bar (Plain / Technical). Plain English shows friendly build progress summaries. Technical shows detailed step-by-step pipeline progress. Click to switch at any time.
+
+GitHub commit: After a successful build, a "Commit + Push to GitHub" button appears. One click stages all changed files, commits with an auto-generated message, and pushes to the remote. Requires GitHub to be configured.
+
+Production readiness check: A preflight check that runs before shipping. It scans the project for common issues — missing error handling, exposed secrets, broken imports, TODO items, large files — and gives a prioritized list of things to fix.
+
+Blueprint interview: A structured interview that captures the five questions every project needs answered: Who is this for? What does it do? Where does it run? When should it be done? Why does it exist? The blueprint is the AI's north star for every build and fix.
 
 Quality Gate: An internal marker Redivivus uses to confirm generated code has passed its quality review. Users never need to worry about this -- Redivivus handles it automatically.
 
