@@ -10,13 +10,17 @@ import { getSystemPrompt } from './chatPanelAIPrompt';
 import { buildProjectAnnotationContext } from '../project/chatPanelProjectContext';
 import { Redivivus_WORKER_RULES } from '../../services/ai/redivivusWorkerRules';
 import { extractFileMentions } from '../project/chatPanelFileContext';
+import { getActiveProjectRoot } from '../../services/project/activeProjectRoot';
 import { selectRelevantTurns } from './contextSelector';
 
 /** Builds the AI prompt prefix — question path gets Redivivus identity + annotations, code gen gets focused prompt
  *  isConvert: true = code generation (convert/build). false or undefined = Q&A (always conversational). */
 export async function buildAIPrefix(redivivus: RedivivusService, recentMessages: string[] = [], routing?: any, fullConversation?: Array<{role: string; content: string}>, userText?: string, isConvert?: boolean): Promise<string> {
   const config = redivivus.isInitialized() ? redivivus.loadConfig() : null;
-  const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'none';
+  // [FIX] Use getActiveProjectRoot() so we resolve to chess-ai-game, not the projects container.
+  // vscode.workspace.workspaceFolders[0] points at the container (~/projects/games) when Model A
+  // is active, causing resolveSourceFiles to scan ALL projects instead of the active one.
+  const workspaceRoot = getActiveProjectRoot({ redivivus }) || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || 'none';
   const bp = config?.blueprint;
 
   // [Redivivus] Code gen prompt ONLY for explicit convert/build paths (isConvert=true).
