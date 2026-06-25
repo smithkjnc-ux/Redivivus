@@ -70,50 +70,6 @@ export function enrichDepsWithCritiques(deps: MessageHandlerDeps, critiques: str
   return { ...deps, routing: enrichedRouting };
 }
 
-/** Phase 2.5 — Supervisor verifies the Worker's logic. Returns a directive for the loop:
- *  'pass' → continue to Guardian; 'retry' → loop again; 'fail' → caller throws (rejected after N tries).
- *  Pushes critiques in place; `forceSurgical` is true when a truncation was detected. */
-export async function runVerifyStep(p: {
-  diagnosis: string; workerResponse: string; deps: MessageHandlerDeps; root: string;
-  conversation: any[]; supervisorLabel: string; attempt: number; maxRetries: number; critiques: string[];
-}): Promise<{ action: 'pass' | 'retry' | 'fail'; message?: string; forceSurgical: boolean; verifySuggestion?: string }> {
-  const { diagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques } = p;
-  let forceSurgical = false;
-  try {
-    const { runSupervisorVerify } = await import('./chatPanelMsgFixVerify.js');
-    const userRequest = conversation.map(m => m.role === 'user' ? m.content : '').filter(Boolean).pop() || 'Fix the issue';
-    fixLog(`Supervisor verify (attempt ${attempt + 1}): Starting...`);
-    const verifyResult = await runSupervisorVerify(diagnosis, workerResponse, userRequest, deps, root);
-    fixLog(`Supervisor verify result`, { passed: verifyResult.passed, issues: verifyResult.issues });
-
-    if (!verifyResult.passed) {
-      const logicIssue = verifyResult.issues.join('; ') || 'Logic does not match intent';
-      const verifySuggestion = verifyResult.suggestion;
-      critiques.push(`[SUPERVISOR LOGIC CHECK] ${logicIssue}`);
-      fixLog(`Supervisor REJECTED Worker logic (attempt ${attempt + 1})`, { issue: logicIssue.substring(0, 300) });
-      fixActStep({ phase: 'supervisor', status: 'fix', label: "Checked the fix — it didn't match the intent, retrying", detail: logicIssue });
-
-      if (isTruncationText(logicIssue) && attempt < maxRetries) {
-        forceSurgical = true;
-        fixLog(`[TRUNCATION DETECTED] Switching to surgical format for retry ${attempt + 2}`);
-        critiques.push(`[FORMAT CHANGE] Previous attempt used FULL FILE but output was truncated. Use SURGICAL EDITS (SEARCH/REPLACE) instead for reliability.`);
-      }
-
-      if (attempt < maxRetries) {
-        conversation[conversation.length - 1].content =
-          `Supervisor (${supervisorLabel}): done\nWorker: rejected — "${logicIssue.slice(0, 80)}" — retrying...\nVerify: pending\nGuardian: pending`;
-        return { action: 'retry', forceSurgical, verifySuggestion };
-      }
-      return { action: 'fail', message: logicIssue, forceSurgical, verifySuggestion };
-    }
-    fixActStep({ phase: 'supervisor', status: 'pass', label: 'Checked — the fix matches what you asked for' });
-    return { action: 'pass', forceSurgical, verifySuggestion: undefined };
-  } catch (e: any) {
-    if (e.message?.startsWith('Supervisor rejected Worker output')) { throw e; }
-    fixLog(`Supervisor verify skipped (error): ${e?.message || e}`);
-    return { action: 'pass', forceSurgical };
-  }
-}
 
 /** Renders the Guardian verdict row + records its usage. Returns the derived guardianLabel + scopeNote. */
 export function renderGuardianVerdict(p: {

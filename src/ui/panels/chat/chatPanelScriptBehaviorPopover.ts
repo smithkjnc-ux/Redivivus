@@ -54,27 +54,36 @@ export function buildBehaviorPopoverScript(): string {
         if (col) { tipDiv.style.display = 'none'; }
       });
 
+      const iconKnobs = String.fromCodePoint(0x1F39B, 0xFE0F);
+      const iconFire = String.fromCodePoint(0x1F525);
+      const iconSnow = String.fromCodePoint(0x2744, 0xFE0F);
+      const iconPalette = String.fromCodePoint(0x1F3A8);
+      const iconGear = String.fromCodePoint(0x2699, 0xFE0F);
+      const iconBrain = String.fromCodePoint(0x1F9E0);
+      const iconCabinet = String.fromCodePoint(0x1F5C4, 0xFE0F);
+      const iconLock = String.fromCodePoint(0x1F512);
+
       const content = \`
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <div>
-            <div style="font-size:12px; font-weight:bold; margin-bottom:4px;">🎛️ AI Behavior Panel</div>
+            <div style="font-size:12px; font-weight:bold; margin-bottom:4px;">\${iconKnobs} AI Behavior Panel</div>
             <div style="font-size:10px; color:var(--vscode-descriptionForeground); margin-bottom:12px;">Session Overrides (resets on new chat)</div>
           </div>
-          <button id="pop-therm-reset" title="Reset to defaults" style="background:transparent; border:none; color:var(--vscode-descriptionForeground); cursor:pointer; font-size:12px; padding:2px; opacity:0.8;">↺ Reset</button>
+          <button id="pop-therm-reset" title="Reset to defaults" style="background:transparent; border:none; color:var(--vscode-descriptionForeground); cursor:pointer; font-size:12px; padding:2px; opacity:0.8;">&#x21BA; Reset</button>
         </div>
         <div style="display:flex; justify-content:space-between; gap:4px; height:140px; align-items:flex-end;">
           <div style="display:flex; flex-direction:column; justify-content:space-between; height:100px; font-size:9px; color:var(--vscode-descriptionForeground); text-align:right; padding-right:4px; margin-bottom:28px;">
-            <div>🔥 Experimental</div>
+            <div>\${iconFire} Experimental</div>
             <div>Creative</div>
             <div>Balanced</div>
             <div>Stable</div>
-            <div>❄️ Consistent</div>
+            <div>\${iconSnow} Consistent</div>
           </div>
-          \${renderPopTherm('visual', '🎨', 'Visual', '0.75')}
-          \${renderPopTherm('mechanics', '⚙️', 'Mechanics', '0.50')}
-          \${renderPopTherm('logic', '🧠', 'Logic', '0.25')}
-          \${renderPopTherm('data', '🗄️', 'Data', '0.10')}
-          \${renderPopTherm('security', '🔒', 'Security', '0.00', true)}
+          \${renderPopTherm('visual', iconPalette, 'Visual', '0.75')}
+          \${renderPopTherm('mechanics', iconGear, 'Mechanics', '0.50')}
+          \${renderPopTherm('logic', iconBrain, 'Logic', '0.25')}
+          \${renderPopTherm('data', iconCabinet, 'Data', '0.10')}
+          \${renderPopTherm('security', iconLock, 'Security', '0.00', true)}
         </div>
       \`;
       

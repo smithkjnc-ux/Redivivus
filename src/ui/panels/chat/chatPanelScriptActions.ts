@@ -126,7 +126,7 @@ export function buildActionsScript(): string {
         var raw=''; try{raw=decodeURIComponent(escape(atob(fwdBtn.getAttribute('data-fwd')||fwdBtn.getAttribute('data-copy')||'')));}catch(e){}
         if (fwdBtn.hasAttribute('data-copy')) {
           try{navigator.clipboard.writeText(raw);}catch(e){var t=document.createElement('textarea');t.value=raw;document.body.appendChild(t);t.select();document.execCommand('copy');document.body.removeChild(t);}
-          var orig=fwdBtn.textContent; fwdBtn.textContent='✓'; setTimeout(function(){fwdBtn.textContent=orig;},1200);
+          var orig=fwdBtn.textContent; fwdBtn.textContent='\\u2713'; setTimeout(function(){fwdBtn.textContent=orig;},1200);
         } else {
           var inp=document.getElementById('message-input'); if(inp){inp.value=raw;inp.focus();inp.style.height='auto';inp.style.height=inp.scrollHeight+'px';}
         }

@@ -38,6 +38,105 @@ export async function runGuardianReview(ctx: BuildContext, code: string, relPath
   }
 }
 
+export async function runStaticCompilationGate(code: string, absPath: string, root: string, isMod: boolean): Promise<string | null> {
+  // Only run for JS/TS files
+  if (!['.ts', '.tsx', '.js', '.jsx'].some(e => absPath.endsWith(e))) { return null; }
+  
+  const fs = await import('fs');
+  const path = await import('path');
+  const { runCompileCheck } = await import('../../services/build/compileRunner.js');
+  
+  let originalContent: string | null = null;
+  const fileExists = fs.existsSync(absPath);
+  
+  if (fileExists) {
+    try { originalContent = fs.readFileSync(absPath, 'utf8'); } catch {}
+  }
+  
+  try {
+    // Write the new code to disk temporarily
+    const dir = path.dirname(absPath);
+    if (!fs.existsSync(dir)) { fs.mkdirSync(dir, { recursive: true }); }
+    fs.writeFileSync(absPath, code, 'utf8');
+    
+    // Run the deterministic compile check
+    const result = runCompileCheck(root);
+    
+    // If it fails, extract the relevant error
+    if (!result.success) {
+      // Find the specific error for this file to avoid massive error dumps
+      const relPath = path.relative(root, absPath);
+      const lines = result.output.split('\n');
+      const fileErrors = lines.filter(l => l.includes(relPath));
+      if (fileErrors.length > 0) {
+        return `Compilation error in ${relPath}:\n${fileErrors.join('\n').slice(0, 500)}`;
+      }
+      return `Compilation error:\n${result.output.slice(0, 500)}`;
+    }
+    return null; // Passed compilation
+  } finally {
+    // Perfect revert
+    try {
+      if (originalContent !== null) {
+        fs.writeFileSync(absPath, originalContent, 'utf8');
+      } else if (!isMod && fileExists) {
+        // If it was a new file, we created it just for this check. Delete it.
+        fs.unlinkSync(absPath);
+      }
+    } catch {}
+  }
+}
+
+export async function runStaticCompilationGateForFix(workerResponse: string, root: string): Promise<string | null> {
+  const fs = await import('fs');
+  const path = await import('path');
+  const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits } = await import('../../services/build/surgicalEditService.js');
+  const { runCompileCheck } = await import('../../services/build/compileRunner.js');
+
+  const format = detectResponseFormat(workerResponse);
+  if (format !== 'surgical') {
+    return null; // Skip static check for full-file fixes for now as file routing is ambiguous
+  }
+
+  const edits = parseSurgicalEdits(workerResponse);
+  if (edits.length === 0) { return null; }
+
+  // Snapshot original file states
+  const snapshots = new Map<string, string>();
+  for (const edit of edits) {
+    const absPath = path.join(root, edit.filePath);
+    if (fs.existsSync(absPath) && !snapshots.has(absPath)) {
+      snapshots.set(absPath, fs.readFileSync(absPath, 'utf8'));
+    }
+  }
+
+  try {
+    const results = applySurgicalEdits(edits, root);
+    const failed = results.find(r => !r.success);
+    if (failed) {
+      return `Surgical edit failed to apply to ${failed.filePath}: ${failed.error}`;
+    }
+
+    const result = runCompileCheck(root);
+    if (!result.success) {
+      // Find errors relevant to touched files
+      const relPaths = [...new Set(edits.map(e => e.filePath))];
+      const lines = result.output.split('\n');
+      const relevantErrors = lines.filter(l => relPaths.some(rp => l.includes(rp)));
+      if (relevantErrors.length > 0) {
+        return `Compilation error after fix:\n${relevantErrors.join('\n').slice(0, 500)}`;
+      }
+      return `Compilation error:\n${result.output.slice(0, 500)}`;
+    }
+    return null;
+  } finally {
+    // Perfect revert
+    for (const [absPath, content] of snapshots) {
+      try { fs.writeFileSync(absPath, content, 'utf8'); } catch {}
+    }
+  }
+}
+
 export async function runStaticValidation(code: string, relPath: string): Promise<string> {
   try {
     const { validateCode } = await import('../../services/code/codeValidator.js');

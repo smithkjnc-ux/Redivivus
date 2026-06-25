@@ -63,7 +63,13 @@ export async function runCodeReviewPipeline(
   absPath: string,
   root: string,
   spec: string | null,
+  isMod: boolean,
 ): Promise<{ code: string; qualityScore: number }> {
+  const compileError = await Review.runStaticCompilationGate(code, absPath, root, isMod);
+  if (compileError) {
+    throw new Error(`[COMPILATION ERROR] Static validation failed: ${compileError}`);
+  }
+
   const reviewResult = await Review.runGuardianReview(ctx, code, relPath, spec);
   let reviewed = reviewResult.code;
   reviewed = await Review.runStaticValidation(reviewed, relPath);

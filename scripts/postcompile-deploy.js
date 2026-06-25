@@ -58,12 +58,13 @@ try {
   }
 } catch {}
 
-// Also sync to any installed redivivus extension in ~/.vscode/extensions/ and ~/.redivivus/extensions/.
+// Also sync to any installed redivivus extension in ~/.redivivus/extensions/.
+// [WARN] DO NOT deploy to ~/.vscode/extensions/ — that path is NOT used by the running IDE.
 // [C2] ~/.redivivus MUST equal product.json `dataFolderName` ('.redivivus', set by
 // scripts/debrand-linux-product.js) — that is the folder the running Linux IDE reads user-installed
 // extensions from, and where the auto-updater's `--install-extension` lands a new VSIX. If the
 // debrand ever sets a different dataFolderName, update this path to match or updates won't be seen.
-for (const extRoot of [path.join(home, '.vscode', 'extensions'), path.join(home, '.redivivus', 'extensions')]) {
+for (const extRoot of [path.join(home, '.redivivus', 'extensions')]) {
   if (!fs.existsSync(extRoot)) continue;
   for (const entry of fs.readdirSync(extRoot)) {
     if (/^papajoe\.redivivus-/.test(entry)) {
@@ -76,10 +77,22 @@ let deployed = 0;
 for (const target of deployTargets) {
   if (!fs.existsSync(target)) { continue; }
   try {
-    execSync(`rsync -a --delete "${path.join(workspaceRoot, 'out')}/" "${path.join(target, 'out')}/"`, { stdio: 'pipe' });
-    execSync(`cp "${path.join(workspaceRoot, 'package.json')}" "${target}/"`, { stdio: 'pipe' });
-    if (fs.existsSync(path.join(workspaceRoot, 'resources'))) {
-      execSync(`rsync -a --delete "${path.join(workspaceRoot, 'resources')}/" "${path.join(target, 'resources')}/"`, { stdio: 'pipe' });
+    const targetOut = path.join(target, 'out');
+    if (fs.existsSync(targetOut)) {
+      try { fs.chmodSync(targetOut, 0o777); } catch {} // attempt to ensure writable before delete
+      fs.rmSync(targetOut, { recursive: true, force: true });
+    }
+    fs.cpSync(path.join(workspaceRoot, 'out'), targetOut, { recursive: true });
+    fs.cpSync(path.join(workspaceRoot, 'package.json'), path.join(target, 'package.json'), { force: true });
+    
+    const workspaceResources = path.join(workspaceRoot, 'resources');
+    const targetResources = path.join(target, 'resources');
+    if (fs.existsSync(workspaceResources)) {
+      if (fs.existsSync(targetResources)) {
+        try { fs.chmodSync(targetResources, 0o777); } catch {}
+        fs.rmSync(targetResources, { recursive: true, force: true });
+      }
+      fs.cpSync(workspaceResources, targetResources, { recursive: true });
     }
     deployed++;
   } catch (e) {

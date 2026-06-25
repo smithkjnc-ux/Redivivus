@@ -148,7 +148,7 @@ export async function runSingleFileBuild(ctx: BuildContext): Promise<void> {
 
   const code = Inf.extractCodeFromResponse(res.text);
   const _grdT0 = Date.now(); const _grdSid = tracer.step('GUARDIAN', undefined, relPath);
-  const reviewResult = await runCodeReviewPipeline(ctx, code, relPath, absPath, root, spec);
+  const reviewResult = await runCodeReviewPipeline(ctx, code, relPath, absPath, root, spec, isMod);
   const reviewedCode = reviewResult.code;
   tracer.done(_grdSid, 'success', Date.now() - _grdT0, 'review complete');
   // [FIX] Transparent Guardian — show review result to user instead of swallowing it

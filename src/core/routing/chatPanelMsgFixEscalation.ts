@@ -7,10 +7,14 @@ import { fixLog } from '../../services/logging/fixPipelineLogger';
 import { fixActStep, fixActCode } from './fixActivityPanel.js';
 import { progressEscalating, progressRetrying } from '../../services/ui/fixProgressStyle.js';
 import {
-  updateStatus, enrichDepsWithCritiques, runVerifyStep, renderGuardianVerdict,
+  updateStatus, enrichDepsWithCritiques, renderGuardianVerdict,
   represcribeAfterRejection, logExhaustedDeadEnd, isTruncationText,
   type EscalationResult,
 } from './chatPanelMsgFixEscalationUtils.js';
+import { runSupervisorSelfFix } from './chatPanelMsgFixSelfFix.js';
+import { runGuardianPhase } from './chatPanelMsgFixGuardianPhase.js';
+import { runWorkerPhase } from './chatPanelMsgFixWorkerPhase.js';
+import { runVerifyPhase } from './chatPanelMsgFixVerifyPhase.js';
 // [DONE] EscalationResult interface moved to chatPanelMsgFixEscalationUtils.ts (Rule 9 split)
 export type { EscalationResult } from './chatPanelMsgFixEscalationUtils.js';
 
@@ -60,36 +64,12 @@ export async function runEscalationLoop(params: {
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     // ── Phase 2: Worker generates fix ──
-    if (!escalated && !originalWorkerProvider) {
-      try { originalWorkerProvider = deps.routing.selectSupervisorAndWorker().worker || ''; } catch { /* ignore */ }
-    }
-    updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated);
-    refresh();
-    // [FIX-ACTIVITY] Live Worker row — its code streams into this row's code block (live:true).
-    fixActStep({ phase: 'worker', status: 'running', live: true,
-      label: attempt > 0 ? `Rewriting the fix (retry ${attempt})` : 'Writing the fix' });
-
-    try {
-      const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
-      // Inject accumulated critiques into the worker context for retries
-      const enrichedDeps = attempt > 0 ? enrichDepsWithCritiques(deps, accumulatedCritiques) : deps;
-      let streamBytes = 0;
-      const onChunk = (chunk: string) => {
-        streamBytes += chunk.length;
-        updateStatus(conversation, supervisorLabel, 'worker', attempt, escalated, streamBytes);
-        fixActCode(chunk); // [FIX-ACTIVITY] stream the Worker's fix into the panel live
-        refresh();
-      };
-      // [STAGE 2] Use currentDiagnosis (may be updated by re-prescription)
-      const p2 = await runPhase2Worker(currentDiagnosis, fileNames, filesBlock, activePatterns, enrichedDeps, root, onChunk, escalated, forceSurgical);
-      if (!p2) { throw new Error('Worker returned null'); }
-      workerResponse = p2.workerResponse;
-      workerLabel = p2.workerLabel;
-      // [FIX-ACTIVITY] Worker done — mark the row complete (the streamed code stays as its detail).
-      fixActStep({ phase: 'worker', status: 'pass', label: 'Fix written', model: workerLabel });
-    } catch (err) {
-      throw new Error(`Worker phase failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
+    const workerPhaseResult = await runWorkerPhase({
+      escalated, originalWorkerProvider, deps, conversation, supervisorLabel, attempt, refresh, accumulatedCritiques, currentDiagnosis, fileNames, filesBlock, activePatterns, root, forceSurgical
+    });
+    workerResponse = workerPhaseResult.workerResponse;
+    workerLabel = workerPhaseResult.workerLabel;
+    originalWorkerProvider = workerPhaseResult.originalWorkerProvider;
 
     // ── Check for Trivial Fast-Path ──
     const isTrivial = currentDiagnosis.includes('[TRIVIAL: SKIP REVIEW]');
@@ -100,181 +80,56 @@ export async function runEscalationLoop(params: {
     }
 
     // ── Phase 2.5: Supervisor verifies Worker logic ──
-    // [SELF-FIX] Skip Verify when escalated — Supervisor wrote this fix itself, so Verify
-    // would be grading its own homework. Guardian is the only independent gate here.
-    if (!escalated) {
-      updateStatus(conversation, supervisorLabel, 'verify', attempt, escalated);
-      refresh();
-      const verify = await runVerifyStep({ diagnosis: currentDiagnosis, workerResponse, deps, root, conversation, supervisorLabel, attempt, maxRetries, critiques: accumulatedCritiques });
-      if (verify.forceSurgical) { forceSurgical = true; }
-      if (verify.verifySuggestion && verify.verifySuggestion.length > 20) {
-        accumulatedCritiques.push(`[VERIFY SUGGESTED APPROACH] ${verify.verifySuggestion.slice(0, 500)}`);
-        fixLog(`[VERIFY-HINT] Stashed Verify suggestion into critiques (${verify.verifySuggestion.length} chars)`);
-      }
-      if (verify.action === 'fail') {
-        // [SELF-FIX] Worker exhausted all Verify attempts — route to Supervisor self-fix
-        // instead of throwing, same as Guardian exhaustion path.
-        fixLog(`[VERIFY-EXHAUSTED] Worker failed all ${maxRetries + 1} Verify checks — routing to Supervisor self-fix`);
-        escalated = true;
-        logExhaustedDeadEnd(root, accumulatedCritiques, attempt, maxRetries, false);
-        try {
-          const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
-          const failureSummary = accumulatedCritiques
-            .filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'))
-            .map((c, i) => `Attempt ${i + 1} failed: ${c.slice(0, 200)}`).join('\n');
-          const verifySuggestions = accumulatedCritiques
-            .filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'))
-            .map(c => c.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 400)).join('\n');
-          // Build a diagnosis that IS the correct approach — Worker prompt on Supervisor model
-          const selfFixDiagnosis = `${currentDiagnosis}\n\n[SELF-FIX — SUPERVISOR MODEL WRITING DIRECTLY]\nWORKER_TIER: ultra\nAll previous Worker attempts failed. You are the Supervisor model writing the fix yourself.\nUse SURGICAL SEARCH/REPLACE edits ONLY — do NOT rewrite entire files.\nPrevious attempts failed because:\n${failureSummary}${verifySuggestions ? `\n\nThe correct approach (from Verify analysis):\n${verifySuggestions}\nImplement this exactly using surgical edits.` : ''}`;
-          fixActStep({ phase: 'supervisor', status: 'running', label: 'Worker exhausted — Supervisor writing fix directly' });
-          conversation[conversation.length - 1].content = progressEscalating({ supervisorLabel });
-          refresh();
-          const selfFix = await runPhase2Worker(selfFixDiagnosis, fileNames, filesBlock, activePatterns, deps, root, undefined, true /* escalated=Supervisor model */, forceSurgical);
-          if (selfFix?.workerResponse && selfFix.workerResponse.length > 50) {
-            workerResponse = selfFix.workerResponse;
-            workerLabel = selfFix.workerLabel || supervisorLabel;
-            fixActStep({ phase: 'worker', status: 'pass', label: 'Supervisor wrote fix directly', model: workerLabel });
-            fixLog(`[SUPERVISOR-SELF-FIX] Supervisor produced fix after Verify exhaustion (${workerResponse.length} chars)`);
-            guardianNote = `⚠️ Written by Supervisor directly after ${maxRetries + 1} Worker failures — please verify the fix worked as expected. If not, retry and past failures are logged.`;
-            supervisorSelfFixReady = true;
-            break; // exit loop — handled below before exhausted block
-          }
-        } catch (sfErr) {
-          fixLog(`[SUPERVISOR-SELF-FIX] Failed after Verify exhaustion: ${sfErr instanceof Error ? sfErr.message : String(sfErr)}`);
-        }
-        throw new Error(`Supervisor rejected Worker output after ${maxRetries + 1} attempts. Last issue: ${verify.message}`);
-      }
-      if (verify.action === 'retry') {
-        refresh(); continue;
-      }
+    const verifyPhaseResult = await runVerifyPhase({
+      escalated, conversation, supervisorLabel, attempt, refresh, currentDiagnosis, workerResponse, deps, root, maxRetries, accumulatedCritiques, forceSurgical, fileNames, filesBlock, activePatterns
+    });
+
+    forceSurgical = verifyPhaseResult.forceSurgical;
+    escalated = verifyPhaseResult.escalated;
+
+    if (verifyPhaseResult.action === 'error') throw verifyPhaseResult.error;
+    if (verifyPhaseResult.action === 'retry_loop') { refresh(); continue; }
+    if (verifyPhaseResult.action === 'break_loop') {
+      workerResponse = verifyPhaseResult.workerResponse;
+      workerLabel = verifyPhaseResult.workerLabel;
+      guardianNote = verifyPhaseResult.guardianNote;
+      supervisorSelfFixReady = true;
+      break;
     }
 
-    // ── Phase 3: Guardian reviews the fix ──
-    updateStatus(conversation, supervisorLabel, 'guardian', attempt, escalated);
-    refresh();
-
     try {
-      const userRequest = conversation.map(m => m.role === 'user' ? m.content : '').filter(Boolean).pop() || 'Fix the issue';
-      const guardianContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${currentDiagnosis}`;
-      fixLog(`Guardian review (attempt ${attempt + 1}): Starting...`);
-      fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
-      // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
-      // [SELF-FIX] When escalated, workerLabel is the Supervisor — use originalWorkerProvider so
-      // Guardian excludes the Worker (not the Supervisor that wrote the fix).
-      const guardianWorkerHint = escalated && originalWorkerProvider ? originalWorkerProvider : workerLabel.toLowerCase();
-      const guardianResult = await routing.guardianReview(guardianContext, workerResponse, guardianWorkerHint, '', deps.routingOverrides?.guardian);
-      fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
-      // [FIX] Distinguish a REAL guardian verdict from the "couldn't run on any provider" fallback. routingGuardian
-      // returns guardianAI:'none' when EVERY provider failed — that is NOT an approval, it's an unreviewed pass.
-      const guardianRan = !!guardianResult.guardianAI && guardianResult.guardianAI !== 'none';
-      const guardianProvider = guardianRan
-        ? guardianResult.guardianAI
-        : ((() => { try { return routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude');
+      // ── Phase 3: Guardian reviews the fix ──
+      updateStatus(conversation, supervisorLabel, 'guardian', attempt, escalated);
+      refresh();
 
-      const verdict = renderGuardianVerdict({ guardianRan, guardianResult, guardianProvider, workerResponse, root, deps });
-      guardianLabel = verdict.guardianLabel;
-      scopeNote = verdict.scopeNote;
+      const guardianPhaseResult = await runGuardianPhase({
+        conversation, supervisorLabel, attempt, escalated, currentDiagnosis, workerResponse, workerLabel, originalWorkerProvider, deps, root, maxRetries, userText, filesBlock, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, forceSurgical
+      });
 
-      // Hand off when the Guardian uses any of its explicit "this needs the Agent" phrasings.
-      if (guardianResult.issues?.some((issue: string) => /Simple Pipeline is insufficient|Routing to Agent|Agent Pipeline/i.test(issue))) {
-        needsAgentHandoff = true;
-        // [HANDOFF] Guardian says the simple pipeline can't do this → route to the Agent. Return NOW so
-        // runFixFinalize calls executeAgentHandoff (the live run_command Tool-Gap path) instead of burning
-        // Worker retries the Guardian already said can't succeed (the old bug: retried 3x, then died).
-        fixLog('Guardian routed to Agent Pipeline — handing off immediately (skipping Worker retries)');
-        guardianNote = `Guardian (${guardianLabel}): routing to Agent for environment verification`;
-        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated, forceSurgical };
-      }
-
-      if (guardianResult.passed) {
-        guardianNote = guardianRan
-          ? `Guardian (${guardianLabel}): Approved`
-          : `Guardian: skipped (no reviewer available — fix applied without final review)`;
-        fixLog(guardianRan ? `Guardian APPROVED the fix` : `Guardian SKIPPED (no provider) — fix passed through unreviewed`);
-        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical };
-      }
-
-      // Guardian rejected WITHOUT corrected text — accumulate critique and retry
-      const critique = guardianResult.issues?.join('; ') || 'Unknown issue';
-      accumulatedCritiques.push(critique);
-      fixLog(`Guardian REJECTED the fix (attempt ${attempt + 1})`, { critique: critique.substring(0, 300) });
-
-      // [SELF-FIX] If escalated (Supervisor wrote this fix), don't re-enter the Worker loop —
-      // the Worker already failed; retrying it makes no sense. Return with the warning note.
-      if (escalated) {
-        fixLog(`[SUPERVISOR-SELF-FIX] Guardian rejected Supervisor fix — returning with user warning`);
-        guardianNote = `⚠️ Written by Supervisor directly after Worker failures, but Guardian flagged issues: ${critique.slice(0, 200)}. Please review manually or retry.`;
-        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical };
-      }
-
-      // [FIX] Detect truncation errors and force surgical format on retry
-      if (isTruncationText(critique) && attempt < maxRetries) {
-        forceSurgical = true;
-        fixLog(`[TRUNCATION DETECTED] Switching to surgical format for retry ${attempt + 2}`);
-        accumulatedCritiques.push(`[FORMAT CHANGE] Previous attempt used FULL FILE but output was truncated. Use SURGICAL EDITS (SEARCH/REPLACE) instead for reliability.`);
-      }
-
-      // [STAGE 2] RE-PRESCRIPTION: Call Supervisor again with enriched context after Guardian rejection
-      const rp = await represcribeAfterRejection({ attempt, maxRetries, userText, root, filesBlock, currentDiagnosis, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, deps });
-      filesBlock = rp.filesBlock;
-      currentDiagnosis = rp.diagnosis;
-      // [FIX] Inject hard DO_NOT_MODIFY constraints into the diagnosis itself — files the Verify/Guardian
-      // said to leave untouched. This lives inside the diagnosis (the Worker's primary instruction source)
-      // rather than as a separate appended block, so it carries Supervisor-level authority.
-      {
-        const doNotFiles: string[] = [];
-        for (const c of accumulatedCritiques) {
-          const matches = c.matchAll(/(?:leaving|unchanged|do not (?:touch|modify)|should not (?:touch|modify)|must not (?:touch|modify)|only involve[^,]+,\s*leaving)\s+[`']?([\w./\\-]+\.[a-zA-Z0-9]{1,6})[`']?/gi);
-          for (const m of matches) { if (!doNotFiles.includes(m[1])) { doNotFiles.push(m[1]); } }
-        }
-        if (doNotFiles.length > 0) {
-          const constraint = `\n\n[WORKER CONSTRAINTS — ABSOLUTE]\nDO NOT MODIFY: ${doNotFiles.join(', ')}\nPrevious fix attempts failed because the Worker incorrectly modified these files. Your fix MUST leave them completely unchanged.`;
-          currentDiagnosis = currentDiagnosis + constraint;
-          fixLog(`[DIAG-CONSTRAINT] Injected DO_NOT_MODIFY into diagnosis: ${doNotFiles.join(', ')}`);
-        }
-      }
-      // [FIX] Re-prescription may return [AGENT_HANDOFF] — the outer guard in chatPanelMsgFix.ts only
-      // checks the original diagnosis, so this path was missed. The Worker receiving [AGENT_HANDOFF] as
-      // its prescription produces garbage on the next attempt. Break out and signal agent handoff instead.
-      if (/\[AGENT_HANDOFF\]/i.test(currentDiagnosis)) {
-        needsAgentHandoff = true;
-        fixLog('Re-prescription returned [AGENT_HANDOFF] — breaking out of escalation loop');
-        return { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote: 'Re-prescription routed to Agent pipeline', scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated };
+      if (guardianPhaseResult.action === 'return' && guardianPhaseResult.payload) {
+        return guardianPhaseResult.payload;
+      } else if (guardianPhaseResult.action === 'error') {
+        guardianNote = guardianPhaseResult.guardianNote;
+        return { finalResponse: workerResponse, workerLabel, guardianLabel: guardianPhaseResult.guardianLabel || 'skipped (error)', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical };
+      } else if (guardianPhaseResult.action === 'continue') {
+        forceSurgical = guardianPhaseResult.forceSurgical;
+        filesBlock = guardianPhaseResult.filesBlock;
+        currentDiagnosis = guardianPhaseResult.currentDiagnosis;
       }
 
       // If we've exhausted Worker retries — have the Supervisor write the fix directly
       if (attempt === maxRetries && !escalated) {
         escalated = true;
         fixLog(`[SUPERVISOR-SELF-FIX] Worker failed ${maxRetries + 1} times — Supervisor writing fix directly`);
-        fixActStep({ phase: 'supervisor', status: 'running', label: `Worker exhausted — Supervisor writing fix directly` });
-        conversation[conversation.length - 1].content = progressEscalating({ supervisorLabel });
-        refresh();
         // Log Worker failures to dead_ends + knowledge.json NOW — before self-fix — so they
         // persist even if the Supervisor self-fix passes Guardian and the loop returns success.
         logExhaustedDeadEnd(root, accumulatedCritiques, attempt, maxRetries, false);
-        try {
-          const { runPhase2Worker } = await import('./chatPanelMsgFixPhases.js');
-          const failureSummary = accumulatedCritiques
-            .filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'))
-            .map((c, i) => `Attempt ${i + 1} failed: ${c.slice(0, 200)}`).join('\n');
-          const verifySuggestions = accumulatedCritiques
-            .filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'))
-            .map(c => c.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 400)).join('\n');
-          // Use the Worker endpoint with escalated=true (Supervisor model) + a diagnosis that
-          // embeds the correct approach. Worker prompt is designed for surgical code output.
-          const selfFixDiagnosis = `${currentDiagnosis}\n\n[SELF-FIX — SUPERVISOR MODEL WRITING DIRECTLY]\nWORKER_TIER: ultra\nAll previous Worker attempts failed. You are the Supervisor model writing the fix yourself.\nUse SURGICAL SEARCH/REPLACE edits ONLY — do NOT rewrite entire files.\nPrevious attempts failed because:\n${failureSummary}${verifySuggestions ? `\n\nThe correct approach (from Verify analysis):\n${verifySuggestions}\nImplement this exactly using surgical edits.` : ''}`;
-          const selfFix = await runPhase2Worker(selfFixDiagnosis, fileNames, filesBlock, activePatterns, deps, root, undefined, true /* escalated=Supervisor model */, forceSurgical);
-          if (selfFix?.workerResponse && selfFix.workerResponse.length > 50) {
-            workerResponse = selfFix.workerResponse;
-            workerLabel = selfFix.workerLabel || supervisorLabel;
-            fixActStep({ phase: 'worker', status: 'pass', label: 'Supervisor wrote fix directly', model: workerLabel });
-            fixLog(`[SUPERVISOR-SELF-FIX] Supervisor produced fix (${workerResponse.length} chars)`);
-            guardianNote = `⚠️ Written by Supervisor directly after ${maxRetries + 1} Worker failures — please verify the fix worked as expected. If not, retry and past failures are logged.`;
-            continue; // go straight to Guardian (Verify skipped via escalated flag)
-          }
-        } catch (sfErr) {
-          fixLog(`[SUPERVISOR-SELF-FIX] Failed: ${sfErr instanceof Error ? sfErr.message : String(sfErr)}`);
+        const selfFixResult = await runSupervisorSelfFix({ currentDiagnosis, accumulatedCritiques, supervisorLabel, conversation, refresh, fileNames, filesBlock, activePatterns, deps, root, forceSurgical, maxRetries });
+        if (selfFixResult) {
+          workerResponse = selfFixResult.workerResponse;
+          workerLabel = selfFixResult.workerLabel;
+          guardianNote = `⚠️ Written by Supervisor directly after ${maxRetries + 1} Worker failures — please verify the fix worked as expected. If not, retry and past failures are logged.`;
+          continue; // go straight to Guardian (Verify skipped via escalated flag)
         }
         // Self-fix failed or returned nothing — fall through to exhausted
         break;
@@ -282,6 +137,7 @@ export async function runEscalationLoop(params: {
 
       // Log the retry in chat
       if (attempt < maxRetries) {
+        const critique = accumulatedCritiques[accumulatedCritiques.length - 1] || 'Unknown issue';
         conversation[conversation.length - 1].content =
           progressRetrying({ supervisorLabel, retryCount: attempt, critique });
         refresh();

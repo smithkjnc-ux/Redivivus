@@ -97,11 +97,11 @@ export function buildListenerScript(): string {
       if (msg.type === 'preview-show-refresh' && window.__redivivusPreviewShowAndRefresh) { window.__redivivusPreviewShowAndRefresh(); }
       if (msg.type === 'preview-reverted') {
         var revLast = document.getElementById('preview-chat-last');
-        if (revLast) { revLast.textContent = '↩ Reverted — files restored.'; }
+        if (revLast) { revLast.textContent = '\\u21A9 Reverted — files restored.'; }
       }
       if (msg.type === 'preview-fix-applied' && msg.snapId) {
         var fixLast = document.getElementById('preview-chat-last');
-        if (fixLast) { fixLast.innerHTML = '✓ Fixed — <button data-action="preview-revert" data-snap="' + msg.snapId + '" style="background:rgba(248,113,113,0.18);border:1px solid #f87171;color:#f87171;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin:0 4px;">↩ Revert</button><button data-action="preview-save" style="background:rgba(52,211,153,0.12);border:1px solid #34d399;color:#34d399;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">📌 Save</button>'; }
+        if (fixLast) { fixLast.innerHTML = '\\u2713 Fixed — <button data-action="preview-revert" data-snap="' + msg.snapId + '" style="background:rgba(248,113,113,0.18);border:1px solid #f87171;color:#f87171;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;margin:0 4px;">\\u21A9 Revert</button><button data-action="preview-save" style="background:rgba(52,211,153,0.12);border:1px solid #34d399;color:#34d399;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u{1F4CC} Save</button>'; }
       }
       if (msg.type === 'redivivus-drag-drop') { vscode.postMessage(msg.inside ? { type: 'redivivus-drag-drop', inside: true, fromParentPath: msg.fromParentPath, fromIndex: msg.fromIndex, toPath: msg.toPath, snapId: window._rearrangeSnap } : msg.transplant ? { type: 'redivivus-drag-drop', transplant: true, fromParentPath: msg.fromParentPath, fromIndex: msg.fromIndex, refPath: msg.refPath, after: msg.after, snapId: window._rearrangeSnap } : { type: 'redivivus-drag-drop', parentPath: msg.parentPath, fromIndex: msg.fromIndex, toIndex: msg.toIndex, snapId: window._rearrangeSnap }); }
       if (msg.type === 'redivivus-hud-save') { vscode.postMessage({ type: 'rearrange-finish', snapId: window._rearrangeSnap }); }
@@ -109,16 +109,16 @@ export function buildListenerScript(): string {
       if (msg.type === 'rearrange-active') {
         window._rearrangeSnap = msg.snapId;
         var mb = document.getElementById('preview-move-btn'); if (mb) mb.classList.add('active');
-        var rl = document.getElementById('preview-chat-last'); if (rl) rl.innerHTML = '↕ Move — click element, then: <button data-action="mv-up" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">↑ Up</button> <button data-action="mv-dn" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">↓ Down</button> or drag. <button data-action="rearrange-toggle" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">✓ Done</button>';
+        var rl = document.getElementById('preview-chat-last'); if (rl) rl.innerHTML = '\\u2195 Move — click element, then: <button data-action="mv-up" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u2191 Up</button> <button data-action="mv-dn" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u2193 Down</button> or drag. <button data-action="rearrange-toggle" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u2713 Done</button>';
       }
       if (msg.type === 'rearrange-moved') {
         window._rearrangeSnap = msg.snapId || window._rearrangeSnap;
-        var rl2 = document.getElementById('preview-chat-last'); if (rl2) rl2.innerHTML = '↕ Moved — <button data-action="mv-up" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">↑ Up</button> <button data-action="mv-dn" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">↓ Down</button> <button data-action="rearrange-undo" style="background:rgba(248,113,113,0.15);border:1px solid #f87171;color:#f87171;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">↩ Undo</button> <button data-action="rearrange-toggle" style="background:rgba(166,227,161,0.15);border:1px solid #a6e3a1;color:#a6e3a1;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">✓ Done</button>';
+        var rl2 = document.getElementById('preview-chat-last'); if (rl2) rl2.innerHTML = '\\u2195 Moved — <button data-action="mv-up" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u2191 Up</button> <button data-action="mv-dn" style="background:rgba(137,180,250,0.15);border:1px solid #89b4fa;color:#89b4fa;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u2193 Down</button> <button data-action="rearrange-undo" style="background:rgba(248,113,113,0.15);border:1px solid #f87171;color:#f87171;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u21A9 Undo</button> <button data-action="rearrange-toggle" style="background:rgba(166,227,161,0.15);border:1px solid #a6e3a1;color:#a6e3a1;padding:1px 8px;border-radius:4px;cursor:pointer;font-size:11px;">\\u2713 Done</button>';
       }
       if (msg.type === 'rearrange-done' || msg.type === 'rearrange-error') {
         window._rearrangeSnap = null;
         var mb2 = document.getElementById('preview-move-btn'); if (mb2) mb2.classList.remove('active');
-        var rl3 = document.getElementById('preview-chat-last'); if (rl3) rl3.textContent = msg.type === 'rearrange-error' ? '⚠ ' + (msg.message || 'Move failed') : '✓ Done';
+        var rl3 = document.getElementById('preview-chat-last'); if (rl3) rl3.textContent = msg.type === 'rearrange-error' ? '\\u26A0 ' + (msg.message || 'Move failed') : '\\u2713 Done';
       }
       if (msg.type === 'update-health-btn') {
         var hBtn = document.querySelector('[data-cmd="redivivus.showSystemHealth"]');
@@ -130,7 +130,7 @@ export function buildListenerScript(): string {
       }
       if (msg.type === 'show-visual-editor' && msg.contract) { veOpen(msg.contract); }
       if (msg.type === 'visual-patch-ack') {
-        veShowStatus(msg.ok ? 'Saved ✓' : '⚠ ' + (msg.message || 'Error'), !msg.ok);
+        veShowStatus(msg.ok ? 'Saved \\u2713' : '\\u26A0 ' + (msg.message || 'Error'), !msg.ok);
         if (msg.ok) {
           var vb = document.getElementById('ve-apply'); if(vb) vb.disabled = true;
           vePending = {};

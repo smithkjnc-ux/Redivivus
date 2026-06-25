@@ -9,9 +9,9 @@
 ---
 
 ## Project Info
-- **Version:** 0.3.84
+- **Version:** 0.4.13
 - **Extension ID:** papajoe.redivivus
-- **Engine compat:** `vscode ^1.70.0` (for Windsurf compatibility)
+- **Engine compat:** `vscode ^1.110.0`
 - **GitHub:** `https://github.com/smithkjnc-ux/Redivivus.git` (private)
 - **Backend:** `https://redivivus-backend-1017737301468.us-east4.run.app` (Google Cloud Run — `redivivus-backend` repo, deployed from `Dockerfile`). This is the authoritative backend every shipped client calls. A legacy Fly.io deployment (`redivivus-backend.fly.dev`, see `fly.toml`) still runs in parallel but no shipped client references it.
 - **Website:** `https://redivivus.dev` (Cloudflare Workers — `redivivus-web` repo, `npx wrangler deploy`)
@@ -163,8 +163,8 @@ FAILOVER (src/core/ai/roleAssignmentFailover.ts)
 - Settings.json entries cleared after migration
 
 ## Known Issues
-- Engine version must stay at `^1.70.0` for Windsurf compat (Windsurf 1.110.1)
-- `@types/vscode` must match engine version (currently 1.70.0)
+- Engine version must stay at `^1.110.0` for Windsurf compat (Windsurf 1.110.1)
+- `@types/vscode` must match engine version (currently 1.110.0)
 - AI review/restructure commands need API key — show clear stub when missing
 - Several pre-existing files exceed 200 lines (Rule 9) — split required before editing them: `chatPanelBuildRunner.ts` (240), `chatPanelMessageRouterEarlyExits.ts` (229), `chatPanelMsgFix.ts` (220+), `extension.ts` (369), `extensionCommands.ts` (208), `agentTools.ts` (now fixed), `supervisorOrchestrator.ts` (248), `cloudBuildClient.ts` (280), `chatPanel.ts` (217), `chatPanelPublicAPI.ts` (227), `chatPanelRenderer.ts` (208), `chatPanelScriptActions.ts` (235)
 - Supervisor can over-engineer fix prescriptions (e.g., recommending inline SVG for chess pieces instead of Unicode) — domain-specific guidance added to fix-supervisor prompt for known patterns; watch for similar issues in other domains

@@ -12,7 +12,7 @@ export function registerGitCommands(context: vscode.ExtensionContext, redivivus:
       const mode = config.autoCommit || 'prompt';
       if (mode === 'off') { vscode.window.showInformationMessage('Auto-commit is off. Commit manually.'); return; }
 
-      const { execSync } = require('child_process');
+      const { execSync, execFileSync } = require('child_process');
       const cwd = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       try {
         const status = execSync('git status --porcelain', { encoding: 'utf-8', cwd });
@@ -29,7 +29,7 @@ export function registerGitCommands(context: vscode.ExtensionContext, redivivus:
       if (mode === 'auto') {
         try {
           execSync(`git add -A`, { cwd });
-          execSync(`git commit -m "${commitMessage}"`, { cwd });
+          execFileSync('git', ['commit', '-m', commitMessage], { cwd });
           vscode.window.showInformationMessage('Auto-committed successfully.');
         } catch (e) { vscode.window.showErrorMessage('Auto-commit failed: ' + (e as Error).message); }
       } else if (mode === 'prompt') {
@@ -37,7 +37,7 @@ export function registerGitCommands(context: vscode.ExtensionContext, redivivus:
         if (result) {
           try {
             execSync(`git add -A`, { cwd });
-            execSync(`git commit -m "${result}"`, { cwd });
+            execFileSync('git', ['commit', '-m', result], { cwd });
             vscode.window.showInformationMessage('Committed successfully.');
           } catch (e) { vscode.window.showErrorMessage('Commit failed: ' + (e as Error).message); }
         }

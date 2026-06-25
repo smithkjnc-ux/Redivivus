@@ -62,10 +62,27 @@ export async function runPhase2Worker(
   let workerResponse = '';
   let providerUsed = workerAI;
   let lastError = '';
-  // [FIX] The Supervisor SIZES the Worker to the job — it emits WORKER_TIER (flash/pro/ultra).
-  // [CAPABILITY-AWARE] ultra is NO LONGER capped to pro — for providers like Gemini, only 'ultra' reaches the strongest model.
-  const _wt = diagnosis.match(/WORKER_TIER:\s*(flash|pro|ultra)/i)?.[1]?.toLowerCase();
-  const workerTier: 'flash' | 'pro' | 'ultra' = _wt === 'ultra' ? 'ultra' : _wt === 'pro' ? 'pro' : 'flash';
+  // [FIX] Deterministic Tiering — Worker complexity is evaluated based on the files being fixed.
+  function determineFixWorkerTier(fixFiles: { path: string, content: string }[]): 'flash' | 'pro' | 'ultra' {
+    let hasLogic = false;
+    let needsUltra = false;
+    const complexKeywords = /physics|engine|state|game|algorithm|canvas|core|manager|router|auth|store|database/i;
+
+    for (const f of fixFiles) {
+      if (/\.(js|ts|jsx|tsx|py|go|rs|java|c|cpp|cs|php|rb)$/i.test(f.path)) {
+        hasLogic = true;
+        // Upgrade to ultra if the file is large (>150 lines) or has complex keywords
+        if (f.content.split('\n').length > 150 || complexKeywords.test(f.path)) {
+          needsUltra = true;
+        }
+      }
+    }
+    
+    if (!hasLogic) return 'flash'; // pure CSS/HTML/Markdown
+    return needsUltra ? 'ultra' : 'pro';
+  }
+  
+  const workerTier = determineFixWorkerTier(files);
   for (const provider of _effProviderOrder) {
     const pModel = (_manualModel && provider === _manualModelProvider) ? _manualModel : (bestModelForRole(provider, workerTier)?.modelId || provider);
     let attempt = '';
