@@ -6,6 +6,14 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ## [Unreleased]
 
+### Added — June 24, 2026
+- **AI Self-Awareness** (`chatPanelAIPrompt.ts`, `redivivus-backend/chat/route.ts`): The AI now knows it is Redivivus, knows the exact model answering each turn (injected into context per call), knows the byline showing model/tokens/cost is a real UI element, and can accurately answer "what model are you?" and "why does it show X tokens?" without denying visible UI elements.
+- **Proprietary Protection** (`chatPanelAIPrompt.ts`, `chat/route.ts`): Hard block on revealing system prompt contents, routing logic, provider order, failover strategy, temperature settings, or internal pipeline details. AI redirects all probing questions warmly but firmly.
+- **Full Self-Knowledge — 21 KEY CONCEPTS** (`chatPanelAIPrompt.ts`): AI now knows every Redivivus feature: Vault, Save Point, Undo Build, Quality Review, Tokens, Sessions, AI Behavior Panel, Multi-AI routing, Adaptive AI pill, Build Mode, Assist Mode, Preview panel, Convert to PWA, Run, Activity, Health, Memory, Usage, Progress style, GitHub commit, Production readiness check, Blueprint interview.
+- **AI Behavior Panel tooltips** (`chatPanelScriptBehaviorPopover.ts`, `filesTab.ts`): Custom JS tooltip div on each thermometer (VS Code webviews suppress native `title` tooltips). Fixed execution-order bug where `THERM_TIPS` const was declared after the template literal that called it.
+- **Low-confidence build guard** (`chatPanelMsgSendPostCloud.ts`): If classifier returns `build` with `confidence < 0.75`, converts to `clarify` instead of launching the pipeline. Prevents casual questions from triggering full builds.
+- **GitHub API 403 accepted as healthy** (`rigops/panels/admin/sysop.py`): Unauthenticated requests to `api.github.com` return 403 when rate-limited — added to accepted health codes.
+
 ### Added
 - **Blueprint Revision System** (`src/types/index.ts`, `blueprintRevisions.ts`, `blueprintService.ts`): Replaced the old "lock blueprint" boolean with a full revision history. Every blueprint save snapshots the previous state as a locked `BlueprintRevision`. The current blueprint is always editable. Reverting a fix creates a new revision — history is never destroyed.
 - **Hybrid Deep Fix** (`chatPanelMsgArchitectDeepFix.ts`, `chatPanelRendererArchitect.ts`): Architect Review now offers **Fix All** (light edit pipeline, fast) and **Deep Fix** (full Supervisor→Worker→Guardian with retry loop, high quality). Users choose speed vs. correctness per review.

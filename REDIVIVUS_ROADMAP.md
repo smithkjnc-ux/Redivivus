@@ -7,11 +7,11 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 23, 2026 — Vite Port Detection: updated `chatPanelPreview.ts` to read `server.port` from `vite.config.js` instead of hardcoding 5173. Also fixed `currentProvider` undefined variable in backend failover. Full entries in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 24, 2026 — AI Self-Awareness + Full Self-Knowledge: Redivivus AI now knows every feature it has (21 KEY CONCEPTS), knows the model answering each turn, knows the byline is real, blocks proprietary internals from leaking, and added thermometer tooltips to the AI Behavior Panel (custom JS tooltip — VS Code webviews suppress native title tooltips). Also: low-confidence build guard, GitHub API 403 health fix. Full entries in docs/REDIVIVUS_FIXES.md.
+
+*Prior:* June 23, 2026 — Vite Port Detection + AI Domain Reasoning: updated `chatPanelPreview.ts` to read `server.port` from `vite.config.js` instead of hardcoding 5173. Added domain reasoning to all AI prompts (Supervisor, Worker, Guardian, Q&A) so models recall specific training knowledge before answering. Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* June 23, 2026 — Supervisor Architecture Hardening: added strict rules to `SUPERVISOR_CONTRACT_GUIDANCE` to enforce the generation of `package.json` and build systems whenever the AI prescribes a frontend framework. Full entries in docs/REDIVIVUS_FIXES.md.
-
-*Prior:* June 23, 2026 — Claude API Temperature Parameter Rejection: stripped the `temperature` parameter from Claude execution calls in `redivivus-backend` to prevent `invalid_request_error` crashes. Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* 2026-06-14 — Build Contract enforcement (PRIORITY): worker gets full rulebook, quality gate rejects flat games, distillation logged+retried, multi-file decomposition. Canonical: docs/REDIVIVUS_BUILD_CONTRACT.md.
 
