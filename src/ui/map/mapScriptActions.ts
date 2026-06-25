@@ -53,28 +53,30 @@ export const MAP_SCRIPT_ACTIONS = `
       if (/service|controller|handler|manager/i.test(src)&&/ui|view|component|screen|page|\.css|\.html/i.test(tgt)) violations.push(src+' -> '+tgt);
     });
     // [FIX] Prompt must NOT start with "You are a..." — Claude refuses user-role persona reassignment.
-    // Frame as a data analysis task. Explicitly say this is graph topology, not source code.
+    // [BLUEPRINT-REVIEW] Compare what was spec'd (blueprint) against what was actually built (code).
+    // The blueprint is injected server-side by architectReviewCommand.ts — placeholder here.
     const hasData = nodes.length > 0;
+    const fileList = ranked.map(n => '  ' + n.id + ' (' + n.lines + ' lines, health:' + n.health + (n.todos ? ', ' + n.todos + ' TODOs' : '') + ')').join('\\n');
     const prompt =
-      'Analyze the following project dependency graph and give a structural assessment.\\n' +
-      'This is file topology metadata (connections, line counts, health scores) -- not source code.\\n\\n' +
-      'PROJECT STATS: '+nodes.length+' file'+(nodes.length!==1?'s':'')+', '+edges.length+' connection'+(edges.length!==1?'s':'')+'\\n\\n' +
-      (hasData?'MOST CONNECTED FILES (hotspots):\\n'+hotspots.map(n=>'  '+n.id+' (in:'+n.in+' out:'+n.out+', '+n.lines+' lines, health:'+n.health+')').join('\\n')+'\\n\\n':'') +
-      (orphans.length?'ISOLATED FILES (no connections -- possibly dead code):\\n'+orphans.map(n=>'  '+n.id+' ('+n.lines+' lines)').join('\\n')+'\\n\\n':'') +
-      (unhealthy.length?'FILES WITH HEALTH ISSUES:\\n'+unhealthy.map(n=>'  '+n.id+' ('+n.health+', '+n.todos+' TODOs)').join('\\n')+'\\n\\n':'') +
-      (large.length?'OVERSIZED FILES (over 200 lines):\\n'+large.map(n=>'  '+n.id+' ('+n.lines+' lines)').join('\\n')+'\\n\\n':'') +
-      (violations.length?'LAYER VIOLATIONS (service imports UI):\\n'+violations.slice(0,5).map(v=>'  '+v).join('\\n')+'\\n\\n':'') +
-      'Based on this topology data AND the actual file content below, provide a thorough architectural review:\\n\\n' +
-      '1. **Structure pattern and health** — identify the pattern (layered, monolith, hub-and-spoke, etc.), flow direction, and whether separation of concerns is clean.\\n' +
-      '2. **Coupling and dependency problems** — flag concrete classes instantiated inside constructors (tight coupling), missing interfaces or abstractions, and any file that imports more than it should.\\n' +
-      '3. **Input validation gaps** — list every public method or CLI command that accepts user input without validating it (empty strings, out-of-range values, wrong types).\\n' +
-      '4. **Error handling and resilience** — identify silent failures (errors swallowed without re-throw), missing error propagation, and places that could corrupt data on failure.\\n' +
-      '5. **Type safety issues** — flag use of "any", unsafe casts, or untyped parsed data (e.g. JSON.parse results used without a typed interface).\\n' +
-      '6. **Security concerns** — note side-effects on import, hardcoded paths, missing sanitization, or patterns that could be exploited.\\n' +
-      '7. **Testability** — flag classes that are hard to unit-test because of tight coupling, no dependency injection, or global mutable state.\\n' +
-      '8. **Prioritized quick-wins** — list 3-5 specific, concrete changes a developer could make today, each naming the exact file and line area. Order by impact.\\n' +
-      '9. **Plain-English summary** (2-3 sentences) for a non-programmer.\\n\\n' +
-      'Rules: be specific — name files and methods. Skip sections where there are no issues. No filler. No praise.';
+      'ARCHITECT REVIEW — Blueprint vs Build\\n\\n' +
+      'Your job is to compare what this project was SUPPOSED to be (the blueprint spec) against what was ACTUALLY built (the file content below). ' +
+      'Report only real findings. If something is correctly built, say so and move on. Do not apply enterprise patterns to a project that was designed to be simple.\\n\\n' +
+      'PROJECT FILES (' + nodes.length + ' file' + (nodes.length !== 1 ? 's' : '') + '):\\n' + (hasData ? fileList : '  (no files found)') + '\\n\\n' +
+      (unhealthy.length ? 'FILES WITH HEALTH ISSUES:\\n' + unhealthy.map(n => '  ' + n.id + ' (' + n.health + ', ' + n.todos + ' TODOs)').join('\\n') + '\\n\\n' : '') +
+      (large.length ? 'OVERSIZED FILES (over 200 lines):\\n' + large.map(n => '  ' + n.id + ' (' + n.lines + ' lines)').join('\\n') + '\\n\\n' : '') +
+      '__BLUEPRINT_PLACEHOLDER__\\n\\n' +
+      'Based on the blueprint and the actual file content injected below, answer these questions:\\n\\n' +
+      '1. **Blueprint compliance** — Which features from the blueprint are fully built? Which are missing or incomplete? Be specific — name the feature and where it should be in the code.\\n' +
+      '2. **Scope drift** — Did the build include anything NOT in the blueprint? If so, is it an improvement or a distraction?\\n' +
+      '3. **Real bugs or broken behaviour** — Looking at the actual code, is anything likely to fail, crash, or behave wrong at runtime? Name the file and line area.\\n' +
+      '4. **Quick-wins** — List 2-4 specific, actionable improvements ordered by impact. Each must name the exact file and describe the change. Only include items that genuinely improve the project relative to its blueprint goal — not generic engineering ideals.\\n' +
+      '5. **Plain-English verdict** (2-3 sentences) — Is this project in good shape relative to what it set out to do? What is the most important thing to do next?\\n\\n' +
+      'CRITICAL RULES:\\n' +
+      '- Judge the project by what it was DESIGNED to be, not by enterprise software standards.\\n' +
+      '- A self-contained single-file game is correct if it plays correctly — do NOT flag it for lacking TypeScript classes or dependency injection.\\n' +
+      '- A simple web app does not need microservices — do NOT flag it for being a monolith.\\n' +
+      '- If the project is well-built relative to its blueprint, say so clearly. A clean bill of health IS a valid result.\\n' +
+      '- Be specific — name files and line numbers. No filler. No praise. No generic advice.';
     vs.postMessage({ type: 'architectReview', prompt: prompt });
   };
 

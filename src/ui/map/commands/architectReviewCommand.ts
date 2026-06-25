@@ -18,10 +18,20 @@ export async function executeArchitectReview(msg: any, ctx: MapMsgCtx): Promise<
   if (msg.type === 'architectReview' && msg.prompt) {
     // [WARN] Must NOT use redivivus.postToChat here — routes through fix-request -> build pipeline -> vault modal.
     //        redivivus.mapContextChat routes through map-context -> direct AI call, no build pipeline.
+    // [BLUEPRINT-REVIEW] Read the blueprint from disk and substitute it into the prompt so the AI
+    // can compare what was spec'd against what was actually built.
+    let blueprintBlock = 'PROJECT BLUEPRINT: No blueprint found. Judge the project solely from the file content below.';
+    try {
+      const bpPath = path.join(root, '.redivivus', 'blueprint.md');
+      if (fs.existsSync(bpPath)) {
+        const bpRaw = fs.readFileSync(bpPath, 'utf8').trim();
+        if (bpRaw) { blueprintBlock = 'PROJECT BLUEPRINT (what this project was designed to be):\n' + bpRaw; }
+      }
+    } catch { /* blueprint unreadable — use fallback */ }
     // [FIX] Enrich with actual file content server-side. Webview only has topology metadata (connections,
     //       line counts, health). Single-file projects have 0 graph edges — Claude refuses a code review
     //       with no code. Read top 5 files (health-prioritized) and append real content to the prompt.
-    let enrichedPrompt = msg.prompt;
+    let enrichedPrompt = msg.prompt.replace('__BLUEPRINT_PLACEHOLDER__', blueprintBlock);
     if (map.nodes.length > 0) {
       const topNodes = [...map.nodes]
         .sort((a: any, b: any) => (b.todos || 0) + (b.warns || 0) - ((a.todos || 0) + (a.warns || 0)))
@@ -34,7 +44,7 @@ export async function executeArchitectReview(msg: any, ctx: MapMsgCtx): Promise<
         } catch { /* unreadable — skip */ }
       }
       if (snippets.length > 0) {
-        enrichedPrompt = msg.prompt + '\n\nACTUAL FILE CONTENT (first 80 lines each, for your analysis):\n\n' + snippets.join('\n\n');
+        enrichedPrompt += '\n\nACTUAL FILE CONTENT (first 80 lines each, for your analysis):\n\n' + snippets.join('\n\n');
       }
     }
     // [FIX] Authoritative current graph — overrides any stale "0 connections / isolated" stats baked into the
