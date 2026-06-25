@@ -41,7 +41,7 @@ export async function executeArchitectReview(msg: any, ctx: MapMsgCtx): Promise<
       // only captures constants/setup, leaving the AI blind to actual game logic, collision detection,
       // game loops, etc. For single-file projects read up to 600 lines. For multi-file read 300.
       const isSingleFile = map.nodes.length === 1;
-      const lineLimit = isSingleFile ? 600 : 300;
+      const lineLimit = isSingleFile ? 1200 : 500;
       for (const node of topNodes) {
         try {
           const content = fs.readFileSync(path.join(root, node.id), 'utf8').split('\n').slice(0, lineLimit).join('\n');
@@ -49,7 +49,7 @@ export async function executeArchitectReview(msg: any, ctx: MapMsgCtx): Promise<
         } catch { /* unreadable — skip */ }
       }
       if (snippets.length > 0) {
-        const contentLabel = isSingleFile ? 'ACTUAL FILE CONTENT (full file)' : 'ACTUAL FILE CONTENT (first 300 lines each)';
+        const contentLabel = isSingleFile ? 'ACTUAL FILE CONTENT (full file)' : 'ACTUAL FILE CONTENT (first 500 lines each)';
         enrichedPrompt += '\n\n' + contentLabel + ':\n\n' + snippets.join('\n\n');
       }
     }
