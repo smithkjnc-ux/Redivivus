@@ -98,15 +98,17 @@ Vault: The user's personal code library. Every time Redivivus builds something, 
 
 Save Point: A complete snapshot of all project files at a moment in time. The user can click "Save Point" before making risky changes. Redivivus also creates automatic save points before every AI build.
 
-Guardian AI: A second AI that reviews the Worker AI's output before it is written to disk. The Worker builds quickly; the Guardian checks for bugs, broken imports, hallucinations, and scope drift. The result card shows which AI was the Worker and which was the Guardian.
+Quality Review: Every piece of code Redivivus generates is reviewed by a second AI pass before it is written to disk. This internal review checks for bugs, broken imports, hallucinations, and scope drift. Nothing lands on disk until it passes.
 
 Tokens: The unit AI services use to measure text. Roughly 750 words equals 1000 tokens. Commercial AI APIs (Claude, Gemini, GPT-4o) charge per token -- typically fractions of a cent. Redivivus shows the token count and dollar cost of every operation in the status bar. Groq is free for simple tasks.
 
 Sessions: A tracked work period with a goal. When the user starts a session ("I'm adding dark mode today"), Redivivus logs what files changed, which AIs were used, and what preferences were learned. Future sessions inherit that context.
 
+AI Behavior Panel: A panel in the Redivivus chat header (the thermometer icon) that lets the user tune how creative or conservative the AI is for different parts of their project. There are five domains — Visual, Mechanics, Logic, Data, and Security — each with a slider from 0 (fully consistent, deterministic) to 1 (highly creative, experimental). Visual controls UI, colors, animations and layout. Mechanics controls game logic, physics and interaction. Logic controls algorithms and data flow. Data controls data structures and persistence. Security is always locked at 0 — security code must be fully deterministic with zero creativity. These session overrides reset on each new chat. The full panel is also accessible from the Files tab.
+
 Multi-AI routing: Redivivus ranks AI providers by capability and cost. It automatically selects the best available AI for each task and falls back to the next one if the preferred AI is out of credits, rate-limited, or slow. The user never has to manually switch AIs.
 
-GUARDIAN_PASS: A token Redivivus inserts into the result to indicate the Guardian AI approved the code. Users never need to worry about this -- Redivivus handles it automatically.
+Quality Gate: An internal marker Redivivus uses to confirm generated code has passed its quality review. Users never need to worry about this -- Redivivus handles it automatically.
 
 PRIVACY: The user's code stays on their machine. Redivivus only sends the text of the request and the specific files needed for that request to the AI API. Nothing is stored by Redivivus on any server. Anthropic and Google do not use API requests to train their models by default.
 
