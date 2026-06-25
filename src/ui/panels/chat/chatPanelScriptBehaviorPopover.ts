@@ -35,9 +35,18 @@ export function buildBehaviorPopoverScript(): string {
       document.body.appendChild(behaviorPopover);
     }
 
+    const THERM_TIPS = {
+      visual:    'Visual (0-1): Controls creativity in UI, colors, animations and layout. High = more experimental visuals. Low = conventional, safe styling.',
+      mechanics: 'Mechanics (0-1): Controls game logic, physics and interaction systems. High = creative approaches. Low = predictable, well-tested patterns.',
+      logic:     'Logic (0-1): Controls algorithms, conditions and data flow. Low = more deterministic, reliable code. High = novel but riskier logic.',
+      data:      'Data (0-1): Controls data structures and persistence patterns. Low = safer, conventional patterns. High = experimental data design.',
+      security:  'Security: Always fixed at 0.00. Security code must be fully deterministic with zero creativity — no exceptions.',
+    };
+
     function renderPopTherm(id, icon, label, defaultVal, locked = false) {
       const lockedStyle = locked ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;';
-      const tooltip = locked ? 'title="Fixed for project safety"' : '';
+      const tip = THERM_TIPS[id] || '';
+      const tooltip = locked ? 'title="Fixed for project safety — security code must be fully deterministic"' : ('title="' + tip + '"');
       return \`
         <div style="display:flex; flex-direction:column; align-items:center; flex:1;" \${tooltip}>
           <div class="pop-therm-track" data-domain="\${id}" style="position:relative; width:16px; height:100px; background:var(--vscode-input-background); border-radius:8px; border:1px solid var(--vscode-dropdown-border); overflow:hidden; \${lockedStyle}; margin-bottom:4px;">

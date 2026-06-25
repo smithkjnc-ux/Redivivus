@@ -148,6 +148,30 @@ export function renderSwitchForm(currentAI: string): string {
       </div>
     </div>`;
 
+  const THERM_TIPS: Record<string, string> = {
+    visual:    'Visual (0-1): Controls creativity in UI, colors, animations and layout. High = more experimental visuals. Low = conventional, safe styling.',
+    mechanics: 'Mechanics (0-1): Controls game logic, physics and interaction systems. High = creative approaches. Low = predictable, well-tested patterns.',
+    logic:     'Logic (0-1): Controls algorithms, conditions and data flow. Low = more deterministic, reliable code. High = novel but riskier logic.',
+    data:      'Data (0-1): Controls data structures and persistence patterns. Low = safer, conventional patterns. High = experimental data design.',
+    security:  'Security: Always fixed at 0.00. Security code must be fully deterministic with zero creativity — no exceptions.',
+  };
+
+  function renderThermometer(id: string, icon: string, label: string, defaultVal: string, locked: boolean = false): string {
+    const lockedStyle = locked ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;';
+    const tip = THERM_TIPS[id] || '';
+    const tooltip = locked ? 'title="Fixed for project safety — security code must be fully deterministic"' : `title="${tip}"`;
+    return `
+      <div class="thermometer-col" style="display:flex; flex-direction:column; align-items:center; flex:1;" ${tooltip}>
+        <div class="thermometer-track" data-domain="${id}" style="position:relative; width:20px; height:150px; background:var(--input-bg, #0d1117); border-radius:10px; border:1px solid var(--border, #334455); overflow:hidden; ${lockedStyle}; margin-bottom:8px;">
+          <div class="thermometer-fill" id="therm-${id}" data-val="${defaultVal}" style="position:absolute; bottom:0; left:0; width:100%; height:${parseFloat(defaultVal)*100}%; background:linear-gradient(to top, #3b82f6, #ef4444); transition:height 0.2s ease, background 0.2s ease;"></div>
+        </div>
+        <div style="font-size:16px; margin-bottom:2px;">${icon}</div>
+        <div style="font-size:10px; font-weight:bold;">${label}</div>
+        <div style="font-size:9px; color:var(--vscode-descriptionForeground);" id="therm-label-${id}">${defaultVal}</div>
+      </div>
+    `;
+  }
+
   html += `
     <div id="behavior-panel-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
       <h3 style="margin:0 0 4px 0; font-size:14px;">🎛️ AI Behavior Panel</h3>
@@ -173,21 +197,6 @@ export function renderSwitchForm(currentAI: string): string {
         <button id="behavior-close-btn" style="padding:8px 20px; background:transparent; color:var(--fg, #e6edf3); border:1px solid var(--border, #334455); border-radius:4px; cursor:pointer; font-size:13px;">Close</button>
       </div>
     </div>`;
-
-  function renderThermometer(id: string, icon: string, label: string, defaultVal: string, locked: boolean = false): string {
-    const lockedStyle = locked ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;';
-    const tooltip = locked ? 'title="Fixed for project safety"' : '';
-    return `
-      <div class="thermometer-col" style="display:flex; flex-direction:column; align-items:center; flex:1;" ${tooltip}>
-        <div class="thermometer-track" data-domain="${id}" style="position:relative; width:20px; height:150px; background:var(--input-bg, #0d1117); border-radius:10px; border:1px solid var(--border, #334455); overflow:hidden; ${lockedStyle}; margin-bottom:8px;">
-          <div class="thermometer-fill" id="therm-${id}" data-val="${defaultVal}" style="position:absolute; bottom:0; left:0; width:100%; height:${parseFloat(defaultVal)*100}%; background:linear-gradient(to top, #3b82f6, #ef4444); transition:height 0.2s ease, background 0.2s ease;"></div>
-        </div>
-        <div style="font-size:16px; margin-bottom:2px;">${icon}</div>
-        <div style="font-size:10px; font-weight:bold;">${label}</div>
-        <div style="font-size:9px; color:var(--vscode-descriptionForeground);" id="therm-label-${id}">${defaultVal}</div>
-      </div>
-    `;
-  }
 
   return html;
 }
