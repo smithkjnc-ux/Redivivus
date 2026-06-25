@@ -7,6 +7,53 @@ export function buildBehaviorPopoverScript(): string {
       behaviorPopover.id = 'behavior-popover';
       behaviorPopover.style.cssText = 'display:none;position:absolute;top:40px;right:10px;background:var(--vscode-editor-background);border:1px solid var(--vscode-focusBorder);border-radius:8px;padding:12px;box-shadow:0 8px 32px rgba(0,0,0,0.35);z-index:9999;width:320px;';
       
+      const THERM_TIPS = {
+        visual:    'Visual (0-1): Controls creativity in UI, colors, animations and layout. High = more experimental visuals. Low = conventional, safe styling.',
+        mechanics: 'Mechanics (0-1): Controls game logic, physics and interaction systems. High = creative approaches. Low = predictable, well-tested patterns.',
+        logic:     'Logic (0-1): Controls algorithms, conditions and data flow. Low = more deterministic, reliable code. High = novel but riskier logic.',
+        data:      'Data (0-1): Controls data structures and persistence patterns. Low = safer, conventional patterns. High = experimental data design.',
+        security:  'Security: Always fixed at 0.00. Security code must be fully deterministic with zero creativity — no exceptions.',
+      };
+
+      function renderPopTherm(id, icon, label, defaultVal, locked = false) {
+        const lockedStyle = locked ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;';
+        const tip = locked ? 'Fixed at 0.00 — security code must be fully deterministic, no creativity.' : (THERM_TIPS[id] || '');
+        return \`
+          <div class="pop-therm-col" data-tip="\${tip}" style="display:flex; flex-direction:column; align-items:center; flex:1; position:relative;">
+            <div class="pop-therm-track" data-domain="\${id}" style="position:relative; width:16px; height:100px; background:var(--vscode-input-background); border-radius:8px; border:1px solid var(--vscode-dropdown-border); overflow:hidden; \${lockedStyle}; margin-bottom:4px;">
+              <div class="pop-therm-fill" id="pop-therm-\${id}" data-val="\${defaultVal}" style="position:absolute; bottom:0; left:0; width:100%; height:\${parseFloat(defaultVal)*100}%; background:linear-gradient(to top, #3b82f6, #ef4444); transition:height 0.2s ease, background 0.2s ease;"></div>
+            </div>
+            <div style="font-size:12px; margin-bottom:2px;">\${icon}</div>
+            <div style="font-size:9px; font-weight:bold;">\${label}</div>
+            <div style="font-size:8px; color:var(--vscode-descriptionForeground);" id="pop-therm-label-\${id}">\${defaultVal}</div>
+          </div>
+        \`;
+      }
+
+      // Custom tooltip div — VS Code webviews suppress native browser title tooltips
+      const tipDiv = document.createElement('div');
+      tipDiv.id = 'pop-therm-tip';
+      tipDiv.style.cssText = 'display:none;position:fixed;z-index:99999;background:var(--vscode-editorHoverWidget-background,#252526);color:var(--vscode-editorHoverWidget-foreground,#ccc);border:1px solid var(--vscode-editorHoverWidget-border,#454545);border-radius:4px;padding:6px 10px;font-size:11px;max-width:220px;line-height:1.5;pointer-events:none;';
+      document.body.appendChild(tipDiv);
+
+      document.addEventListener('mouseover', (e) => {
+        const col = e.target.closest ? e.target.closest('.pop-therm-col') : null;
+        if (col && col.dataset.tip) {
+          tipDiv.textContent = col.dataset.tip;
+          tipDiv.style.display = 'block';
+        }
+      });
+      document.addEventListener('mousemove', (e) => {
+        if (tipDiv.style.display === 'block') {
+          tipDiv.style.left = (e.clientX + 12) + 'px';
+          tipDiv.style.top = (e.clientY - 8) + 'px';
+        }
+      });
+      document.addEventListener('mouseout', (e) => {
+        const col = e.target.closest ? e.target.closest('.pop-therm-col') : null;
+        if (col) { tipDiv.style.display = 'none'; }
+      });
+
       const content = \`
         <div style="display:flex; justify-content:space-between; align-items:flex-start;">
           <div>
@@ -33,30 +80,6 @@ export function buildBehaviorPopoverScript(): string {
       
       behaviorPopover.innerHTML = content;
       document.body.appendChild(behaviorPopover);
-    }
-
-    const THERM_TIPS = {
-      visual:    'Visual (0-1): Controls creativity in UI, colors, animations and layout. High = more experimental visuals. Low = conventional, safe styling.',
-      mechanics: 'Mechanics (0-1): Controls game logic, physics and interaction systems. High = creative approaches. Low = predictable, well-tested patterns.',
-      logic:     'Logic (0-1): Controls algorithms, conditions and data flow. Low = more deterministic, reliable code. High = novel but riskier logic.',
-      data:      'Data (0-1): Controls data structures and persistence patterns. Low = safer, conventional patterns. High = experimental data design.',
-      security:  'Security: Always fixed at 0.00. Security code must be fully deterministic with zero creativity — no exceptions.',
-    };
-
-    function renderPopTherm(id, icon, label, defaultVal, locked = false) {
-      const lockedStyle = locked ? 'opacity: 0.6; cursor: not-allowed;' : 'cursor: pointer;';
-      const tip = THERM_TIPS[id] || '';
-      const tooltip = locked ? 'title="Fixed for project safety — security code must be fully deterministic"' : ('title="' + tip + '"');
-      return \`
-        <div style="display:flex; flex-direction:column; align-items:center; flex:1;" \${tooltip}>
-          <div class="pop-therm-track" data-domain="\${id}" style="position:relative; width:16px; height:100px; background:var(--vscode-input-background); border-radius:8px; border:1px solid var(--vscode-dropdown-border); overflow:hidden; \${lockedStyle}; margin-bottom:4px;">
-            <div class="pop-therm-fill" id="pop-therm-\${id}" data-val="\${defaultVal}" style="position:absolute; bottom:0; left:0; width:100%; height:\${parseFloat(defaultVal)*100}%; background:linear-gradient(to top, #3b82f6, #ef4444); transition:height 0.2s ease, background 0.2s ease;"></div>
-          </div>
-          <div style="font-size:12px; margin-bottom:2px;">\${icon}</div>
-          <div style="font-size:9px; font-weight:bold;">\${label}</div>
-          <div style="font-size:8px; color:var(--vscode-descriptionForeground);" id="pop-therm-label-\${id}">\${defaultVal}</div>
-        </div>
-      \`;
     }
 
     document.addEventListener('click', (e) => {
