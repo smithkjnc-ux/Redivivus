@@ -147,8 +147,11 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
         if (results.every(r => r.success)) {
           newContent = fs.readFileSync(absPath, 'utf-8');
         } else {
-          // Surgical failed — fall back to full-file
-          newContent = result;
+          // [FIX] Surgical failed — do NOT fall back to writing raw AI text (which contains
+          // <<<SEARCH...REPLACE>>> markers) to disk. That silently corrupts the file.
+          // Throw so the caller surfaces a clean error instead.
+          const failedEdits = results.filter(r => !r.success).map(r => r.error || 'search string not found').join('; ');
+          throw new Error(`Surgical edit failed — search string not found in file. Try again. (${failedEdits})`);
         }
       } else {
         newContent = useExcerpt ? spliceExcerpt(lines, excerptStart, excerptEnd, result) : result;
