@@ -83,6 +83,8 @@ export async function runPhase2Worker(
   }
   
   const workerTier = determineFixWorkerTier(files);
+  const fixLog = require('../../services/logging/fixPipelineLogger.js').fixLog;
+  fixLog(`[WORKER_TIER_ROUTING] Fix Worker | Assigned Tier: ${workerTier.toUpperCase()}`);
   for (const provider of _effProviderOrder) {
     const pModel = (_manualModel && provider === _manualModelProvider) ? _manualModel : (bestModelForRole(provider, workerTier)?.modelId || provider);
     let attempt = '';
