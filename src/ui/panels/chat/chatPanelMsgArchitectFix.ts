@@ -58,7 +58,7 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
       const act = existingActions[i];
       const task = _fixTaskFor(reviewText, act.file, act.description);
       try {
-        await vscode.commands.executeCommand('redivivus.runEditFix', task, act.file, 'refactor');
+        await vscode.commands.executeCommand('redivivus.runEditFix', task, act.file, 'todo');
         const progress = conversation[conversation.length - 1];
         if (progress && progress.content.startsWith('Applying ')) { progress.content = `Applying ${existingActions.length} fixes: ${i + 1} done...`; refresh(); }
       } catch { /* continue on individual failures */ }
@@ -95,7 +95,7 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
     const f = existingFiles[i];
     const task = _fixTaskFor(reviewText, f);
     try {
-      await vscode.commands.executeCommand('redivivus.runEditFix', task, f, 'refactor');
+      await vscode.commands.executeCommand('redivivus.runEditFix', task, f, 'todo');
       const progress = conversation[conversation.length - 1];
       if (progress && progress.content.startsWith('Fixing ')) { progress.content = 'Fixing ' + existingFiles.length + ' files: ' + (i + 1) + ' done...'; refresh(); }
     } catch { /* continue on individual failures */ }
@@ -151,7 +151,7 @@ export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[
     const actions = _architectActions.get(reviewId) || [];
     const act = actions.find(a => a.file === currentFile);
     const task = _fixTaskFor(reviewText, currentFile, act?.description);
-    await vscode.commands.executeCommand('redivivus.runEditFix', task, currentFile, 'refactor');
+    await vscode.commands.executeCommand('redivivus.runEditFix', task, currentFile, 'todo');
   }
   const nextFile = state.issues[state.index];
   const actions2 = _architectActions.get(reviewId) || [];
