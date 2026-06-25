@@ -22,7 +22,7 @@ import { progressScanning } from '../../services/ui/fixProgressStyle.js';
 // [DEAD] Context assembly moved to collectAllFixContext in chatPanelMsgFixContext.ts (Rule 9 split)
 // [DEAD] resolveSourceFiles (subfolder fallback) moved to chatPanelMsgFixContext.ts (Rule 9 split)
 
-export async function handleFixRequest(userText: string, deps: MessageHandlerDeps, imageBase64?: string, imageType?: string): Promise<void> {
+export async function handleFixRequest(userText: string, deps: MessageHandlerDeps, imageBase64?: string, imageType?: string, preDiagnosis?: string): Promise<void> {
   const { conversation, refresh } = deps;
   // [FIX] Resolve the ACTIVE project root — under Model A, workspace is the projects CONTAINER;
   // getActiveProjectRoot() returns the active subfolder so the fix stays in the right project.
@@ -96,9 +96,18 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   await (await import('../../services/ai/routeClassifier.js')).applyRouteTier(userText, true, deps);
 
   // Phase 1: Supervisor diagnoses ALL bugs
+  // [ARCHITECT-FIX] When a pre-built diagnosis is injected (e.g. from Architect Review), skip the
+  // Supervisor API call entirely — the review already diagnosed the problem with file+line precision.
+  // Jump straight to Worker → Guardian with the prescription pre-loaded.
+  let diagnosis = ''; let supervisorLabel = 'Architect Review'; let subtasks: string[] = []; let executionMode: 'parallel' | 'sequential' = 'sequential';
+  if (preDiagnosis) {
+    fixLog('Phase 1: Skipping Supervisor — pre-built diagnosis provided by Architect Review');
+    diagnosis = preDiagnosis;
+    conversation.push({ role: 'assistant', content: progressScanning({ fileCount: sourceFiles.length }), timestamp: Date.now() });
+    refresh();
+  } else {
   conversation.push({ role: 'assistant', content: progressScanning({ fileCount: sourceFiles.length }), timestamp: Date.now() });
   refresh();
-  let diagnosis = ''; let supervisorLabel = 'AI'; let subtasks: string[] = []; let executionMode: 'parallel' | 'sequential' = 'sequential';
   try {
     const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
     fixLog('Phase 1: Running Supervisor diagnosis...');
@@ -146,6 +155,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       `__RETRY_FIX__:${_b64}__END_RETRY__`;
     finalizeFixLogger(); refresh(); deps.panel.webview.postMessage({ type: 'set-status', status: 'ready' }); return;
   }
+  } // end else (Phase 1 Supervisor — skipped when preDiagnosis provided)
 
   // [PLAN-GATE] High-stakes fix? Show plan, wait for user approval BEFORE any Worker or Agent runs.
   let approvedPlan: string | undefined;

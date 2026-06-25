@@ -6,11 +6,25 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ChatMessage } from './chatPanelHtml';
+import type { MessageHandlerDeps } from '../../../core/routing/chatPanelMessages';
 import { _architectReviews, _architectFixState, _architectActions } from './chatPanelMsgArchitect.js';
 import { getActiveProjectRoot } from '../../../services/project/activeProjectRoot.js';
 
 function _projectRoot(): string {
   return getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
+}
+
+/** Build a pre-diagnosis string from the review prescription so the full fix pipeline can skip
+ *  Phase 1 (Supervisor) and go straight to Worker → Guardian with the exact prescription. */
+function _buildPreDiagnosis(reviewText: string, file: string, actionDescription?: string): string {
+  const prescription = actionDescription
+    ? actionDescription
+    : (() => {
+        const lines = reviewText.split('\n');
+        const idx = lines.findIndex(l => l.includes(path.basename(file)));
+        return idx === -1 ? reviewText.slice(0, 1500) : lines.slice(Math.max(0, idx - 3), idx + 12).join('\n');
+      })();
+  return `WORKER_TIER: pro\n\nTARGET FILE: ${file}\n\nPRESCRIPTION:\n${prescription}\n\nFULL REVIEW CONTEXT (background only):\n${reviewText.slice(0, 2000)}`;
 }
 
 /** Build a precise task string for a file using ACTIONS_JSON descriptions when available, falling
@@ -35,7 +49,7 @@ function _fixTaskFor(reviewText: string, file: string, actionDescription?: strin
   return `Implement these architect-review fixes for \`${file}\`. Make REAL code changes, not comments.\n\nPRESCRIPTION:\n${nearby}`;
 }
 
-export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[], refresh: () => void, panel?: vscode.WebviewPanel): Promise<void> {
+export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[], refresh: () => void, panel?: vscode.WebviewPanel, deps?: MessageHandlerDeps): Promise<void> {
   const reviewId = msg.reviewId || '';
   const reviewText = _architectReviews.get(reviewId);
   if (!reviewText) { return; }
@@ -56,9 +70,15 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
     refresh();
     for (let i = 0; i < existingActions.length; i++) {
       const act = existingActions[i];
-      const task = _fixTaskFor(reviewText, act.file, act.description);
       try {
-        await vscode.commands.executeCommand('redivivus.runEditFix', task, act.file, 'todo');
+        if (deps) {
+          const { handleFixRequest } = await import('../../../core/routing/chatPanelMsgFix.js');
+          const preDiagnosis = _buildPreDiagnosis(reviewText, act.file, act.description);
+          await handleFixRequest(act.description || act.label, deps, undefined, undefined, preDiagnosis);
+        } else {
+          const task = _fixTaskFor(reviewText, act.file, act.description);
+          await vscode.commands.executeCommand('redivivus.runEditFix', task, act.file, 'todo');
+        }
         const progress = conversation[conversation.length - 1];
         if (progress && progress.content.startsWith('Applying ')) { progress.content = `Applying ${existingActions.length} fixes: ${i + 1} done...`; refresh(); }
       } catch { /* continue on individual failures */ }
@@ -93,9 +113,15 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
   refresh();
   for (let i = 0; i < existingFiles.length; i++) {
     const f = existingFiles[i];
-    const task = _fixTaskFor(reviewText, f);
     try {
-      await vscode.commands.executeCommand('redivivus.runEditFix', task, f, 'todo');
+      if (deps) {
+        const { handleFixRequest } = await import('../../../core/routing/chatPanelMsgFix.js');
+        const preDiagnosis = _buildPreDiagnosis(reviewText, f);
+        await handleFixRequest(`Fix ${f} per architect review`, deps, undefined, undefined, preDiagnosis);
+      } else {
+        const task = _fixTaskFor(reviewText, f);
+        await vscode.commands.executeCommand('redivivus.runEditFix', task, f, 'todo');
+      }
       const progress = conversation[conversation.length - 1];
       if (progress && progress.content.startsWith('Fixing ')) { progress.content = 'Fixing ' + existingFiles.length + ' files: ' + (i + 1) + ' done...'; refresh(); }
     } catch { /* continue on individual failures */ }
@@ -106,7 +132,7 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
 }
 
 
-export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[], refresh: () => void, panel?: vscode.WebviewPanel): Promise<void> {
+export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[], refresh: () => void, panel?: vscode.WebviewPanel, deps?: MessageHandlerDeps): Promise<void> {
   const reviewId = msg.reviewId || '';
   const reviewText = _architectReviews.get(reviewId);
   if (!reviewText) { return; }
@@ -151,7 +177,13 @@ export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[
     const actions = _architectActions.get(reviewId) || [];
     const act = actions.find(a => a.file === currentFile);
     const task = _fixTaskFor(reviewText, currentFile, act?.description);
-    await vscode.commands.executeCommand('redivivus.runEditFix', task, currentFile, 'todo');
+    if (deps) {
+      const { handleFixRequest } = await import('../../../core/routing/chatPanelMsgFix.js');
+      const preDiagnosis = _buildPreDiagnosis(reviewText, currentFile, act?.description);
+      await handleFixRequest(act?.description || `Fix ${currentFile} per architect review`, deps, undefined, undefined, preDiagnosis);
+    } else {
+      await vscode.commands.executeCommand('redivivus.runEditFix', task, currentFile, 'todo');
+    }
   }
   const nextFile = state.issues[state.index];
   const actions2 = _architectActions.get(reviewId) || [];

@@ -136,14 +136,14 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
     handleArchitectAddTodos(msg, conversation, refresh);
 
   } else if (msg.type === 'architect-fix-all') {
-    await handleArchitectFixAll(msg, conversation, refresh, panel);
+    await handleArchitectFixAll(msg, conversation, refresh, panel, deps);
 
   } else if (msg.type === 'architect-deep-fix') {
     const { handleArchitectDeepFix } = await import('../../ui/panels/chat/chatPanelMsgArchitectDeepFix.js');
     await handleArchitectDeepFix(msg, conversation, refresh, deps, panel);
 
   } else if (msg.type === 'architect-fix-one') {
-    await handleArchitectFixOne(msg, conversation, refresh, panel);
+    await handleArchitectFixOne(msg, conversation, refresh, panel, deps);
 
   } else if (msg.type === 'architect-per-action') {
     await handleArchitectPerAction(msg, conversation, refresh);
