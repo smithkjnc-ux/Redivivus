@@ -7,7 +7,7 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 26, 2026 — Migrated the codebase to a Modular Monolith (Hybrid) Architecture using automated ts-morph AST manipulation. Extracted core logics into `features/` and `shared/` bounded contexts while auto-patching runtime dynamic imports. Full entries in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 26, 2026 — Migrated the codebase to a Modular Monolith (Hybrid) Architecture using automated ts-morph AST manipulation. Extracted core logics into `features/` and `shared/` bounded contexts while auto-patching runtime dynamic imports. In Phase 2, dissolved `src/commands` entirely into feature slices (`telemetry`, `runtime`, `settings`, etc). Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* June 25, 2026 — Enforced Bottom-Up Build Sequence and Strict JSDoc Interface Contracts in the Supervisor prompt to prevent API hallucinations in multi-file generations. Full entries in docs/REDIVIVUS_FIXES.md.
 
