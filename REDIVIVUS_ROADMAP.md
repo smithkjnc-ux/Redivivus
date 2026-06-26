@@ -7,7 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 25, 2026
+*Last updated:* June 25, 2026 — Enforced Bottom-Up Build Sequence and Strict JSDoc Interface Contracts in the Supervisor prompt to prevent API hallucinations in multi-file generations. Full entries in docs/REDIVIVUS_FIXES.md.
+
+*Prior:* June 25, 2026
 
 *Prior:* June 23, 2026 — Vite Port Detection + AI Domain Reasoning: updated `chatPanelPreview.ts` to read `server.port` from `vite.config.js` instead of hardcoding 5173. Added domain reasoning to all AI prompts (Supervisor, Worker, Guardian, Q&A) so models recall specific training knowledge before answering. Full entries in docs/REDIVIVUS_FIXES.md.
 
