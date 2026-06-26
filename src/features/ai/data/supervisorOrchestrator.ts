@@ -1,12 +1,15 @@
-// [SCOPE] Supervisor Orchestrator — multi-AI build pipeline: Plan → Execute → Review
-// When 2+ AIs are configured, the Supervisor (highest-ranked) creates a step-by-step plan,
-// assigns each step to the best-fit worker AI, dispatches work, and reviews the assembled output.
+// [SCOPE] Supervisor Orchestrator — multi-AI build pipeline: Plan → Execute
+// Supervisor (highest-ranked AI) creates a step-by-step plan, assigns each step to the best-fit
+// worker AI, and dispatches work sequentially. Guardian review lives in supervisorLayerReview.ts.
+// [DONE] 2026-06-26: Fix 1 — single-AI bypass removed; single AI now plans its own serialized steps.
+// [DONE] 2026-06-26: Fix 3+4 — executeStep caps previousOutput to worker context window + injects blueprint.
+// [DEAD] reviewOutput removed — replaced by reviewLayer + reviewIntegration in supervisorLayerReview.ts.
 
 import { AI_CAPABILITIES } from './guardianAI.js';
 import type { AIResponse } from './routingTypes.js';
 import { getWorkerRules } from '../../../features/api/data/apiClientKnowledge.js';
 import { log } from '../../../features/logging/data/redivivusLogger.js';
-import { buildCapabilityProfiles, buildPlanPrompt, parsePlan } from './supervisorPlanner.js';
+import { buildCapabilityProfiles, buildPlanPrompt, parsePlan, type WorkerProfile } from './supervisorPlanner.js';
 
 export interface PlanStep {
   stepNumber: number;
@@ -14,9 +17,9 @@ export interface PlanStep {
   filesToCreate?: string[];
   dependencies?: string[];
   exactInstructions?: string;
-  spec?: string;          // Backwards compatibility
-  assignedAI: string;     // AI id (e.g., 'gemini', 'claude')
-  assignedLabel: string;  // Human label (e.g., 'Gemini')
+  spec?: string;         // Backwards compatibility
+  assignedAI: string;
+  assignedLabel: string;
   type: 'code' | 'review' | 'structure';
 }
 
@@ -26,12 +29,10 @@ export interface OrchestratedResult {
   reviewPassed: boolean;
   reviewNotes: string;
   totalTokensEstimate: number;
-  // [DEGRADED] True when the build shipped WITHOUT independent Guardian review because only one
-  // provider is configured. Distinct from reviewPassed:true (independently reviewed + approved).
+  // [DEGRADED] True when shipped WITHOUT independent Guardian review (single-provider config).
   degraded?: boolean;
 }
 
-/** Progress callback for UI updates */
 export type ProgressCallback = (phase: string, detail: string) => void;
 
 /** Ask the Supervisor AI to create a build plan */
@@ -43,27 +44,29 @@ export async function createPlan(
 ): Promise<PlanStep[]> {
   if (availableAIs.length === 0) { return []; }
 
-  // [WARN] If only 1 AI available, skip planning — just assign everything to it
+  // [DONE] Fix 1: Single AI now plans its own serialized work — no more single-step dump.
+  // Groq (8K output) planning 3-8 small steps is far more reliable than one prompt with a
+  // non-trivial project that silently truncates at token limit.
   if (availableAIs.length === 1) {
     const ai = availableAIs[0];
-    const cap = AI_CAPABILITIES[ai];
-    return [{
-      stepNumber: 1,
-      description: task,
-      assignedAI: ai,
-      assignedLabel: cap?.label || ai,
-      type: 'code',
-    }];
+    const profiles = buildCapabilityProfiles([ai]);
+    const prompt = buildPlanPrompt(task, profiles, context);
+    const res = await callAI(ai, prompt);
+    if (!res.success || !res.text) {
+      // Planning call itself failed — last-resort single step fallback only.
+      const cap = AI_CAPABILITIES[ai];
+      return [{ stepNumber: 1, description: task, assignedAI: ai, assignedLabel: cap?.label || ai, type: 'code' }];
+    }
+    return parsePlan(res.text, profiles);
   }
 
   const supervisor = availableAIs[0]; // highest-ranked = supervisor
-  // Constraint-aware profiles (capability, output budget, context, cost) drive assignment + strategy.
   const profiles = buildCapabilityProfiles(availableAIs);
   const prompt = buildPlanPrompt(task, profiles, context);
   const res = await callAI(supervisor, prompt);
 
   if (!res.success || !res.text) {
-    // Fallback: supervisor failed to plan, assign everything to best worker
+    // Supervisor failed to plan — assign everything to best worker as fallback.
     const worker = availableAIs[1] || availableAIs[0];
     const cap = AI_CAPABILITIES[worker];
     return [{ stepNumber: 1, description: task, assignedAI: worker, assignedLabel: cap?.label || worker, type: 'code' }];
@@ -78,9 +81,10 @@ export async function executeStep(
   task: string,
   previousOutput: string,
   callAI: (ai: string, prompt: string) => Promise<AIResponse>,
-  allSteps?: PlanStep[]
+  allSteps?: PlanStep[],
+  profiles?: WorkerProfile[],    // Fix 3: caps previousOutput to the worker's context window
+  blueprintContext?: string,      // Fix 4: injected into every step — Worker never loses the spec
 ): Promise<{ code: string; tokens: number; failed?: boolean; error?: string }> {
-  // Reconstruct a strict text contract for the Worker
   let specText = '';
   if (step.filesToCreate || step.dependencies || step.exactInstructions) {
     specText += step.filesToCreate ? `FILES TO CREATE:\n${step.filesToCreate.map(f => `- ${f}`).join('\n')}\n\n` : '';
@@ -89,6 +93,19 @@ export async function executeStep(
   } else {
     specText = step.spec || step.description;
   }
+
+  // [FIX 3] Cap previousOutput to the worker's context window to prevent overflow.
+  // Reserve ~12K tokens for prompt + new output; remainder is available for prior layers.
+  const contextK = profiles?.find(p => p.ai === step.assignedAI)?.contextK ?? 32;
+  const maxPrevChars = Math.max(2000, (contextK - 12) * 750);
+  const safePrevious = previousOutput.length > maxPrevChars
+    ? `[earlier layers summarized — blueprint has the full spec]\n\n${previousOutput.slice(-maxPrevChars)}`
+    : previousOutput;
+
+  // [FIX 4] Blueprint anchor — every step gets the project spec so context resets are harmless.
+  const blueprintBlock = blueprintContext
+    ? `\nBLUEPRINT (your source of truth — read before writing anything):\n${blueprintContext}\n`
+    : '';
 
   const planBlock = allSteps && allSteps.length > 1
     ? `\nFULL BUILD PLAN (all steps — know what each Worker is responsible for):\n` +
@@ -99,89 +116,22 @@ export async function executeStep(
       }).join('\n') + '\n'
     : '';
   const workerPersona = `You are the mechanic. You turn wrenches. You do not talk to the customer.\nYour output goes to the Guardian, who translates it.\nWrite clean code. Leave clear comments. That's your communication.\nWhen you're unsure: flag it with [WARN] in a comment so the Guardian sees it. Do not guess silently.\n\nPROJECT RULES (MUST COMPLY):\n${getWorkerRules()}\n\n`;
-  const stepPrompt = previousOutput
-    ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${planBlock}\nSTRICT CONTRACT FOR YOUR STEP:\n${specText}\n\nPREVIOUS OUTPUT (from prior steps):\n${previousOutput}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`
-    : `${workerPersona}You are building: "${task}"\n${planBlock}\nSTRICT CONTRACT:\n${specText}\n\nImplement exactly as prescribed. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`;
+  const stepPrompt = safePrevious
+    ? `${workerPersona}You are completing step ${step.stepNumber} of a build plan.\n\nORIGINAL TASK: "${task}"\n${blueprintBlock}${planBlock}\nSTRICT CONTRACT FOR YOUR STEP:\n${specText}\n\nPREVIOUS LAYERS (Guardian-approved):\n${safePrevious}\n\nImplement YOUR STEP exactly. Match interfaces/names from previous output. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`
+    : `${workerPersona}You are building: "${task}"\n${blueprintBlock}${planBlock}\nSTRICT CONTRACT:\n${specText}\n\nImplement exactly as prescribed. Implement the FULL logic. DO NOT use placeholders or leave functions empty. Output ONLY the complete working code.`;
 
   log('debug', 'services', 'supervisorOrchestrator', 'executeStep', `Worker Prompt for Step ${step.stepNumber}`, {
-    ai: step.assignedAI,
-    contract: specText,
-    fullPrompt: stepPrompt
+    ai: step.assignedAI, contract: specText, contextCap: maxPrevChars, fullPrompt: stepPrompt
   });
 
   const res = await callAI(step.assignedAI, stepPrompt);
-  
+
   log('debug', 'services', 'supervisorOrchestrator', 'executeStep', `Worker Output for Step ${step.stepNumber}`, {
-    success: res.success,
-    tokens: Math.ceil((res.text || '').length / 4),
-    fullResponse: res.text
+    success: res.success, tokens: Math.ceil((res.text || '').length / 4), fullResponse: res.text
   });
 
-  // [M1] Signal failure to the caller instead of silently returning empty code — a dropped step would
-  // otherwise vanish from the assembled output with no indication the build is incomplete.
+  // [M1] Signal failure explicitly — a silently dropped step leaves the build incomplete with no trace.
   if (!res.success) { return { code: '', tokens: 0, failed: true, error: res.error || 'worker produced no output' }; }
   const tokens = Math.ceil((res.text || '').length / 4);
   return { code: res.text || '', tokens };
-}
-
-/** Supervisor reviews the assembled output */
-export async function reviewOutput(
-  task: string,
-  assembledCode: string,
-  guardianAI: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
-  planContext?: string,
-  // [DEGRADED] Caller sets this ONLY when guardianAI is empty *specifically* because the user has a
-  // single provider configured (an expected, known config state — not a failure). When set, an empty
-  // guardian degrades to "ship unreviewed + warn" instead of blocking. Any other empty-guardian case,
-  // and every real Guardian failure below, still fails CLOSED (H3) regardless of this flag.
-  allowDegradedSingleProvider = false,
-): Promise<{ passed: boolean; corrected: string; notes: string; blocked?: boolean; degraded?: boolean; error?: string; warning?: string }> {
-  if (!guardianAI) {
-    // [DEGRADED] Case 1 — only one provider configured: proceed but mark unreviewed (NOT passed:true).
-    if (allowDegradedSingleProvider) {
-      return { passed: false, degraded: true, corrected: assembledCode, notes: '',
-        warning: 'Shipped without independent Guardian review — only one AI provider is configured, so no different AI could review what this one built. Add a second provider for full review coverage.' };
-    }
-    // [H3] Case 2 — guardian absent for any other reason: fail CLOSED, do not ship unreviewed.
-    return { passed: false, corrected: assembledCode, notes: '', blocked: true,
-      error: 'No independent Guardian available — a second AI provider (different from the builder) is required to review the output.' };
-  }
-  const prompt = `You are a Senior Architect/Guardian reviewing assembled code from a junior worker.
-
-ORIGINAL TASK: "${task}"
-${planContext ? `\nSTRICT BUILD PLAN (CONTRACT):\n${planContext}\n` : ''}
-CODE FROM WORKER:
-${assembledCode}
-
-Did the worker strictly follow the exact instructions? Did they create the specified files and link the correct dependencies? Does this code work correctly and completely fulfill the task?
-- If YES: respond with EXACTLY "REVIEW_PASS"
-- If NO: respond with "REVIEW_FIX:" followed by the complete corrected code. Do NOT output markdown fences if rewriting code.`;
-
-  log('debug', 'services', 'supervisorOrchestrator', 'reviewOutput', 'Guardian Review Prompt', { fullPrompt: prompt });
-
-  const res = await callAI(guardianAI, prompt);
-
-  log('debug', 'services', 'supervisorOrchestrator', 'reviewOutput', 'Guardian Review Outcome', {
-    success: res.success,
-    fullResponse: res.text
-  });
-
-  // [H3] Guardian call failed or returned nothing — block, do NOT ship unreviewed code.
-  if (!res.success || !res.text) {
-    return { passed: false, corrected: assembledCode, notes: '', blocked: true,
-      error: `Guardian review failed (${guardianAI}): ${res.error || 'no response from reviewer'}.` };
-  }
-
-  const text = res.text.trim();
-  if (text.startsWith('REVIEW_PASS')) {
-    return { passed: true, corrected: assembledCode, notes: 'Guardian approved' };
-  }
-  const fixMatch = text.match(/REVIEW_FIX:\s*([\s\S]*)/);
-  if (fixMatch) {
-    return { passed: false, corrected: fixMatch[1].trim(), notes: 'Guardian corrected output' };
-  }
-  // [H3] Unrecognized Guardian response — ambiguous verdict; block rather than ship unreviewed code.
-  return { passed: false, corrected: assembledCode, notes: '', blocked: true,
-    error: `Guardian (${guardianAI}) returned an unrecognized response — blocking to avoid shipping unreviewed code.` };
 }
