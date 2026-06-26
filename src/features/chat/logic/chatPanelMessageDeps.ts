@@ -1,8 +1,8 @@
 // [SCOPE] Message handler dependency types — shared interface injected into all chatPanel message handlers.
 import type * as vscode from 'vscode';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
 
 export interface MessageHandlerDeps {
@@ -20,7 +20,7 @@ export interface MessageHandlerDeps {
   onStartSession?: (goal: string, ai: string) => Promise<void>;
   onSwitchAI?: (ai: string) => Promise<void>;
   onNewProject?: (name: string, answers: Record<string, string>, folderPath?: string) => Promise<void>;
-  buildMode?: 'plan' | 'direct'; assistMode?: boolean; vault?: import('../../vault/infrastructure/vaultService').VaultService;
+  buildMode?: 'plan' | 'direct'; assistMode?: boolean; vault?: import('../../vault/data/vaultService').VaultService;
   planInterview?: import('../ui/chatPanelPlanInterview').PlanInterviewState;
   setBlueprintContext?: (ctx: string) => void;
   onSaveAiTemperature?: (settings: any) => void;

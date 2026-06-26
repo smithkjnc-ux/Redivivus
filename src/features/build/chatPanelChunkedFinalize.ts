@@ -4,18 +4,18 @@ import * as path from 'path';
 import type { BuildContext } from './chatPanelBuild.js';
 import { encodeStoryToken, buildResultCard } from './buildOutput.js';
 import { buildPostBuildGuidance } from './chatPanelPostBuild.js';
-import { generateDocs } from '../ui/chatPanelDocs.js';
-import { autoCaptureFiles } from '../../vault/infrastructure/vaultAutoCapture.js';
+import { generateDocs } from '../chat/ui/chatPanelDocs.js';
+import { autoCaptureFiles } from '../vault/data/vaultAutoCapture.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from './services/buildHistoryService.js';
-import { tracer } from '../../project/application/pipelineTracer.js';
-import { writeProjectRoadmapEntry } from '../routing/chatPanelMsgFixUtils.js';
-import { autoCommitIfEnabled } from '../../workspace/infrastructure/gitAutoCommitService.js';
-import { refreshSetupProgressIfOpen } from '../../project/application/setupProgressPanel.js';
+import { tracer } from '../project/logic/pipelineTracer.js';
+import { writeProjectRoadmapEntry } from '../fix/chatPanelMsgFixUtils.js';
+import { autoCommitIfEnabled } from '../workspace/data/gitAutoCommitService.js';
+import { refreshSetupProgressIfOpen } from '../project/logic/setupProgressPanel.js';
 import { runCompileAutoFix } from './services/compileAutoFix.js';
 import { runTestAutoFix } from './services/testAutoFix.js';
 import { runAutoFix } from './services/runAutoFix.js';
 import { scanProject, formatSecurityReport } from './services/securityScanner.js';
-import type { VaultService } from '../../vault/infrastructure/vaultService.js';
+import type { VaultService } from '../vault/data/vaultService.js';
 import type { BuildLedger } from './services/buildLedgerService.js';
 
 export async function runChunkedBuildFinalize(
@@ -28,7 +28,7 @@ export async function runChunkedBuildFinalize(
   const capture = vault ? await autoCaptureFiles(absPaths, projectName, vault as VaultService, task, _callAI) : { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
   // Fire-and-forget cloud sync after every successful capture — keeps cloud vault current
   if (vault && capture.newItems > 0) {
-    import('../../vault/infrastructure/vaultCloudSync.js').then(({ syncVaultToCloud }) => {
+    import('../vault/data/vaultCloudSync.js').then(({ syncVaultToCloud }) => {
       syncVaultToCloud(vault as VaultService).catch(() => {});
     }).catch(() => {});
   }
@@ -68,10 +68,10 @@ export async function runChunkedBuildFinalize(
     if (_wsf.length > 0) {
       vscode.workspace.updateWorkspaceFolders(_wsf.length, null, { uri: vscode.Uri.file(root) });
       // Update the custom Project Files tree to the newly built project
-      try { const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider; PFP.instance?.setRoot(root); PFP.instance?.startLiveRefresh(); vscode.commands.executeCommand('redivivusProjectFiles.focus').then(undefined, () => {}); } catch {}
+      try { const PFP = require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider; PFP.instance?.setRoot(root); PFP.instance?.startLiveRefresh(); vscode.commands.executeCommand('redivivusProjectFiles.focus').then(undefined, () => {}); } catch {}
       vscode.commands.executeCommand('workbench.view.explorer').then(() => { vscode.commands.executeCommand('workbench.files.action.focusFilesExplorer'); }, () => {});
     } else {
-      try { const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); } } catch {}
+      try { const CP = require('../../panels/chat/chatPanel.js').ChatPanel; if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); } } catch {}
       vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
     }
   }

@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { MapMsgCtx } from '../mapMessageDispatcher.js';
-import { buildProjectMap } from '../../application/mapBuilderService.js';
+import { buildProjectMap } from '../../logic/mapBuilderService.js';
 
 export async function executeArchitectReview(msg: any, ctx: MapMsgCtx): Promise<void> {
   const { root } = ctx;

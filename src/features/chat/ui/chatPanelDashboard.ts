@@ -3,9 +3,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { SetupProgress } from '../../project/application/setupProgressService.js';
+import type { SetupProgress } from '../../project/logic/setupProgressService.js';
 import type { ChatHeaderInfo } from './chatPanelHtml.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 
 export interface DashboardData {
   blueprint?: { who?: string; what?: string; why?: string; where?: string; when?: string };

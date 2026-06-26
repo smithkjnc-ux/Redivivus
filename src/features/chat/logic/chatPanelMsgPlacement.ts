@@ -1,7 +1,7 @@
 // [SCOPE] Handlers for placement actions: adding to current file, new project, or cancelling.
 // Extracted from chatPanelMessages.ts.
 
-import { resolvePlacement } from '../../../shared/ai/domain/chatPanelResolvers.js';
+import { resolvePlacement } from '../../../features/ai/logic/chatPanelResolvers.js';
 
 export async function handlePlacementAction(msg: any): Promise<void> {
   if (msg.type === 'placement-add-here' && msg.placementId) {

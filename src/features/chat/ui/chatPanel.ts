@@ -4,20 +4,20 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
-import type { VaultService } from '../../vault/infrastructure/vaultService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
+import type { VaultService } from '../../vault/data/vaultService.js';
 import type { ChatMessage } from './chatPanelHtml.js';
 import { buildChatHtml } from './chatPanelHtml.js';
-import { handleInterviewMessage } from '../../project/ui/blueprint/blueprintInterviewPanel.js';
-import type { BuildContext } from '../build/chatPanelBuild.js';
-import { classifyIntent, isBuildRequest, handleBuildRequest, handleEditRequest, BuildRequestDeps } from '../../../shared/ai/domain/chatPanelIntent.js';
-import { handleChatMessage } from '../routing/chatPanelMessages.js';
+import { handleInterviewMessage } from '../../blueprint/ui/blueprintInterviewPanel.js';
+import type { BuildContext } from '../../build/chatPanelBuild.js';
+import { classifyIntent, isBuildRequest, handleBuildRequest, handleEditRequest, BuildRequestDeps } from '../../../features/ai/logic/chatPanelIntent.js';
+import { handleChatMessage } from '../logic/chatPanelMessages.js';
 import { buildHeaderInfo } from './chatPanelHeader.js';
-import { SetupProgressService, SetupProgress } from '../../project/application/setupProgressService.js';
-import { BuildHistoryService } from '../build/services/buildHistoryService.js';
-import { handlePanelMessage } from '../routing/chatPanelMessageRouter.js';
+import { SetupProgressService, SetupProgress } from '../../project/logic/setupProgressService.js';
+import { BuildHistoryService } from '../../build/services/buildHistoryService.js';
+import { handlePanelMessage } from '../logic/chatPanelMessageRouter.js';
 import { loadLastSessionContext } from './chatPanelSessionResume.js';
 import { restoreConversation } from './chatPanelPublicAPI.js';
 import { registerChatPanelListeners } from './chatPanelListeners.js';
@@ -79,7 +79,7 @@ export class ChatPanel {
     restoreConversation(this);
     if (this.state.conversation.length === 0) { loadLastSessionContext(this.redivivus, this.state.conversation); }
     this._panel.webview.options = { enableScripts: true };
-    this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('../routing/chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
+    this._panel.webview.onDidReceiveMessage((msg) => { const { handlePanelMessage } = require('../logic/chatPanelMessageRouter.js'); handlePanelMessage(this, msg); }, null, this._disposables);
     this._panel.onDidDispose(() => this._dispose(), null, this._disposables);
     registerChatPanelListeners(this, this._disposables);
     // [DEAD] Build history restoration via BuildHistoryService.getLastResultCards() — disabled, causes chat tab duplication. Re-enable post-v1.0.
@@ -122,37 +122,37 @@ export class ChatPanel {
   }
 
   private _logBuildError(task: string, prompt: string, error: string, promptTokens = 0): void {
-    const { panelLogBuildError } = require('../build/chatPanelBuildUtils.js');
+    const { panelLogBuildError } = require('../../build/chatPanelBuildUtils.js');
     return panelLogBuildError(this, task, prompt, error, promptTokens);
   }
 
-  private _buildRequestDeps(): import('../../../shared/ai/domain/chatPanelIntent').BuildRequestDeps {
-    const { panelBuildRequestDeps } = require('../build/chatPanelBuildUtils.js');
+  private _buildRequestDeps(): import('../../../features/ai/logic/chatPanelIntent').BuildRequestDeps {
+    const { panelBuildRequestDeps } = require('../../build/chatPanelBuildUtils.js');
     return panelBuildRequestDeps(this);
   }
 
   private async _classifyIntent(text: string) {
-    const { panelClassifyIntent } = require('../build/chatPanelBuildUtils.js');
+    const { panelClassifyIntent } = require('../../build/chatPanelBuildUtils.js');
     return panelClassifyIntent(this, text);
   }
 
   private async _isBuildRequest(text: string) {
-    const { panelIsBuildRequest } = require('../build/chatPanelBuildUtils.js');
+    const { panelIsBuildRequest } = require('../../build/chatPanelBuildUtils.js');
     return panelIsBuildRequest(this, text);
   }
 
   private async _handleBuildRequest(task: string, skipComplex = false, isFixRequest = false) {
-    const { panelHandleBuildRequest } = require('../build/chatPanelBuildUtils.js');
+    const { panelHandleBuildRequest } = require('../../build/chatPanelBuildUtils.js');
     return panelHandleBuildRequest(this, task, skipComplex, isFixRequest);
   }
 
   private async _handleVaultOnlyBuild(task: string): Promise<void> {
-    const { panelVaultOnlyBuild } = require('../build/chatPanelBuildUtils.js');
+    const { panelVaultOnlyBuild } = require('../../build/chatPanelBuildUtils.js');
     return panelVaultOnlyBuild(this, task);
   }
 
   public async handleMessage(msg: any): Promise<void> {
-    const { handlePanelMessage } = require('../routing/chatPanelMessageRouter.js');
+    const { handlePanelMessage } = require('../logic/chatPanelMessageRouter.js');
     return handlePanelMessage(this, msg);
   }
 

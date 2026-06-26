@@ -11,4 +11,4 @@ export {
   extractAllNarrators,
   encodeStoryToken,
   buildResultCard,
-} from '../build/buildOutput.js';
+} from '../../build/buildOutput.js';

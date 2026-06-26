@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { consolidatePanelLayout } from './features/chat/ui/chatPanelShow.js';
-import { wasProjectClosedRecently } from './features/project/application/closeMarker.js';
+import { wasProjectClosedRecently } from './features/project/logic/closeMarker.js';
 
 export function registerPanelSerializer(
   context: vscode.ExtensionContext,

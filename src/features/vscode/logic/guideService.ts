@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 import type { RedivivusService } from './redivivusService.js';
-import type { SessionService } from '../../../features/project/application/sessionService.js';
+import type { SessionService } from '../../project/logic/sessionService.js';
 import { buildGuide } from './guideContent.js';
 import { mdToHtml } from './guideMarkdown.js';
 

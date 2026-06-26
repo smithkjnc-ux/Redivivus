@@ -1,8 +1,8 @@
 // [SCOPE] Redivivus Setup Progress Command — shows the 10-step setup checklist
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import { SetupProgressService } from '../../project/application/setupProgressService.js';
-import { showSetupProgressPanel } from '../../project/application/setupProgressPanel.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import { SetupProgressService } from '../../project/logic/setupProgressService.js';
+import { showSetupProgressPanel } from '../../project/logic/setupProgressPanel.js';
 
 export function registerSetupProgressCommand(context: vscode.ExtensionContext, redivivus: RedivivusService): void {
   context.subscriptions.push(

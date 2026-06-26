@@ -1,9 +1,9 @@
 // [SCOPE] Manages and updates the VS Code status bar items for Redivivus — blueprint, session, tokens, save status
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../application/redivivusService.js';
-import type { SessionService } from '../../../features/project/application/sessionService.js';
-import type { UsageTracker } from '../../../features/telemetry/infrastructure/usageTracker.js';
-import { getDuration } from '../../../features/project/application/sessionStorage.js';
+import type { RedivivusService } from '../logic/redivivusService.js';
+import type { SessionService } from '../../project/logic/sessionService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
+import { getDuration } from '../../project/logic/sessionStorage.js';
 
 export class StatusBar {
   private blueprintItem: vscode.StatusBarItem;
@@ -57,7 +57,7 @@ export class StatusBar {
 
   async refreshConnection(): Promise<void> {
     try {
-      const { getAccountToken, getApiBase, clearAccountToken } = await import('../../api/infrastructure/apiClient.js');
+      const { getAccountToken, getApiBase, clearAccountToken } = await import('../../api/data/apiClient.js');
       const token = await getAccountToken();
       if (!token) {
         this._isConnected = false;

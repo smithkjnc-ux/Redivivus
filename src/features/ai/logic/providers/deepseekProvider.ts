@@ -1,8 +1,8 @@
 // [SCOPE] DeepSeek provider implementation. OpenAI-compatible Chat Completions API at api.deepseek.com.
 // Models: deepseek-chat (V3, fast/cheap) and deepseek-reasoner (R1, chain-of-thought). Low cost.
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
-import { getDeepseekKey } from '../../infrastructure/routingKeys.js';
+import type { AIResponse } from '../../data/routingTypes.js';
+import { getDeepseekKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 
 export async function executeDeepseek(
@@ -12,7 +12,7 @@ export async function executeDeepseek(
   tier?: 'flash' | 'pro' | 'ultra'
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getDeepseekKey()!;
-  const { bestModelForRole, tierToRole } = await import('../../infrastructure/modelRegistry.js');
+  const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
   const model = bestModelForRole('deepseek', tierToRole(tier))?.modelId ?? 'deepseek-chat';
   try {
     const url = 'https://api.deepseek.com/v1/chat/completions';

@@ -4,11 +4,11 @@ import * as os from 'os';
 import * as path from 'path';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { handleFixRequest } from './chatPanelMsgFix.js';
-import { runTemplateWizard } from '../../project/application/templateWizard.js';
-import { detectBlueprintGaps, buildGapPromptMessage } from '../../project/infrastructure/blueprint/blueprintGapDetector.js';
+import { handleFixRequest } from '../../fix/chatPanelMsgFix.js';
+import { runTemplateWizard } from '../../project/logic/templateWizard.js';
+import { detectBlueprintGaps, buildGapPromptMessage } from '../../blueprint/logic/blueprintGapDetector.js';
 import { _pendingGuidedBuilds } from './chatPanelMsgSpecial.js';
-import { inferBlueprintFields, buildBlueprintCardToken } from '../../project/infrastructure/blueprint/blueprintInference.js';
+import { inferBlueprintFields, buildBlueprintCardToken } from '../../blueprint/logic/blueprintInference.js';
 import { _pendingBlueprintCards } from './chatPanelMsgBlueprintCard.js';
 
 function isProjectsContainer(root: string): boolean {
@@ -32,7 +32,7 @@ export async function handleBuildIntent(
 
   // [FIX] Force modification requests to bypass build and go straight to fix pipeline
   if (wsRoot && !isProjectsContainer(wsRoot) && isInit) {
-    const { isModificationRequest } = await import('../build/chatPanelBuildInference.js');
+    const { isModificationRequest } = await import('../../build/chatPanelBuildInference.js');
     if (await isModificationRequest(routedText, deps.routing, deps.usageTracker)) {
       await handleFixRequest(routedText, deps, msg.imageBase64, msg.imageType);
       return;

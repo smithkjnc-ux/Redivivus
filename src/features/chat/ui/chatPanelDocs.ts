@@ -2,7 +2,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 
 /** Ask AI to write a README.md from the blueprint + file list, then save to docs/README.md */
 export async function generateDocs(

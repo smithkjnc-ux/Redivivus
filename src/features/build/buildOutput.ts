@@ -3,7 +3,7 @@
 // chatPanelStory.ts (UI) re-exports these for backward compatibility with UI consumers.
 // Rule: NO imports from ui/ — these functions must remain UI-agnostic.
 
-import type { CaptureResult } from '../../vault/infrastructure/vaultAutoCapture.js';
+import type { CaptureResult } from '../vault/data/vaultAutoCapture.js';
 import type { LedgerSummaryLine } from './services/buildLedgerService.js';
 
 // ── Narrative extraction ──────────────────────────────────────────────────────────────────────

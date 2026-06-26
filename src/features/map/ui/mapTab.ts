@@ -1,7 +1,7 @@
 // [SCOPE] Architecture Map tab renderer for the Redivivus dashboard
 // Logic moved from mapPanel.ts to support dashboard integration while keeping file sizes small.
 
-import type { ProjectMap } from '../application/mapBuilderService.js';
+import type { ProjectMap } from '../logic/mapBuilderService.js';
 import { MAP_SCRIPT } from './mapScript.js';
 import { MAP_STYLES } from './mapStyles.js';
 

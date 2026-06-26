@@ -3,7 +3,7 @@
 
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { getApiBase, getAccountToken, collectKeys } from '../../../shared/api/infrastructure/apiClient.js';
+import { getApiBase, getAccountToken, collectKeys } from '../../../features/api/data/apiClient.js';
 import { checkProviderBalances } from './chatPanelProviderBalance.js';
 import type { ProviderBalance } from './chatPanelProviderBalance.js';
 import { readBuildStats, readUsage } from './chatPanelHealthMetrics.js';

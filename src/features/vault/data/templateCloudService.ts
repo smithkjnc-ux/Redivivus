@@ -1,7 +1,7 @@
 // [SCOPE] Cloud template service — fetch templates from Supabase instead of GitHub raw
 // Replaces the GitHub-based template fetching with Supabase-backed API
 
-import { getApiBase } from '../../../shared/api/infrastructure/apiClient.js';
+import { getApiBase } from '../../../features/api/data/apiClient.js';
 
 export interface CloudTemplate {
   id: string;

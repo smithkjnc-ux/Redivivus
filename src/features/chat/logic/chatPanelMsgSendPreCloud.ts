@@ -6,19 +6,19 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import type { ChatResult } from '../../../shared/api/infrastructure/apiClientChat.js';
+import type { ChatResult } from '../../../features/api/data/apiClientChat.js';
 import { handleKeywordShortcuts } from './chatPanelMsgSendKeywords.js';
 import { handleUrlRead, handleWebSearch, handleRememberIntent, handleReadResult } from './chatPanelMsgSendEarlyExits.js';
 import { checkBuildConfirmation, getWorkspaceFileList } from './chatPanelMsgSendConfirmCheck.js';
-import { handleFixRequest } from './chatPanelMsgFix.js';
+import { handleFixRequest } from '../../fix/chatPanelMsgFix.js';
 import { handleAIChat } from './chatPanelMsgSendAI.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
-import { isProjectsContainer } from '../../project/application/redivivusPaths.js';
+import { fixLog } from '../../../features/logging/data/fixPipelineLogger.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
+import { isProjectsContainer } from '../../project/logic/redivivusPaths.js';
 import { checkProjectContextGuard } from './chatPanelProjectContextGuard.js';
 import { getEffectiveProjectRoot } from '../ui/chatPanelHeaderUtils.js';
-import { recordRoutingCost } from '../build/services/buildRoutingCostTracker.js';
-import { applyRouteTier } from '../../../shared/ai/infrastructure/routeClassifier.js';
+import { recordRoutingCost } from '../../build/services/buildRoutingCostTracker.js';
+import { applyRouteTier } from '../../../features/ai/data/routeClassifier.js';
 
 // Return shape from runPreCloudRouting — either a terminal 'done' (early exit) or
 // 'continue' with the cloudChat result + resolved workspace context for post-cloud routing.
@@ -79,7 +79,7 @@ export async function runPreCloudRouting(
   }
 
   // ── Call cloudChat (AI intent classifier) ──
-  const { cloudChat } = await import('../../../shared/api/infrastructure/apiClientChat.js');
+  const { cloudChat } = await import('../../../features/api/data/apiClientChat.js');
   const _cfgBlueprint = deps.redivivus.isInitialized() ? (deps.redivivus.loadConfig?.() as any)?.blueprint : undefined;
   const hasProjectOpen = effectiveRoot
     ? require('fs').existsSync(require('path').join(effectiveRoot, '.redivivus', 'config.json'))

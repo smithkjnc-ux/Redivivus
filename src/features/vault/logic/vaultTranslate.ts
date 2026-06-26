@@ -1,9 +1,9 @@
 // [SCOPE] Vault Translate Command — QuickPick item + target language, AI translates, saves as new vault entry
 
 import * as vscode from 'vscode';
-import type { VaultService } from '../infrastructure/vaultService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import { translateVaultItem, TRANSLATE_LANGS } from '../infrastructure/vaultTranslator.js';
+import type { VaultService } from '../data/vaultService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import { translateVaultItem, TRANSLATE_LANGS } from '../data/vaultTranslator.js';
 
 export function registerVaultTranslateCommand(
   context: vscode.ExtensionContext,

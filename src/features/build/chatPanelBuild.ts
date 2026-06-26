@@ -3,27 +3,27 @@
 
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { findRelevantByTask } from '../../vault/infrastructure/buildFromVaultSearch.js';
+import { findRelevantByTask } from '../vault/data/buildFromVaultSearch.js';
 import { BuildLedger } from './services/buildLedgerService.js';
 import * as Worker from './chatPanelBuildWorker.js';
 import * as Inf from './chatPanelBuildInference.js';
 import * as Writer from './chatPanelBuildWriter.js';
-import { tracer } from '../../project/application/pipelineTracer.js';
-import { formatVaultContext, isVaultEnabled } from '../../vault/infrastructure/vaultContextService.js';
-import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
-import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils.js';
+import { tracer } from '../project/logic/pipelineTracer.js';
+import { formatVaultContext, isVaultEnabled } from '../vault/data/vaultContextService.js';
+import { readProjectDeadEnds } from '../fix/chatPanelMsgFixDeadEnds.js';
+import { readProjectRules, getRecentBuildsContext } from '../fix/chatPanelMsgFixUtils.js';
 import { buildSingleFileResult } from './chatPanelBuildResult.js';
 import type { BuildContext } from './chatPanelBuildHelpers.js';
 import { updateLastMsg, appendMsg, supervisorPlanWithTicker } from './chatPanelBuildHelpers.js';
-import { buildGitContextBlock } from '../../workspace/infrastructure/gitContext.js';
-import { redivivusLog } from '../../../shared/logging/infrastructure/redivivusLogger.js';
+import { buildGitContextBlock } from '../workspace/data/gitContext.js';
+import { redivivusLog } from '../../features/logging/data/redivivusLogger.js';
 import { inferBuildTarget, runCodeReviewPipeline, applyCodeToFile, runPostBuildActions, resolveWorkerPrompt } from './chatPanelBuildSteps.js';
 import { generatePlanId, formatPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate.js';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough.js';
-import { LearnedMemoryService } from '../application/learnedMemoryService.js';
-import { getCommunityGotchas, fetchCommunityGotchas } from '../../../shared/api/infrastructure/apiClientKnowledge.js';
-import { selectRelevantTurns } from '../../../shared/ai/domain/contextSelector.js';
-import { findSimilarCode } from '../../workspace/domain/code/similarCodeFinder.js';
+import { LearnedMemoryService } from '../chat/logic/learnedMemoryService.js';
+import { getCommunityGotchas, fetchCommunityGotchas } from '../../features/api/data/apiClientKnowledge.js';
+import { selectRelevantTurns } from '../../features/ai/logic/contextSelector.js';
+import { findSimilarCode } from '../workspace/logic/similarCodeFinder.js';
 
 export type { BuildContext } from './chatPanelBuildHelpers.js';
 export { registerVaultHitResolver, resolveVaultHit, isChunkedBuildRequest } from './chatPanelBuildHelpers.js';

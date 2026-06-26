@@ -1,7 +1,7 @@
 // [SCOPE] Architecture Map panel — Command Dispatcher for webview messages
 import * as vscode from 'vscode';
-import type { ProjectMap } from '../application/mapBuilderService.js';
-import type { GuardianService } from '../../../shared/ai/infrastructure/guardianService.js';
+import type { ProjectMap } from '../logic/mapBuilderService.js';
+import type { GuardianService } from '../../../features/ai/data/guardianService.js';
 import { handleMapTimelineMessage } from './mapPanelTimelineMessages.js';
 
 import { executeOpenFile } from './commands/openFileCommand.js';

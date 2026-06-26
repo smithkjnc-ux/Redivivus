@@ -2,7 +2,7 @@
 // or needs user confirmation before writing into the current project.
 // Called by handleBuildRequest before vault search, on every build path.
 
-import type { RoutingService } from '../../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 
 export type PlacementDecision = 'fit' | 'ambiguous' | 'no-project';
 

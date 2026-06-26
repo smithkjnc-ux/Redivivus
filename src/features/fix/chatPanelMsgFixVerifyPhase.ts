@@ -1,8 +1,8 @@
 // [SCOPE] Verify Phase for Escalation Loop
 // Extracted from chatPanelMsgFixEscalation.ts (Rule 9 split).
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { updateStatus, logExhaustedDeadEnd, isTruncationText } from './chatPanelMsgFixEscalationUtils.js';
 import { runSupervisorSelfFix } from './chatPanelMsgFixSelfFix.js';
 import { fixActStep } from './fixActivityPanel.js';

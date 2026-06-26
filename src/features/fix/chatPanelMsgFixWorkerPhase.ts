@@ -1,7 +1,7 @@
 // [SCOPE] Worker Fix Generation Phase for Escalation Loop
 // Extracted from chatPanelMsgFixEscalation.ts (Rule 9 split).
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { fixActStep, fixActCode } from './fixActivityPanel.js';
 import { enrichDepsWithCritiques, updateStatus } from './chatPanelMsgFixEscalationUtils.js';
 

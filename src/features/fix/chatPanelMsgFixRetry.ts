@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { validateOutputFiles } from './chatPanelMsgFixPatterns.js';
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 
 export async function retryPatternFix(params: {
   written: string[];

@@ -1,9 +1,9 @@
 // [SCOPE] Claude AI provider implementation
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
-import { getClaudeKey } from '../../infrastructure/routingKeys.js';
+import type { AIResponse } from '../../data/routingTypes.js';
+import { getClaudeKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
-import { bestModelForRole, tierToRole } from '../../infrastructure/modelRegistry.js';
+import { bestModelForRole, tierToRole } from '../../data/modelRegistry.js';
 
 export async function executeClaude(
   text: string,

@@ -2,7 +2,7 @@
 // Called by wizardService. No other wizard logic here.
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../../features/vscode/logic/redivivusService.js';
 
 export async function handleNormalWorkflowWizard(redivivus: RedivivusService): Promise<void> {
   const config = redivivus.loadConfig();

@@ -18,7 +18,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
 
   // Easter egg: Konami code in the webview triggers the personality picker
   if (msg.type === 'easter-egg-personality') {
-    import('../../settings/application/personalityPicker.js').then(m => m.pickPersonality());
+    import('../../settings/logic/personalityPicker.js').then(m => m.pickPersonality());
     return;
   }
 
@@ -26,7 +26,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
   if (msg.type === 'classify-route') {
     let tier = 'pro';
     try {
-      const { classifyRoute } = await import('../../../shared/ai/infrastructure/routeClassifier.js');
+      const { classifyRoute } = await import('../../../features/ai/data/routeClassifier.js');
       const hasProject = !!require('vscode').workspace.workspaceFolders?.length;
       const cls = await classifyRoute(msg.text || '', hasProject, { routing: (panel as any).routing } as any);
       if (cls) { tier = cls.tier; }

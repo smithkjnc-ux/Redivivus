@@ -2,7 +2,7 @@
 // Like building a car: blueprint → parts → frame → drivetrain → body → polish → deliver
 
 import type * as vscode from 'vscode';
-import type { ComplexityResult, ComplexityTier as _ComplexityTier } from '../../../../shared/ai/domain/complexityAssessment.js';
+import type { ComplexityResult, ComplexityTier as _ComplexityTier } from '../../../features/ai/logic/complexityAssessment.js';
 export type ComplexityTier = _ComplexityTier;
 import { BUILD_PHASES } from './buildPhaseDefinitions.js';
 

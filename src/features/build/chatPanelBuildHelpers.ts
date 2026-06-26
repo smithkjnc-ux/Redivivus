@@ -1,13 +1,13 @@
 // [SCOPE] Redivivus Chat Panel Build Helpers — BuildContext type, vault resolvers, message helpers
 // Extracted from chatPanelBuild.ts to keep that file under 200 lines.
 
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { VaultService } from '../../vault/infrastructure/vaultService.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
-import type { VaultSearchResult } from '../../vault/infrastructure/buildFromVaultSearch.js';
-import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import type { BlueprintContract } from '../../project/infrastructure/blueprint/blueprintContract.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
+import type { VaultService } from '../vault/data/vaultService.js';
+import type { RedivivusService } from '../../features/vscode/logic/redivivusService.js';
+import type { UsageTracker } from '../telemetry/data/usageTracker.js';
+import type { VaultSearchResult } from '../vault/data/buildFromVaultSearch.js';
+import type { ChatMessage } from '../chat/ui/chatPanelHtml.js';
+import type { BlueprintContract } from '../blueprint/logic/blueprintContract.js';
 
 export interface BuildContext {
   task: string; root: string; blueprintContext: string; vault?: VaultService; routing: RoutingService; conversation: ChatMessage[]; refresh: () => void; logError: (t: string, p: string, e: string, l: number) => void; postToWebview?: (msg: any) => void; onBuildFinished?: (t: string, f?: string[]) => void;

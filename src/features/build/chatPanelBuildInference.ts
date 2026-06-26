@@ -3,10 +3,10 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { getWorkspaceContextService } from '../../workspace/infrastructure/workspaceContext.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import { getWorkspaceContextService } from '../workspace/data/workspaceContext.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
 
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
+import type { UsageTracker } from '../telemetry/data/usageTracker.js';
 
 export function isWebPageTask(taskLow: string): boolean {
   return /\bweb\s*page\b|\bwebsite\b|\bhtml\s*page\b|\bstatic\s*site\b/.test(taskLow)

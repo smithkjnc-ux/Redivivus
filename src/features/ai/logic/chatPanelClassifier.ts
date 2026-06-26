@@ -1,10 +1,10 @@
 // [SCOPE] Chat Panel Intent Classifier — delegates to cloud API; system prompt lives server-side
 // Extracted from chatPanelIntent.ts
 
-import type { RoutingService } from '../infrastructure/routingService.js';
-import { tracer } from '../../../features/project/application/pipelineTracer.js';
+import type { RoutingService } from '../data/routingService.js';
+import { tracer } from '../../../features/project/logic/pipelineTracer.js';
 import { fallbackClassify } from './chatPanelClassifierOverrides.js';
-import { cloudClassify } from '../../api/infrastructure/apiClient.js';
+import { cloudClassify } from '../../../features/api/data/apiClient.js';
 
 export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service';
 export type AvailableCommand =

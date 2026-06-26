@@ -1,8 +1,8 @@
 // [SCOPE] Handlers for dynamic handoff from Simple (Direct Mode) to Agent Pipeline.
 
 import * as vscode from 'vscode';
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { confirmAgentRun } from '../../../shared/ai/infrastructure/agentPermissionSummary.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { confirmAgentRun } from '../../features/ai/data/agentPermissionSummary.js';
 
 export async function executeAgentHandoff(
     deps: MessageHandlerDeps,
@@ -48,7 +48,7 @@ export async function executeAgentHandoff(
     deps.refresh();
 
     try {
-        const { executeAgentTask } = await import('../../../shared/ai/infrastructure/agentService.js');
+        const { executeAgentTask } = await import('../../features/ai/data/agentService.js');
         const agentCtx: any = {
             root: root,
             task: fromDiagnosis
@@ -65,8 +65,8 @@ export async function executeAgentHandoff(
             // [TOOL-GAP] Live per-session cost choice when run_command hits a costlier out-of-plan
             // alternate. This is the LIVE agent path (the run_command Tool-Gap pilot), so wire it here.
             askUser: async (prompt: string): Promise<'alternate' | 'wait'> => {
-                const { encodeClarifyToken } = await import('../ui/chatPanelClarify.js');
-                const { setPendingClarifyResolve } = await import('../ui/chatPanelClarifyBridge.js');
+                const { encodeClarifyToken } = await import('../chat/ui/chatPanelClarify.js');
+                const { setPendingClarifyResolve } = await import('../chat/ui/chatPanelClarifyBridge.js');
                 const q = { id: 'toolgap_cost_choice', question: prompt,
                     options: [{ label: 'Try alternate approach (uses extra tokens)' }, { label: 'Wait' }] };
                 conversation.push({ role: 'assistant', content: encodeClarifyToken([q]), timestamp: Date.now() });

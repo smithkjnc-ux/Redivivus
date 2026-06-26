@@ -4,8 +4,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { SnapshotService } from '../../project/application/snapshotService.js';
-import { autoCaptureFile } from '../../vault/infrastructure/vaultAutoCapture.js';
+import { SnapshotService } from '../project/logic/snapshotService.js';
+import { autoCaptureFile } from '../vault/data/vaultAutoCapture.js';
 import type { BuildContext } from './chatPanelBuild.js';
 
 export interface WriteOptions { root?: string; task?: string; skipInitialSnapshot?: boolean; }

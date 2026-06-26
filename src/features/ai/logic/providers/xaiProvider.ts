@@ -1,7 +1,7 @@
 // [SCOPE] xAI provider implementation
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
-import { getXAIKey } from '../../infrastructure/routingKeys.js';
+import type { AIResponse } from '../../data/routingTypes.js';
+import { getXAIKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 
 export async function executeXAI(
@@ -11,7 +11,7 @@ export async function executeXAI(
   tier?: 'flash' | 'pro' | 'ultra'
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getXAIKey()!;
-  const { bestModelForRole, tierToRole } = await import('../../infrastructure/modelRegistry.js');
+  const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
   const model = bestModelForRole('xai', tierToRole(tier))?.modelId ?? 'grok-3-mini';
   try {
     const url = 'https://api.x.ai/v1/chat/completions';

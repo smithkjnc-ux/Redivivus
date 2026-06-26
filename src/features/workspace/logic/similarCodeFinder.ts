@@ -4,7 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RoutingService } from '../../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 
 const SKIP_DIRS = new Set(['node_modules', 'out', '.redivivus', '.git', 'dist', 'build', '.next', 'coverage']);
 const CODE_EXTS = new Set(['.ts', '.tsx', '.js', '.jsx']);

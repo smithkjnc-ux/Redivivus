@@ -6,7 +6,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { ChatMessage } from './chatPanelHtml.js';
 import { _architectReviews, _architectActions } from './chatPanelMsgArchitect.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 
 function _projectRoot(): string {
   return getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
@@ -45,7 +45,7 @@ export async function handleArchitectDeepFix(msg: any, conversation: ChatMessage
   conversation.push({ role: 'assistant', content: `🔬 **Deep Fix** — routing ${filesToFix.length} fix${filesToFix.length !== 1 ? 'es' : ''} through the full Supervisor→Worker→Guardian pipeline...`, timestamp: Date.now() });
   refresh();
 
-  const { handleFixRequest } = await import('../routing/chatPanelMsgFix.js');
+  const { handleFixRequest } = await import('../../fix/chatPanelMsgFix.js');
 
   for (let i = 0; i < filesToFix.length; i++) {
     const { file, description } = filesToFix[i];

@@ -2,9 +2,9 @@
 
 import * as vscode from 'vscode';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
-import { runAutoInit } from './features/project/application/init.js';
-import { finalizeRedivivusLogger, initRedivivusLogger, redivivusLog } from './shared/logging/infrastructure/redivivusLogger.js';
-import { resetProjectContext, initProjectContextLogger } from './shared/logging/infrastructure/projectContextLogger.js';
+import { runAutoInit } from './features/project/logic/init.js';
+import { finalizeRedivivusLogger, initRedivivusLogger, redivivusLog } from './features/logging/data/redivivusLogger.js';
+import { resetProjectContext, initProjectContextLogger } from './features/logging/data/projectContextLogger.js';
 
 export function registerWorkspaceFolderListener(
   context: vscode.ExtensionContext,

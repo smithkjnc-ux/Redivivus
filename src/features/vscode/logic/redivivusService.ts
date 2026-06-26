@@ -3,11 +3,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { RedivivusPaths, isInitialized, hasWorkspace } from '../../../features/project/application/redivivusPaths.js';
+import { RedivivusPaths, isInitialized, hasWorkspace } from '../../project/logic/redivivusPaths.js';
 import { loadConfig, saveConfig } from './redivivusConfig.js';
-import { initProject, scaffoldAt } from '../../../features/project/application/redivivusInit.js';
-import { generateRules } from '../domain/rules/redivivusRules.js';
-import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from '../../logging/infrastructure/redivivusLogging.js';
+import { initProject, scaffoldAt } from '../../project/logic/redivivusInit.js';
+import { generateRules } from './rules/redivivusRules.js';
+import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from '../../logging/data/redivivusLogging.js';
 
 export class RedivivusService {
   private paths: RedivivusPaths;

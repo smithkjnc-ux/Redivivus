@@ -1,7 +1,7 @@
 // [SCOPE] Vault Translation Engine — converts vault items between programming languages using AI
 
 import type { VaultItem } from './vaultTypes.js';
-import type { AIResponse } from '../../../shared/ai/infrastructure/routingTypes.js';
+import type { AIResponse } from '../../../features/ai/data/routingTypes.js';
 import * as crypto from 'crypto';
 
 export const TRANSLATE_LANGS: Record<string, string> = {

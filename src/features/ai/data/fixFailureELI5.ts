@@ -4,7 +4,7 @@
 // Cost: ~100 tokens per failure — justified since 3+ expensive AI attempts already ran.
 
 import * as vscode from 'vscode';
-import type { MessageHandlerDeps } from '../../../features/chat/routing/chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../../../features/chat/logic/chatPanelMessages.js';
 
 export interface ELI5FailureResult {
   explanation: string;  // plain English paragraph for the user

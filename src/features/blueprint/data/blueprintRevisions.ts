@@ -2,7 +2,7 @@
 // The current blueprint is always open (editable). When updated, the previous state
 // is snapshotted into `revisions[]` and locked. Revision 1 = original, always preserved.
 
-import type { Blueprint, BlueprintRevision } from '../../../../types/index.js';
+import type { Blueprint, BlueprintRevision } from '../../../types/index.js';
 
 /** Snapshot the current blueprint state into its revisions array before overwriting.
  *  Call this BEFORE modifying the blueprint fields. Returns the updated blueprint

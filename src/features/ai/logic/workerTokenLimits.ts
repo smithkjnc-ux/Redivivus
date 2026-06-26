@@ -46,7 +46,7 @@ export const STREAMING_TOKEN_LIMITS = WORKER_TOKEN_LIMITS;
 // Based on provider token maximums — conservative to protect
 // lower-limit providers (Groq 8K, Kimi 16K)
 // [NOTE] Primary definition is in fileSizeGate.ts — this is a re-export for convenience
-export { FILE_SIZE_THRESHOLDS } from '../../../features/chat/routing/fileSizeGate.js';
+export { FILE_SIZE_THRESHOLDS } from '../../../features/chat/logic/fileSizeGate.js';
 
 // Context window sizes (in thousands of tokens) for reference
 // Used to estimate if a file + prompt will fit in context

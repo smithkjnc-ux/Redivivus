@@ -3,24 +3,24 @@
 
 import * as vscode from 'vscode';
 import type { ChatMessage } from '../../../features/chat/ui/chatPanelHtml.js';
-import type { RoutingService } from '../infrastructure/routingService.js';
-import type { VaultService } from '../../../features/vault/infrastructure/vaultService.js';
-import type { RedivivusService } from '../../vscode/application/redivivusService.js';
-import type { BuildContext } from '../../../features/chat/build/chatPanelBuild.js';
-import { runSingleFileBuild, runChunkedBuild, isChunkedBuildRequest, runVaultAssemblyBuild, registerVaultHitResolver, resolveVaultHit } from '../../../features/chat/build/chatPanelBuild.js';
-import type { VaultSearchResult } from '../../../features/vault/infrastructure/buildFromVaultSearch.js';
-import { findRelevantByTask } from '../../../features/vault/infrastructure/buildFromVaultSearch.js';
-import { semanticVaultSearch } from '../../../features/vault/infrastructure/vaultSemanticSearch.js';
-import { runEditFileBuild, EditBuildContext } from '../../../features/chat/build/chatPanelEditBuild.js';
+import type { RoutingService } from '../data/routingService.js';
+import type { VaultService } from '../../../features/vault/data/vaultService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { BuildContext } from '../../../features/build/chatPanelBuild.js';
+import { runSingleFileBuild, runChunkedBuild, isChunkedBuildRequest, runVaultAssemblyBuild, registerVaultHitResolver, resolveVaultHit } from '../../../features/build/chatPanelBuild.js';
+import type { VaultSearchResult } from '../../../features/vault/data/buildFromVaultSearch.js';
+import { findRelevantByTask } from '../../../features/vault/data/buildFromVaultSearch.js';
+import { semanticVaultSearch } from '../../../features/vault/data/vaultSemanticSearch.js';
+import { runEditFileBuild, EditBuildContext } from '../../../features/build/chatPanelEditBuild.js';
 import { assessComplexity, ComplexityResult, shouldRequireDeepInterview } from './complexityAssessment.js';
-import { BuildOrchestrator, BuildBlueprint, BuildPhase } from '../../../features/chat/build/services/buildOrchestrator.js';
-import { BUILD_PHASES } from '../../../features/chat/build/services/buildPhaseDefinitions.js';
-import { generateVagueWarning, getQuestionsForTier, organizeByCategory } from '../../../features/project/infrastructure/blueprint/expandedInterview.js';
-import { isVagueProjectRequest, askScopeQuestions, parseScopeAnswer, hasPendingScopeQuestion, resolveScopeQuestion } from '../../../features/project/application/templateScopeService.js';
-import { runBuildAfterGates } from '../../../features/chat/build/chatPanelBuildRunner.js';
-import { autoCreateProject } from '../../../features/chat/build/chatPanelBuildAutoCreate.js';
+import { BuildOrchestrator, BuildBlueprint, BuildPhase } from '../../../features/build/services/buildOrchestrator.js';
+import { BUILD_PHASES } from '../../../features/build/services/buildPhaseDefinitions.js';
+import { generateVagueWarning, getQuestionsForTier, organizeByCategory } from '../../../features/blueprint/logic/expandedInterview.js';
+import { isVagueProjectRequest, askScopeQuestions, parseScopeAnswer, hasPendingScopeQuestion, resolveScopeQuestion } from '../../../features/project/logic/templateScopeService.js';
+import { runBuildAfterGates } from '../../../features/build/chatPanelBuildRunner.js';
+import { autoCreateProject } from '../../../features/build/chatPanelBuildAutoCreate.js';
 import { estimateBuild } from './costEstimatorService.js';
-import { extractBlueprintFromPrompt } from '../../../features/project/infrastructure/blueprint/blueprintExtractor.js';
+import { extractBlueprintFromPrompt } from '../../../features/blueprint/logic/blueprintExtractor.js';
 
 // [Redivivus] Moved resolvers to chatPanelResolvers.ts
 
@@ -37,7 +37,7 @@ import type { BuildRequestDeps } from './chatPanelBuildDeps.js';
  * Uses Supervisor AI to classify user messages into intent categories.
  */
 import { classifyIntent, isBuildRequest, IntentType, IntentResult, AvailableCommand } from './chatPanelClassifier.js';
-import { tracer } from '../../../features/project/application/pipelineTracer.js';
+import { tracer } from '../../../features/project/logic/pipelineTracer.js';
 export { classifyIntent, isBuildRequest, IntentType, IntentResult, AvailableCommand };
 
 /** Handles a build request — shows choice dialog for complex requests, runs pipeline for simple ones. */
@@ -45,7 +45,7 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
   deps.postToWebview({ type: 'set-status', status: 'working' });
   
   // Hard auth gate — check FIRST before asking scope questions
-  const { getAccountToken } = await import('../../api/infrastructure/apiClient.js');
+  const { getAccountToken } = await import('../../../features/api/data/apiClient.js');
   const token = await getAccountToken();
   if (!token) {
     deps.postToWebview({ type: 'set-status', status: 'ready' });
@@ -135,7 +135,7 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
             vaultBlueprintContext = created.blueprintContext;
             
             // [FIX] Update the Redivivus service to point to the newly created project
-            const { RedivivusService } = await import('../../vscode/application/redivivusService.js');
+            const { RedivivusService } = await import('../../../features/vscode/logic/redivivusService.js');
             deps.redivivus = new RedivivusService(vaultRoot);
             
             autoCreated = true;

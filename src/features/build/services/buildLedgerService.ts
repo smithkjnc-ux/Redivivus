@@ -2,7 +2,7 @@
 // Instantiated once per build, passed through the pipeline, summarised for the result card.
 // Imports cost rates from costEstimatorService to avoid duplication.
 
-import { tokenCostForAI } from '../../../../shared/ai/domain/costEstimatorService.js';
+import { tokenCostForAI } from '../../../features/ai/logic/costEstimatorService.js';
 
 export type LedgerAction = 'planned' | 'built' | 'reviewed' | 'corrected' | 'fallback';
 export type LedgerRole = 'supervisor' | 'worker' | 'solo';

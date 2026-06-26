@@ -5,8 +5,8 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ChatMessage } from './chatPanelHtml.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 
 // [FIX] Under Model A the workspace root is the projects CONTAINER (~/projects); the ACTIVE project is a
 // subfolder (e.g. ~/projects/tic-tac-toe-game). Architect-review file paths (e.g. `src/ai.js`) are relative

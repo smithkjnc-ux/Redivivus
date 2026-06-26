@@ -20,7 +20,7 @@ export function registerCloseProjectCommand(context: vscode.ExtensionContext): v
           const PFP = require('../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
           PFP.instance?.setRoot(wsRoot);
           try { require('../core/project/projectFolderDecorations.js').refreshProjectFolderDecorations(); } catch {}
-          try { import('../domain/projectFocusMode.js').then(m => m.clearFocus()).catch(() => {}); } catch {}
+          try { import('./projectFocusMode.js').then(m => m.clearFocus()).catch(() => {}); } catch {}
           const cp = ChatPanel.currentPanel as any;
           if (cp?.state) { cp.state.conversation = []; cp._initialized = false; cp.refresh?.(); }
           return;

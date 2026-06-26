@@ -1,7 +1,7 @@
 // [SCOPE] Registers VS Code commands related to Redivivus retrofit operations, including initiating, confirming, and reverting project retrofits.
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RetrofitService } from '../domain/retrofit/retrofitService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RetrofitService } from './retrofit/retrofitService.js';
 
 export function registerRetrofitCommands(
   context: vscode.ExtensionContext,

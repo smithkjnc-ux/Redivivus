@@ -4,9 +4,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import type { WizardPanelState } from './messageRouterTypes.js';
-import { syncBlueprintMd } from '../../project/infrastructure/blueprint/blueprintWriter.js';
+import { syncBlueprintMd } from '../../blueprint/data/blueprintWriter.js';
 import { handleKeyMessage } from './messageRouterKeys.js';
 
 export async function handleCoreMessage(

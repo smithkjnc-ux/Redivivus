@@ -2,9 +2,9 @@
 import * as assert from 'assert';
 import { assertMatchesBaseline } from '../../utils/baseline.js';
 
-import { aiLogger } from '../../../shared/ai/domain/aiLogger.js';
-import { initMasterLogger } from '../../../shared/logging/domain/masterLogger.js';
-import { fallbackClassify } from '../../../shared/ai/domain/chatPanelClassifierOverrides.js';
+import { aiLogger } from '../../../features/ai/logic/aiLogger.js';
+import { initMasterLogger } from '../../../features/logging/logic/masterLogger.js';
+import { fallbackClassify } from '../../../features/ai/logic/chatPanelClassifierOverrides.js';
 import { mochaHooks } from '../../utils/logDumper.js';
 import { setupNockMock } from '../../utils/nockHelper.js';
 

@@ -5,10 +5,10 @@ import * as vscode from 'vscode';
 import type { ChatMessage } from './chatPanelHtml.js';
 import { ChatPanel } from './chatPanel.js';
 import { buildHeaderInfo } from './chatPanelHeader.js';
-import { SetupProgressService } from '../../project/application/setupProgressService.js';
+import { SetupProgressService } from '../../project/logic/setupProgressService.js';
 import { buildChatHtml } from './chatPanelHtml.js';
 import { readActiveProjectDashboard } from './chatPanelDashboard.js';
-import { logProjectContextSwitch } from '../../../shared/logging/infrastructure/projectContextLogger.js';
+import { logProjectContextSwitch } from '../../../features/logging/data/projectContextLogger.js';
 export { panelRefresh, saveConversation } from './chatPanelPublicAPIRefresh.js';
 
 export function panelShowGettingStarted(panel: any): void {

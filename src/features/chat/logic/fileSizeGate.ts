@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { fixLog } from '../../../features/logging/data/fixPipelineLogger.js';
 
 /** File size thresholds for the gate.
  * [FIX] Raised from 10KB/15KB to 30KB/50KB — Worker token limits raised to provider maximums,

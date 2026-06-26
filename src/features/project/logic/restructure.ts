@@ -2,10 +2,10 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { MeasureTwiceService } from '../../chat/build/services/measureTwiceService.js';
-import type { ChangeTracker } from '../../chat/build/services/changeTracker.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { MeasureTwiceService } from '../../build/services/measureTwiceService.js';
+import type { ChangeTracker } from '../../build/services/changeTracker.js';
 
 export function registerRestructureCommands(
   context: vscode.ExtensionContext,

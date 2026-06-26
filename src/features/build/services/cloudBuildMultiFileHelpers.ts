@@ -1,9 +1,9 @@
 // [SCOPE] Helper functions for cloudBuildMultiFile.ts (Rule 9 split).
 // Contains: per-file fetch+drain helper, and post-loop Guardian summary + result assembly.
 
-import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
+import type { BuildRequestDeps } from '../../../features/ai/logic/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
-import { calcCost } from '../../../telemetry/infrastructure/usageTracker.js';
+import { calcCost } from '../../telemetry/data/usageTracker.js';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
 
 export type SingleFileResult = {
@@ -37,7 +37,7 @@ export async function buildSingleFileViaBuildEndpoint(
     body,
   });
   if (res.status === 401) {
-    const { clearAccountToken } = await import('../../../../shared/api/infrastructure/apiClient.js');
+    const { clearAccountToken } = await import('../../../features/api/data/apiClient.js');
     await clearAccountToken();
     throw Object.assign(new Error('NOT_AUTHENTICATED'), { _authError: true });
   }

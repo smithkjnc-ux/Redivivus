@@ -1,7 +1,7 @@
 // [SCOPE] Phase 2.5 (Supervisor Verify) logic for the fix pipeline.
 // Extracted from chatPanelMsgFixPhases.ts to comply with Rule 9 file size limits.
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 
 export interface SupervisorVerifyResult {
   passed: boolean;

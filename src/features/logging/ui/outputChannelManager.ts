@@ -3,8 +3,8 @@
 // One channel per layer + one master "All" channel. Call initOutputChannels() from extensionCommands.ts.
 
 import * as vscode from 'vscode';
-import type { StructuredLogEntry, LayerName } from '../infrastructure/logListeners.js';
-import { addLogListener } from '../infrastructure/logListeners.js';
+import type { StructuredLogEntry, LayerName } from '../data/logListeners.js';
+import { addLogListener } from '../data/logListeners.js';
 
 const LAYER_LABELS: Record<LayerName | 'all', string> = {
   commands: 'Commands',

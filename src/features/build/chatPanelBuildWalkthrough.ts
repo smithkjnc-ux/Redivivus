@@ -1,8 +1,8 @@
 // [SCOPE] Build Walkthrough Generator — AI-generated summary of what was built, architecture, and next steps
 // Called after successful builds to provide a structured handoff to the user.
 
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { ChatMessage } from '../ui/chatPanelHtml.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
+import type { ChatMessage } from '../chat/ui/chatPanelHtml.js';
 import * as path from 'path';
 import * as fs from 'fs';
 

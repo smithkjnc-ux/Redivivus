@@ -2,14 +2,14 @@
 // Project type helpers extracted to routingGuardianUtils.ts (Rule 9 split).
 // [WARN] Guardian sends keys as X-Provider-Keys header — never in body (avoid logging exposure).
 
-import { callProvider } from '../domain/providers/providerFactory.js';
+import { callProvider } from '../logic/providers/providerFactory.js';
 import type { GuardianReviewResult } from './guardianAI.js';
 import { selectGuardianAI, AI_RANK } from './guardianAI.js';
 import { bestModelForRole } from './modelRegistry.js';
 import type { RoutingService } from './routingService.js';
 import { logAICall } from './aiCallLogger.js';
 import { detectProjectType, getFolderStructureTemplate } from './routingGuardianUtils.js';
-import { collectKeys } from '../../api/infrastructure/apiClient.js';
+import { collectKeys } from '../../../features/api/data/apiClient.js';
 
 export async function supervisorPlanImpl(
   svc: RoutingService,

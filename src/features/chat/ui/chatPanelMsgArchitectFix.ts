@@ -6,9 +6,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import type { ChatMessage } from './chatPanelHtml.js';
-import type { MessageHandlerDeps } from '../routing/chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../logic/chatPanelMessages.js';
 import { _architectReviews, _architectFixState, _architectActions } from './chatPanelMsgArchitect.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 
 function _projectRoot(): string {
   return getActiveProjectRoot() || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
@@ -72,7 +72,7 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
       const act = existingActions[i];
       try {
         if (deps) {
-          const { handleFixRequest } = await import('../routing/chatPanelMsgFix.js');
+          const { handleFixRequest } = await import('../../fix/chatPanelMsgFix.js');
           const preDiagnosis = _buildPreDiagnosis(reviewText, act.file, act.description);
           await handleFixRequest(act.description || act.label, deps, undefined, undefined, preDiagnosis);
         } else {
@@ -115,7 +115,7 @@ export async function handleArchitectFixAll(msg: any, conversation: ChatMessage[
     const f = existingFiles[i];
     try {
       if (deps) {
-        const { handleFixRequest } = await import('../routing/chatPanelMsgFix.js');
+        const { handleFixRequest } = await import('../../fix/chatPanelMsgFix.js');
         const preDiagnosis = _buildPreDiagnosis(reviewText, f);
         await handleFixRequest(`Fix ${f} per architect review`, deps, undefined, undefined, preDiagnosis);
       } else {
@@ -178,7 +178,7 @@ export async function handleArchitectFixOne(msg: any, conversation: ChatMessage[
     const act = actions.find(a => a.file === currentFile);
     const task = _fixTaskFor(reviewText, currentFile, act?.description);
     if (deps) {
-      const { handleFixRequest } = await import('../routing/chatPanelMsgFix.js');
+      const { handleFixRequest } = await import('../../fix/chatPanelMsgFix.js');
       const preDiagnosis = _buildPreDiagnosis(reviewText, currentFile, act?.description);
       await handleFixRequest(act?.description || `Fix ${currentFile} per architect review`, deps, undefined, undefined, preDiagnosis);
     } else {

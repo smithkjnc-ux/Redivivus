@@ -3,9 +3,9 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SnapshotService } from '../../project/application/snapshotService.js';
-import { BuildHistoryService } from '../build/services/buildHistoryService.js';
-import { moveChildElement, reparentElement, transplantElement } from '../../vault/domain/htmlElementMover.js';
+import { SnapshotService } from '../../project/logic/snapshotService.js';
+import { BuildHistoryService } from '../../build/services/buildHistoryService.js';
+import { moveChildElement, reparentElement, transplantElement } from '../../vault/logic/htmlElementMover.js';
 import { getRearrangeScript } from '../ui/chatPanelRearrangeScript.js';
 
 const MARK_S = '<!-- Redivivus:REARRANGE -->';

@@ -3,14 +3,14 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import { checkImports, formatMissingImports } from '../ui/chatPanelImportCheck.js';
+import { checkImports, formatMissingImports } from '../chat/ui/chatPanelImportCheck.js';
 import { buildResultCard } from './buildOutput.js';
 import { buildPostBuildGuidance } from './chatPanelPostBuild.js';
 import { BuildLedger } from './services/buildLedgerService.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from './services/buildHistoryService.js';
 import * as Inf from './chatPanelBuildInference.js';
 import * as Writer from './chatPanelBuildWriter.js';
-import { redivivusLog } from '../../../shared/logging/infrastructure/redivivusLogger.js';
+import { redivivusLog } from '../../features/logging/data/redivivusLogger.js';
 import type { BuildContext } from './chatPanelBuildHelpers.js';
 
 export interface SingleFileBuildResultParams {

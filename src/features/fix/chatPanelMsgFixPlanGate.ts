@@ -4,7 +4,7 @@
 // proceed, the (possibly edited) diagnosis for the Worker path, and an approvedPlan for the Agent path so
 // the user's edits actually reach the agent. Fail-open: a gate error never blocks a fix.
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { generatePlanId, awaitPlanApproval, takePlanEditedText } from '../build/chatPanelBuildPlanGate.js';
 
 const TRIVIAL = /\[TRIVIAL/i;

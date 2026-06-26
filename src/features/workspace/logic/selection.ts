@@ -3,10 +3,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
-import type { VaultService } from '../../vault/infrastructure/vaultService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
+import type { VaultService } from '../../vault/data/vaultService.js';
 
 export function registerSelectionCommands(
   context: vscode.ExtensionContext,

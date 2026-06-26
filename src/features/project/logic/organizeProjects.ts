@@ -9,7 +9,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { enumerateProjects, classifyCategory, writeProjectMarker } from './projectResolver.js';
-import { isProtectedProject } from '../domain/activeProjectWatcher.js';
+import { isProtectedProject } from './activeProjectWatcher.js';
 
 function projectsDir(): string {
   return vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());

@@ -2,7 +2,7 @@
 // Balance APIs are mostly unavailable publicly; key validation is the reliable fallback.
 // Called from collectHealthData() in chatPanelHealthCheck.ts.
 
-import { detectKimiBase } from '../../../shared/ai/infrastructure/kimiEndpoint.js';
+import { detectKimiBase } from '../../../features/ai/data/kimiEndpoint.js';
 
 export interface ProviderBalance {
   provider: string;

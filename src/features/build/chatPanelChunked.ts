@@ -4,19 +4,19 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { VaultSearchResult } from '../../vault/infrastructure/buildFromVaultSearch.js';
-import { findRelevantByTask } from '../../vault/infrastructure/buildFromVaultSearch.js';
-import { getPhaseUndoService } from '../../project/application/phaseUndoService.js';
+import type { VaultSearchResult } from '../vault/data/buildFromVaultSearch.js';
+import { findRelevantByTask } from '../vault/data/buildFromVaultSearch.js';
+import { getPhaseUndoService } from '../project/logic/phaseUndoService.js';
 import type { BuildContext } from './chatPanelBuild.js';
-import { encodeStoryToken } from '../ui/chatPanelStory.js';
-import { SnapshotService } from '../../project/application/snapshotService.js';
+import { encodeStoryToken } from '../chat/ui/chatPanelStory.js';
+import { SnapshotService } from '../project/logic/snapshotService.js';
 import { BuildLedger } from './services/buildLedgerService.js';
 import { runFileBuildLoop } from './chatPanelChunkedLoop.js';
-import { tracer } from '../../project/application/pipelineTracer.js';
-import { formatVaultContext, isVaultEnabled } from '../../vault/infrastructure/vaultContextService.js';
-import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
-import { readProjectRules, getRecentBuildsContext } from '../routing/chatPanelMsgFixUtils.js';
-import { getWorkspaceContextService } from '../../workspace/infrastructure/workspaceContext.js';
+import { tracer } from '../project/logic/pipelineTracer.js';
+import { formatVaultContext, isVaultEnabled } from '../vault/data/vaultContextService.js';
+import { readProjectDeadEnds } from '../fix/chatPanelMsgFixDeadEnds.js';
+import { readProjectRules, getRecentBuildsContext } from '../fix/chatPanelMsgFixUtils.js';
+import { getWorkspaceContextService } from '../workspace/data/workspaceContext.js';
 import { runChunkedBuildFinalize } from './chatPanelChunkedFinalize.js';
 import { startProgressTicker, SUPERVISOR_TICKER_LABELS } from './chatPanelBuildHelpers.js';
 
@@ -126,7 +126,7 @@ Return ONLY a JSON array — no markdown, no explanation, no code:
   const _stopTicker = startProgressTicker(ctx, SUPERVISOR_TICKER_LABELS);
   try {
     const res = await (workerLabel
-      ? (async () => { const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 30_000); const { callProvider } = await import('../../../shared/ai/domain/providers/providerFactory.js'); return callProvider(supervisor, planPrompt, f); })()
+      ? (async () => { const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 30_000); const { callProvider } = await import('../../features/ai/logic/providers/providerFactory.js'); return callProvider(supervisor, planPrompt, f); })()
       : routing.prompt(planPrompt, 30_000));
     _stopTicker();
     if (!res.success) { tracer.done(_planSid, 'fail', Date.now() - _planT0, res.error || 'failed'); throw new Error(res.error || 'Planning step failed'); }

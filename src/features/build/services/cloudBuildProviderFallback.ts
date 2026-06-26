@@ -1,6 +1,6 @@
 // [SCOPE] Handles provider fallbacks and API key header filtering for multi-file cloud builds.
-import { isProviderUnavailable } from '../../../../shared/ai/infrastructure/providerTierState.js';
-import { AI_RANK } from '../../../../shared/ai/infrastructure/guardianAI.js';
+import { isProviderUnavailable } from '../../../features/ai/data/providerTierState.js';
+import { AI_RANK } from '../../../features/ai/data/guardianAI.js';
 
 /** Pick the next available provider from AI_RANK, skipping unavailable ones and the current one. */
 export function nextAvailableProvider(current: string, keyHeaders: Record<string, string>): string | null {

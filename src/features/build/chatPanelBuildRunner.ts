@@ -4,16 +4,16 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
-import { TOK_OPEN_WORKSPACE, TOK_OPEN_WORKSPACE_END, TOK_PREVIEW_BROWSER, TOK_PREVIEW_BROWSER_END, TOK_RUN_PROJECT, TOK_RUN_PROJECT_END, DELIM } from '../ui/chatPanelTokens.js';
-import type { BuildRequestDeps } from '../../../shared/ai/domain/chatPanelIntent.js';
-import type { VaultSearchResult } from '../../vault/infrastructure/buildFromVaultSearch.js';
+import { TOK_OPEN_WORKSPACE, TOK_OPEN_WORKSPACE_END, TOK_PREVIEW_BROWSER, TOK_PREVIEW_BROWSER_END, TOK_RUN_PROJECT, TOK_RUN_PROJECT_END, DELIM } from '../chat/ui/chatPanelTokens.js';
+import type { BuildRequestDeps } from '../../features/ai/logic/chatPanelIntent.js';
+import type { VaultSearchResult } from '../vault/data/buildFromVaultSearch.js';
 import { isValidBuildRoot } from './chatPanelBuildUtils.js';
 import { autoCreateProject } from './chatPanelBuildAutoCreate.js';
 import { callCloudBuild } from './services/cloudBuildClient.js';
-import { getAccountToken } from '../../../shared/api/infrastructure/apiClient.js';
-import { fetchCommunityGotchas } from '../../../shared/api/infrastructure/apiClientKnowledge.js';
+import { getAccountToken } from '../../features/api/data/apiClient.js';
+import { fetchCommunityGotchas } from '../../features/api/data/apiClientKnowledge.js';
 import { appendBuildLog } from './services/buildLogger.js';
-import { BuildActivityPanel } from '../ui/buildActivity/buildActivityPanel.js';
+import { BuildActivityPanel } from '../chat/ui/buildActivity/buildActivityPanel.js';
 import { checkParadoxGuard, setupProjectFilesTree, assembleBuildTask, handleBuildSuccess } from './chatPanelBuildRunnerHelpers.js';
 
 function isProjectsContainer(root: string): boolean {
@@ -61,7 +61,7 @@ export async function runBuildAfterGates(
       
       // [FIX] Update the Redivivus service to point to the newly created project
       // so downstream systems (like the Living Blueprint distiller) save to the right config
-      const { RedivivusService } = await import('../../../shared/vscode/application/redivivusService.js');
+      const { RedivivusService } = await import('../../features/vscode/logic/redivivusService.js');
       deps.redivivus = new RedivivusService(root);
       
       autoCreated = true;
@@ -189,9 +189,9 @@ export async function runBuildAfterGates(
     deps.setActiveBuildCtx(undefined);
     deps.postToWebview({ type: 'set-status', status: 'ready' });
     // Stop the live poll and do a final render so the Project Files tree shows the completed file set.
-    try { require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.stopLiveRefresh(); } catch {}
+    try { require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.stopLiveRefresh(); } catch {}
   }
 }
 
 /** Handles edit-request messages — edits an existing file in-place for TODO/scope fixes. */
-export { handleEditRequest } from '../ui/chatPanelEditHandler.js';
+export { handleEditRequest } from '../chat/ui/chatPanelEditHandler.js';

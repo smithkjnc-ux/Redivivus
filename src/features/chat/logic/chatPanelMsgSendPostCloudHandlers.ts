@@ -3,11 +3,11 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import type { ChatResult } from '../../../shared/api/infrastructure/apiClientChat.js';
-import { handleFixRequest } from './chatPanelMsgFix.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
-import { isProjectsContainer } from '../../project/application/redivivusPaths.js';
-import { cloudChat } from '../../../shared/api/infrastructure/apiClientChat.js';
+import type { ChatResult } from '../../../features/api/data/apiClientChat.js';
+import { handleFixRequest } from '../../fix/chatPanelMsgFix.js';
+import { fixLog } from '../../../features/logging/data/fixPipelineLogger.js';
+import { isProjectsContainer } from '../../project/logic/redivivusPaths.js';
+import { cloudChat } from '../../../features/api/data/apiClientChat.js';
 
 export async function handleAnswerClarifyResult(
   msg: any,

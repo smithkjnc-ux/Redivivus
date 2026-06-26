@@ -2,7 +2,7 @@
 // Checks for hallucinations and scope drift. Supervisor corrects or takes over on failure.
 // [WARN] scope_check makes a real AI call (max_tokens:50). Keep fast — called after every phase.
 
-import { callProvider } from '../domain/providers/providerFactory.js';
+import { callProvider } from '../logic/providers/providerFactory.js';
 
 /** Caller signature injected from RoutingService to avoid circular imports */
 export type ProviderCaller = (ai: string, prompt: string) => Promise<{ text: string; success: boolean; error?: string }>;

@@ -1,8 +1,8 @@
 // [SCOPE] Redivivus File Split Assistant Command — scans and suggests file splits
 
 import * as vscode from 'vscode';
-import { FileSplitService } from '../../workspace/domain/code/fileSplitService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import { FileSplitService } from '../../workspace/logic/fileSplitService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 
 export function registerFileSplitCommand(

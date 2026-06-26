@@ -2,18 +2,18 @@
 // Extracted from chatPanelMessageRouterEarlyExits.ts (Rule 9 split).
 
 import * as vscode from 'vscode';
-import { extractVisualContract } from '../../vault/domain/propertyExtractor.js';
-import { applyBatchPatches } from '../../vault/domain/visualContractPatcher.js';
-import type { VisualProperty } from '../../vault/domain/visualContractTypes.js';
-import { BuildHistoryService } from '../build/services/buildHistoryService.js';
+import { extractVisualContract } from '../../vault/logic/propertyExtractor.js';
+import { applyBatchPatches } from '../../vault/logic/visualContractPatcher.js';
+import type { VisualProperty } from '../../vault/logic/visualContractTypes.js';
+import { BuildHistoryService } from '../../build/services/buildHistoryService.js';
 import { handleRearrangeStart, handleRearrangeMove, handleRearrangeFinish, handleRearrangeUndo, stripRearrangeMarkers } from './chatPanelMessageRouterRearrange.js';
 import * as fs from 'fs';
 import * as path from 'path';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 
 export async function handlePreviewMessages(panel: any, msg: any): Promise<boolean> {
   if (msg.type === 'preview-errors-captured') {
-    const { recordPreviewErrors } = await import('../../workspace/infrastructure/previewErrorService.js');
+    const { recordPreviewErrors } = await import('../../workspace/data/previewErrorService.js');
     recordPreviewErrors(msg.errors || []);
     return true;
   }

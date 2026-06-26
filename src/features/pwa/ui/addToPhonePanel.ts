@@ -1,7 +1,7 @@
 // [SCOPE] "Add to Phone" webview panel. Generates a QR for the install URL server-side (vendored MIT qrcode lib,
 // inlined as SVG) and shows the finished PWA preview: URL + QR + countdown + install steps. See REDIVIVUS_ADD_TO_PHONE.md.
 import * as vscode from 'vscode';
-import type { PublishResult } from '../infrastructure/pwaPublish.js';
+import type { PublishResult } from '../data/pwaPublish.js';
 import { addToPhoneHtml } from './addToPhonePanelHtml.js';
 
 // Vendored qrcode-generator (Kazuhiko Arase, MIT) — copied to out/ by the compile step; required in Node, not the webview.

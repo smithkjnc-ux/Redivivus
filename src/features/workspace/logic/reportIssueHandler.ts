@@ -5,8 +5,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { execFileSync } from 'child_process';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import { getSessionSnapshot } from '../../../shared/logging/infrastructure/redivivusLoggerOps.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import { getSessionSnapshot } from '../../../features/logging/data/redivivusLoggerOps.js';
 import { collectDiagnostics } from './reportDiagnostics.js';
 
 const FEEDBACK_URL = 'https://redivivus.dev/api/feedback';

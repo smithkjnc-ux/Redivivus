@@ -3,14 +3,14 @@
 // Phase 2: Worker generates fix content (subtasks loop OR escalation loop).
 // Phase 3: Guardian reviews + apply (applyFixContent). Failure path: retryNoOutput + dead-end vault.
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { fixLog, finalizeFixLogger } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { fixLog, finalizeFixLogger } from '../../features/logging/data/fixPipelineLogger.js';
 import { fixCostByline, fixErrorHint } from './chatPanelMsgFixUsage.js';
 import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds.js';
 import { fixActFinish } from './fixActivityPanel.js';
 import { runFixFinalize } from './chatPanelMsgFixFinalize.js';
-import { explainFixFailure, formatELI5Block } from '../../../shared/ai/infrastructure/fixFailureELI5.js';
-import { progressApplying } from '../ui/fixProgressStyle.js';
+import { explainFixFailure, formatELI5Block } from '../../features/ai/data/fixFailureELI5.js';
+import { progressApplying } from './fixProgressStyle.js';
 
 export interface FixPhase23Params {
   subtasks: string[];

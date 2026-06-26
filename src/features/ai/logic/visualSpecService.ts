@@ -2,7 +2,7 @@
 // Three sources: extracted (theme/token files) > inferred (existing components) > defaulted (new project).
 // Contract is embedded in routedText so Worker has locked visual values; also passed to Visual Contract Editor.
 
-import type { RoutingService } from '../infrastructure/routingService.js';
+import type { RoutingService } from '../data/routingService.js';
 import { extractFromProjectFiles, inferFromComponents } from './visualSpecExtractor.js';
 
 export interface VisualSpec {

@@ -48,7 +48,7 @@ export const COMMAND_TOOLS: AgentTool[] = [
       if (command !== requested) { ctx.log(`↪️ Using an alternate approach: \`${command}\``); }
       // [MIGRATIONS-GUARD] Preview prisma migrate dev with --create-only, scan for data loss, discard if found.
       try {
-        const mg = await import('../../../features/chat/build/services/migrationsGuard.js');
+        const mg = await import('../../../features/build/services/migrationsGuard.js');
         if (mg.isApplyingPrismaMigrate(command)) {
           const before = mg.newestMigrationSqlPath(ctx.root);
           await runShell(`${command} --create-only`, ctx.root);
@@ -78,7 +78,7 @@ export const COMMAND_TOOLS: AgentTool[] = [
         return `Command failed (exit ${code}):\nSTDOUT:\n${trimForModel(stdout)}\nSTDERR:\n${trimForModel(stderr)}${gapNote}`;
       }
       try {
-        const { looksLikeMigrationApply } = await import('../../../features/chat/build/services/migrationsGuard.js');
+        const { looksLikeMigrationApply } = await import('../../../features/build/services/migrationsGuard.js');
         if (looksLikeMigrationApply(command)) { ctx.migrationRan = true; }
       } catch { /* best-effort flag */ }
       let result = '';
@@ -140,7 +140,7 @@ export const COMMAND_TOOLS: AgentTool[] = [
       if (typeof args.search !== 'string' || args.search === '') { return 'Error: "search" must be a non-empty exact snippet copied from the current file (read it first).'; }
       try {
         const before = fs.readFileSync(absPath, 'utf8');
-        const { applySurgicalEdits } = await import('../../../features/chat/build/services/surgicalEditService.js');
+        const { applySurgicalEdits } = await import('../../../features/build/services/surgicalEditService.js');
         const [res] = applySurgicalEdits([{ filePath: rel, searchBlock: args.search, replaceBlock: typeof args.replace === 'string' ? args.replace : '' }], ctx.root);
         if (!res || !res.success) {
           return `Edit failed: ${res?.error || 'the search text was not found'}. Read the file (read_file / read_file_lines) and copy the snippet EXACTLY, including indentation — or if the file is small, use write_file to rewrite it.`;

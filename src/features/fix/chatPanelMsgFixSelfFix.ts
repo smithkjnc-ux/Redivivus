@@ -1,10 +1,10 @@
 // [SCOPE] Supervisor Self-Fix Pipeline — invoked when Worker exhausts retries
 // Extracted from chatPanelMsgFixEscalation.ts (Rule 9 split).
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { fixActStep } from './fixActivityPanel.js';
-import { progressEscalating } from '../ui/fixProgressStyle.js';
+import { progressEscalating } from './fixProgressStyle.js';
 
 export async function runSupervisorSelfFix(params: {
   currentDiagnosis: string;

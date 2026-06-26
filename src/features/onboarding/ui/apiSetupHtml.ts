@@ -2,14 +2,14 @@
 // Imported by ApiSetupPanel._getHtml() in apiSetup.ts.
 
 import * as vscode from 'vscode';
-import { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import { RoutingService } from '../../../features/ai/data/routingService.js';
 import { API_SETUP_CSS } from './apiSetupStyles.js';
 import { buildProviderCards } from './apiSetupHtmlCards.js';
 import { API_SETUP_SCRIPT } from './apiSetupScript.js';
-import { modelsForProvider } from '../../../shared/ai/infrastructure/modelRegistry.js';
+import { modelsForProvider } from '../../../features/ai/data/modelRegistry.js';
 
 export function getApiSetupHtml(): string {
-  const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../shared/ai/infrastructure/secretKeyStore');
+  const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../features/ai/data/secretKeyStore');
   const config = vscode.workspace.getConfiguration('redivivus');
   const [geminiKey, claudeKey, openaiKey, groqKey, xaiKey, kimiKey, deepseekKey] =
     ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi', 'deepseek'].map(p => getKeyCached(p) || '');

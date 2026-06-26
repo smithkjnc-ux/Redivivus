@@ -3,9 +3,9 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { ProjectOperations } from '../../project/application/projectOperations.js';
-import { _scanRedivivusProjects } from '../../workspace/infrastructure/redivivusProjectScanner.js';
-import { markProjectClosed } from '../../project/application/closeMarker.js';
+import { ProjectOperations } from '../../project/logic/projectOperations.js';
+import { _scanRedivivusProjects } from '../../workspace/data/redivivusProjectScanner.js';
+import { markProjectClosed } from '../../project/logic/closeMarker.js';
 
 export async function handleKeywordShortcuts(
   userText: string,
@@ -16,7 +16,7 @@ export async function handleKeywordShortcuts(
 
   if (/what\s+templates|show.*templates|list.*templates|templates.*available|templates.*do\s+you\s+have|what\s+can\s+you\s+build|what\s+types.*build|what.*project.*types/i.test(lowerText)) {
     try {
-      const { TEMPLATE_CATEGORIES } = await import('../../project/application/templateRegistry.js');
+      const { TEMPLATE_CATEGORIES } = await import('../../project/logic/templateRegistry.js');
       const lines = ['**Redivivus Template Library** -- here\'s what I can build:\n', ...TEMPLATE_CATEGORIES.flatMap(cat => [`**${cat.label}** -- ${cat.description}`, ...cat.subcategories.map(sub => `  - **${sub.label}**: ${sub.description}${sub.tags?.length ? ' (' + sub.tags.slice(0, 3).join(', ') + ')' : ''}`)]), '\nJust say **"build me a [type]"** and I\'ll walk you through it.'];
       conversation.push({ role: 'assistant', content: lines.join('\n'), timestamp: Date.now() });
     } catch {
@@ -29,11 +29,11 @@ export async function handleKeywordShortcuts(
   if (/^(run|open|launch|show|preview|view)\s+(it|the\s+(program|app|site|page|game|file|project|result|output)|my\s+(program|app|site|game))/i.test(lowerText) || lowerText.trim() === 'run it') {
     const _runRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (_runRoot) {
-      const { detectPostBuildInfo } = await import('../build/chatPanelPostBuild.js');
+      const { detectPostBuildInfo } = await import('../../build/chatPanelPostBuild.js');
       const _info = detectPostBuildInfo(_runRoot, []);
       if (_info.entryFile) {
         // [FIX][RUN-WEB-HTTP] Serve over http (NOT file:// — modular apps break there).
-        const { openWebInBrowser } = await import('../../project/domain/openWebInBrowser.js');
+        const { openWebInBrowser } = await import('../../project/logic/openWebInBrowser.js');
         await openWebInBrowser(_runRoot, _info.entryFile);
         conversation.push({ role: 'assistant', content: `Opening \`${_info.entryFile}\` in your browser.`, timestamp: Date.now() });
         refresh(); return true;
@@ -76,8 +76,8 @@ export async function handleKeywordShortcuts(
   if (/how'?s\s+my\s+setup|setup\s+progress|what'?s\s+left|what\s+to\s+do\s+next/i.test(lowerText)) {
     const _spRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (_spRoot && redivivus) {
-      const { SetupProgressService } = await import('../../project/application/setupProgressService.js');
-      const { showSetupProgressPanel } = await import('../../project/application/setupProgressPanel.js');
+      const { SetupProgressService } = await import('../../project/logic/setupProgressService.js');
+      const { showSetupProgressPanel } = await import('../../project/logic/setupProgressPanel.js');
       const svc = new SetupProgressService(redivivus, _spRoot);
       const prog = await svc.getProgress();
       showSetupProgressPanel(prog, () => svc.getProgress());
@@ -98,14 +98,14 @@ export async function handleKeywordShortcuts(
       // ensureProjectsWorkspace.healUntitledProjectsWorkspace() then collapses it BACK to ~/projects,
       // making the project appear open for ~2 seconds then vanish. Fix: use activateProject() instead —
       // it sets the ProjectFilesProvider root and refreshes the chat header without touching workspace folders.
-      const { isProjectsContainer } = await import('../../project/application/redivivusPaths.js');
+      const { isProjectsContainer } = await import('../../project/logic/redivivusPaths.js');
       const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const inProjectsContainer = wsRoot && isProjectsContainer(wsRoot);
       const alreadyOpen = vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === named.fullPath);
 
       if (inProjectsContainer && !alreadyOpen) {
         // Model A path: ~/projects is open — just activate the sub-project in the tree without reloading
-        const { activateProject } = await import('../../project/domain/activeProjectWatcher.js');
+        const { activateProject } = await import('../../project/logic/activeProjectWatcher.js');
         activateProject(named.fullPath);
         // Also update the chat service so routing knows about the new project root
         try {
@@ -137,7 +137,7 @@ export async function handleKeywordShortcuts(
         vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(named.fullPath) });
       } else {
         // Already open — just focus the Redivivus project files tree
-        const { activateProject } = await import('../../project/domain/activeProjectWatcher.js');
+        const { activateProject } = await import('../../project/logic/activeProjectWatcher.js');
         activateProject(named.fullPath);
         vscode.commands.executeCommand('redivivusProjectFiles.focus');
       }

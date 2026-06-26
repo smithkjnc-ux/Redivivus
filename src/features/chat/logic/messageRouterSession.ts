@@ -2,7 +2,7 @@
 // Called by messageRouter orchestrator. No wizard or vault logic here.
 
 import * as vscode from 'vscode';
-import type { SessionService } from '../../project/application/sessionService.js';
+import type { SessionService } from '../../project/logic/sessionService.js';
 
 let isProcessingSession = false;
 
@@ -23,7 +23,7 @@ export async function handleSessionMessage(
         await sessions.endSessionWithData(msg.data);
         // [FIX] Clear the project-context latch so the NEXT project isn't mistaken for an illegal
         // mid-build switch (previously left the old project "stuck in the queue" after exiting).
-        const { resetProjectContext } = await import('../../../shared/logging/infrastructure/projectContextLogger.js');
+        const { resetProjectContext } = await import('../../../features/logging/data/projectContextLogger.js');
         resetProjectContext();
         refresh();
       } finally {

@@ -10,7 +10,7 @@ import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent.js';
 import { createTurnContext } from './turnContext.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 import { runPreCloudRouting } from './chatPanelMsgSendPreCloud.js';
 import { routeCloudChatResult } from './chatPanelMsgSendPostCloud.js';
 
@@ -24,7 +24,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   deps.manualModel = (msg.manualModel as string) || undefined;
 
   // ── Auth gate ──
-  const { getAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js');
+  const { getAccountToken } = await import('../../../features/api/data/apiClient.js');
   if (!(await getAccountToken())) {
     conversation.push({
       role: 'assistant',

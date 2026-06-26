@@ -1,7 +1,7 @@
 // [SCOPE] Groq provider implementation
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
-import { getGroqKey } from '../../infrastructure/routingKeys.js';
+import type { AIResponse } from '../../data/routingTypes.js';
+import { getGroqKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 
 export async function executeGroq(
@@ -11,7 +11,7 @@ export async function executeGroq(
   tier?: 'flash' | 'pro' | 'ultra'
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getGroqKey()!;
-  const { bestModelForRole, tierToRole } = await import('../../infrastructure/modelRegistry.js');
+  const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
   const model = bestModelForRole('groq', tierToRole(tier))?.modelId ?? 'llama-3.3-70b-versatile';
   try {
     const url = 'https://api.groq.com/openai/v1/chat/completions';

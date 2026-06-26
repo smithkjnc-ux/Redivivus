@@ -2,7 +2,7 @@
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import type { BuildContext } from './chatPanelBuild.js';
-import { LearnedMemoryService } from '../application/learnedMemoryService.js';
+import { LearnedMemoryService } from '../chat/logic/learnedMemoryService.js';
 
 export interface GuardianReviewResult {
   code: string;
@@ -18,14 +18,14 @@ export async function runGuardianReview(ctx: BuildContext, code: string, relPath
     const guardianContext = neverDo ? `${baseContext}\n${neverDo}` : baseContext;
 
     // Stage 6: retry loop with user escalation (replaces one-shot correction)
-    const { runGuardianWithRetry } = await import('../../../shared/ai/infrastructure/guardianRetryHandler.js');
+    const { runGuardianWithRetry } = await import('../../features/ai/data/guardianRetryHandler.js');
     const result = await runGuardianWithRetry(ctx, code, relPath, supervisorSpec, guardianContext);
 
     // Persist final issues as NeverDo entries AND send to backend for collective learning
     if (result.finalIssues.length > 0) {
       const learned = new LearnedMemoryService(root);
       const ext = relPath.split('.').pop() || 'code';
-      const { logGotcha } = await import('../../../shared/api/infrastructure/apiClientTelemetry.js');
+      const { logGotcha } = await import('../../features/api/data/apiClientTelemetry.js');
       result.finalIssues.forEach(issue => {
         learned.addNeverDo(issue, ext);
         logGotcha({ pattern: issue.slice(0, 200), issueText: issue, buildContext: ext, taskSummary: task.slice(0, 200) });
@@ -139,7 +139,7 @@ export async function runStaticCompilationGateForFix(workerResponse: string, roo
 
 export async function runStaticValidation(code: string, relPath: string): Promise<string> {
   try {
-    const { validateCode } = await import('../../workspace/domain/code/codeValidator.js');
+    const { validateCode } = await import('../workspace/logic/codeValidator.js');
     const res = validateCode(code, relPath.split('.').pop() || '');
     if (res.autoFixed) {return res.code;}
   } catch {}
@@ -148,7 +148,7 @@ export async function runStaticValidation(code: string, relPath: string): Promis
 
 export async function runImportValidation(ctx: BuildContext, code: string, absPath: string, root: string): Promise<string> {
   try {
-    const { validateImports, buildImportRepairPrompt } = await import('../../../shared/ai/infrastructure/importValidator.js');
+    const { validateImports, buildImportRepairPrompt } = await import('../../features/ai/data/importValidator.js');
     const check = validateImports(code, absPath, root);
     if (!check.valid) {
       const repairPrompt = buildImportRepairPrompt(ctx.task, code, check, absPath);

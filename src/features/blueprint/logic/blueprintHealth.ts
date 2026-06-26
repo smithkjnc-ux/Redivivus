@@ -1,7 +1,7 @@
 // [SCOPE] Blueprint health calculator — calculateHealth function for blueprint confidence scoring
 // Called by blueprintService. No interview or writing logic here.
 
-import type { Blueprint, BlueprintHealth } from '../../../../types/index.js';
+import type { Blueprint, BlueprintHealth } from '../../../types/index.js';
 
 export function calculateHealth(answers: Pick<Blueprint, 'who' | 'what' | 'where' | 'when' | 'why'>): BlueprintHealth {
   let confirmed = 0;

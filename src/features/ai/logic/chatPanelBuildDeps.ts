@@ -3,10 +3,10 @@
 // All callers import from chatPanelIntent.ts via re-export (no import path changes needed).
 
 import type { ChatMessage } from '../../../features/chat/ui/chatPanelHtml.js';
-import type { RoutingService } from '../infrastructure/routingService.js';
-import type { VaultService } from '../../../features/vault/infrastructure/vaultService.js';
-import type { RedivivusService } from '../../vscode/application/redivivusService.js';
-import type { BuildContext } from '../../../features/chat/build/chatPanelBuild.js';
+import type { RoutingService } from '../data/routingService.js';
+import type { VaultService } from '../../../features/vault/data/vaultService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { BuildContext } from '../../../features/build/chatPanelBuild.js';
 
 export interface BuildRequestDeps {
   redivivus: RedivivusService;
@@ -21,6 +21,6 @@ export interface BuildRequestDeps {
   setActiveBuildCtx: (ctx: BuildContext | undefined) => void;
   pendingTask: string | undefined;
   setPendingTask: (t: string | undefined) => void;
-  usageTracker?: import('../../../features/telemetry/infrastructure/usageTracker').UsageTracker;
+  usageTracker?: import('../../../features/telemetry/data/usageTracker').UsageTracker;
   buildMode?: 'plan' | 'direct';
 }

@@ -2,7 +2,7 @@
 // Step checker functions -> setupProgressSteps.ts
 
 import * as path from 'path';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import {
   checkStep1, checkStep2, checkStep3, checkStep4, checkStep5,
   checkStep6, checkStep7, checkStep8, checkStep9, checkStep10,

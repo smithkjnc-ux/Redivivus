@@ -3,12 +3,12 @@
 // Parent: apiSetup.ts (registers commands and exports registerApiSetupCommand).
 
 import * as vscode from 'vscode';
-import { getApiSetupHtml } from './apiSetupHtml.js';
-import { checkProviderReachable } from '../../workspace/domain/selfDiagnosticChecks.js';
+import { getApiSetupHtml } from '../ui/apiSetupHtml.js';
+import { checkProviderReachable } from '../../workspace/logic/selfDiagnosticChecks.js';
 
 export async function refreshChatPanelForKeyChange(): Promise<void> {
   try {
-    const { invalidateRosterCache } = await import('../../../shared/ai/infrastructure/routingServiceRoster.js');
+    const { invalidateRosterCache } = await import('../../../features/ai/data/routingServiceRoster.js');
     invalidateRosterCache();
     const { ChatPanel } = await import('../../chat/ui/chatPanel.js');
     const p = ChatPanel.currentPanel as { refresh?: () => void } | undefined;
@@ -27,7 +27,7 @@ export class ApiSetupPanel {
     this._panel.webview.html = html.replace('<head>', '<head>\n<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">\n<meta http-equiv="Pragma" content="no-cache">\n<meta http-equiv="Expires" content="0">');
     this._panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'save-keys') {
-        const { storeKey, deleteKey } = await import('../../../shared/ai/infrastructure/secretKeyStore.js');
+        const { storeKey, deleteKey } = await import('../../../features/ai/data/secretKeyStore.js');
         const toCheck: { id: string, name: string, key: string }[] = [];
         const pairs: [string, string, string][] = [
           ['gemini', 'geminiKey', 'Gemini'], ['claude', 'claudeKey', 'Claude'],
@@ -74,10 +74,10 @@ export class ApiSetupPanel {
       } else if (msg.type === 'open-vscode-settings') {
         await vscode.commands.executeCommand('workbench.action.openSettings', 'redivivus');
       } else if (msg.type === 'export-all-keys') {
-        const { exportKeysEncrypted } = await import('../../../shared/vscode/application/keyBackup.js');
+        const { exportKeysEncrypted } = await import('../../../features/vscode/logic/keyBackup.js');
         await exportKeysEncrypted();
       } else if (msg.type === 'import-keys') {
-        const { importKeysEncrypted } = await import('../../../shared/vscode/application/keyBackup.js');
+        const { importKeysEncrypted } = await import('../../../features/vscode/logic/keyBackup.js');
         const imported = await importKeysEncrypted();
         if (imported > 0) {
           this._panel.webview.html = getApiSetupHtml();
@@ -103,7 +103,7 @@ export class ApiSetupPanel {
   }
 
   private async testAllKeys(): Promise<void> {
-    const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../shared/ai/infrastructure/secretKeyStore');
+    const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../features/ai/data/secretKeyStore');
     const providers = [
       { id: 'gemini', name: 'Gemini' }, { id: 'claude', name: 'Claude' },
       { id: 'openai', name: 'OpenAI' }, { id: 'groq', name: 'Groq' },

@@ -1,7 +1,7 @@
 // [SCOPE] OpenAI provider implementation
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
-import { getOpenAIKey } from '../../infrastructure/routingKeys.js';
+import type { AIResponse } from '../../data/routingTypes.js';
+import { getOpenAIKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 
 export async function executeOpenAI(
@@ -13,7 +13,7 @@ export async function executeOpenAI(
   imageType?: string
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getOpenAIKey()!;
-  const { bestModelForRole, tierToRole } = await import('../../infrastructure/modelRegistry.js');
+  const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
   const model = bestModelForRole('openai', tierToRole(tier))?.modelId ?? 'gpt-4o-mini';
   try {
     const url = 'https://api.openai.com/v1/chat/completions';

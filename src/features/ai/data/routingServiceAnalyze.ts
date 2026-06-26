@@ -1,12 +1,12 @@
 // [SCOPE] File analysis helper — extracted from routingService.ts (Rule 9 split)
 
 import * as path from 'path';
-import type { VaultContextService } from '../../../features/vault/infrastructure/vaultContextService.js';
+import type { VaultContextService } from '../../../features/vault/data/vaultContextService.js';
 import type { AIResponse } from './routingTypes.js';
 import { getGeminiKey } from './routingKeys.js';
 import { callGemini } from './routingGemini.js';
-import { callProvider } from '../domain/providers/providerFactory.js';
-import { redivivusLog, logAIInteraction } from '../../logging/infrastructure/redivivusLogger.js';
+import { callProvider } from '../logic/providers/providerFactory.js';
+import { redivivusLog, logAIInteraction } from '../../../features/logging/data/redivivusLogger.js';
 
 export async function analyzeFileImpl(
   supervisor: string,

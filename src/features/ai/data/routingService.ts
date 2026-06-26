@@ -1,17 +1,17 @@
 // [SCOPE] AI Routing Service orchestrator — thin facade over keys, providers, and roster modules. Complexity routing and guardian logic extracted to routingComplexity.ts and routingGuardian.ts.
 
 import * as vscode from 'vscode';
-import type { VaultContextService } from '../../../features/vault/infrastructure/vaultContextService.js';
+import type { VaultContextService } from '../../../features/vault/data/vaultContextService.js';
 import type { AIResponse } from './routingTypes.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
-import { callProvider } from '../domain/providers/providerFactory.js';
+import { callProvider } from '../logic/providers/providerFactory.js';
 import { AI_RANK } from './guardianAI.js';
 import { routeByComplexityImpl } from './routingComplexity.js';
 import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
 import { supervisorPlanWithFailover } from './routingServiceSupervisor.js';
-import { redivivusLog } from '../../logging/infrastructure/redivivusLogger.js';
+import { redivivusLog } from '../../../features/logging/data/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
-import { logTelemetry } from '../../api/infrastructure/apiClientTelemetry.js';
+import { logTelemetry } from '../../../features/api/data/apiClientTelemetry.js';
 import { logAICall } from './aiCallLogger.js';
 import { promptCheapImpl } from './routingServiceCheap.js';
 import { recordQuotaError } from './providerTierState.js';

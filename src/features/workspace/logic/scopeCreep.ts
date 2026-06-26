@@ -1,9 +1,9 @@
 // [SCOPE] Redivivus Scope Creep Detection Command — warn when project drifts from blueprint
 
 import * as vscode from 'vscode';
-import { ScopeCreepDetectionService } from '../domain/code/scopeCreepDetection.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import { ScopeCreepDetectionService } from './scopeCreepDetection.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 
 export function registerScopeCreepCommand(

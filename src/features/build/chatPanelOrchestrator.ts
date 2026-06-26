@@ -1,21 +1,21 @@
 // [SCOPE] Chat Panel Build Orchestrator — complexity assessment, phased builds, expanded interviews
 // Handles deep complexity builds with the "car assembly line" approach.
 import * as vscode from 'vscode';
-import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { VaultService } from '../../vault/infrastructure/vaultService.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { ComplexityResult} from '../../../shared/ai/domain/complexityAssessment.js';
-import { assessComplexity, getTierDescription } from '../../../shared/ai/domain/complexityAssessment.js';
+import type { ChatMessage } from '../chat/ui/chatPanelHtml.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
+import type { VaultService } from '../vault/data/vaultService.js';
+import type { RedivivusService } from '../../features/vscode/logic/redivivusService.js';
+import type { ComplexityResult} from '../../features/ai/logic/complexityAssessment.js';
+import { assessComplexity, getTierDescription } from '../../features/ai/logic/complexityAssessment.js';
 import { BuildOrchestrator, BuildBlueprint, BuildPlan, BuildPhase } from './services/buildOrchestrator.js';
-import { generateVagueWarning } from '../../project/infrastructure/blueprint/expandedInterview.js';
+import { generateVagueWarning } from '../blueprint/logic/expandedInterview.js';
 import { createBuildContext } from './chatPanelPhasedBuild.js';
 import { runSingleFileBuild, runChunkedBuild, isChunkedBuildRequest, BuildContext } from './chatPanelBuild.js';
-import type { VaultSearchResult } from '../../vault/infrastructure/buildFromVaultSearch.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
-import { inspectPhase, PhaseInspection } from '../../project/domain/inspector/phaseInspector.js';
-import { formatInspectionReport } from '../../project/domain/inspector/phaseInspectorReport.js';
-import { extractBlueprintFromPrompt } from '../../project/infrastructure/blueprint/blueprintExtractor.js';
+import type { VaultSearchResult } from '../vault/data/buildFromVaultSearch.js';
+import type { UsageTracker } from '../telemetry/data/usageTracker.js';
+import { inspectPhase, PhaseInspection } from '../project/logic/inspector/phaseInspector.js';
+import { formatInspectionReport } from '../project/logic/inspector/phaseInspectorReport.js';
+import { extractBlueprintFromPrompt } from '../blueprint/logic/blueprintExtractor.js';
 import { isValidBuildRoot } from './chatPanelBuildUtils.js';
 import { isModificationRequest } from './chatPanelBuildInference.js';
 

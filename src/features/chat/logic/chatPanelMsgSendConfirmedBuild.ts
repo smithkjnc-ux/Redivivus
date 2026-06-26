@@ -5,8 +5,8 @@
 import * as vscode from 'vscode';
 import { ChatMessage } from '../ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { runSingleFileBuild } from '../build/chatPanelBuild.js';
-import { autoCreateProject } from '../build/chatPanelBuildAutoCreate.js';
+import { runSingleFileBuild } from '../../build/chatPanelBuild.js';
+import { autoCreateProject } from '../../build/chatPanelBuildAutoCreate.js';
 import { ChatPanel } from '../ui/chatPanel.js';
 
 export async function runConfirmedLocalBuild(
@@ -16,7 +16,7 @@ export async function runConfirmedLocalBuild(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<void> {
-  const { getAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js');
+  const { getAccountToken } = await import('../../../features/api/data/apiClient.js');
   const token = await getAccountToken();
   if (!token) {
     conversation.push({ role: 'assistant', content: '🔒 **Sign in to use Redivivus**\n\nRun **Redivivus: Sign In** from the command palette.', timestamp: Date.now() });
@@ -28,7 +28,7 @@ export async function runConfirmedLocalBuild(
   // Step 1: Extract blueprint from the task using Redivivus AI
   let extracted: any = { suggestedName: '', who: '', what: '', where: '', when: '', why: '' };
   try {
-    const { extractBlueprintFromPrompt } = await import('../../project/infrastructure/blueprint/blueprintExtractor.js');
+    const { extractBlueprintFromPrompt } = await import('../../blueprint/logic/blueprintExtractor.js');
     extracted = await extractBlueprintFromPrompt(task, deps.routing);
   } catch {
     // [WARN] AI extraction failed — use heuristic fallback
@@ -73,9 +73,9 @@ export async function runConfirmedLocalBuild(
   }
 
   // Step 3: Build with full Redivivus context (supervisor->worker->guardian)
-  const { readProjectDeadEnds } = await import('./chatPanelMsgFixDeadEnds.js');
-  const { readProjectRules, getRecentBuildsContext } = await import('./chatPanelMsgFixUtils.js');
-  const { buildGitContextBlock } = await import('../../workspace/infrastructure/gitContext.js');
+  const { readProjectDeadEnds } = await import('../../fix/chatPanelMsgFixDeadEnds.js');
+  const { readProjectRules, getRecentBuildsContext } = await import('../../fix/chatPanelMsgFixUtils.js');
+  const { buildGitContextBlock } = await import('../../workspace/data/gitContext.js');
   const deadEnds = readProjectDeadEnds(root);
   const projectRules = readProjectRules(root);
   const gitCtx = buildGitContextBlock(root);

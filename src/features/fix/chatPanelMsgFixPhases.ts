@@ -4,11 +4,11 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { modelLabel } from './chatPanelMsgFixUtils.js';
 import { buildSupervisorNotes, buildWorkerRules } from './chatPanelMsgFixPatterns.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
-import { buildPromptInjection } from '../application/userMemoryService.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
+import { buildPromptInjection } from '../chat/logic/userMemoryService.js';
 
 export async function runPhase1Supervisor(
   userText: string,

@@ -3,7 +3,7 @@
 
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { enrichTaskWithBlueprint } from '../../project/infrastructure/blueprint/blueprintInference.js';
+import { enrichTaskWithBlueprint } from '../../blueprint/logic/blueprintInference.js';
 import { handleSendMessage } from './chatPanelMsgSendMessage.js';
 
 // [Redivivus] Pending blueprint card builds — sessionId -> original user task

@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { Blueprint } from '../../../../types/index.js';
+import type { Blueprint } from '../../../types/index.js';
 
 // [LIVING BLUEPRINT] Render the user prompts that built/changed this project — read from the revision ledger
 // (blueprint_revisions.jsonl, a sibling of blueprint.md). Oldest-to-newest, last 20, so the blueprint shows WHAT

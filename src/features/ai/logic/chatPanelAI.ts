@@ -4,13 +4,13 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RedivivusService } from '../../vscode/application/redivivusService.js';
-import { LearnedMemoryService } from '../../../features/chat/application/learnedMemoryService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import { LearnedMemoryService } from '../../../features/chat/logic/learnedMemoryService.js';
 import { getSystemPrompt } from './chatPanelAIPrompt.js';
-import { buildProjectAnnotationContext } from '../../../features/project/domain/chatPanelProjectContext.js';
-import { Redivivus_WORKER_RULES } from '../infrastructure/redivivusWorkerRules.js';
-import { extractFileMentions } from '../../../features/project/domain/chatPanelFileContext.js';
-import { getActiveProjectRoot } from '../../../features/project/application/activeProjectRoot.js';
+import { buildProjectAnnotationContext } from '../../../features/project/logic/chatPanelProjectContext.js';
+import { Redivivus_WORKER_RULES } from '../data/redivivusWorkerRules.js';
+import { extractFileMentions } from '../../../features/project/logic/chatPanelFileContext.js';
+import { getActiveProjectRoot } from '../../../features/project/logic/activeProjectRoot.js';
 import { selectRelevantTurns } from './contextSelector.js';
 import { buildCodeGenPrefix } from './chatPanelAICodeGen.js';
 
@@ -53,7 +53,7 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
   // answered generically instead of auditing the actual project. (Jun 24, 2026)
   if (!activeFileContext && workspaceRoot !== 'none' && userText) {
     try {
-      const { resolveSourceFiles } = await import('../../../features/chat/routing/chatPanelMsgFixContext.js');
+      const { resolveSourceFiles } = await import('../../../features/fix/chatPanelMsgFixContext.js');
       const files = await resolveSourceFiles(workspaceRoot, userText, { routing });
       if (files.length > 0) {
         activeFileContext = '\n--- CURRENT PROJECT SOURCE FILES (READ THESE to answer questions about behavior, appearance, rendering, bugs) ---'

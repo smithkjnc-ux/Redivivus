@@ -2,7 +2,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { FileInfo, AnalysisResult } from './analyzerTypes.js';
-import { getResolvedPaths } from '../../../chat/application/resolvedItems.js';
+import { getResolvedPaths } from '../../chat/logic/resolvedItems.js';
 
 export { FileInfo, AnalysisResult };
 

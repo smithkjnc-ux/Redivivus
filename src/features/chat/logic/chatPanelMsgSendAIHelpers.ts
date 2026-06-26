@@ -1,9 +1,9 @@
 // [SCOPE] Extracted Guardian review validation and Auto-Save orchestration logic for AI messages
 import * as vscode from 'vscode';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import { shouldAutoSave, extractAutoSaveTarget, autoSaveAndOpen } from '../build/chatPanelAutoSave.js';
+import { shouldAutoSave, extractAutoSaveTarget, autoSaveAndOpen } from '../../build/chatPanelAutoSave.js';
 
 export async function runGuardianReviewOnCode(
   finalText: string,
@@ -56,7 +56,7 @@ export async function handleAutoSaveLogic(
     const path = require('path') as typeof import('path');
     const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
     if (path.resolve(root) === path.resolve(cfg)) {
-      const { lastAutoCreatedDir } = await import('../build/chatPanelBuildAutoCreate.js');
+      const { lastAutoCreatedDir } = await import('../../build/chatPanelBuildAutoCreate.js');
       root = (lastAutoCreatedDir && require('fs').existsSync(lastAutoCreatedDir)) ? lastAutoCreatedDir : '';
     }
   }

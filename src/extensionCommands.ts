@@ -2,62 +2,62 @@
 // Extracted from extension.ts
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
-import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
-import type { VaultService } from './features/vault/infrastructure/vaultService.js';
-import type { MeasureTwiceService } from './features/chat/build/services/measureTwiceService.js';
-import type { ChangeTracker } from './features/chat/build/services/changeTracker.js';
-import type { AnalyzerService } from './features/workspace/ui/analyzer/analyzerService.js';
-import type { RulesService } from './shared/vscode/domain/rules/rulesService.js';
-import type { RetrofitService } from './features/project/domain/retrofit/retrofitService.js';
-import type { SessionService } from './features/project/application/sessionService.js';
-import type { GuideService } from './shared/vscode/application/guideService.js';
-import type { BlueprintService } from './features/project/infrastructure/blueprint/blueprintService.js';
-import type { StatusBar } from './shared/vscode/ui/statusBar.js';
-import type { GuardianService } from './shared/ai/infrastructure/guardianService.js';
-import type { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
-import { openBlueprintPanel } from './features/project/ui/blueprint/blueprintInterviewPanel.js';
-import { registerVaultDedupCommand } from './features/vault/application/vaultDedup.js';
-import { registerCloseProjectCommand } from './features/project/application/closeProject.js';
-import { registerCompileProjectCommand } from './features/project/application/compileProject.js';
-import type { RedivivusSidebarProvider } from './shared/vscode/ui/sidebar/redivivusSidebar.js';
-import { registerOnNewProject } from './features/project/application/init.js';
-import { registerInitCommands } from './features/project/application/initCommands.js';
-import { DelegationCodeLensProvider } from './features/workspace/application/delegationCodeLens.js';
-import { registerSessionCommands } from './features/project/application/session.js';
-import { registerBlueprintCommands } from './features/project/application/blueprint.js';
-import { registerAnalysisCommands } from './features/workspace/application/analysis.js';
-import { registerReviewCommands } from './features/workspace/application/review.js';
-import { registerRestructureCommands } from './features/project/application/restructure.js';
-import { registerRetrofitCommands } from './features/project/application/retrofit.js';
-import { registerVaultCommands } from './features/vault/application/vault.js';
-import { registerVaultBrowseCommand } from './features/vault/application/vaultBrowse.js';
-import { registerVaultTranslateCommand } from './features/vault/application/vaultTranslate.js';
-import { registerBuildFromVaultCommand } from './features/vault/application/buildFromVault.js';
-import { registerMiscCommands } from './shared/vscode/misc.js';
-import { registerAuthHandler } from './shared/api/infrastructure/authHandler.js';
-import { registerApiSetupCommand } from './features/onboarding/application/apiSetup.js';
-import { registerUsageCommands } from './features/telemetry/application/usageCommands.js';
-import { registerSetupProgressCommand } from './features/onboarding/application/setupProgressCommand.js';
-import { registerSelectionCommands } from './features/workspace/application/selection.js';
-import { registerTimelineCommand } from './features/project/application/timeline.js';
-import { registerLoggingCommands } from './shared/logging/application/logging.js';
-import { registerSavePointCommand } from './features/project/application/savePoint.js';
-import { registerOrganizeProjects } from './features/project/application/organizeProjects.js';
-import { registerFileSplitCommand } from './features/project/application/fileSplit.js';
-import { registerRetrofitBlueprintCommand } from './features/project/application/retrofitBlueprint.js';
-import { registerScopeCreepCommand } from './features/workspace/application/scopeCreep.js';
-import { registerDuplicateCodeCommand } from './features/workspace/application/duplicateCode.js';
-import { registerGitHubBackupCommands } from './features/workspace/application/githubBackup.js';
-import { registerSetupHubCommand } from './features/onboarding/application/setupHub.js';
-import { registerProfileRuntimeCommand } from './features/runtime/application/profileRuntime.js';
-import { registerStartRuntimeAnalysisCommand } from './features/runtime/application/startRuntimeAnalysis.js';
+import type { RedivivusService } from './features/vscode/logic/redivivusService.js';
+import type { RoutingService } from './features/ai/data/routingService.js';
+import type { UsageTracker } from './features/telemetry/data/usageTracker.js';
+import type { VaultService } from './features/vault/data/vaultService.js';
+import type { MeasureTwiceService } from './features/build/services/measureTwiceService.js';
+import type { ChangeTracker } from './features/build/services/changeTracker.js';
+import type { AnalyzerService } from './features/workspace/logic/analyzerService.js';
+import type { RulesService } from './features/vscode/logic/rules/rulesService.js';
+import type { RetrofitService } from './features/project/logic/retrofit/retrofitService.js';
+import type { SessionService } from './features/project/logic/sessionService.js';
+import type { GuideService } from './features/vscode/logic/guideService.js';
+import type { BlueprintService } from './features/blueprint/logic/blueprintService.js';
+import type { StatusBar } from './features/vscode/ui/statusBar.js';
+import type { GuardianService } from './features/ai/data/guardianService.js';
+import type { GitHubBackupService } from './features/workspace/data/githubBackupService.js';
+import { openBlueprintPanel } from './features/blueprint/ui/blueprintInterviewPanel.js';
+import { registerVaultDedupCommand } from './features/vault/logic/vaultDedup.js';
+import { registerCloseProjectCommand } from './features/project/logic/closeProject.js';
+import { registerCompileProjectCommand } from './features/project/logic/compileProject.js';
+import type { RedivivusSidebarProvider } from './features/vscode/ui/sidebar/redivivusSidebar.js';
+import { registerOnNewProject } from './features/project/logic/init.js';
+import { registerInitCommands } from './features/project/logic/initCommands.js';
+import { DelegationCodeLensProvider } from './features/workspace/logic/delegationCodeLens.js';
+import { registerSessionCommands } from './features/project/logic/session.js';
+import { registerBlueprintCommands } from './features/project/logic/blueprint.js';
+import { registerAnalysisCommands } from './features/workspace/logic/analysis.js';
+import { registerReviewCommands } from './features/workspace/logic/review.js';
+import { registerRestructureCommands } from './features/project/logic/restructure.js';
+import { registerRetrofitCommands } from './features/project/logic/retrofit.js';
+import { registerVaultCommands } from './features/vault/logic/vault.js';
+import { registerVaultBrowseCommand } from './features/vault/logic/vaultBrowse.js';
+import { registerVaultTranslateCommand } from './features/vault/logic/vaultTranslate.js';
+import { registerBuildFromVaultCommand } from './features/vault/logic/buildFromVault.js';
+import { registerMiscCommands } from './features/vscode/logic/misc.js';
+import { registerAuthHandler } from './features/api/logic/authHandler.js';
+import { registerApiSetupCommand } from './features/onboarding/logic/apiSetup.js';
+import { registerUsageCommands } from './features/telemetry/logic/usageCommands.js';
+import { registerSetupProgressCommand } from './features/onboarding/logic/setupProgressCommand.js';
+import { registerSelectionCommands } from './features/workspace/logic/selection.js';
+import { registerTimelineCommand } from './features/project/logic/timeline.js';
+import { registerLoggingCommands } from './features/logging/logic/logging.js';
+import { registerSavePointCommand } from './features/project/logic/savePoint.js';
+import { registerOrganizeProjects } from './features/project/logic/organizeProjects.js';
+import { registerFileSplitCommand } from './features/project/logic/fileSplit.js';
+import { registerRetrofitBlueprintCommand } from './features/project/logic/retrofitBlueprint.js';
+import { registerScopeCreepCommand } from './features/workspace/logic/scopeCreep.js';
+import { registerDuplicateCodeCommand } from './features/workspace/logic/duplicateCode.js';
+import { registerGitHubBackupCommands } from './features/workspace/logic/githubBackup.js';
+import { registerSetupHubCommand } from './features/onboarding/logic/setupHub.js';
+import { registerProfileRuntimeCommand } from './features/runtime/logic/profileRuntime.js';
+import { registerStartRuntimeAnalysisCommand } from './features/runtime/logic/startRuntimeAnalysis.js';
 import { registerInlineCommands } from './extensionInlineCommands.js';
-import { registerSignInCommand } from './features/onboarding/application/signIn.js';
-import { registerReportIssueCommand } from './features/workspace/application/reportIssue.js';
-import { registerCheckForUpdatesCommand } from './features/settings/application/checkForUpdates.js';
-import { initOutputChannels } from './shared/logging/ui/outputChannelManager.js';
+import { registerSignInCommand } from './features/onboarding/logic/signIn.js';
+import { registerReportIssueCommand } from './features/workspace/logic/reportIssue.js';
+import { registerCheckForUpdatesCommand } from './features/settings/logic/checkForUpdates.js';
+import { initOutputChannels } from './features/logging/ui/outputChannelManager.js';
 
 export function registerAllCommands(
   context: vscode.ExtensionContext,
@@ -91,7 +91,7 @@ export function registerAllCommands(
   try {   registerVaultCommands(context, redivivusService, vaultService, routingService, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerVaultCommands(context, redivivusService, vaultService, routingService, refreshAll);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerVaultCommands(context, redivivusService, vaultService, routingService, refreshAll); failed: ' + e + '\n'); }
   try {   registerVaultBrowseCommand(context, vaultService); } catch (e) { console.error('Failed to register ' + 'registerVaultBrowseCommand(context, vaultService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerVaultBrowseCommand(context, vaultService); failed: ' + e + '\n'); }
   try {   registerVaultTranslateCommand(context, vaultService, routingService); } catch (e) { console.error('Failed to register ' + 'registerVaultTranslateCommand(context, vaultService, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerVaultTranslateCommand(context, vaultService, routingService); failed: ' + e + '\n'); }
-  try { const { BuildFromVaultService } = require('./features/vault/infrastructure/buildFromVaultService.js'); registerBuildFromVaultCommand(context, new BuildFromVaultService(vaultService, routingService)); } catch (e) { console.error('Failed to register buildFromVault', e); }
+  try { const { BuildFromVaultService } = require('./features/vault/data/buildFromVaultService.js'); registerBuildFromVaultCommand(context, new BuildFromVaultService(vaultService, routingService)); } catch (e) { console.error('Failed to register buildFromVault', e); }
   
   // [DONE] vaultDedup inline handler moved to commands/vaultDedup.ts (Rule 9 split)
   try { registerVaultDedupCommand(context, redivivusService, routingService, usageTracker, vaultService); } catch (e) { console.error('Failed to register vaultDedup command', e); }
@@ -120,7 +120,7 @@ export function registerAllCommands(
   try { registerReportIssueCommand(context, routingService); } catch (e) { console.error('Failed to register reportIssue command', e); }
   try {
     context.subscriptions.push(vscode.commands.registerCommand('redivivus.changePersonality', () =>
-      import('./features/settings/application/personalityPicker.js').then(m => m.pickPersonality())
+      import('./features/settings/logic/personalityPicker.js').then(m => m.pickPersonality())
     ));
   } catch (e) { console.error('Failed to register changePersonality command', e); }
   try { registerCheckForUpdatesCommand(context); } catch (e) { console.error('Failed to register checkForUpdates command', e); }

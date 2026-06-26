@@ -5,11 +5,11 @@
 import * as vscode from 'vscode';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { buildAIPrefix, processAIResponse, getPreviewSnapshot } from '../../../shared/ai/domain/chatPanelAI.js';
-import { clearPendingScopeQuestion } from '../../project/application/templateScopeService.js';
-import { LearnedMemoryService } from '../application/learnedMemoryService.js';
+import { buildAIPrefix, processAIResponse, getPreviewSnapshot } from '../../../features/ai/logic/chatPanelAI.js';
+import { clearPendingScopeQuestion } from '../../project/logic/templateScopeService.js';
+import { LearnedMemoryService } from './learnedMemoryService.js';
 import { _architectReviews } from '../ui/chatPanelMsgArchitect.js';
-import { shouldDeleteFiles, deleteRequestedFiles, identifyFilesToDelete } from '../build/chatPanelAutoSave.js';
+import { shouldDeleteFiles, deleteRequestedFiles, identifyFilesToDelete } from '../../build/chatPanelAutoSave.js';
 import { runChunkedConvert } from './chatPanelMsgSendAIConvert.js';
 import { runGuardianReviewOnCode, handleAutoSaveLogic } from './chatPanelMsgSendAIHelpers.js';
 

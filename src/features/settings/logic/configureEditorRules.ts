@@ -3,10 +3,10 @@
 // use. Persists to the `redivivus.editorRuleFiles` setting and optionally applies to the active project.
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RulesService } from '../../../shared/vscode/domain/rules/rulesService.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
-import { EDITOR_RULE_FILES, getEnabledEditorKeys, setEnabledEditorKeys, removeDisabledShims } from '../../../shared/vscode/domain/rules/editorRuleFiles.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RulesService } from '../../../features/vscode/logic/rules/rulesService.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
+import { EDITOR_RULE_FILES, getEnabledEditorKeys, setEnabledEditorKeys, removeDisabledShims } from '../../../features/vscode/logic/rules/editorRuleFiles.js';
 
 export function registerConfigureEditorRules(
   context: vscode.ExtensionContext,

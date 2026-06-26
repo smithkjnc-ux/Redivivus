@@ -4,7 +4,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 import { getMemoryPanelScript } from './memoryPanelHtmlScripts.js';
 import { getMemoryPanelStyles } from './memoryPanelHtmlStyles.js';
 
@@ -18,7 +18,7 @@ function deleteBtn(type: string, extra: string): string {
 
 export function getMemoryPanelHtml(): string {
   // --- Global memory ---
-  const { loadUserMemory } = require('../../../services/userMemoryService.js') as typeof import('../application/userMemoryService');
+  const { loadUserMemory } = require('../../../services/userMemoryService.js') as typeof import('../logic/userMemoryService');
   const mem = loadUserMemory();
   const topLangs = Object.entries(mem.stack.languages).sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 5);
 
@@ -57,7 +57,7 @@ export function getMemoryPanelHtml(): string {
 
     let knowledgeEntries: any[] = [];
     try {
-      const { readKnowledge } = require('../../../services/learnedMemoryServiceIO.js') as typeof import('../application/learnedMemoryServiceIO');
+      const { readKnowledge } = require('../../../services/learnedMemoryServiceIO.js') as typeof import('../logic/learnedMemoryServiceIO');
       knowledgeEntries = readKnowledge(root).entries || [];
     } catch {}
 

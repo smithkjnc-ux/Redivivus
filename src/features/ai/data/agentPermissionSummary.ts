@@ -3,7 +3,7 @@
 // Uses the existing clarify token pattern so no new webview plumbing is needed.
 // Returns true if approved, false if cancelled. Falls through to true on AI failure (never blocks).
 
-import type { MessageHandlerDeps } from '../../../features/chat/routing/chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../../../features/chat/logic/chatPanelMessages.js';
 import type { ChatMessage } from '../../../features/chat/ui/chatPanelHtml.js';
 
 export interface AgentPermissionResult {

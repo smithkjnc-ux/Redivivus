@@ -5,8 +5,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { AnalyzerService } from '../ui/analyzer/analyzerService.js';
-import type { GuardianService } from '../../../shared/ai/infrastructure/guardianService.js';
+import type { AnalyzerService } from './analyzerService.js';
+import type { GuardianService } from '../../../features/ai/data/guardianService.js';
 
 export interface ElementMetadata {
   tagName?: string;

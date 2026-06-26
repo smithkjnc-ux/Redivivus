@@ -4,7 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { syncBlueprintMd } from './blueprintWriter.js';
+import { syncBlueprintMd } from '../data/blueprintWriter.js';
 
 const BUILDS_PER_REVISION = 3;
 

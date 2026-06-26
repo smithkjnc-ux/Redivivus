@@ -4,7 +4,7 @@
 // Public API is unchanged -- callers do not need to update.
 
 import * as path from 'path';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import {
   KnowledgeEntry, KnowledgeStore, RECENT_TTL_DAYS,
   readKnowledge, writeKnowledge, makeEntry,

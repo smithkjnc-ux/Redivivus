@@ -96,7 +96,7 @@ export async function runEditFileBuild(ctx: EditBuildContext): Promise<void> {
   // [FIX] Snapshot the original file BEFORE writing — enables proper rollback from History.
   let snapshotId: string | undefined;
   try {
-    const { SnapshotService } = await import('../../project/application/snapshotService.js');
+    const { SnapshotService } = await import('../project/logic/snapshotService.js');
     const snap = new SnapshotService(root);
     snapshotId = snap.prepare(`[EDIT] ${task.slice(0, 80)}`, [filePath]);
   } catch { /* snapshot is best-effort */ }

@@ -2,13 +2,13 @@
 // Section HTML is built in analyzerSections.ts. This file is panel lifecycle only.
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { AnalysisResult } from './analyzerTypes.js';
+import type { AnalysisResult } from '../../logic/analyzerTypes.js';
 import {
   buildOverviewSection, buildLargeFilesSection, buildTodosSection,
   buildUncommentedSection, buildNextStepsSection
 } from './analyzerSections.js';
 import { buildRecommendationsHtml } from './analyzerHtml.js';
-import { markResolved } from '../../../chat/application/resolvedItems.js';
+import { markResolved } from '../../../chat/logic/resolvedItems.js';
 
 export function showRecommendationsPanel(result: AnalysisResult): void {
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';

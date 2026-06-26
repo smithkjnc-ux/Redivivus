@@ -4,7 +4,7 @@
 // returns the prescription + supervisor meta for reuse by the single-file /build call.
 
 import * as vscode from 'vscode';
-import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
+import type { BuildRequestDeps } from '../../../features/ai/logic/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
 import { executeMultiFileBuild } from './cloudBuildMultiFile.js';
 

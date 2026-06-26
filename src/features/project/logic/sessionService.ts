@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 import type { SessionInfo, ExitInterview } from '../../../types/index.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import { runExitInterview } from './sessionInterview.js';
 import { generateId } from './sessionStorage.js';
 import { finalizeSession, parseEndSessionData } from './sessionServiceFinalize.js';
@@ -149,7 +149,7 @@ export class SessionService {
     try {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (root) {
-        const { LearnedMemoryService } = await import('../../chat/application/learnedMemoryService.js');
+        const { LearnedMemoryService } = await import('../../chat/logic/learnedMemoryService.js');
         const { ChatPanel } = await import('../../chat/ui/chatPanel.js');
         const learned = new LearnedMemoryService(root);
         learned.pruneRecent();

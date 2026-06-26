@@ -1,8 +1,8 @@
 // [SCOPE] Defines and registers VSCode commands for Redivivus Blueprint operations, including running the interview process and opening the blueprint file.
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { BlueprintService } from '../infrastructure/blueprint/blueprintService.js';
-import { syncBlueprintMd } from '../infrastructure/blueprint/blueprintWriter.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { BlueprintService } from '../../blueprint/logic/blueprintService.js';
+import { syncBlueprintMd } from '../../blueprint/data/blueprintWriter.js';
 
 export function registerBlueprintCommands(
   context: vscode.ExtensionContext,

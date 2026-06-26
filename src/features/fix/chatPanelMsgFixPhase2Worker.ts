@@ -4,7 +4,7 @@
 // Worker is sized by the Supervisor's WORKER_TIER directive (flash/pro/ultra) in the diagnosis.
 
 import * as path from 'path';
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { buildWorkerRules } from './chatPanelMsgFixPatterns.js';
 import { modelLabel } from './chatPanelMsgFixUtils.js';
 

@@ -6,8 +6,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { ChatMessage } from '../../chat/ui/chatPanelHtml.js';
-import type { MessageHandlerDeps } from '../../chat/routing/chatPanelMessages.js';
-import { getActiveProjectRoot } from '../application/activeProjectRoot.js';
+import type { MessageHandlerDeps } from '../../chat/logic/chatPanelMessages.js';
+import { getActiveProjectRoot } from './activeProjectRoot.js';
 
 export async function handleUndoBuild(msg: any, deps: MessageHandlerDeps, conversation: ChatMessage[], refresh: () => void): Promise<void> {
   const { snapshotId } = msg;
@@ -17,14 +17,14 @@ export async function handleUndoBuild(msg: any, deps: MessageHandlerDeps, conver
     refresh(); return;
   }
   try {
-    const { SnapshotService } = await import('../application/snapshotService.js');
+    const { SnapshotService } = await import('./snapshotService.js');
     const snap = new SnapshotService(root);
     const { restored, deleted, error } = snap.restore(snapshotId);
     if (error) {
       conversation.push({ role: 'assistant', content: `❌ Could not undo — ${error}`, timestamp: Date.now() });
     } else {
       conversation.push({ role: 'assistant', content: `✅ Undone! Restored ${restored} file${restored !== 1 ? 's' : ''} to the previous version.`, timestamp: Date.now() });
-      try { const { BuildHistoryService } = await import('../../chat/build/services/buildHistoryService.js'); new BuildHistoryService(root).markUndone(snapshotId); } catch { /* best-effort */ }
+      try { const { BuildHistoryService } = await import('../../build/services/buildHistoryService.js'); new BuildHistoryService(root).markUndone(snapshotId); } catch { /* best-effort */ }
       deps.panel.webview.postMessage({ type: 'preview-reverted' });
       deps.panel.webview.postMessage({ type: 'preview-refresh' });
     }
@@ -38,7 +38,7 @@ export async function handleBuildFeedback(msg: any, deps: MessageHandlerDeps, co
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (root && msg.rating === 'bad') {
     try {
-      const { LearnedMemoryService } = await import('../../chat/application/learnedMemoryService.js');
+      const { LearnedMemoryService } = await import('../../chat/logic/learnedMemoryService.js');
       const learned = new LearnedMemoryService(root);
       const note = msg.note?.trim();
       if (note && note.length > 5) {
@@ -151,7 +151,7 @@ export async function handleCreateFile(msg: any): Promise<void> {
     // If workspace is the projects container (~/projects) or nothing open,
     // create a proper project folder with full Redivivus scaffold.
     if (!rootPath || isProjectsContainer(rootPath)) {
-      const { lastAutoCreatedDir } = await import('../../chat/build/chatPanelBuildAutoCreate.js');
+      const { lastAutoCreatedDir } = await import('../../build/chatPanelBuildAutoCreate.js');
       if (lastAutoCreatedDir && fs.existsSync(lastAutoCreatedDir)) {
         rootPath = lastAutoCreatedDir;
       } else {
@@ -161,7 +161,7 @@ export async function handleCreateFile(msg: any): Promise<void> {
           .replace('~', require('os').homedir());
         rootPath = path.join(projectsDir, stem);
         fs.mkdirSync(rootPath, { recursive: true });
-        const { scaffoldAt } = await import('../application/redivivusInit.js');
+        const { scaffoldAt } = await import('./redivivusInit.js');
         await scaffoldAt(rootPath, stem);
       }
     }

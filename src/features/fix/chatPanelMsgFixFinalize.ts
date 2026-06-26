@@ -3,8 +3,8 @@
 
 import * as path from 'path';
 import * as vscode from 'vscode';
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { finalizeFixLogger, fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { finalizeFixLogger, fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { fixActFinish } from './fixActivityPanel.js';
 
 export async function runFixFinalize(params: {
@@ -80,7 +80,7 @@ export async function runFixFinalize(params: {
   // [POST-FIX VERIFICATION] Re-run the command that originally failed to confirm the fix worked
   if (written.length > 0 && params.verificationCommand) {
     try {
-      const { runPostFixVerification } = await import('../../workspace/infrastructure/postFixVerification.js');
+      const { runPostFixVerification } = await import('../workspace/data/postFixVerification.js');
       const { fixActStep } = await import('./fixActivityPanel.js');
       fixActStep({ phase: 'verify', status: 'running', label: `Verifying: ${params.verificationCommand}` });
       const pfResult = await runPostFixVerification(params.verificationCommand, root);
@@ -110,10 +110,10 @@ export async function runFixFinalize(params: {
   // flat "Fixed" (the file WAS changed, but it doesn't work yet). The auto-fix loop (Phase 3) will act on this.
   if (written.length > 0) {
     try {
-      const { verifyPreviewRuns } = await import('../ui/chatPanelPreviewVerify.js');
+      const { verifyPreviewRuns } = await import('../chat/ui/chatPanelPreviewVerify.js');
       const v = await verifyPreviewRuns(root);
       if (v.applicable) {
-        const { BuildActivityPanel } = await import('../ui/buildActivity/buildActivityPanel.js');
+        const { BuildActivityPanel } = await import('../chat/ui/buildActivity/buildActivityPanel.js');
         if (v.ok) {
           BuildActivityPanel.current?.step({ phase: 'guardian', status: 'pass', label: 'Ran the preview - it works' });
         } else {
@@ -135,7 +135,7 @@ export async function runFixFinalize(params: {
   if (deps.vault && written.length > 0) {
     const absPaths = written.map(f => path.join(root, f));
     const callAI = (p: string) => deps.routing.prompt(p, 12_000);
-    const { autoCaptureFiles } = await import('../../vault/infrastructure/vaultAutoCapture.js');
+    const { autoCaptureFiles } = await import('../vault/data/vaultAutoCapture.js');
     autoCaptureFiles(absPaths, path.basename(root), deps.vault, `fix: ${userText.slice(0, 120)}`, callAI).catch(() => {});
   }
 
@@ -145,8 +145,8 @@ export async function runFixFinalize(params: {
   if (written.length > 0) {
     (async () => {
       try {
-        const { distillFixRevision } = await import('../../project/infrastructure/blueprint/livingBlueprintDistill.js');
-        const { appendRevision, nextRev, setMechanics } = await import('../../project/infrastructure/blueprint/livingBlueprintService.js');
+        const { distillFixRevision } = await import('../blueprint/logic/livingBlueprintDistill.js');
+        const { appendRevision, nextRev, setMechanics } = await import('../blueprint/logic/livingBlueprintService.js');
         const d = await distillFixRevision(deps.routing, deps, userText, diagnosis);
         if (d) {
           appendRevision(root, { rev: nextRev(root), ts: new Date().toISOString(), kind: 'fix', request: userText.slice(0, 400), summary: d.summary, mechanics_delta: d.delta, files: written, by: workerLabel, snapshotId: fixSnapId });

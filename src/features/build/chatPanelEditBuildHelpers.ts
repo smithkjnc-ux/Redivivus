@@ -4,8 +4,8 @@
 import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
-import type { VaultService } from '../../vault/infrastructure/vaultService.js';
-import type { ChatMessage } from '../ui/chatPanelHtml.js';
+import type { VaultService } from '../vault/data/vaultService.js';
+import type { ChatMessage } from '../chat/ui/chatPanelHtml.js';
 
 export interface EditBuildContext {
   filePath: string;
@@ -13,7 +13,7 @@ export interface EditBuildContext {
   issueType: string;
   root: string;
   blueprintContext?: string;
-  routing: import('../../../shared/ai/infrastructure/routingService').RoutingService;
+  routing: import('../../features/ai/data/routingService').RoutingService;
   vault?: VaultService;
   conversation: ChatMessage[];
   refresh: () => void;

@@ -1,7 +1,7 @@
 // [SCOPE] Redivivus Chat Panel Empty State rendering — onboarding launcher, templates, and dashboard selection
 // Split from chatPanelHtml.ts to comply with the 200-line limit (Rule 9).
 
-import type { SetupProgress } from '../../project/application/setupProgressService.js';
+import type { SetupProgress } from '../../project/logic/setupProgressService.js';
 import type { ChatHeaderInfo } from './chatPanelHtml.js';
 import { escapeHtml } from './chatPanelRenderer.js';
 import { buildProjectDashboard } from './chatPanelDashboard.js';

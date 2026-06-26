@@ -1,8 +1,8 @@
 // [SCOPE] Redivivus Duplicate Code Detection Command — find repeated patterns
 
 import * as vscode from 'vscode';
-import { DuplicateCodeDetectionService } from '../domain/code/duplicateCodeDetection.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import { DuplicateCodeDetectionService } from './duplicateCodeDetection.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 
 export function registerDuplicateCodeCommand(

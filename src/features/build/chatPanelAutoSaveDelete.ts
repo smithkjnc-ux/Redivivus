@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
 
 /** Identify files in the project matching a delete request — does NOT delete anything */
 export function identifyFilesToDelete(userText: string, root: string): string[] {

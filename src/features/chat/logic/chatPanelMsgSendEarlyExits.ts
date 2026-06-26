@@ -10,7 +10,7 @@ export async function handleUrlRead(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<boolean> {
-  const { extractUrl, readUrl } = await import('../../../shared/vscode/application/webSearchService.js');
+  const { extractUrl, readUrl } = await import('../../../features/vscode/logic/webSearchService.js');
   const pastedUrl = extractUrl(userText);
   if (!pastedUrl || !/\b(read|use|look at|check|fetch|get|from|reference)\b/i.test(lowerText)) {
     return false;
@@ -54,7 +54,7 @@ export async function handleWebSearch(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<boolean> {
-  const { extractUrl, detectSearchIntent, searchWeb } = await import('../../../shared/vscode/application/webSearchService.js');
+  const { extractUrl, detectSearchIntent, searchWeb } = await import('../../../features/vscode/logic/webSearchService.js');
   const pastedUrl = extractUrl(userText);
   const rawQuery = detectSearchIntent(userText);
   if (!rawQuery || pastedUrl) { return false; }
@@ -83,7 +83,7 @@ export async function handleRememberIntent(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<boolean> {
-  const { detectRememberIntent, rememberExplicit } = await import('../application/userMemoryService.js');
+  const { detectRememberIntent, rememberExplicit } = await import('./userMemoryService.js');
   const rememberText = detectRememberIntent(userText);
   if (!rememberText) { return false; }
   rememberExplicit(rememberText);
@@ -102,7 +102,7 @@ export async function handleReadResult(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<boolean> {
-  const { readUrl } = await import('../../../shared/vscode/application/webSearchService.js');
+  const { readUrl } = await import('../../../features/vscode/logic/webSearchService.js');
   const readResultMatch = lowerText.match(/^read\s+#?(\d+)/);
   if (!readResultMatch) { return false; }
   const prevMsg = [...conversation].reverse().find(

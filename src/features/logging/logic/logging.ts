@@ -2,8 +2,8 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import type { RedivivusService } from '../../vscode/application/redivivusService.js';
-import { asChatPanel } from '../../../features/chat/ui/IChatPanel.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import { asChatPanel } from '../../chat/ui/IChatPanel.js';
 
 export function registerLoggingCommands(
   context: vscode.ExtensionContext,

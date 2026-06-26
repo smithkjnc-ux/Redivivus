@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import { ChatPanel } from './chatPanel.js';
 import { buildHeaderInfo } from './chatPanelHeader.js';
-import { SetupProgressService } from '../../project/application/setupProgressService.js';
+import { SetupProgressService } from '../../project/logic/setupProgressService.js';
 import { buildChatHtml } from './chatPanelHtml.js';
 import { readActiveProjectDashboard } from './chatPanelDashboard.js';
 
@@ -53,7 +53,7 @@ export async function panelRefresh(panel: any): Promise<void> {
   if (recentMsgs.some((m: any) => m.content?.includes('__ARCHITECT_ACTIONS__'))) {
     headerInfo.panelContext = 'architect';
   }
-  try { const { getAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js'); headerInfo.isSignedIn = !!(await getAccountToken()); } catch {}
+  try { const { getAccountToken } = await import('../../../features/api/data/apiClient.js'); headerInfo.isSignedIn = !!(await getAccountToken()); } catch {}
   const _panel = panel._panel;
   const _initialized = panel._initialized;
   const wsFolder = vscode.workspace.workspaceFolders?.[0];

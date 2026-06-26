@@ -3,9 +3,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { getVisualContractHtml } from './visualContractPanelHtml.js';
-import { extractVisualContract } from '../domain/propertyExtractor.js';
-import { applyBatchPatches, applyPropertyPatch } from '../domain/visualContractPatcher.js';
-import type { VisualContract, VisualProperty } from '../domain/visualContractTypes.js';
+import { extractVisualContract } from '../logic/propertyExtractor.js';
+import { applyBatchPatches, applyPropertyPatch } from '../logic/visualContractPatcher.js';
+import type { VisualContract, VisualProperty } from '../logic/visualContractTypes.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { postToChatWebview } from '../../chat/ui/chatPanelPublicAPI.js';
 
@@ -21,7 +21,7 @@ export async function openVisualContractPanel(
     _activePanel.reveal(vscode.ViewColumn.Two);
     const contract = extractVisualContract(projectRoot, builtFiles);
     let bSpec = null;
-    try { const { getCurrentSpec } = await import('../../../shared/ai/domain/visualSpecService.js'); bSpec = getCurrentSpec(); } catch {}
+    try { const { getCurrentSpec } = await import('../../../features/ai/logic/visualSpecService.js'); bSpec = getCurrentSpec(); } catch {}
     _activePanel.webview.postMessage({ type: 'load-contract', contract, baselineSpec: bSpec });
     return;
   }
@@ -41,8 +41,8 @@ export async function openVisualContractPanel(
   console.log('[Redivivus][VisualEditor] contract.properties.length:', contract.properties.length);
   console.log('[Redivivus][VisualEditor] contract.properties:', JSON.stringify(contract.properties.slice(0, 5)));
   // Include upstream baseline spec if one was established before this build
-  let baselineSpec: import('../../../shared/ai/domain/visualSpecService').VisualSpec | null = null;
-  try { const { getCurrentSpec } = await import('../../../shared/ai/domain/visualSpecService.js'); baselineSpec = getCurrentSpec(); } catch {}
+  let baselineSpec: import('../../../features/ai/logic/visualSpecService').VisualSpec | null = null;
+  try { const { getCurrentSpec } = await import('../../../features/ai/logic/visualSpecService.js'); baselineSpec = getCurrentSpec(); } catch {}
   const nonce = Math.random().toString(36).slice(2);
   panel.webview.html = getVisualContractHtml(nonce, contract);
 

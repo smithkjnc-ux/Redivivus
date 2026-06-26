@@ -4,8 +4,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { applyRedivivusStructure } from '../ui/chatPanelCodeStructure.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import { applyRedivivusStructure } from '../chat/ui/chatPanelCodeStructure.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
 
 // Minimum lines in a code block to qualify for auto-save
 const MIN_AUTO_SAVE_LINES = 10;
@@ -106,7 +106,7 @@ export async function autoSaveAndOpen(
   if (!root || root === 'none' || isProjectsContainer(root)) {
     const stem = path.basename(filename, path.extname(filename)).replace(/[^a-z0-9_-]/gi, '_') || 'project';
     root = path.join(projectsDir, stem);
-    const { scaffoldAt } = await import('../../project/application/redivivusInit.js');
+    const { scaffoldAt } = await import('../project/logic/redivivusInit.js');
     await scaffoldAt(root, stem);
   }
 
@@ -152,7 +152,7 @@ export async function autoSaveAndOpen(
   // The user is trapped in a dirty "Untitled (Workspace)" state, and opening in a new window is the only programmatic escape.
   if (!isSameRoot) {
     try {
-      const { ChatPanel } = await import('../ui/chatPanel.js');
+      const { ChatPanel } = await import('../chat/ui/chatPanel.js');
       const ctx = ChatPanel.extensionContext;
       if (ctx) {
         // Persist the build result so it shows after the new window opens

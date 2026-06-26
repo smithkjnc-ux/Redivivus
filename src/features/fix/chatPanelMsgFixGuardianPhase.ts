@@ -1,8 +1,8 @@
 // [SCOPE] Guardian Review Phase for Escalation Loop
 // Extracted from chatPanelMsgFixEscalation.ts (Rule 9 split).
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { renderGuardianVerdict, represcribeAfterRejection, isTruncationText, type EscalationResult } from './chatPanelMsgFixEscalationUtils.js';
 
 export type GuardianPhaseResult = 

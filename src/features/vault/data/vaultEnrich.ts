@@ -3,7 +3,7 @@
 
 import type { VaultService } from './vaultService.js';
 import { evaluateQuality } from './vaultQualityGate.js';
-import type { AIResponse } from '../../../shared/ai/infrastructure/routingTypes.js';
+import type { AIResponse } from '../../../features/ai/data/routingTypes.js';
 
 export interface EnrichResult {
   enriched: number;

@@ -2,11 +2,11 @@
 // Split from 215-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import type { Blueprint } from '../../../../types/index.js';
-import type { RedivivusService } from '../../../../shared/vscode/application/redivivusService.js';
+import type { Blueprint } from '../../../types/index.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import { QUESTIONS } from './blueprintQuestions.js';
 import { calculateHealth } from './blueprintHealth.js';
-import { writeBlueprintMd } from './blueprintWriter.js';
+import { writeBlueprintMd } from '../data/blueprintWriter.js';
 
 export class BlueprintService {
   constructor(private redivivus: RedivivusService) {}
@@ -73,7 +73,7 @@ export class BlueprintService {
 
     if (existing && existing.who) {
       // Snapshot the existing blueprint as a locked revision
-      const { snapshotBeforeUpdate } = await import('./blueprintRevisions.js');
+      const { snapshotBeforeUpdate } = await import('../data/blueprintRevisions.js');
       const withHistory = snapshotBeforeUpdate(existing, 'Updated via Blueprint Interview');
       fullBlueprint.revision = withHistory.revision;
       fullBlueprint.revisions = withHistory.revisions;

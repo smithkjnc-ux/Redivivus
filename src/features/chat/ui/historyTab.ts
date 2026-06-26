@@ -2,7 +2,7 @@
 
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 
 export function getSessionHistory(redivivus: RedivivusService): {html:string,path:string}[] {
   if (!redivivus.isInitialized()) {return [];}

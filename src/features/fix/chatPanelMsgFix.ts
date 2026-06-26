@@ -6,16 +6,16 @@
 //        to Groq/cheap models which produce thin output and cause silent pipeline failure.
 
 import * as vscode from 'vscode';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
-import { isProjectsContainer } from '../../project/application/redivivusPaths.js';
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import { getActiveProjectRoot } from '../project/logic/activeProjectRoot.js';
+import { isProjectsContainer } from '../project/logic/redivivusPaths.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { resolveSourceFiles, collectAllFixContext } from './chatPanelMsgFixContext.js';
 import { detectPatterns } from './chatPanelMsgFixPatterns.js';
-import { initFixLogger, fixLog, finalizeFixLogger } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { initFixLogger, fixLog, finalizeFixLogger } from '../../features/logging/data/fixPipelineLogger.js';
 import { fixActStart, fixActSupervisor } from './fixActivityPanel.js';
 import { fixSessionCostBefore, fixCostByline, fixErrorHint } from './chatPanelMsgFixUsage.js';
 import { runFixPhase23 } from './chatPanelMsgFixPhase23.js';
-import { progressScanning } from '../ui/fixProgressStyle.js';
+import { progressScanning } from './fixProgressStyle.js';
 
 // [DEAD] _fixErrorHint moved to chatPanelMsgFixUsage.ts as fixErrorHint (Rule 9 split)
 // [DEAD] Phase 2+3 loop moved to chatPanelMsgFixPhase23.ts (Rule 9 split)
@@ -49,13 +49,13 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   if (sourceFiles.length === 0) { await deps.handleBuildRequest(userText, true); return; }
 
   // [FILE_SIZE_GATE] Check for oversized files before firing any AI calls
-  const { runFileSizeGate } = await import('./fileSizeGate.js');
+  const { runFileSizeGate } = await import('../chat/logic/fileSizeGate.js');
   const gateResult = await runFileSizeGate(sourceFiles, deps);
 
   // [FIX] Auto-force surgical when largest file exceeds Worker output capacity.
   // The size gate catches 50KB+ but GPT-4o/Groq/Kimi cap at 16K/8K/16K tokens (~12-20KB).
   if (!gateResult.forceSurgical) {
-    const { bestModelForRole } = await import('../../../shared/ai/infrastructure/modelRegistry.js');
+    const { bestModelForRole } = await import('../../features/ai/data/modelRegistry.js');
     const { worker } = deps.routing.selectSupervisorAndWorker();
     const workerModel = worker ? bestModelForRole(worker, 'flash') : undefined;
     const workerOutputBytes = (workerModel?.outputK ?? 8) * 1000 * 3.5;
@@ -79,7 +79,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // If the user hasn't explicitly opened the preview, the runtime reports buffer is empty.
   // We must actually load the app headlessly so the AI can see the real errors before diagnosing.
   try {
-    const { verifyPreviewRuns } = await import('../ui/chatPanelPreviewVerify.js');
+    const { verifyPreviewRuns } = await import('../chat/ui/chatPanelPreviewVerify.js');
     deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
     conversation.push({ role: 'assistant', content: 'Running the app to check for runtime errors...', timestamp: Date.now() });
     refresh();
@@ -93,7 +93,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   deps.panel.webview.postMessage({ type: 'set-status', status: 'working' });
   fixActStart(userText, sourceFiles.length);
   // [RULE 18] Size the Supervisor by UNDERSTANDING the request (tiny AI classifier), not regex.
-  await (await import('../../../shared/ai/infrastructure/routeClassifier.js')).applyRouteTier(userText, true, deps);
+  await (await import('../../features/ai/data/routeClassifier.js')).applyRouteTier(userText, true, deps);
 
   // Phase 1: Supervisor diagnoses ALL bugs
   // [ARCHITECT-FIX] When a pre-built diagnosis is injected (e.g. from Architect Review), skip the

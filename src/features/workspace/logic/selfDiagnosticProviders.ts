@@ -29,14 +29,14 @@ function extractProviderError(body?: string): string | null {
 export async function checkProviderReachable(providerName: string): Promise<DiagResult> {
   const cfg = PROVIDER_PING[providerName];
   if (!cfg) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'Unknown provider' }; }
-  const { getKeyCached } = await import('../../../shared/ai/infrastructure/secretKeyStore.js');
+  const { getKeyCached } = await import('../../../features/ai/data/secretKeyStore.js');
   const key = (getKeyCached(providerName.toLowerCase()) || '').trim();
   if (!key) { return { name: `${providerName} reachable`, category: 'AI Providers', status: 'skip', message: 'No API key -- skipping ping' }; }
   try {
     let url = cfg.url(key);
     const headers = cfg.headers(key);
     if (providerName === 'Kimi') {
-      const { detectKimiBase } = await import('../../../shared/ai/infrastructure/kimiEndpoint.js');
+      const { detectKimiBase } = await import('../../../features/ai/data/kimiEndpoint.js');
       url = (await detectKimiBase(key)) + '/v1/models';
     }
     const result = await new Promise<{ status: number; data?: string }>((resolve, reject) => {

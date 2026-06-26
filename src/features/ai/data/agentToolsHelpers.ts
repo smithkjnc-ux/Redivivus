@@ -9,7 +9,7 @@ import type { AgentContext } from './agentTools.js';
 // to reality instead of inventing a conventional layout (src/routes/, controllers/, etc.).
 export async function realFilesHint(root: string): Promise<string> {
   try {
-    const { listSourceFiles } = await import('../../../features/workspace/infrastructure/codebaseSearch.js');
+    const { listSourceFiles } = await import('../../../features/workspace/data/codebaseSearch.js');
     const files = listSourceFiles(root, false, 30).map((f: any) => f.rel);
     if (files.length) {
       return ` This project's ACTUAL files are: ${files.join(', ')}. Do NOT assume a conventional layout — there is no routes/, controllers/, or utils/ here unless listed above. Read REAL paths only (list_dir / read_file).`;
@@ -23,7 +23,7 @@ export async function realFilesHint(root: string): Promise<string> {
 export async function schemaWriteGuards(ctx: AgentContext, rel: string, before: string | null, after: string): Promise<string> {
   let note = '';
   try {
-    const mg = await import('../../../features/chat/build/services/migrationsGuard.js');
+    const mg = await import('../../../features/build/services/migrationsGuard.js');
     const mh = mg.migrationHook(ctx.root, rel, after, ctx.task);
     if (mh) { ctx.log(mh.log); note += mh.note; ctx.schemaChanged = true; }
     const missing = mg.schemaCodeMismatch(ctx.root, rel, after);

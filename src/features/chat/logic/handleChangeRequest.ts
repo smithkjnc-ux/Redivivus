@@ -10,8 +10,8 @@
 
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent.js';
-import { handleFixRequest } from './chatPanelMsgFix.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { handleFixRequest } from '../../fix/chatPanelMsgFix.js';
+import { fixLog } from '../../../features/logging/data/fixPipelineLogger.js';
 
 export async function handleChangeRequest(
   msg: any,

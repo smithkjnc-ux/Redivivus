@@ -39,7 +39,7 @@ export function clearPendingScopeQuestion(): void {
   }
 }
 
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 
 /**
  * Returns true if the task is a vague new-project request needing scope clarification.

@@ -7,12 +7,12 @@ import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
 import { runSingleFileBuild } from './chatPanelBuild.js';
 import type { BuildContext } from './chatPanelBuild.js';
 import { runOrchestratedPhaseBuild, isOrchestratedAvailable, buildPhaseTask } from './chatPanelBuildOrchestrated.js';
-import { inspectPhase } from '../../project/domain/inspector/phaseInspector.js';
-import { formatInspectionReport } from '../../project/domain/inspector/phaseInspectorReport.js';
-import type { PhaseInspection } from '../../project/domain/inspector/phaseInspector.js';
+import { inspectPhase } from '../project/logic/inspector/phaseInspector.js';
+import { formatInspectionReport } from '../project/logic/inspector/phaseInspectorReport.js';
+import type { PhaseInspection } from '../project/logic/inspector/phaseInspector.js';
 import { isValidBuildRoot } from './chatPanelBuildUtils.js';
-import { LearnedMemoryService } from '../application/learnedMemoryService.js';
-import { buildPromptInjection } from '../application/userMemoryService.js';
+import { LearnedMemoryService } from '../chat/logic/learnedMemoryService.js';
+import { buildPromptInjection } from '../chat/logic/userMemoryService.js';
 
 // [FIX] Supervisor contract guidance — tells the Supervisor to produce explicit implementation
 // contracts for the Worker, not just problem diagnoses. Applies to ALL local build paths.

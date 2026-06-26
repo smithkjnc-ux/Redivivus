@@ -3,9 +3,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
-import { logProjectContextSwitch, validateProjectContext } from '../../../shared/logging/infrastructure/projectContextLogger.js';
+import { logProjectContextSwitch, validateProjectContext } from '../../../features/logging/data/projectContextLogger.js';
 
 export function registerOnNewProject(context: vscode.ExtensionContext): void {
   ChatPanel.onNewProject = async (name: string, answers: Record<string, string>, folderPath?: string) => {
@@ -33,7 +33,7 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
     }
     
     if (!fs.existsSync(targetFolder)) { fs.mkdirSync(targetFolder, { recursive: true }); }
-    const { RedivivusService } = await import('../../../shared/vscode/application/redivivusService.js');
+    const { RedivivusService } = await import('../../../features/vscode/logic/redivivusService.js');
     const redivivus = new RedivivusService(targetFolder);
     await redivivus.initProject(name);
     if (answers && Object.keys(answers).length > 0) {
@@ -51,9 +51,9 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
     await context.globalState.update('pendingRedivivusInit', undefined);
     
     // [LOG] Initialize logging in the standalone extension host explicitly before build starts
-    const { initRedivivusLogger, redivivusLog } = await import('../../../shared/logging/infrastructure/redivivusLogger.js');
-    const { initMasterLogger } = await import('../../../shared/logging/domain/masterLogger.js');
-    const { initProjectContextLogger } = await import('../../../shared/logging/infrastructure/projectContextLogger.js');
+    const { initRedivivusLogger, redivivusLog } = await import('../../../features/logging/data/redivivusLogger.js');
+    const { initMasterLogger } = await import('../../../features/logging/logic/masterLogger.js');
+    const { initProjectContextLogger } = await import('../../../features/logging/data/projectContextLogger.js');
     const sessionId = initRedivivusLogger(targetFolder);
     redivivusLog({ operation: 'system', message: 'New project initialized', data: { root: targetFolder, sessionId } });
     initMasterLogger(targetFolder);

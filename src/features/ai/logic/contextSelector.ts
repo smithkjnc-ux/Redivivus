@@ -2,7 +2,7 @@
 // Replaces fixed slice(-N).content.slice(0, 300) with relevance-based turn selection.
 // [RULE 18] AI judges which turns are relevant; code handles slicing and formatting.
 
-import type { RoutingService } from '../infrastructure/routingService.js';
+import type { RoutingService } from '../data/routingService.js';
 
 export interface ConversationTurn { role: string; content: string; }
 

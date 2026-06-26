@@ -1,7 +1,7 @@
 // [SCOPE] Usage HTML template — full webview HTML for Redivivus usage report
 // CSS extracted to usageHtmlStyles.ts. Imported by usageCommands.ts.
 
-import type { UsageReport, UsageEntry } from '../infrastructure/usageTracker.js';
+import type { UsageReport, UsageEntry } from '../data/usageTracker.js';
 import { getUsageCss } from './usageHtmlStyles.js';
 
 export function getUsageHtml(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>, history?: UsageEntry[]): string {

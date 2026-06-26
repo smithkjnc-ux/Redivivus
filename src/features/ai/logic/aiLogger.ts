@@ -1,5 +1,5 @@
 // [SCOPE] Redivivus AI Domain Logger
-import { masterLog } from '../../logging/domain/masterLogger.js';
+import { masterLog } from '../../../features/logging/logic/masterLogger.js';
 
 const DOMAIN = 'AI';
 

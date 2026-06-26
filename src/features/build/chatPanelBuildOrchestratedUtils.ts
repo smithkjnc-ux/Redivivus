@@ -1,7 +1,7 @@
 // [SCOPE] Orchestrated build utilities — shared helpers for the multi-AI orchestration pipeline
 // Extracted from chatPanelBuildOrchestrated.ts to comply with Rule 9 (200-line limit).
 
-import type { PlanStep } from '../../../shared/ai/infrastructure/supervisorOrchestrator.js';
+import type { PlanStep } from '../../features/ai/data/supervisorOrchestrator.js';
 import type { BuildPlan } from './services/buildOrchestrator.js';
 import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
 

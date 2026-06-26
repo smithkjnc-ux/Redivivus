@@ -2,10 +2,10 @@
 // Called by chatPanelMsgFix.ts in place of the old sequential Phase 2 + Phase 3 blocks.
 // Step helpers live in chatPanelMsgFixEscalationUtils.ts (Rule 9 split); the loop control flow stays here.
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { fixActStep, fixActCode } from './fixActivityPanel.js';
-import { progressEscalating, progressRetrying } from '../ui/fixProgressStyle.js';
+import { progressEscalating, progressRetrying } from './fixProgressStyle.js';
 import {
   updateStatus, enrichDepsWithCritiques, renderGuardianVerdict,
   represcribeAfterRejection, logExhaustedDeadEnd, isTruncationText,

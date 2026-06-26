@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { VaultService, VaultItem } from './vaultService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import { BuildPlan } from './buildFromVaultTypes.js';
 import type { VaultSearchResult } from './buildFromVaultSearch.js';
 import { findRelevantByTask } from './buildFromVaultSearch.js';

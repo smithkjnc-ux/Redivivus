@@ -33,13 +33,13 @@ export const FILE_IO_TOOLS: AgentTool[] = [
       const absPath = path.join(ctx.root, args.filePath);
       try {
         if (!ctx.snapshotId) {
-          const { createSnapshot } = await import('../../../features/chat/build/chatPanelBuildWriter.js');
+          const { createSnapshot } = await import('../../../features/build/chatPanelBuildWriter.js');
           ctx.snapshotId = createSnapshot(ctx.root, `Agent task: ${ctx.task.substring(0, 50)}`, args.filePath);
         }
         let contentToWrite = args.content || '';
         // [FIX] Strip markdown fences: AIs frequently wrap write_file content in ```lang\n...\n```.
         if (contentToWrite.trimStart().startsWith('```')) {
-          const { extractCodeFromResponse } = await import('../../../features/chat/build/chatPanelBuildInference.js');
+          const { extractCodeFromResponse } = await import('../../../features/build/chatPanelBuildInference.js');
           contentToWrite = extractCodeFromResponse(contentToWrite);
         }
         // [Redivivus] Guardian AI Oversight
@@ -50,7 +50,7 @@ export const FILE_IO_TOOLS: AgentTool[] = [
             if (review && !review.passed && review.correctedText) {
               const issues = review.issues && review.issues.length ? review.issues.join('; ') : 'Quality/correctness improvements';
               ctx.log(`⚠️ **Guardian AI** corrected proposed write to \`${args.filePath}\` (Issues: ${issues})`);
-              const { extractCodeFromResponse } = await import('../../../features/chat/build/chatPanelBuildInference.js');
+              const { extractCodeFromResponse } = await import('../../../features/build/chatPanelBuildInference.js');
               contentToWrite = extractCodeFromResponse(review.correctedText);
             } else {
               ctx.log(`🟢 **Guardian AI** approved proposed write to \`${args.filePath}\``);

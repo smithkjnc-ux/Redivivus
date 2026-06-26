@@ -69,8 +69,8 @@ export async function generateEditPrompt(
     const importCtx = gatherImportContext(absPath, root);
     let projectHistoryCtx = '';
     try {
-      const { getBlueprintEvolutionContext } = await import('../routing/chatPanelMsgFixBuildCtx.js');
-      const { readProjectDeadEnds } = await import('../routing/chatPanelMsgFixDeadEnds.js');
+      const { getBlueprintEvolutionContext } = await import('../fix/chatPanelMsgFixBuildCtx.js');
+      const { readProjectDeadEnds } = await import('../fix/chatPanelMsgFixDeadEnds.js');
       const bpEvolution = getBlueprintEvolutionContext(root);
       const deadEnds = readProjectDeadEnds(root);
       if (bpEvolution) { projectHistoryCtx += '\n\n' + bpEvolution; }

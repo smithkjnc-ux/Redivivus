@@ -5,10 +5,10 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { getRecentBuildContext } from './chatPanelMsgFixBuildCtx.js';
-import { getLastTerminalError } from '../../workspace/infrastructure/terminalErrorService.js';
-import { getPreviewErrors } from '../../workspace/infrastructure/previewErrorService.js';
-import { listSourceFiles } from '../../workspace/infrastructure/codebaseSearch.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { getLastTerminalError } from '../workspace/data/terminalErrorService.js';
+import { getPreviewErrors } from '../workspace/data/previewErrorService.js';
+import { listSourceFiles } from '../workspace/data/codebaseSearch.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { collectSourceFiles, resolveSourceFiles } from './chatPanelMsgFixFileSelect.js';
 
 export { collectSourceFiles, resolveSourceFiles };
@@ -110,8 +110,8 @@ export async function collectAllFixContext(
   const [{ readProjectDeadEnds }, { readProjectRules, getRecentBuildContext, getBlueprintEvolutionContext }, { LearnedMemoryService }, { inferVerificationCommand }] = await Promise.all([
     import('./chatPanelMsgFixDeadEnds.js'),
     import('./chatPanelMsgFixBuildCtx.js'),
-    import('../application/learnedMemoryService.js'),
-    import('../../workspace/infrastructure/postFixVerification.js'),
+    import('../chat/logic/learnedMemoryService.js'),
+    import('../workspace/data/postFixVerification.js'),
   ]);
 
   // Static context — cached across rapid sequential calls (batch fixes)
@@ -135,7 +135,7 @@ export async function collectAllFixContext(
   const fullDiagnosticCtx = collectFixContext(root, sourceFiles);
   const buildContext = [blueprintCtx, fullDiagnosticCtx].filter(Boolean).join('\n\n');
   // Capture the failing command BEFORE the fix so we can re-run it after to verify
-  const { getLastFailingCommand } = await import('../../workspace/infrastructure/terminalErrorService.js');
+  const { getLastFailingCommand } = await import('../workspace/data/terminalErrorService.js');
   const capturedCmd = getLastFailingCommand();
   const verificationCommand = inferVerificationCommand(root, capturedCmd?.command || undefined);
   return { buildContext, projectDeadEnds: combinedDeadEnds, projectRules, verificationCommand };

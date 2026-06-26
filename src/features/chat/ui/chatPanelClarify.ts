@@ -2,7 +2,7 @@
 // The AI decides IF questions are needed (lightbulb vs paint job), then generates
 // targeted design questions for ambiguous requests. Simple edits pass through.
 
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 
 export interface ClarifyOption {
   label: string;

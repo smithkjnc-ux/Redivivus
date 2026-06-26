@@ -1,6 +1,6 @@
 // [SCOPE] Factory for AI provider execution — delegates to specific provider implementations
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
+import type { AIResponse } from '../../data/routingTypes.js';
 import { executeGemini } from './geminiProvider.js';
 import { executeClaude } from './claudeProvider.js';
 import { executeOpenAI } from './openaiProvider.js';

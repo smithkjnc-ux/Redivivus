@@ -2,9 +2,9 @@
 // Extracted from extensionCommands.ts (Rule 9 split).
 
 import * as vscode from 'vscode';
-import type { VaultService } from '../infrastructure/vaultService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
+import type { VaultService } from '../data/vaultService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 
 export function registerVaultDedupCommand(

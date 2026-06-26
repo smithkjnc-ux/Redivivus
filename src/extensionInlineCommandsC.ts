@@ -2,14 +2,14 @@
 // Extracted from extensionInlineCommandsB.ts to keep it under 200 lines.
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
-import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
-import type { VaultService } from './features/vault/infrastructure/vaultService.js';
+import type { RedivivusService } from './features/vscode/logic/redivivusService.js';
+import type { RoutingService } from './features/ai/data/routingService.js';
+import type { UsageTracker } from './features/telemetry/data/usageTracker.js';
+import type { VaultService } from './features/vault/data/vaultService.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
-import { registerTerminalErrorService, getLastTerminalError } from './features/workspace/infrastructure/terminalErrorService.js';
-import { detectPostBuildInfo } from './features/chat/build/chatPanelPostBuild.js';
-import { BuildHistoryService } from './features/chat/build/services/buildHistoryService.js';
+import { registerTerminalErrorService, getLastTerminalError } from './features/workspace/data/terminalErrorService.js';
+import { detectPostBuildInfo } from './features/build/chatPanelPostBuild.js';
+import { BuildHistoryService } from './features/build/services/buildHistoryService.js';
 export function registerInlineCommandsC(
   context: vscode.ExtensionContext,
   redivivusService: RedivivusService,
@@ -28,7 +28,7 @@ export function registerInlineCommandsC(
       try { if (!rootOverride) { const _a = require('./ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); if (_a) { root = _a; } } } catch {}
       if (!root) { vscode.window.showWarningMessage('No project folder open.'); return; }
       // [CONSOLIDATE] One shared, type-aware runProject (web→http, .js→node, else→terminal + error monitor).
-      const { runProject } = await import('./features/project/domain/runProject.js');
+      const { runProject } = await import('./features/project/logic/runProject.js');
       await runProject(root);
     })
   );
@@ -38,7 +38,7 @@ export function registerInlineCommandsC(
     vscode.commands.registerCommand('redivivus.inspectElement', async () => {
       const input = await vscode.window.showInputBox({ prompt: 'Describe the UI element (class name, id, or description)', placeHolder: 'e.g., .submit-button, #navbar, the login form' });
       if (!input) { return; }
-      const { LensService } = await import('./features/workspace/application/lensService.js');
+      const { LensService } = await import('./features/workspace/logic/lensService.js');
       const lens = new LensService(null as any, null as any);
       await lens.inspectAndInject({ description: input, className: input.startsWith('.') ? input.slice(1) : undefined, id: input.startsWith('#') ? input.slice(1) : undefined });
     })

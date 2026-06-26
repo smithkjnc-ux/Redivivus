@@ -4,7 +4,7 @@
 // over BuildActivityPanel (singleton); every call is best-effort and NEVER blocks or throws into the fix.
 // Each step's `detail` is expandable in the panel, so the user can open it and read exactly what each AI did.
 
-import { BuildActivityPanel } from '../ui/buildActivity/buildActivityPanel.js';
+import { BuildActivityPanel } from '../chat/ui/buildActivity/buildActivityPanel.js';
 
 // Open the panel for this fix and show the Supervisor starting to read the code.
 export function fixActStart(userText: string, fileCount: number): void {

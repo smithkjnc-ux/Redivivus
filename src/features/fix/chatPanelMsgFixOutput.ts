@@ -3,13 +3,13 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds.js';
 import { parseFixResponse, takeSnapshot, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils.js';
 import { validateOutputFiles } from './chatPanelMsgFixPatterns.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../build/services/buildHistoryService.js';
-import { recordFix, learnFromFile } from '../application/userMemoryService.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { recordFix, learnFromFile } from '../chat/logic/userMemoryService.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 
 function extractPlain(diagnosis: string): string {
   return diagnosis.match(/^PLAIN:\s*(.+?)(?:\n|$)/m)?.[1]?.trim() ?? '';

@@ -6,7 +6,7 @@
 import * as crypto from 'crypto';
 import type { VaultItem, VaultCategory } from './vaultTypes.js';
 import type { VaultService } from './vaultService.js';
-import { getStarterPatterns } from '../../project/application/starterPatterns.js';
+import { getStarterPatterns } from '../../project/logic/starterPatterns.js';
 
 // [DONE] Added: localStorage, date format, DOM helpers, array utilities, CSS animation
 const GITHUB_SEARCHES: Array<{ query: string; category: VaultCategory; language: string; tags: string[] }> = [

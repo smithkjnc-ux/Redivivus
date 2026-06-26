@@ -2,9 +2,9 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { VaultService} from '../infrastructure/vaultService.js';
-import { VAULT_CATEGORIES } from '../infrastructure/vaultService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { VaultService} from '../data/vaultService.js';
+import { VAULT_CATEGORIES } from '../data/vaultService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { ensureChatPanelOpen } from './vault.js';
 

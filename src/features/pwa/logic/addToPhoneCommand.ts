@@ -3,8 +3,8 @@
 // the panel. See docs/REDIVIVUS_ADD_TO_PHONE.md.
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
-import { publishPwa } from '../infrastructure/pwaPublish.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
+import { publishPwa } from '../data/pwaPublish.js';
 import { showAddToPhonePanel } from '../ui/addToPhonePanel.js';
 
 const DEFAULT_HOST = 'https://redivivus-pwa-host.smithkjnc.workers.dev';

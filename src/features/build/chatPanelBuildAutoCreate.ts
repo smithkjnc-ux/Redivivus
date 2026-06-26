@@ -5,11 +5,11 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
-import type { BuildRequestDeps } from '../../../shared/ai/domain/chatPanelIntent.js';
-import type { ExtractedBlueprint } from '../../project/infrastructure/blueprint/blueprintExtractor.js';
-import { extractBlueprintFromPrompt } from '../../project/infrastructure/blueprint/blueprintExtractor.js';
+import type { BuildRequestDeps } from '../../features/ai/logic/chatPanelIntent.js';
+import type { ExtractedBlueprint } from '../blueprint/logic/blueprintExtractor.js';
+import { extractBlueprintFromPrompt } from '../blueprint/logic/blueprintExtractor.js';
 import { deriveFileBase } from './chatPanelBuildInference.js';
-import { scaffoldAt } from '../../project/application/redivivusInit.js';
+import { scaffoldAt } from '../project/logic/redivivusInit.js';
 
 export interface AutoCreateResult {
   dir: string;

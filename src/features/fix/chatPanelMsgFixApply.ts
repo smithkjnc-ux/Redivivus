@@ -1,10 +1,10 @@
 // [SCOPE] Application of code fixes (Surgical or Full-file fallback)
 
 import * as fs from 'fs';
-import { validateCode } from '../../workspace/domain/code/codeValidator.js';
+import { validateCode } from '../workspace/logic/codeValidator.js';
 import * as path from 'path';
 import { parseFixResponse, takeSnapshot } from './chatPanelMsgFixUtils.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 
 // Strip SEARCH/REPLACE separator artifacts ("===") that some AIs emit as visual section dividers.
 // These are never valid in HTML/CSS/JS/TS/Python/Go — writing them breaks the target file.
@@ -76,7 +76,7 @@ export async function applyFixContent(finalResponse: string, root: string, allow
     fixLog(`Apply: Legacy parsing complete`, { filesFound: legacyFixes.length, skipped: legacySkipped.length });
     if (legacyFixes.length > 0) {
       // [SAFETY] Check if any fix content is truncated before writing
-      const { isTruncatedOutput } = await import('./fileSizeGate.js');
+      const { isTruncatedOutput } = await import('../chat/logic/fileSizeGate.js');
       const truncatedFixes = legacyFixes.filter(f => isTruncatedOutput(f.content));
       if (truncatedFixes.length > 0) {
         fixLog(`[SAFETY] BLOCKING WRITE: ${truncatedFixes.length} file(s) have truncated content`, { files: truncatedFixes.map(f => f.rel) });

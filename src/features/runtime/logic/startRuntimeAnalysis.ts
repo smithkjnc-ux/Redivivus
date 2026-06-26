@@ -8,14 +8,14 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as cp from 'child_process';
-import { loadRuntimeProfile } from '../infrastructure/runtimeProfiler.js';
-import { buildPythonTraceScript } from '../../../runtime/pythonInstrumentor.js';
-import { buildJsHookScript } from '../../../runtime/jsInstrumentor.js';
+import { loadRuntimeProfile } from '../data/runtimeProfiler.js';
+import { buildPythonTraceScript } from '../data/pythonInstrumentor.js';
+import { buildJsHookScript } from '../data/jsInstrumentor.js';
 
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
-import type { VaultService } from '../../vault/infrastructure/vaultService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
+import type { VaultService } from '../../vault/data/vaultService.js';
 import { postToChat, deleteSafe, readTraceEntries, summariseEntries, buildConnections, buildPlainEnglishReport } from './startRuntimeAnalysisHelpers.js';
 
 const DURATION_S  = 30;

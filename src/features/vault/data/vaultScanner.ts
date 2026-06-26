@@ -1,7 +1,7 @@
 // [SCOPE] Vault AI categorization and codebase scanning — delegates extraction to vaultExtractor.ts
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import type { VaultItem } from './vaultTypes.js';
 import { VAULT_CATEGORIES } from './vaultTypes.js';
 import { extractFromFile } from './vaultExtractor.js';

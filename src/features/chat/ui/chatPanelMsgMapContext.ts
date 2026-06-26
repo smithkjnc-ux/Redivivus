@@ -3,8 +3,8 @@
 
 import * as vscode from 'vscode';
 import { ChatMessage } from './chatPanelHtml.js';
-import type { MessageHandlerDeps } from '../routing/chatPanelMessages.js';
-import { buildAIPrefix, processAIResponse } from '../../../shared/ai/domain/chatPanelAI.js';
+import type { MessageHandlerDeps } from '../logic/chatPanelMessages.js';
+import { buildAIPrefix, processAIResponse } from '../../../features/ai/logic/chatPanelAI.js';
 import type { ArchitectAction } from './chatPanelMsgArchitect.js';
 import { _architectReviews, _architectActions } from './chatPanelMsgArchitect.js';
 

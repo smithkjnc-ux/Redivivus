@@ -14,18 +14,18 @@ export class MemoryPanel {
     this._render();
     this._panel.webview.onDidReceiveMessage(async (msg) => {
       if (msg.type === 'delete-explicit') {
-        const { removeExplicit } = await import('../application/userMemoryService.js');
+        const { removeExplicit } = await import('../logic/userMemoryService.js');
         removeExplicit(msg.index);
         this._render();
       } else if (msg.type === 'add-explicit') {
-        const { rememberExplicit } = await import('../application/userMemoryService.js');
+        const { rememberExplicit } = await import('../logic/userMemoryService.js');
         if (msg.text?.trim()) { rememberExplicit(msg.text.trim()); }
         this._render();
       } else if (msg.type === 'delete-knowledge') {
         try {
           const root = msg.root;
           if (!root) { return; }
-          const { readKnowledge, writeKnowledge } = await import('../application/learnedMemoryServiceIO.js');
+          const { readKnowledge, writeKnowledge } = await import('../logic/learnedMemoryServiceIO.js');
           const store = readKnowledge(root);
           store.entries = store.entries.filter((_: any, i: number) => i !== msg.index);
           writeKnowledge(root, store);
@@ -35,7 +35,7 @@ export class MemoryPanel {
         try {
           const root = msg.root;
           if (!root) { return; }
-          const { readKnowledge, writeKnowledge } = await import('../application/learnedMemoryServiceIO.js');
+          const { readKnowledge, writeKnowledge } = await import('../logic/learnedMemoryServiceIO.js');
           const store = readKnowledge(root);
           store.entries = store.entries.filter((e: any) => e.permanent);
           writeKnowledge(root, store);

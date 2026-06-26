@@ -1,7 +1,7 @@
 // [SCOPE] Redivivus Timeline Command — view project history in chat panel
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { TimelineService } from './timelineService.js';
 

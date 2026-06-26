@@ -1,26 +1,26 @@
 // [SCOPE] Redivivus service initialization — extracted from extension.ts (Rule 9 split).
 
 import * as vscode from 'vscode';
-import { RedivivusService } from './shared/vscode/application/redivivusService.js';
-import { BlueprintService } from './features/project/infrastructure/blueprint/blueprintService.js';
-import { SessionService } from './features/project/application/sessionService.js';
-import { RulesService } from './shared/vscode/domain/rules/rulesService.js';
-import { ChangeTracker } from './features/chat/build/services/changeTracker.js';
-import { MeasureTwiceService } from './features/chat/build/services/measureTwiceService.js';
-import { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import { GuideService } from './shared/vscode/application/guideService.js';
-import { AnalyzerService } from './features/workspace/ui/analyzer/analyzerService.js';
-import { AnnotationService } from './features/workspace/application/annotationService.js';
-import { VaultService } from './features/vault/infrastructure/vaultService.js';
-import { VaultContextService } from './features/vault/infrastructure/vaultContextService.js';
-import { BuildFromVaultService } from './features/vault/infrastructure/buildFromVaultService.js';
-import { StatusBar } from './shared/vscode/ui/statusBar.js';
-import { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
-import { GuardianService } from './shared/ai/infrastructure/guardianService.js';
-import { RetrofitService } from './features/project/domain/retrofit/retrofitService.js';
+import { RedivivusService } from './features/vscode/logic/redivivusService.js';
+import { BlueprintService } from './features/blueprint/logic/blueprintService.js';
+import { SessionService } from './features/project/logic/sessionService.js';
+import { RulesService } from './features/vscode/logic/rules/rulesService.js';
+import { ChangeTracker } from './features/build/services/changeTracker.js';
+import { MeasureTwiceService } from './features/build/services/measureTwiceService.js';
+import { RoutingService } from './features/ai/data/routingService.js';
+import { GuideService } from './features/vscode/logic/guideService.js';
+import { AnalyzerService } from './features/workspace/logic/analyzerService.js';
+import { AnnotationService } from './features/workspace/logic/annotationService.js';
+import { VaultService } from './features/vault/data/vaultService.js';
+import { VaultContextService } from './features/vault/data/vaultContextService.js';
+import { BuildFromVaultService } from './features/vault/data/buildFromVaultService.js';
+import { StatusBar } from './features/vscode/ui/statusBar.js';
+import { UsageTracker } from './features/telemetry/data/usageTracker.js';
+import { GuardianService } from './features/ai/data/guardianService.js';
+import { RetrofitService } from './features/project/logic/retrofit/retrofitService.js';
 import { WizardService } from './features/project/ui/wizard/wizardService.js';
-import { seedVault } from './features/vault/infrastructure/vaultSeeder.js';
-import { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
+import { seedVault } from './features/vault/data/vaultSeeder.js';
+import { GitHubBackupService } from './features/workspace/data/githubBackupService.js';
 
 export interface ExtensionServices {
   redivivusService: RedivivusService;

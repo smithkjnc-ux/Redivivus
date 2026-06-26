@@ -4,7 +4,7 @@
 import * as path from 'path';
 import * as fs from 'fs/promises';
 import { execSync } from 'child_process';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import type { SetupStep } from './setupProgressService.js';
 
 

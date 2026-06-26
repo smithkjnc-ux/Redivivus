@@ -2,15 +2,15 @@
 // Sub-modules: chatPanelMsgSendMessage, chatPanelMsgFileOps, chatPanelMsgProjectOps, chatPanelMsgArchitect, chatPanelMsgSpecial
 
 import type * as vscode from 'vscode';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import { resolveBuildConfirm, resolvePlacement } from '../../../shared/ai/domain/chatPanelResolvers.js';
-import { resolveVaultHit } from '../build/chatPanelBuild.js';
+import { resolveBuildConfirm, resolvePlacement } from '../../../features/ai/logic/chatPanelResolvers.js';
+import { resolveVaultHit } from '../../build/chatPanelBuild.js';
 import { handleSendMessage } from './chatPanelMsgSendMessage.js';
-import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser, handleOpenHtmlByName } from '../../project/domain/chatPanelMsgFileOps.js';
-import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder, handleStartNewProject } from '../../project/domain/chatPanelMsgProjectOps.js';
+import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser, handleOpenHtmlByName } from '../../project/logic/chatPanelMsgFileOps.js';
+import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder, handleStartNewProject } from '../../project/logic/chatPanelMsgProjectOps.js';
 import { routeArchitectMessage } from './chatPanelMsgArchitectRouter.js';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial.js';
 import { handleBlueprintCardConfirm, handleBlueprintCardSkip } from './chatPanelMsgBlueprintCard.js';

@@ -1,14 +1,14 @@
 // [SCOPE] Redivivus Vault commands — save, scan, cleanup + panel helpers
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { VaultService } from '../infrastructure/vaultService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { VaultService } from '../data/vaultService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { registerVaultValidate } from './vaultValidate.js';
 import { showVaultScanResults } from './vaultResults.js';
-import { enrichVaultDescriptions } from '../infrastructure/vaultEnrich.js';
-import { evaluateQuality } from '../infrastructure/vaultQualityGate.js';
+import { enrichVaultDescriptions } from '../data/vaultEnrich.js';
+import { evaluateQuality } from '../data/vaultQualityGate.js';
 
 export let _pendingScanItems: any[] = [];
 
@@ -115,7 +115,7 @@ export function registerVaultCommands(
   // Sync local vault to cloud (push) and fetch community items (pull)
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.syncVaultToCloud', async () => {
-      const { syncVaultToCloud, fetchCommunityVault, mergeCloudIntoLocal } = await import('../infrastructure/vaultCloudSync.js');
+      const { syncVaultToCloud, fetchCommunityVault, mergeCloudIntoLocal } = await import('../data/vaultCloudSync.js');
       await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: 'Redivivus Vault: Syncing...', cancellable: false },
         async (progress) => {

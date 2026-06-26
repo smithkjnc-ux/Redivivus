@@ -5,10 +5,10 @@ import * as fs from 'fs';
 import type { BuildContext } from './chatPanelBuild.js';
 import { appendMsg, updateLastMsg } from './chatPanelChunked.js';
 import { extractAllNarrators, encodeStoryToken } from './buildOutput.js';
-import { Redivivus_WORKER_RULES } from '../../../shared/ai/infrastructure/redivivusWorkerRules.js';
+import { Redivivus_WORKER_RULES } from '../../features/ai/data/redivivusWorkerRules.js';
 import { generateFileCode } from './chatPanelChunkedBuildFile.js';
-import { extractContractFromCode, mergeContract, buildContractBlock, detectContractViolations, emptyContract } from '../../project/infrastructure/blueprint/blueprintContract.js';
-import { formatVaultContext } from '../../vault/infrastructure/vaultContextService.js';
+import { extractContractFromCode, mergeContract, buildContractBlock, detectContractViolations, emptyContract } from '../blueprint/logic/blueprintContract.js';
+import { formatVaultContext } from '../vault/data/vaultContextService.js';
 
 export interface FileBuildLoopContext {
   task: string;

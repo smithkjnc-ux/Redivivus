@@ -2,7 +2,7 @@
 // Keys: stored in settings.json on device only. Sent to backend as X-Provider-Keys header (not body).
 
 import * as vscode from 'vscode';
-import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from '../../ai/infrastructure/routingKeys.js';
+import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from '../../../features/ai/data/routingKeys.js';
 
 const SECRET_KEY = 'redivivus.account.token';
 // [FIX] Default to PRODUCTION (Cloud Run), like any shipped client — so dev builds test the real deployed
@@ -81,7 +81,7 @@ export function getPreferred(): string | undefined {
   // Use the top-ranked available AI (supervisor), not the manually-set defaultAI preference.
   // defaultAI is the user's chat default — it doesn't reflect which AI should be supervisor.
   const { selectSupervisorAndWorker } = require('../../ai/infrastructure/routingServiceRoster.js');
-  const { getGeminiKey: gk, getClaudeKey: ck, getOpenAIKey: ok, getGroqKey: gr, getXAIKey: xk, getKimiKey: km, getDeepseekKey: dk } = require('../../ai/infrastructure/routingKeys.js');
+  const { getGeminiKey: gk, getClaudeKey: ck, getOpenAIKey: ok, getGroqKey: gr, getXAIKey: xk, getKimiKey: km, getDeepseekKey: dk } = require('../../../features/ai/data/routingKeys.js');
   const keyMap: Record<string, () => string | null> = { gemini: gk, claude: ck, openai: ok, groq: gr, xai: xk, kimi: km, deepseek: dk };
   const { supervisor } = selectSupervisorAndWorker(keyMap);
   // [STICKY-SKIP] If the top-ranked supervisor is already flagged out-of-credits/bad-key this session, lead a

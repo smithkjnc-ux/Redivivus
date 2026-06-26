@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { ProjectMap } from '../application/mapBuilderService.js';
+import type { ProjectMap } from '../logic/mapBuilderService.js';
 import { MAP_SCRIPT } from './mapScript.js';
 import { MAP_STYLES } from './mapStyles.js';
 import { MAP_TIMELINE_SCRIPT } from './mapTimelineScript.js';

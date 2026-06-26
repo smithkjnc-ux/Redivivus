@@ -2,16 +2,16 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
 import type { ChatHeaderInfo } from './chatPanelHtml.js';
-import { BuildHistoryService } from '../build/services/buildHistoryService.js';
-import { getAccountToken } from '../../../shared/api/infrastructure/apiClient.js';
+import { BuildHistoryService } from '../../build/services/buildHistoryService.js';
+import { getAccountToken } from '../../../features/api/data/apiClient.js';
 import * as fs from 'fs';
 import { determineBlueprintStatus } from './chatPanelHeaderUtils.js';
-import { isProjectsContainer } from '../../project/application/redivivusPaths.js';
-import { isSecretKeyStoreReady } from '../../../shared/ai/infrastructure/secretKeyStore.js';
+import { isProjectsContainer } from '../../project/logic/redivivusPaths.js';
+import { isSecretKeyStoreReady } from '../../../features/ai/data/secretKeyStore.js';
 import { getPrimaryAction, getConfiguredProviders, getVaultCounts } from './chatPanelHeaderActions.js';
 
 export function buildHeaderInfo(

@@ -1,7 +1,7 @@
 // [SCOPE] VS Code Deep Link Auth Handler — catches vscode://papajoe.redivivus/auth?token=XYZ
 import * as vscode from 'vscode';
-import { setAccountToken } from './apiClient.js';
-import type { StatusBar } from '../../vscode/ui/statusBar.js';
+import { setAccountToken } from '../data/apiClient.js';
+import type { StatusBar } from '../../../features/vscode/ui/statusBar.js';
 
 export class AuthUriHandler implements vscode.UriHandler {
   constructor(private statusBar?: StatusBar) {}

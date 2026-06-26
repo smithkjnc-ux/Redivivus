@@ -2,7 +2,7 @@
 // Extracted per Rule 9. Guardian reviews, Worker fixes targeted issues, Guardian re-reviews.
 // After MAX_GUARDIAN_RETRIES failures: escalate to user in plain English, never loop indefinitely.
 
-import type { BuildContext } from '../../../features/chat/build/chatPanelBuild.js';
+import type { BuildContext } from '../../../features/build/chatPanelBuild.js';
 
 export const MAX_GUARDIAN_RETRIES = 2;
 
@@ -68,7 +68,7 @@ export async function runGuardianWithRetry(
     try {
       const fixRes = await routing.routeByComplexity(task, fixPrompt);
       if (fixRes.success && fixRes.text?.trim()) {
-        const { extractCodeFromResponse } = await import('../../../features/chat/build/chatPanelBuildInference.js');
+        const { extractCodeFromResponse } = await import('../../../features/build/chatPanelBuildInference.js');
         code = extractCodeFromResponse(fixRes.text.trim());
       }
     } catch { /* fix call failed -- Guardian will review original code again */ }

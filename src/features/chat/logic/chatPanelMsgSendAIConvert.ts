@@ -1,11 +1,11 @@
 // [SCOPE] AI chat: chunked conversion handler for large source files.
 // Returns null when source is small enough for a single API call (falls through to routing.prompt).
 
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
+import type { UsageTracker } from '../../telemetry/data/usageTracker.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import { findSourceFiles } from '../../../shared/ai/domain/chatPanelAICodeGen.js';
-import { splitSourceIntoSections, chunkedGenerate } from '../build/chatPanelChunkedGen.js';
+import { findSourceFiles } from '../../../features/ai/logic/chatPanelAICodeGen.js';
+import { splitSourceIntoSections, chunkedGenerate } from '../../build/chatPanelChunkedGen.js';
 
 const CHUNKED_THRESHOLD = 300;
 

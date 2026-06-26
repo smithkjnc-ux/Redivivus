@@ -7,12 +7,12 @@ import * as path from 'path';
 import * as os from 'os';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import { deriveFileBase } from '../build/chatPanelBuildInference.js';
-import { confirmAgentRun } from '../../../shared/ai/infrastructure/agentPermissionSummary.js';
+import { deriveFileBase } from '../../build/chatPanelBuildInference.js';
+import { confirmAgentRun } from '../../../features/ai/data/agentPermissionSummary.js';
 
 /** Runs the Agent Mode loop — used by adaptive routing. */
 export async function runAgentMode(userText: string, deps: MessageHandlerDeps, conversation: ChatMessage[], refresh: () => void): Promise<void> {
-  const { executeAgentTask } = await import('../../../shared/ai/infrastructure/agentService.js');
+  const { executeAgentTask } = await import('../../../features/ai/data/agentService.js');
   let rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
   let config = deps.redivivus.isInitialized() ? deps.redivivus.loadConfig() : null;
   let blueprintCtx = config?.blueprint ? JSON.stringify(config.blueprint) : '';
@@ -90,8 +90,8 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
     let builtFiles: string[] = [];
     if (agentCtx.modifiedFiles.size > 0 && result.ledger) {
       const { buildResultCard } = await import('../ui/chatPanelStory.js');
-      const { buildPostBuildGuidance } = await import('../build/chatPanelPostBuild.js');
-      const { BuildHistoryService, makeBuildHistoryEntry } = await import('../build/services/buildHistoryService.js');
+      const { buildPostBuildGuidance } = await import('../../build/chatPanelPostBuild.js');
+      const { BuildHistoryService, makeBuildHistoryEntry } = await import('../../build/services/buildHistoryService.js');
       const ls = result.ledger.hasData() ? result.ledger.getSummary() : undefined;
       const totalTokens = ls ? ls.reduce((s: number, l: any) => s + l.tokens, 0) : 0;
       const totalCost = ls ? ls.reduce((s: number, l: any) => s + l.costUSD, 0) : 0;
@@ -113,7 +113,7 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
       const hasVisual = builtFiles.some((f: string) => /\.(html|css)$/i.test(f));
       const editToken = hasVisual && rootPath ? `\n__EDIT_VISUALLY__${rootPath}|||END_EDIT_VISUALLY__` : '';
       let runToken = '';
-      if (!htmlFile && rootPath) { try { const { detectRunCommand } = await import('../build/services/runtimeRunner.js'); if (detectRunCommand(rootPath)) { runToken = `\n__RUN_PROJECT__${rootPath}|||END_RUN__`; } } catch {} }
+      if (!htmlFile && rootPath) { try { const { detectRunCommand } = await import('../../build/services/runtimeRunner.js'); if (detectRunCommand(rootPath)) { runToken = `\n__RUN_PROJECT__${rootPath}|||END_RUN__`; } } catch {} }
 
       finalContent += `\n\n${card}${buildResultMarker}${openWsToken}${previewToken}${runToken}${editToken}${nextSteps}`;
       const sw = deps.routing.selectSupervisorAndWorker();
@@ -130,7 +130,7 @@ export async function runAgentMode(userText: string, deps: MessageHandlerDeps, c
     // Fire build:finished event so save-points and session recording trigger
     if (builtFiles.length > 0) {
       setTimeout(() => {
-        import('../build/services/buildEvents.js').then(({ buildEvents }) => {
+        import('../../build/services/buildEvents.js').then(({ buildEvents }) => {
           buildEvents.emit('build:finished', userText, builtFiles, rootPath);
         });
       }, 300);

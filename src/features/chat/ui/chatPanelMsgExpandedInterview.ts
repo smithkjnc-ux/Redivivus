@@ -1,6 +1,6 @@
 // [SCOPE] Expanded interview submit handler — compiles 5W answers, sets blueprint context, triggers build
 import type { ChatMessage } from './chatPanelHtml.js';
-import type { MessageHandlerDeps } from '../routing/chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../logic/chatPanelMessages.js';
 
 export async function handleExpandedInterviewSubmit(
   msg: any,

@@ -1,6 +1,6 @@
 // [SCOPE] Chat send-message clarify step — asks design questions before intent routing
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 import { generateClarifyQuestions, encodeClarifyToken, formatAnswersForPrompt } from '../ui/chatPanelClarify.js';
 import { setPendingClarifyResolve } from '../ui/chatPanelClarifyBridge.js';
 
@@ -68,7 +68,7 @@ export async function runChatClarifyStep(
   let _guesses: Array<{ question: string; guessValue?: string }> = [];
   if (questions.length > 0) {
     try {
-      const { triageDecisions } = await import('../../../shared/ai/domain/decisionTriage.js');
+      const { triageDecisions } = await import('../../../features/ai/logic/decisionTriage.js');
       const triage = await triageDecisions(questions, routing, userText);
       const askSet = new Set(triage.questionsToAsk.map(q => q.question));
       const filtered = questions.filter(q => askSet.has(q.question));

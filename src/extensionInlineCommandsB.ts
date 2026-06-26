@@ -2,21 +2,21 @@
 // redivivus.runProject + redivivus.inspectElement + redivivus.injectTerminalError extracted to extensionInlineCommandsC.ts.
 
 import * as vscode from 'vscode';
-import { debugLog } from './features/workspace/infrastructure/diagnosticLogger.js';
-import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
-import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
-import type { VaultService } from './features/vault/infrastructure/vaultService.js';
-import type { StatusBar } from './shared/vscode/ui/statusBar.js';
-import type { GuardianService } from './shared/ai/infrastructure/guardianService.js';
+import { debugLog } from './features/workspace/data/diagnosticLogger.js';
+import type { RedivivusService } from './features/vscode/logic/redivivusService.js';
+import type { RoutingService } from './features/ai/data/routingService.js';
+import type { UsageTracker } from './features/telemetry/data/usageTracker.js';
+import type { VaultService } from './features/vault/data/vaultService.js';
+import type { StatusBar } from './features/vscode/ui/statusBar.js';
+import type { GuardianService } from './features/ai/data/guardianService.js';
 import { RecommendationsPanel } from './features/workspace/ui/analyzer/analyzerPanel.js';
 import { MapPanel } from './features/map/ui/mapPanel.js';
-import type { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
+import type { GitHubBackupService } from './features/workspace/data/githubBackupService.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
-import { getActiveProjectRoot } from './features/project/application/activeProjectRoot.js';
-import { openBlueprintPanel } from './features/project/ui/blueprint/blueprintInterviewPanel.js';
-import { registerProfileRuntimeCommand } from './features/runtime/application/profileRuntime.js';
-import { registerStartRuntimeAnalysisCommand } from './features/runtime/application/startRuntimeAnalysis.js';
+import { getActiveProjectRoot } from './features/project/logic/activeProjectRoot.js';
+import { openBlueprintPanel } from './features/blueprint/ui/blueprintInterviewPanel.js';
+import { registerProfileRuntimeCommand } from './features/runtime/logic/profileRuntime.js';
+import { registerStartRuntimeAnalysisCommand } from './features/runtime/logic/startRuntimeAnalysis.js';
 import { showBuildHistoryPanel } from './features/chat/ui/buildHistoryPanel.js';
 import { MemoryPanel } from './features/chat/ui/memoryPanel.js';
 import { registerInlineCommandsC } from './extensionInlineCommandsC.js';
@@ -116,7 +116,7 @@ export function registerInlineCommandsB(
         ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
         await new Promise(resolve => setTimeout(resolve, 600));
       }
-      const { getMemoryForDisplay } = await import('./features/chat/application/userMemoryService.js');
+      const { getMemoryForDisplay } = await import('./features/chat/logic/userMemoryService.js');
       const memory = getMemoryForDisplay();
       const topLangs = Object.entries(memory.stack.languages).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l, c]) => `${l} (${c})`).join(', ') || 'none yet';
       const content = [

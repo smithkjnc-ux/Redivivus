@@ -1,8 +1,8 @@
 // [SCOPE] Client-side AI execution helpers for the cloud build pipeline.
 // Extracted from cloudBuildClient.ts (Rule 9 split).
 
-import { callProvider } from '../../../../shared/ai/domain/providers/providerFactory.js';
-import { streamProvider } from '../../../../shared/ai/infrastructure/streamingProviders.js';
+import { callProvider } from '../../../features/ai/logic/providers/providerFactory.js';
+import { streamProvider } from '../../../features/ai/data/streamingProviders.js';
 
 const MAX_CONTINUATIONS = 3;
 

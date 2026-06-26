@@ -2,12 +2,12 @@
 // Extracted from chatPanelIntent.ts
 
 import * as vscode from 'vscode';
-import type { BuildRequestDeps } from '../../../shared/ai/domain/chatPanelIntent.js';
-import type { EditBuildContext } from '../build/chatPanelEditBuild.js';
-import { runEditFileBuild } from '../build/chatPanelEditBuild.js';
-import { autoCommitIfEnabled } from '../../workspace/infrastructure/gitAutoCommitService.js';
-import { refreshSetupProgressIfOpen } from '../../project/application/setupProgressPanel.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import type { BuildRequestDeps } from '../../../features/ai/logic/chatPanelIntent.js';
+import type { EditBuildContext } from '../../build/chatPanelEditBuild.js';
+import { runEditFileBuild } from '../../build/chatPanelEditBuild.js';
+import { autoCommitIfEnabled } from '../../workspace/data/gitAutoCommitService.js';
+import { refreshSetupProgressIfOpen } from '../../project/logic/setupProgressPanel.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 
 export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, 'pendingTask' | 'setPendingTask' | 'setActiveBuildCtx'>): Promise<void> {
   // [FIX] Resolve the edit against the ACTIVE project root, not the raw workspace folder. Under Model A the
@@ -32,7 +32,7 @@ export async function handleEditRequest(msg: any, deps: Omit<BuildRequestDeps, '
     onBuildFinished: (task: string, builtFiles?: string[]) => {
       vscode.commands.executeCommand('redivivus.resolveFix', task, builtFiles);
       // [FIX] Migrated from dead ChatPanel.onBuildFinished static to buildEvents
-      import('../build/services/buildEvents.js').then(({ buildEvents }) => {
+      import('../../build/services/buildEvents.js').then(({ buildEvents }) => {
         buildEvents.emit('build:finished', task, builtFiles || []);
       }).catch(() => {});
     },

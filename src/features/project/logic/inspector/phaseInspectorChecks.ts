@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import type { PhaseIssue} from './phaseInspector.js';
 import { CompatibilityCheck } from './phaseInspector.js';
-import { RoutingService } from '../../../../shared/ai/infrastructure/routingService.js';
+import { RoutingService } from '../../../../features/ai/data/routingService.js';
 
 import { TestResult } from './phaseInspector.js';
 

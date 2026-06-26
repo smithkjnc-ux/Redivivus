@@ -1,7 +1,7 @@
 // [SCOPE] Vault tab exporter — thin facade over data utils, scan summary, and tab renderer modules
 // Split from 229-line monolith. Each responsibility now lives in its own file under 200 lines.
 
-import { VaultService, VaultCategory, VaultItem } from '../infrastructure/vaultService.js';
+import { VaultService, VaultCategory, VaultItem } from '../data/vaultService.js';
 import { getVaultItems, getVaultCategoryCounts, esc } from './vaultDataUtils.js';
 import { renderVaultScanSummary } from './vaultScanSummary.js';
 import { renderVaultTab } from './vaultTabRenderer.js';

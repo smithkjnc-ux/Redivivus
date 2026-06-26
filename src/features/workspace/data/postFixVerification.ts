@@ -3,7 +3,7 @@
 
 import * as cp from 'child_process';
 import * as path from 'path';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { fixLog } from '../../../features/logging/data/fixPipelineLogger.js';
 
 export interface PostFixResult {
   command: string;

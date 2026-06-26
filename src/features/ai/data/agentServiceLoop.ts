@@ -5,11 +5,11 @@
 
 import type { AgentContext } from './agentTools.js';
 import { BUILT_IN_TOOLS } from './agentTools.js';
-import { getAllTools, callTool } from '../../api/mcp/mcpService.js';
-import { BuildLedger } from '../../../features/chat/build/services/buildLedgerService.js';
+import { getAllTools, callTool } from '../../../features/api/logic/mcpService.js';
+import { BuildLedger } from '../../../features/build/services/buildLedgerService.js';
 import { extractAgentThought, narrateTool, friendlyModelName } from './agentNarrator.js';
 import { executionNudge, budgetNudge, ceilingMessage, proactiveTestNudge } from './agentCompletionGuard.js';
-import { detectTestFramework } from '../../../features/chat/build/services/testFramework.js';
+import { detectTestFramework } from '../../../features/build/services/testFramework.js';
 import { describeProviderError, isSustainedFailure } from './agentFailoverReason.js';
 import { synthesizeCompletion, parseTestSummary, isNoOpFabrication } from './agentCompletionSynthesis.js';
 import { nativeAgentCall, appendUserNote } from './agentNativeCall.js';

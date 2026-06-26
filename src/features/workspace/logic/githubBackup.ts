@@ -2,7 +2,7 @@
 // All operations are user-initiated. No timers, no auto-backup, no silent commits.
 
 import * as vscode from 'vscode';
-import type { GitHubBackupService } from '../infrastructure/githubBackupService.js';
+import type { GitHubBackupService } from '../data/githubBackupService.js';
 
 export function registerGitHubBackupCommands(context: vscode.ExtensionContext, backupService: GitHubBackupService): void {
 

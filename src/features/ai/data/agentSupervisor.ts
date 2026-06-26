@@ -4,7 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { callProvider } from '../domain/providers/providerFactory.js';
+import { callProvider } from '../logic/providers/providerFactory.js';
 import type { RoutingService } from './routingService.js';
 import type { AgentContext } from './agentTools.js';
 import { logAICall } from './aiCallLogger.js';

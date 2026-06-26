@@ -3,7 +3,7 @@
 // Fast-path regex first, AI fallback second. No AI call for trivial tasks.
 // [RULE 18] AI classifier has final say for offer-choices vs explore-with-them.
 
-import type { RoutingService } from '../infrastructure/routingService.js';
+import type { RoutingService } from '../data/routingService.js';
 
 export type JobTier =
   | 'tell-them'           // trivial -- 0 questions, just do it

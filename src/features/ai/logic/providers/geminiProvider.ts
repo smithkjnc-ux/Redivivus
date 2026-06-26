@@ -1,7 +1,7 @@
 // [SCOPE] Gemini AI provider implementation
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
-import { getGeminiKey } from '../../infrastructure/routingKeys.js';
+import type { AIResponse } from '../../data/routingTypes.js';
+import { getGeminiKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 
 export async function executeGemini(
@@ -13,7 +13,7 @@ export async function executeGemini(
   systemMessage?: string
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getGeminiKey()!;
-  const { bestModelForRole, tierToRole } = await import('../../infrastructure/modelRegistry.js');
+  const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
   const model = bestModelForRole('gemini', tierToRole(tier))?.modelId ?? 'gemini-2.5-flash';
   try {
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;

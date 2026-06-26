@@ -2,7 +2,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { Redivivus_WORKER_RULES } from '../infrastructure/redivivusWorkerRules.js';
+import { Redivivus_WORKER_RULES } from '../data/redivivusWorkerRules.js';
 
 export interface SourceFile { relPath: string; content: string; lineCount: number; }
 

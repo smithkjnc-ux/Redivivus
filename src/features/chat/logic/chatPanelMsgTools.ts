@@ -24,10 +24,10 @@ export async function handleToolGapTerminal(msg: any): Promise<void> {
 
 export async function handleCheckReadiness(msg: any, deps: MessageHandlerDeps): Promise<void> {
   try {
-    const { getActiveProjectRoot } = await import('../../project/application/activeProjectRoot.js');
+    const { getActiveProjectRoot } = await import('../../project/logic/activeProjectRoot.js');
     const root = (msg.root ? Buffer.from(msg.root, 'base64').toString('utf-8') : '') || getActiveProjectRoot();
     if (root) {
-      const { runReadinessReport, formatReadinessReport } = await import('../build/services/productionReadiness.js');
+      const { runReadinessReport, formatReadinessReport } = await import('../../build/services/productionReadiness.js');
       const report = runReadinessReport(root);
       deps.conversation.push({ role: 'assistant', content: formatReadinessReport(report, require('path').basename(root)), timestamp: Date.now() });
       deps.refresh();
@@ -47,24 +47,24 @@ export async function handleFileSizeGateChoice(msg: any): Promise<void> {
 }
 
 export async function handleScopeSubmit(msg: any): Promise<void> {
-  const { resolveScopeQuestion } = await import('../../project/application/templateScopeService.js');
+  const { resolveScopeQuestion } = await import('../../project/logic/templateScopeService.js');
   resolveScopeQuestion(msg.answer || '');
 }
 
 export async function handleScopeCancel(): Promise<void> {
-  const { clearPendingScopeQuestion } = await import('../../project/application/templateScopeService.js');
+  const { clearPendingScopeQuestion } = await import('../../project/logic/templateScopeService.js');
   clearPendingScopeQuestion();
 }
 
 export async function handleTemplateWizard(msg: any): Promise<void> {
   try {
-    const { resolveTemplateWizard } = await import('../../project/application/templateWizard.js');
+    const { resolveTemplateWizard } = await import('../../project/logic/templateWizard.js');
     resolveTemplateWizard(msg);
   } catch { /* wizard may have already timed out */ }
 }
 
 export async function handlePlanApproval(msg: any): Promise<void> {
-  const { resolvePlanApproval, setPlanEditedText } = await import('../build/chatPanelBuildPlanGate.js');
+  const { resolvePlanApproval, setPlanEditedText } = await import('../../build/chatPanelBuildPlanGate.js');
   const outcome = msg.type === 'plan-approve' ? 'approve' : msg.type === 'plan-revise' ? 'revise' : 'cancel';
   if (msg.planId) {
     if (msg.editedPlan) { setPlanEditedText(msg.planId, msg.editedPlan); }

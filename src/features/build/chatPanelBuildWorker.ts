@@ -2,10 +2,10 @@
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import type { BuildContext } from './chatPanelBuild.js';
-import { tracer } from '../../project/application/pipelineTracer.js';
-import { Redivivus_WORKER_RULES } from '../../../shared/ai/infrastructure/redivivusWorkerRules.js';
-import { streamProvider } from '../../../shared/ai/infrastructure/streamingProviders.js';
-import { scanProjectExports, formatExportsForPrompt } from '../../workspace/domain/code/projectExportScanner.js';
+import { tracer } from '../project/logic/pipelineTracer.js';
+import { Redivivus_WORKER_RULES } from '../../features/ai/data/redivivusWorkerRules.js';
+import { streamProvider } from '../../features/ai/data/streamingProviders.js';
+import { scanProjectExports, formatExportsForPrompt } from '../workspace/logic/projectExportScanner.js';
 
 // AI display names for user messages
 const AI_LABELS: Record<string, string> = {
@@ -58,7 +58,7 @@ export async function executeWorkerBuild(ctx: BuildContext, prompt: string, onCh
         ctx.refresh();
 
         // Try fallback
-        const { callProvider } = await import('../../../shared/ai/domain/providers/providerFactory.js');
+        const { callProvider } = await import('../../features/ai/logic/providers/providerFactory.js');
         const f = (url: string, opts: RequestInit) => routing.fetchWithTimeout(url, opts, 120_000);
         const fallbackRes = await callProvider(fallbackAI, prompt, f);
 

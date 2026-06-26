@@ -4,7 +4,7 @@
 // user-owns-guess: cheap/easy-to-change preference -- AI picks default, surfaces post-build.
 // [RULE 18] AI classifier determines bucket; fast-path regex handles obvious cases first.
 
-import type { RoutingService } from '../infrastructure/routingService.js';
+import type { RoutingService } from '../data/routingService.js';
 import type { ClarifyQuestion } from '../../../features/chat/ui/chatPanelClarify.js';
 import type { JobTier } from './jobSizer.js';
 

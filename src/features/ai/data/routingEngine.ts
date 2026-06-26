@@ -163,7 +163,7 @@ JSON (use ONLY the exact enum values shown):
 {"reasoning":"low|medium|high","domain":"code-gen|architecture|math|debug|refactor|qa|creative|documentation","contextSize":"tiny|small|medium|large|huge","outputSize":"tiny|small|medium|large|huge","speedPriority":"low|medium|high","thinkingBenefits":true|false}`;
 
   try {
-    const { callProvider } = await import('../domain/providers/providerFactory.js');
+    const { callProvider } = await import('../logic/providers/providerFactory.js');
     const res = await callProvider(classifier, prompt, fetchFn);
     if (res.success && res.text) {
       const match = res.text.match(/\{[\s\S]*?\}/);

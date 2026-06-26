@@ -3,8 +3,8 @@
 // and automatically get structured JSON output, session IDs, and Output Channel dispatch.
 // Log rotation (keep last 3 runs) still applies via the session-based log file naming.
 
-import { log as structuredLog, getCurrentSession } from '../infrastructure/redivivusLogger.js';
-import type { LayerName } from '../infrastructure/logListeners.js';
+import { log as structuredLog, getCurrentSession } from '../data/redivivusLogger.js';
+import type { LayerName } from '../data/logListeners.js';
 import * as fs from 'fs';
 import * as path from 'path';
 

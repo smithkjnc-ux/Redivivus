@@ -4,8 +4,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RedivivusService } from '../../../../shared/vscode/application/redivivusService.js';
-import type { SessionService } from '../../application/sessionService.js';
+import type { RedivivusService } from '../../../../features/vscode/logic/redivivusService.js';
+import type { SessionService } from '../../logic/sessionService.js';
 import { handleNewProjectWizard } from './wizardNewProject.js';
 import { handleActiveSessionWizard } from './wizardActiveSession.js';
 import { handleBackupPendingWizard } from './wizardBackupPending.js';

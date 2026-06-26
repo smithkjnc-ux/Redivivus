@@ -2,11 +2,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RedivivusService } from '../../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import { AnalysisResult } from './analyzerTypes.js';
 import { scanDirectory, buildAnalysis } from './analyzerScanner.js';
 import { generateProjectMap, generateRecommendations, analyzeCurrentFile as _analyzeCurrentFile } from './analyzerReports.js';
-import { showRecommendationsPanel as _showRecommendationsPanel } from './analyzerPanel.js';
+import { showRecommendationsPanel as _showRecommendationsPanel } from '../ui/analyzer/analyzerPanel.js';
 
 export { AnalysisResult };
 

@@ -1,7 +1,7 @@
 // [SCOPE] Session finalization helpers — extracted from sessionService.ts (Rule 9 split)
 
 import type { SessionInfo, ExitInterview } from '../../../types/index.js';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import { saveSessionFile, getDuration } from './sessionStorage.js';
 
 export function finalizeSession(session: SessionInfo, redivivus: RedivivusService, interview: ExitInterview): void {

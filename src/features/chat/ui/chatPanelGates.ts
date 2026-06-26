@@ -2,12 +2,12 @@
 // Extracted from chatPanelIntent.ts
 
 import * as vscode from 'vscode';
-import type { BuildRequestDeps} from '../../../shared/ai/domain/chatPanelIntent.js';
-import { _pendingPlacements, _pendingBuildConfirms } from '../../../shared/ai/domain/chatPanelResolvers.js';
-import { estimateBuild } from '../../../shared/ai/domain/costEstimatorService.js';
-import { checkBuildPlacement } from '../build/services/buildPlacementCheck.js';
-import { autoCreateProject } from '../build/chatPanelBuildAutoCreate.js';
-import { tracer } from '../../project/application/pipelineTracer.js';
+import type { BuildRequestDeps} from '../../../features/ai/logic/chatPanelIntent.js';
+import { _pendingPlacements, _pendingBuildConfirms } from '../../../features/ai/logic/chatPanelResolvers.js';
+import { estimateBuild } from '../../../features/ai/logic/costEstimatorService.js';
+import { checkBuildPlacement } from '../../build/services/buildPlacementCheck.js';
+import { autoCreateProject } from '../../build/chatPanelBuildAutoCreate.js';
+import { tracer } from '../../project/logic/pipelineTracer.js';
 
 export async function awaitPlacementConfirmation(
   task: string,

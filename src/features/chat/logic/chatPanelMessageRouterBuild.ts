@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 import { ChatPanel } from '../ui/chatPanel.js';
-import { panelVaultOnlyBuild } from '../build/chatPanelBuildUtils.js';
+import { panelVaultOnlyBuild } from '../../build/chatPanelBuildUtils.js';
 
 export async function handleBuildSimple(panel: ChatPanel, msg: any): Promise<boolean> {
   const state = (panel as any).state;

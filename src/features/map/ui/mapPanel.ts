@@ -12,14 +12,14 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { ProjectMap } from '../application/mapBuilderService.js';
-import { buildProjectMap } from '../application/mapBuilderService.js';
-import type { GuardianService } from '../../../shared/ai/infrastructure/guardianService.js';
+import type { ProjectMap } from '../logic/mapBuilderService.js';
+import { buildProjectMap } from '../logic/mapBuilderService.js';
+import type { GuardianService } from '../../../features/ai/data/guardianService.js';
 import { MAP_SCRIPT } from './mapScript.js';
 import { MAP_STYLES } from './mapStyles.js';
-import { BuildHistoryService } from '../../chat/build/services/buildHistoryService.js';
-import { SavePointService } from '../../project/application/savePointService.js';
-import { SnapshotService } from '../../project/application/snapshotService.js';
+import { BuildHistoryService } from '../../build/services/buildHistoryService.js';
+import { SavePointService } from '../../project/logic/savePointService.js';
+import { SnapshotService } from '../../project/logic/snapshotService.js';
 import { buildMapHtml as buildFullMapHtml } from './mapPanelHtml.js';
 import { handleMapMessage } from './mapMessageDispatcher.js';
 

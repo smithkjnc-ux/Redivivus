@@ -2,7 +2,7 @@
 // Returns each field with confidence: confident | assumed | unknown.
 // Falls back to all-unknown on any failure — never blocks the build path.
 
-import type { RoutingService } from '../../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../features/ai/data/routingService.js';
 
 export type WConfidence = 'confident' | 'assumed' | 'unknown';
 

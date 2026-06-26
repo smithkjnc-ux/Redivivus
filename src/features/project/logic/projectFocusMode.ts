@@ -10,7 +10,7 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { isProjectsContainer } from '../application/redivivusPaths.js';
+import { isProjectsContainer } from './redivivusPaths.js';
 
 const EXCLUDE_KEY = 'files.exclude';
 const WATCHER_KEY = 'files.watcherExclude';

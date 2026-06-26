@@ -7,16 +7,16 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import type { ChatResult } from '../../../shared/api/infrastructure/apiClientChat.js';
-import { handleFixRequest } from './chatPanelMsgFix.js';
+import type { ChatResult } from '../../../features/api/data/apiClientChat.js';
+import { handleFixRequest } from '../../fix/chatPanelMsgFix.js';
 import { handleAIChat } from './chatPanelMsgSendAI.js';
 import { handleRunIntent, handleScaffoldIntent, handleServiceIntent } from './chatPanelMsgIntentActions.js';
 import { runChatClarifyStep } from './chatPanelMsgSendClarify.js';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
-import { calcCost } from '../../telemetry/infrastructure/usageTracker.js';
-import { isProjectsContainer } from '../../project/application/redivivusPaths.js';
-import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { fixLog } from '../../../features/logging/data/fixPipelineLogger.js';
+import { calcCost } from '../../telemetry/data/usageTracker.js';
+import { isProjectsContainer } from '../../project/logic/redivivusPaths.js';
+import { getActiveProjectRoot } from '../../project/logic/activeProjectRoot.js';
 import { handleChangeRequest } from './handleChangeRequest.js';
 import { handleAnswerClarifyResult, handleCommandResult } from './chatPanelMsgSendPostCloudHandlers.js';
 
@@ -105,7 +105,7 @@ export async function routeCloudChatResult(
   if (chatResult.action === 'personality-picker') {
     conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
     refresh(); releaseInput();
-    setTimeout(() => import('../../settings/application/personalityPicker.js').then(m => m.pickPersonality()), 400);
+    setTimeout(() => import('../../settings/logic/personalityPicker.js').then(m => m.pickPersonality()), 400);
     return;
   }
 
@@ -128,7 +128,7 @@ export async function routeCloudChatResult(
   const _pd = (vscode.workspace.getConfiguration('redivivus').get('projectsDirectory', '~/projects') as string).replace('~', require('os').homedir());
   // [P0] Clarify wizard runs ONLY in explicit Guided mode. Unset mode = Auto (skip wizard).
   if (!msg.fromPreview && deps.buildMode === 'plan' && intent.type === 'build' && _wsR && require('path').resolve(_wsR) !== require('path').resolve(_pd)) {
-    const { sizeJob } = await import('../../../shared/ai/domain/jobSizer.js');
+    const { sizeJob } = await import('../../../features/ai/logic/jobSizer.js');
     const jobSize = await sizeJob(userText, deps.routing);
     if (jobSize.tier === 'tell-them') {
       conversation.push({ role: 'assistant', content: 'Got it — on it.', timestamp: Date.now() });

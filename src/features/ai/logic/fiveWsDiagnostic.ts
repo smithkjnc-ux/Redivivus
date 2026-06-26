@@ -3,7 +3,7 @@
 // Returns aligned=true to proceed, or aligned=false with mismatch details to surface to user.
 // [RULE 18] AI does the alignment check; skip logic uses fast-path heuristics only.
 
-import type { RoutingService } from '../infrastructure/routingService.js';
+import type { RoutingService } from '../data/routingService.js';
 import type { ChatMessage } from '../../../features/chat/ui/chatPanelHtml.js';
 
 export interface DiagnosticResult {

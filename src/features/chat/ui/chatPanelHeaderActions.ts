@@ -43,15 +43,15 @@ export function getPrimaryAction(workspaceRoot: string | undefined): PrimaryActi
 
 export function getConfiguredProviders(): ChatHeaderInfo['configuredProviders'] {
   const PROVIDER_META: Array<{ id: string; label: string; emoji: string; key: () => string | null }> = [
-    { id: 'groq',     label: 'Groq',     emoji: '\u26A1', key: () => { try { const { getGroqKey }     = require('../../../shared/ai/infrastructure/routingKeys.js'); return getGroqKey(); }     catch { return null; } } },
-    { id: 'openai',   label: 'GPT-4o',   emoji: '\u25C6', key: () => { try { const { getOpenAIKey }   = require('../../../shared/ai/infrastructure/routingKeys.js'); return getOpenAIKey(); }   catch { return null; } } },
-    { id: 'deepseek', label: 'DeepSeek', emoji: '\u25BA', key: () => { try { const { getDeepseekKey } = require('../../../shared/ai/infrastructure/routingKeys.js'); return getDeepseekKey(); } catch { return null; } } },
-    { id: 'gemini',   label: 'Gemini',   emoji: '\u2B22', key: () => { try { const { getGeminiKey }   = require('../../../shared/ai/infrastructure/routingKeys.js'); return getGeminiKey(); }   catch { return null; } } },
-    { id: 'claude',   label: 'Claude',   emoji: '\uD83D\uDFE0', key: () => { try { const { getClaudeKey }  = require('../../../shared/ai/infrastructure/routingKeys.js'); return getClaudeKey(); }  catch { return null; } } },
-    { id: 'xai',      label: 'Grok',     emoji: '\u2736', key: () => { try { const { getXAIKey }      = require('../../../shared/ai/infrastructure/routingKeys.js'); return getXAIKey(); }      catch { return null; } } },
-    { id: 'kimi',     label: 'Kimi',     emoji: '\uD83C\uDF19', key: () => { try { const { getKimiKey }     = require('../../../shared/ai/infrastructure/routingKeys.js'); return getKimiKey(); }     catch { return null; } } },
+    { id: 'groq',     label: 'Groq',     emoji: '\u26A1', key: () => { try { const { getGroqKey }     = require('../../../features/ai/data/routingKeys.js'); return getGroqKey(); }     catch { return null; } } },
+    { id: 'openai',   label: 'GPT-4o',   emoji: '\u25C6', key: () => { try { const { getOpenAIKey }   = require('../../../features/ai/data/routingKeys.js'); return getOpenAIKey(); }   catch { return null; } } },
+    { id: 'deepseek', label: 'DeepSeek', emoji: '\u25BA', key: () => { try { const { getDeepseekKey } = require('../../../features/ai/data/routingKeys.js'); return getDeepseekKey(); } catch { return null; } } },
+    { id: 'gemini',   label: 'Gemini',   emoji: '\u2B22', key: () => { try { const { getGeminiKey }   = require('../../../features/ai/data/routingKeys.js'); return getGeminiKey(); }   catch { return null; } } },
+    { id: 'claude',   label: 'Claude',   emoji: '\uD83D\uDFE0', key: () => { try { const { getClaudeKey }  = require('../../../features/ai/data/routingKeys.js'); return getClaudeKey(); }  catch { return null; } } },
+    { id: 'xai',      label: 'Grok',     emoji: '\u2736', key: () => { try { const { getXAIKey }      = require('../../../features/ai/data/routingKeys.js'); return getXAIKey(); }      catch { return null; } } },
+    { id: 'kimi',     label: 'Kimi',     emoji: '\uD83C\uDF19', key: () => { try { const { getKimiKey }     = require('../../../features/ai/data/routingKeys.js'); return getKimiKey(); }     catch { return null; } } },
   ];
-  const { modelsForProvider } = require('../../../shared/ai/infrastructure/modelRegistry.js');
+  const { modelsForProvider } = require('../../../features/ai/data/modelRegistry.js');
   return PROVIDER_META.filter(p => !!p.key()).map(({ id, label, emoji }) => ({
     id, label, emoji,
     models: (modelsForProvider(id) || []).map((m: { modelId: string; label: string; capability: number }) => ({ id: m.modelId, label: m.label, cap: m.capability })),
@@ -60,7 +60,7 @@ export function getConfiguredProviders(): ChatHeaderInfo['configuredProviders'] 
 
 export function getVaultCounts(extensionContext: vscode.ExtensionContext | undefined): { vaultItemCount: number; vaultStarterCount: number } {
   try {
-    const { VaultService } = require('../../vault/infrastructure/vaultService.js');
+    const { VaultService } = require('../../vault/data/vaultService.js');
     const v = new VaultService(extensionContext);
     const all = v.listItems() as Array<{ sourceProject?: string }>;
     const SEEDED = new Set(['redivivus-starter', 'redivivus-seeded']);

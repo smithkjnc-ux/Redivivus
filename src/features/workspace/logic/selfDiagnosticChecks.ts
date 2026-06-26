@@ -69,7 +69,7 @@ export function checkInitState(redivivus: any): DiagResult {
 
 export async function checkApiKey(providerName: string, configKey: string): Promise<DiagResult> {
   // Read from SecretStorage (where keys are actually stored) instead of old settings
-  const { getKeyCached } = await import('../../../shared/ai/infrastructure/secretKeyStore.js');
+  const { getKeyCached } = await import('../../../features/ai/data/secretKeyStore.js');
   const key = getKeyCached(providerName.toLowerCase());
   
   if (key && key.length > 8) {

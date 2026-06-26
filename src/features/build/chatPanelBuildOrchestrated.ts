@@ -3,17 +3,17 @@
 // Utilities (AI_LABELS, parseFileMarkers, etc.) extracted to chatPanelBuildOrchestratedUtils.ts (Rule 9).
 
 import * as path from 'path';
-import { AI_RANK, selectGuardianAI } from '../../../shared/ai/infrastructure/guardianAI.js';
-import { createPlan, executeStep, reviewOutput } from '../../../shared/ai/infrastructure/supervisorOrchestrator.js';
-import { callProvider } from '../../../shared/ai/domain/providers/providerFactory.js';
+import { AI_RANK, selectGuardianAI } from '../../features/ai/data/guardianAI.js';
+import { createPlan, executeStep, reviewOutput } from '../../features/ai/data/supervisorOrchestrator.js';
+import { callProvider } from '../../features/ai/logic/providers/providerFactory.js';
 import type { BuildPlan, BuildPhase } from './services/buildOrchestrator.js';
 import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
 import { writeBuiltFile } from './chatPanelBuildWriter.js';
-import { readProjectDeadEnds } from '../routing/chatPanelMsgFixDeadEnds.js';
-import { readProjectRules } from '../routing/chatPanelMsgFixUtils.js';
+import { readProjectDeadEnds } from '../fix/chatPanelMsgFixDeadEnds.js';
+import { readProjectRules } from '../fix/chatPanelMsgFixUtils.js';
 import { generatePlanId, formatOrchestratedPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate.js';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough.js';
-import { log } from '../../../shared/logging/infrastructure/redivivusLogger.js';
+import { log } from '../../features/logging/data/redivivusLogger.js';
 import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown, pushReviewOutcome } from './chatPanelBuildOrchestratedUtils.js';
 
 // Re-export utilities so existing importers don't break

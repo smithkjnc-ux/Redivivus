@@ -1,7 +1,7 @@
 // [SCOPE] Redivivus Misc commands — undo phased build
 
 import * as vscode from 'vscode';
-import { getPhaseUndoService } from '../../features/project/application/phaseUndoService.js';
+import { getPhaseUndoService } from '../../project/logic/phaseUndoService.js';
 
 export function registerUndoCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(

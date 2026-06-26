@@ -7,7 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 26, 2026 — Enforced Rule 9 by extracting and refactoring 8 oversized files in the features/chat routing and build paths to stay under the 200-line hard stop limit. Full entries in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 26, 2026 — `features/ai/` promoted from `shared/ai/`; 91 files, logic/providers + data. All 17 of 17 features converted. `shared/` reduced to `shared/ui/` only — blueprint target state reached. Migration tracker in `.redivivus/blueprint.md`. Full entries in docs/REDIVIVUS_FIXES.md.
+
+*Prior:* June 26, 2026 — Enforced Rule 9 by extracting and refactoring 8 oversized files in the features/chat routing and build paths to stay under the 200-line hard stop limit. Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* June 26, 2026 — Fully migrated the codebase to a Hybrid Modular Monolith Architecture. Extracted 573 legacy monolithic files across 3 phases via `ts-morph` AST manipulation. Established highly cohesive bounded contexts (`features/`, `shared/`) and auto-patched static/dynamic runtime imports. Full entries in docs/REDIVIVUS_FIXES.md.
 

@@ -1,7 +1,7 @@
 // [SCOPE] Rules Service orchestrator — thin facade over content and wrappers modules
 // Split from 276-line monolith. Each responsibility now lives in its own file under 200 lines.
 
-import type { RedivivusService } from '../../application/redivivusService.js';
+import type { RedivivusService } from '../redivivusService.js';
 import { buildRules } from './rulesContent.js';
 import { writeEnabledShims, getEnabledEditorKeys } from './editorRuleFiles.js';
 

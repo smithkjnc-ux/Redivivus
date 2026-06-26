@@ -1,9 +1,9 @@
 // [SCOPE] Helpers extracted from chatPanelMsgFixEscalation.ts (Rule 9 split). Each is a self-contained
 // step of the Worker → Verify → Guardian retry loop; the loop's control flow stays in the main file.
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { modelLabel } from './chatPanelMsgFixUtils.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds.js';
 import { fixActStep } from './fixActivityPanel.js';
 

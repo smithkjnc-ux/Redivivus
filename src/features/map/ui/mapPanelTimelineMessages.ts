@@ -4,9 +4,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { BuildHistoryService } from '../../chat/build/services/buildHistoryService.js';
-import { SavePointService } from '../../project/application/savePointService.js';
-import { SnapshotService } from '../../project/application/snapshotService.js';
+import { BuildHistoryService } from '../../build/services/buildHistoryService.js';
+import { SavePointService } from '../../project/logic/savePointService.js';
+import { SnapshotService } from '../../project/logic/snapshotService.js';
 import type { MapMsgCtx } from './mapMessageDispatcher.js';
 
 export async function handleMapTimelineMessage(msg: any, ctx: MapMsgCtx): Promise<void> {

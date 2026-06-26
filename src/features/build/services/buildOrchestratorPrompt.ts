@@ -4,7 +4,7 @@
 import type { BuildOrchestrator, BuildPhase } from './buildOrchestrator.js';
 import { BuildPlan, PhaseDefinition } from './buildOrchestrator.js';
 import { BUILD_PHASES } from './buildPhaseDefinitions.js';
-import { Redivivus_WORKER_RULES } from '../../../../shared/ai/infrastructure/redivivusWorkerRules.js';
+import { Redivivus_WORKER_RULES } from '../../../features/ai/data/redivivusWorkerRules.js';
 
   export function getPlanSummaryImpl(orch: BuildOrchestrator, planId: string): string {
     const plan = (orch as any).plans.get(planId);

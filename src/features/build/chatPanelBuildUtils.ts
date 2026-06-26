@@ -5,9 +5,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { BuildRequestDeps} from '../../../shared/ai/domain/chatPanelIntent.js';
-import { classifyIntent, isBuildRequest, handleBuildRequest } from '../../../shared/ai/domain/chatPanelIntent.js';
-import type { ChatPanel } from '../ui/chatPanel.js';
+import type { BuildRequestDeps} from '../../features/ai/logic/chatPanelIntent.js';
+import { classifyIntent, isBuildRequest, handleBuildRequest } from '../../features/ai/logic/chatPanelIntent.js';
+import type { ChatPanel } from '../chat/ui/chatPanel.js';
 
 /** Validates that a build root is a legitimate user project directory, not the Redivivus extension folder or other invalid paths. */
 export function isValidBuildRoot(root: string | undefined): root is string {
@@ -121,7 +121,7 @@ export async function panelVaultOnlyBuild(panel: ChatPanel, task: string): Promi
       const ext = /python|\.py\b/i.test(task) ? '.py' : /html/i.test(task) ? '.html' : /css/i.test(task) ? '.css' : '.js';
       const tmpPath = path.join(os.tmpdir(), `redivivus-snippet-${Date.now()}${ext}`);
       fs.writeFileSync(tmpPath, code, 'utf-8');
-      const { autoCaptureFile } = await import('../../vault/infrastructure/vaultAutoCapture.js');
+      const { autoCaptureFile } = await import('../vault/data/vaultAutoCapture.js');
       const projectName = (panel as any).redivivus?.isInitialized?.() ? ((panel as any).redivivus.loadConfig()?.projectName || 'snippets') : 'snippets';
       const captured = await autoCaptureFile(tmpPath, projectName, vault, task);
       try { fs.unlinkSync(tmpPath); } catch { /* temp cleanup best-effort */ }

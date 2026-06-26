@@ -1,5 +1,5 @@
 // [SCOPE] Chat Panel Auto-Save Inference — detects if an AI response should trigger an auto-save
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
 
 // Minimum lines in a code block to qualify for auto-save
 const MIN_AUTO_SAVE_LINES = 10;

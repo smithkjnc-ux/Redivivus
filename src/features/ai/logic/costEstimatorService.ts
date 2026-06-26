@@ -1,7 +1,7 @@
 // [SCOPE] Redivivus Cost Estimator — estimates token count and USD cost before a build starts.
 // Called by chatPanelBuild.ts BEFORE any AI call. Never makes AI calls itself.
 
-import { estimateTokens } from '../infrastructure/tokenBudget.js';
+import { estimateTokens } from '../data/tokenBudget.js';
 
 /** Cost per token by model family (USD) */
 const COST_PER_TOKEN: Record<string, number> = {

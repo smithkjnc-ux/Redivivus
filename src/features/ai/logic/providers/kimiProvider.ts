@@ -1,8 +1,8 @@
 // [SCOPE] Kimi provider implementation
 
-import type { AIResponse } from '../../infrastructure/routingTypes.js';
-import { getKimiKey } from '../../infrastructure/routingKeys.js';
-import { detectKimiBase } from '../../infrastructure/kimiEndpoint.js';
+import type { AIResponse } from '../../data/routingTypes.js';
+import { getKimiKey } from '../../data/routingKeys.js';
+import { detectKimiBase } from '../../data/kimiEndpoint.js';
 import { classifyError } from './providerUtils.js';
 
 export async function executeKimi(
@@ -12,7 +12,7 @@ export async function executeKimi(
   tier?: 'flash' | 'pro' | 'ultra'
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getKimiKey()!;
-  const { bestModelForRole, tierToRole } = await import('../../infrastructure/modelRegistry.js');
+  const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
   const model = bestModelForRole('kimi', tierToRole(tier))?.modelId ?? 'moonshot-v1-32k';
   try {
     const url = (await detectKimiBase(key)) + '/v1/chat/completions';

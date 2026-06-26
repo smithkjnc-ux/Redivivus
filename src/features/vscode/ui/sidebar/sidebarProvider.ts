@@ -1,8 +1,8 @@
 // [SCOPE] Structured sidebar — section headers + action items for all Redivivus commands
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../application/redivivusService.js';
-import type { SessionService } from '../../../../features/project/application/sessionService.js';
+import type { RedivivusService } from '../../logic/redivivusService.js';
+import type { SessionService } from '../../../project/logic/sessionService.js';
 
 type NodeType = 'section' | 'action' | 'disabled';
 

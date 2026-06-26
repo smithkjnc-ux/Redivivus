@@ -2,8 +2,8 @@
 // Extracted from chatPanelChunkedLoop.ts (Rule 9 split -- was over 200 lines). Single-file generation only.
 import * as path from 'path';
 import type { BuildContext } from './chatPanelBuild.js';
-import type { ProviderCaller } from '../../../shared/ai/infrastructure/supervisorReview.js';
-import { reviewPhase } from '../../../shared/ai/infrastructure/supervisorReview.js';
+import type { ProviderCaller } from '../../features/ai/data/supervisorReview.js';
+import { reviewPhase } from '../../features/ai/data/supervisorReview.js';
 
 export interface GenerateFileCodeParams {
   filePrompt: string;
@@ -40,7 +40,7 @@ export async function generateFileCode(p: GenerateFileCodeParams): Promise<Gener
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 60_000);
-      const { callProvider } = await import('../../../shared/ai/domain/providers/providerFactory.js');
+      const { callProvider } = await import('../../features/ai/logic/providers/providerFactory.js');
       // Use the designated worker AI directly; fall back to supervisor on 429/failure
       const primaryAI = worker || supervisor;
       res = await callProvider(primaryAI, filePrompt, f);
@@ -98,7 +98,7 @@ export async function generateFileCode(p: GenerateFileCodeParams): Promise<Gener
     const caller: ProviderCaller = async (ai, prompt) => {
       try {
         const f = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 20_000);
-        const { callProvider } = await import('../../../shared/ai/domain/providers/providerFactory.js');
+        const { callProvider } = await import('../../features/ai/logic/providers/providerFactory.js');
         return await callProvider(ai, prompt, f);
       } catch { return { text: '', success: false }; }
     };

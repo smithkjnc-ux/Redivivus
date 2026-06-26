@@ -1,7 +1,7 @@
 // [SCOPE] "Add to Phone" panel HTML/CSS/JS template. The finished PWA preview: shows BOTH the install URL and a QR
 // code, a live countdown, copy/open actions, and Android/iPhone/Desktop install steps. ASCII-only injected script
 // (Rule 13). See docs/REDIVIVUS_ADD_TO_PHONE.md.
-import type { PublishResult } from '../infrastructure/pwaPublish.js';
+import type { PublishResult } from '../data/pwaPublish.js';
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

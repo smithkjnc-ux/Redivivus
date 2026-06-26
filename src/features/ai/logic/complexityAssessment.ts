@@ -1,6 +1,6 @@
 // [SCOPE] Complexity Assessment Service — score build requests, route to appropriate interview tier
 // [RULE 18] AI classifier has final say on tier. Regex scoring computes reasons/score (math, not NL).
-import type { RoutingService } from '../infrastructure/routingService.js';
+import type { RoutingService } from '../data/routingService.js';
 
 export type ComplexityTier = 'nano' | 'standard' | 'deep';
 

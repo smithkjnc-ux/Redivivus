@@ -2,8 +2,8 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
-import type { AnalyzerService } from '../ui/analyzer/analyzerService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
+import type { AnalyzerService } from './analyzerService.js';
 
 export function registerAnalysisCommands(
   context: vscode.ExtensionContext,

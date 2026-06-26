@@ -3,7 +3,7 @@
 // Handles: getKeyPreviews, exportKey, exportAllKeys, importKeys.
 
 import * as vscode from 'vscode';
-import { getKeyCached, storeKey, getConfiguredProviders } from '../../../shared/ai/infrastructure/secretKeyStore.js';
+import { getKeyCached, storeKey, getConfiguredProviders } from '../../../features/ai/data/secretKeyStore.js';
 
 const ENV_MAP_OUT: Record<string, string> = {
   gemini: 'GEMINI_API_KEY', claude: 'ANTHROPIC_API_KEY', openai: 'OPENAI_API_KEY',

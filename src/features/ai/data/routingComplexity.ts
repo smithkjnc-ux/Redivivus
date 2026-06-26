@@ -7,7 +7,7 @@
 
 import type { AIResponse } from './routingTypes.js';
 import { estimateTokens, estimateCost } from './routingClassifier.js';
-import { callProvider } from '../domain/providers/providerFactory.js';
+import { callProvider } from '../logic/providers/providerFactory.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
 import type { RoutingService } from './routingService.js';
 import { analyzeTask, scoreModels } from './routingEngine.js';

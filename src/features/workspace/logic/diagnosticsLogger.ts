@@ -1,5 +1,5 @@
 // [SCOPE] Redivivus DIAGNOSTICS Domain Logger
-import { masterLog } from '../../../shared/logging/domain/masterLogger.js';
+import { masterLog } from '../../../features/logging/logic/masterLogger.js';
 
 const DOMAIN = 'DIAGNOSTICS';
 

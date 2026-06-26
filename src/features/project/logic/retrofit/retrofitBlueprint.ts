@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RoutingService } from '../../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../../../features/ai/data/routingService.js';
 import { getCodeFiles } from './retrofitFileScanner.js';
 
 export interface Blueprint5W {

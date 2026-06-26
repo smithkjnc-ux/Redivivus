@@ -42,7 +42,7 @@ export async function handleRunIntent(intent: any, deps: MessageHandlerDeps, con
 
   // [CONSOLIDATE] Delegate to the ONE shared type-aware runProject (web→http+browser, .js→node, .py→python,
   // else→terminal + error monitoring). See core/project/runProject.ts.
-  const { runProject } = await import('../../project/domain/runProject.js');
+  const { runProject } = await import('../../project/logic/runProject.js');
   await runProject(root);
   conversation.push({ role: 'assistant', content: 'Running your project...', timestamp: Date.now() });
   refresh();
@@ -56,9 +56,9 @@ export async function handleScaffoldIntent(userText: string, deps: MessageHandle
   if (root) {
     const isInit = deps.redivivus?.isInitialized?.() || require('fs').existsSync(require('path').join(root, '.redivivus', 'config.json'));
     if (isInit) {
-      const { isModificationRequest } = await import('../build/chatPanelBuildInference.js');
+      const { isModificationRequest } = await import('../../build/chatPanelBuildInference.js');
       if (await isModificationRequest(userText, deps.routing, deps.usageTracker)) {
-        const { handleFixRequest } = await import('./chatPanelMsgFix.js');
+        const { handleFixRequest } = await import('../../fix/chatPanelMsgFix.js');
         await handleFixRequest(userText, deps);
         return;
       }
@@ -67,7 +67,7 @@ export async function handleScaffoldIntent(userText: string, deps: MessageHandle
 
   if (!root) {
     try {
-      const { autoCreateProject } = await import('../build/chatPanelBuildAutoCreate.js');
+      const { autoCreateProject } = await import('../../build/chatPanelBuildAutoCreate.js');
       const created = await autoCreateProject(userText, deps as any);
       root = created.dir;
       autoOpened = true;
@@ -76,7 +76,7 @@ export async function handleScaffoldIntent(userText: string, deps: MessageHandle
       refresh(); return;
     }
   }
-  const { detectScaffoldIntent, runScaffold } = await import('../build/chatPanelScaffold.js');
+  const { detectScaffoldIntent, runScaffold } = await import('../../build/chatPanelScaffold.js');
   const scaffoldInfo = detectScaffoldIntent(userText);
   if (!scaffoldInfo) {
     conversation.push({ role: 'assistant', content: 'I can scaffold: **React** (Vite + TypeScript), **Python Flask**, **Go API**, or **Node Express**. Which one?', timestamp: Date.now() });
@@ -99,7 +99,7 @@ export async function handleServiceIntent(userText: string, deps: MessageHandler
   let autoOpened = false;
   if (!root) {
     try {
-      const { autoCreateProject } = await import('../build/chatPanelBuildAutoCreate.js');
+      const { autoCreateProject } = await import('../../build/chatPanelBuildAutoCreate.js');
       const created = await autoCreateProject(userText, deps as any);
       root = created.dir;
       autoOpened = true;

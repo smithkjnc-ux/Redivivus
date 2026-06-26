@@ -3,7 +3,7 @@
 // source of the Supervisor tier. One tiny call on the Supervisor provider's cheap FLASH model; on any failure
 // returns null so the caller keeps its offline fallback (the legacy heuristic) and nothing breaks.
 
-import type { MessageHandlerDeps } from '../../../features/chat/routing/chatPanelMessageDeps.js';
+import type { MessageHandlerDeps } from '../../../features/chat/logic/chatPanelMessageDeps.js';
 
 export interface RouteClass { tier: 'flash' | 'pro' | 'ultra'; reason: string; }
 

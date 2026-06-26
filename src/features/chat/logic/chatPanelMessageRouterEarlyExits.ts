@@ -4,8 +4,8 @@
 import { resolvePendingClarify } from '../ui/chatPanelClarifyBridge.js';
 import * as vscode from 'vscode';
 import { ChatPanel } from '../ui/chatPanel.js';
-import { handleEditRequest } from '../../../shared/ai/domain/chatPanelIntent.js';
-import { handleInterviewMessage } from '../../project/ui/blueprint/blueprintInterviewPanel.js';
+import { handleEditRequest } from '../../../features/ai/logic/chatPanelIntent.js';
+import { handleInterviewMessage } from '../../blueprint/ui/blueprintInterviewPanel.js';
 import { handlePreviewMessages } from './chatPanelMessageRouterPreview.js';
 import { handleScaffoldQuickstart } from './chatPanelMessageRouterScaffold.js';
 import { handleBuildSimple, handleBuildTask, handleCreateFolder, handleNewProjectCancel, handleOpenWorkspaceBtn, handleSetMode, handleSwitchMode } from './chatPanelMessageRouterBuild.js';
@@ -40,7 +40,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     // [FIX] Use the local fix pipeline (handleFixRequest) which modifies existing files in-place.
     // The cloud build pipeline (_handleBuildRequest) creates new projects and returns full files,
     // which is wrong for fix requests on existing code.
-    const { handleFixRequest } = await import('./chatPanelMsgFix.js');
+    const { handleFixRequest } = await import('../../fix/chatPanelMsgFix.js');
     await handleFixRequest(msg.text, {
       redivivus,
       routing,

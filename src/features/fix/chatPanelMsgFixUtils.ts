@@ -10,9 +10,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { SnapshotService } from '../../project/application/snapshotService.js';
-import { listSourceFiles } from '../../workspace/infrastructure/codebaseSearch.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import { SnapshotService } from '../project/logic/snapshotService.js';
+import { listSourceFiles } from '../workspace/data/codebaseSearch.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 
 /** Maps raw model ID strings to friendly display names for chat messages. */
 export function modelLabel(model: string): string {

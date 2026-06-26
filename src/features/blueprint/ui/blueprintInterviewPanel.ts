@@ -3,11 +3,11 @@
 
 import * as vscode from 'vscode';
 import type { BlueprintSpec, ProjectType
-} from '../../infrastructure/blueprint/blueprintInterview.js';
+} from '../logic/blueprintInterview.js';
 import {
   detectProjectType, getLayersForType, scoreBlueprint,
   buildBlueprintSummary
-} from '../../infrastructure/blueprint/blueprintInterview.js';
+} from '../logic/blueprintInterview.js';
 import { buildInterviewHtmlFull } from './blueprintInterviewHtmlFull.js';
 import { buildBlueprintViewHtml } from './blueprintInterviewHtml.js';
 

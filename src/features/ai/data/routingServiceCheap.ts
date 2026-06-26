@@ -4,10 +4,10 @@
 // [FIX] Caps at pro-tier: never escalates to ultra-tier models (Opus, o3, Gemini Pro) for Q&A.
 //       Those are reserved for complex builds. A Q&A that exhausts flash should use pro, not ultra.
 
-import { callProvider } from '../domain/providers/providerFactory.js';
+import { callProvider } from '../logic/providers/providerFactory.js';
 import { AI_RANK } from './guardianAI.js';
-import { redivivusLog } from '../../logging/infrastructure/redivivusLogger.js';
-import { logTelemetry } from '../../api/infrastructure/apiClientTelemetry.js';
+import { redivivusLog } from '../../../features/logging/data/redivivusLogger.js';
+import { logTelemetry } from '../../../features/api/data/apiClientTelemetry.js';
 import { logAICall } from './aiCallLogger.js';
 import type { RoutingService } from './routingService.js';
 import type { AIResponse } from './routingTypes.js';

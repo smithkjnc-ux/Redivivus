@@ -5,20 +5,20 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as vscode from 'vscode';
 import type { BuildContext } from './chatPanelBuildHelpers.js';
-import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { RoutingService } from '../../features/ai/data/routingService.js';
 import * as Inf from './chatPanelBuildInference.js';
 import * as Review from './chatPanelBuildReview.js';
 import * as Worker from './chatPanelBuildWorker.js';
 import * as Writer from './chatPanelBuildWriter.js';
 import { extractNarrator } from './buildOutput.js';
-import { logFileChange } from '../../../shared/logging/infrastructure/redivivusLogger.js';
-import { refreshSetupProgressIfOpen } from '../../project/application/setupProgressPanel.js';
-import { autoCommitIfEnabled } from '../../workspace/infrastructure/gitAutoCommitService.js';
-import { writeProjectRoadmapEntry } from '../routing/chatPanelMsgFixUtils.js';
+import { logFileChange } from '../../features/logging/data/redivivusLogger.js';
+import { refreshSetupProgressIfOpen } from '../project/logic/setupProgressPanel.js';
+import { autoCommitIfEnabled } from '../workspace/data/gitAutoCommitService.js';
+import { writeProjectRoadmapEntry } from '../fix/chatPanelMsgFixUtils.js';
 import { runCompileAutoFix } from './services/compileAutoFix.js';
 import { runTestAutoFix } from './services/testAutoFix.js';
-import { LearnedMemoryService } from '../application/learnedMemoryService.js';
-import { recordBuild } from '../application/userMemoryService.js';
+import { LearnedMemoryService } from '../chat/logic/learnedMemoryService.js';
+import { recordBuild } from '../chat/logic/userMemoryService.js';
 
 export interface BuildTarget {
   relPath: string;
@@ -168,7 +168,7 @@ export async function runPostBuildActions(opts: {
       );
     } else {
       try {
-        const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+        const CP = require('../../panels/chat/chatPanel.js').ChatPanel;
         if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); }
       } catch {}
       vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });

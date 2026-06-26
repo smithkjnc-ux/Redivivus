@@ -15,7 +15,7 @@ export async function supervisorPlanWithFailover(
   const result = await supervisorPlanImpl(svc, userTask, targetFile, blueprintContext, neverDoContext);
   if (!result) {
     const { supervisor: failedProvider } = svc.selectSupervisorAndWorker();
-    const { recordProviderFailure, setFailoverNotify } = await import('../domain/roleAssignmentFailover.js');
+    const { recordProviderFailure, setFailoverNotify } = await import('../logic/roleAssignmentFailover.js');
     if ((svc as any).supervisorFailoverCallback) { setFailoverNotify((svc as any).supervisorFailoverCallback); }
     const { changed, assignment } = recordProviderFailure(failedProvider, 'supervisorPlan returned null');
     if (changed && assignment.supervisor.providerId !== failedProvider) {

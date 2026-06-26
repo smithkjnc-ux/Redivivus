@@ -1,7 +1,7 @@
 // [SCOPE] Build Plan Approval Gate — formats Supervisor plan for user review, pauses until approved
 // Bridges webview plan-approve/plan-revise/plan-cancel messages back to the build pipeline Promise.
 
-import type { ChatMessage } from '../ui/chatPanelHtml.js';
+import type { ChatMessage } from '../chat/ui/chatPanelHtml.js';
 
 export type PlanDecision = 'approve' | 'revise' | 'cancel';
 

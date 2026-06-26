@@ -5,14 +5,14 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { writeBuiltFile, createSnapshot } from '../chatPanelBuildWriter.js';
-import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
+import type { BuildRequestDeps } from '../../../features/ai/logic/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildClient.js';
 import { appendBuildLog } from './buildLogger.js';
 import type { BuildMeta } from './buildLogger.js';
-import { autoCaptureFiles } from '../../../vault/infrastructure/vaultAutoCapture.js';
+import { autoCaptureFiles } from '../../vault/data/vaultAutoCapture.js';
 import { extractFilesFromRawText } from './cloudBuildFileNamer.js';
 import { writeBuildContractDocs } from './buildContractDocs.js';
-import { fireLivingBlueprintSeed } from '../../../project/infrastructure/blueprint/livingBlueprintService.js';
+import { fireLivingBlueprintSeed } from '../../blueprint/logic/livingBlueprintService.js';
 
 export async function processBuildResults(
   data: any,
@@ -29,7 +29,7 @@ export async function processBuildResults(
   // scaffoldAt is idempotent: it skips files that already exist.
   if (!fs.existsSync(path.join(root, '.redivivus', 'config.json'))) {
     try {
-      const { scaffoldAt } = await import('../../../project/application/redivivusInit.js');
+      const { scaffoldAt } = await import('../../project/logic/redivivusInit.js');
       const slug = path.basename(root);
       await scaffoldAt(root, slug);
     } catch { /* non-fatal */ }
@@ -61,7 +61,7 @@ export async function processBuildResults(
     // [FIX] Run static validator before writing — catches AI-generated runtime bugs (const reassignment, bad transform reset, etc.)
     let content = file.content;
     try {
-      const { validateCode } = await import('../../../workspace/domain/code/codeValidator.js');
+      const { validateCode } = await import('../../workspace/logic/codeValidator.js');
       const ext = path.extname(relPath).replace('.', '');
       const validation = validateCode(content, ext);
       if (validation.autoFixed) { content = validation.code; }
@@ -85,7 +85,7 @@ export async function processBuildResults(
 
   if (newRelPaths.length > 0) {
     try {
-      const { SnapshotService } = await import('../../../project/application/snapshotService.js');
+      const { SnapshotService } = await import('../../project/logic/snapshotService.js');
       new SnapshotService(root).captureInitial(`First build: ${task.slice(0, 60)}`, newRelPaths);
     } catch {}
   }

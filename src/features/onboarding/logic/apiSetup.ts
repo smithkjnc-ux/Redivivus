@@ -26,7 +26,7 @@ export function registerApiSetupCommand(context: vscode.ExtensionContext): void 
 }
 
 function showApiStatusInChat(): void {
-  const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../shared/ai/infrastructure/secretKeyStore');
+  const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../features/ai/data/secretKeyStore');
   const config = vscode.workspace.getConfiguration('redivivus');
   const disabled = config.get<string[]>('disabledProviders') || [];
   const providers = [

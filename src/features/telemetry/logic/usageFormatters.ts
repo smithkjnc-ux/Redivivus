@@ -1,8 +1,8 @@
 // [SCOPE] Usage chat formatters — formats usage report for chat panel display
 // Extracted from usageCommands.ts
 
-import type { UsageReport} from '../infrastructure/usageTracker.js';
-import { AIBreakdown, UsagePeriodWithBreakdown } from '../infrastructure/usageTracker.js';
+import type { UsageReport} from '../data/usageTracker.js';
+import { AIBreakdown, UsagePeriodWithBreakdown } from '../data/usageTracker.js';
 
 export function formatUsageForChat(report: UsageReport, roster?: Array<{ ai: string; label: string; role: string; emoji: string }>): string {
   const aiLabels: Record<string, string> = { gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek' };

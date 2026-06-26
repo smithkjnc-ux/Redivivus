@@ -4,8 +4,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { VaultService } from '../../../vault/infrastructure/vaultService.js';
-import { estimateTokens, getInputBudget } from '../../../../shared/ai/infrastructure/tokenBudget.js';
+import type { VaultService } from '../../vault/data/vaultService.js';
+import { estimateTokens, getInputBudget } from '../../../features/ai/data/tokenBudget.js';
 import { readFileSafe, buildProjectMap, buildGitContext, getRecentBuilds } from './buildContextHelpers.js';
 
 export interface CloudBuildContext {

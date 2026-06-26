@@ -2,8 +2,8 @@
 // [PHASE-1-HARDENING] Simplified for Phase 2 server-side orchestration.
 // Always runs subtasks sequentially; executionMode param retained for API compatibility.
 
-import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
+import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
+import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 
 export async function runSubtasksLoop(params: {
   subtasks: string[];

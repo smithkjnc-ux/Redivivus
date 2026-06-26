@@ -5,12 +5,12 @@
 // [WARN] processBuildResults MUST be called here — returning raw files without writing is a silent no-op.
 
 import * as path from 'path';
-import { getApiBase } from '../../../../shared/api/infrastructure/apiClient.js';
-import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
+import { getApiBase } from '../../../features/api/data/apiClient.js';
+import type { BuildRequestDeps } from '../../../features/ai/logic/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
 import { buildSingleFileViaBuildEndpoint, finalizeMultiFileBuild, logGuardianStep } from './cloudBuildMultiFileHelpers.js';
-import { looksLikeQuotaError, markProviderUnavailable, isProviderUnavailable } from '../../../../shared/ai/infrastructure/providerTierState.js';
-import { AI_RANK } from '../../../../shared/ai/infrastructure/guardianAI.js';
+import { looksLikeQuotaError, markProviderUnavailable, isProviderUnavailable } from '../../../features/ai/data/providerTierState.js';
+import { AI_RANK } from '../../../features/ai/data/guardianAI.js';
 
 import { nextAvailableProvider, filterKeyHeaders } from './cloudBuildProviderFallback.js';
 

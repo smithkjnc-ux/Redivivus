@@ -5,7 +5,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { syncBlueprintMd } from './blueprintWriter.js';
+import { syncBlueprintMd } from '../data/blueprintWriter.js';
 
 export interface BlueprintRevision {
   rev: number;

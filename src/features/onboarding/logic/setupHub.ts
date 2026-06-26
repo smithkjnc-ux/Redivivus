@@ -3,9 +3,9 @@
 // GitHub token validated against GitHub API before storing in VS Code SecretStorage.
 
 import * as vscode from 'vscode';
-import type { GitHubBackupService } from '../../workspace/infrastructure/githubBackupService.js';
-import { getHubHtml } from './setupHubHtml.js';
-import { getKeyCached } from '../../../shared/ai/infrastructure/secretKeyStore.js';
+import type { GitHubBackupService } from '../../workspace/data/githubBackupService.js';
+import { getHubHtml } from '../ui/setupHubHtml.js';
+import { getKeyCached } from '../../../features/ai/data/secretKeyStore.js';
 
 let _panel: vscode.WebviewPanel | undefined;
 
@@ -34,7 +34,7 @@ async function refreshPanel(context: vscode.ExtensionContext, githubBackupServic
   const ghCfg = githubBackupService.getConfig();
   const ghConnected = await githubBackupService.isConnected();
   const vaultEnabled = context.globalState.get<boolean>('redivivus.vaultEnabled', true) !== false;
-  const { RoutingService } = await import('../../../shared/ai/infrastructure/routingService.js');
+  const { RoutingService } = await import('../../../features/ai/data/routingService.js');
   const tmpR = new RoutingService();
   const gActive = tmpR.isGuardianActive();
   const wAI = tmpR.getAvailableAI().ai;
@@ -65,7 +65,7 @@ async function showSetupHub(context: vscode.ExtensionContext, githubBackupServic
   const hasGitHub    = await githubBackupService.isConnected();
   const hasAI        = !!(geminiKey || openaiKey || anthropicKey || kimiKey || groqKey || xaiKey);
 
-  const { RoutingService } = await import('../../../shared/ai/infrastructure/routingService.js');
+  const { RoutingService } = await import('../../../features/ai/data/routingService.js');
   const tmpRouting = new RoutingService();
   const guardianActive = tmpRouting.isGuardianActive();
   const workerAI = tmpRouting.getAvailableAI().ai;

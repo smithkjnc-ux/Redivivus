@@ -1,10 +1,10 @@
 // [SCOPE] Redivivus Session commands — start/end workflow with exit interview
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { RedivivusService } from '../../../features/vscode/logic/redivivusService.js';
 import type { SessionService } from './sessionService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
-import { buildEvents } from '../../chat/build/services/buildEvents.js';
+import { buildEvents } from '../../build/services/buildEvents.js';
 
 export function registerSessionCommands(
   context: vscode.ExtensionContext,
@@ -67,7 +67,7 @@ export function registerSessionCommands(
     try {
       const cfg = redivivus.loadConfig();
       if (cfg && !cfg.lastScan) {
-        const { scanDirectory, buildAnalysis } = await import('../../workspace/ui/analyzer/analyzerScanner.js');
+        const { scanDirectory, buildAnalysis } = await import('../../workspace/logic/analyzerScanner.js');
         const scanFiles: any[] = [];
         scanDirectory(root, root, scanFiles);
         const result = buildAnalysis(scanFiles);

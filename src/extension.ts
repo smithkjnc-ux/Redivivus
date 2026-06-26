@@ -1,28 +1,28 @@
 // [SCOPE] Redivivus entry point — thin orchestrator
 
 import * as vscode from 'vscode';
-import { RedivivusSidebarProvider } from './shared/vscode/ui/sidebar/redivivusSidebar.js';
-import { ProjectFilesProvider } from './shared/vscode/ui/sidebar/projectFilesProvider.js';
+import { RedivivusSidebarProvider } from './features/vscode/ui/sidebar/redivivusSidebar.js';
+import { ProjectFilesProvider } from './features/vscode/ui/sidebar/projectFilesProvider.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
-import { runDiagnostic } from './features/workspace/domain/selfDiagnostic.js';
+import { runDiagnostic } from './features/workspace/logic/selfDiagnostic.js';
 import { initExtensionServices } from './extensionServices.js';
 import { registerWorkspaceFolderListener } from './extensionWorkspaceListener.js';
 import { registerPanelSerializer, scheduleAutoOpenPanel } from './extensionPanelSetup.js';
 
-import { runAutoInit, registerOnNewProject } from './features/project/application/init.js';
+import { runAutoInit, registerOnNewProject } from './features/project/logic/init.js';
 import { registerAllCommands } from './extensionCommands.js';
-import { initApiClient } from './shared/api/infrastructure/apiClient.js';
-import { logSessionStart } from './shared/api/infrastructure/apiClientTelemetry.js';
-import { initSecretKeyStore, onSecretKeyStoreReady } from './shared/ai/infrastructure/secretKeyStore.js';
+import { initApiClient } from './features/api/data/apiClient.js';
+import { logSessionStart } from './features/api/data/apiClientTelemetry.js';
+import { initSecretKeyStore, onSecretKeyStoreReady } from './features/ai/data/secretKeyStore.js';
 import { resumePendingState } from './extensionResumeState.js';
-import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './shared/logging/infrastructure/redivivusLogger.js';
-import { initProjectContextLogger, resetProjectContext } from './shared/logging/infrastructure/projectContextLogger.js';
-import { wasProjectClosedRecently } from './features/project/application/closeMarker.js';
-import { ensureProjectsWorkspace } from './features/project/domain/ensureProjectsWorkspace.js';
-import { registerActiveProjectWatcher } from './features/project/domain/activeProjectWatcher.js';
-import { registerProjectFolderDecorations } from './features/project/domain/projectFolderDecorations.js';
-import { invalidateRosterCache } from './shared/ai/infrastructure/routingServiceRoster.js';
-import { initMasterLogger } from './shared/logging/domain/masterLogger.js';
+import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './features/logging/data/redivivusLogger.js';
+import { initProjectContextLogger, resetProjectContext } from './features/logging/data/projectContextLogger.js';
+import { wasProjectClosedRecently } from './features/project/logic/closeMarker.js';
+import { ensureProjectsWorkspace } from './features/project/logic/ensureProjectsWorkspace.js';
+import { registerActiveProjectWatcher } from './features/project/logic/activeProjectWatcher.js';
+import { registerProjectFolderDecorations } from './features/project/logic/projectFolderDecorations.js';
+import { invalidateRosterCache } from './features/ai/data/routingServiceRoster.js';
+import { initMasterLogger } from './features/logging/logic/masterLogger.js';
 
 // [WARN] Synchronous suppress flag — set BEFORE updateWorkspaceFolders fires onDidChangeWorkspaceFolders.
 // globalState.update() is async and loses the race against the folder-change event, causing a duplicate panel.
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
   const nudgeKey = 'redivivus.signInNudged.v1';
   setTimeout(async () => {
     try {
-      const { getAccountToken } = await import('./shared/api/infrastructure/apiClient.js');
+      const { getAccountToken } = await import('./features/api/data/apiClient.js');
       const token = await getAccountToken();
       if (!token && !context.globalState.get(nudgeKey)) {
         context.globalState.update(nudgeKey, true);
@@ -125,7 +125,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── update check — 1-hour cooldown + snooze, 10s after startup, non-blocking ──
   setTimeout(async () => {
-    const { runStartupUpdateCheck } = await import('./features/settings/application/checkForUpdates.js');
+    const { runStartupUpdateCheck } = await import('./features/settings/logic/checkForUpdates.js');
     await runStartupUpdateCheck(context, statusBar);
   }, 10_000);
 
@@ -141,7 +141,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Add to Phone (installable PWA) ──
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.addToPhone', async () => {
-    const { handleAddToPhone } = await import('./features/pwa/application/addToPhoneCommand.js');
+    const { handleAddToPhone } = await import('./features/pwa/logic/addToPhoneCommand.js');
     await handleAddToPhone();
   }));
 
@@ -185,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── pipeline trace viewer ──
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.showPipelineTrace', async () => {
-    const { tracer } = await import('./features/project/application/pipelineTracer.js');
+    const { tracer } = await import('./features/project/logic/pipelineTracer.js');
     tracer.show();
   }));
 
