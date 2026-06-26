@@ -3,9 +3,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RedivivusService } from '../services/redivivusService.js';
-import type { RoutingService } from '../services/ai/routingService.js';
-import type { ChangeTracker } from '../services/build/changeTracker.js';
-import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import type { RoutingService } from '../shared/ai/infrastructure/routingService.js';
+import type { ChangeTracker } from '../features/chat/build/services/changeTracker.js';
+import { ChatPanel } from '../features/chat/ui/chatPanel.js';
 
 export function registerReviewCommands(
   context: vscode.ExtensionContext,

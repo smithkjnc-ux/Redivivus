@@ -47,7 +47,7 @@ export interface InterviewQuestion {
 }
 
 import { EXPANDED_QUESTIONS } from './expandedInterviewQuestions.js';
-import type { RoutingService } from '../ai/routingService.js';
+import type { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 
 export function getQuestionsForTier(tier: 'standard' | 'deep'): InterviewQuestion[] {
   return EXPANDED_QUESTIONS.filter(q => {

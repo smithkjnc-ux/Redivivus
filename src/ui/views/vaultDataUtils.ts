@@ -1,8 +1,8 @@
 // [SCOPE] Vault data utilities — getVaultItems, getVaultCategoryCounts, HTML escaping
 // Called by vaultScanSummary and vaultTabRenderer. No rendering logic here.
 
-import type { VaultService, VaultItem} from '../../services/vault/vaultService.js';
-import { VaultCategory, VAULT_CATEGORIES } from '../../services/vault/vaultService.js';
+import type { VaultService, VaultItem} from '../../features/vault/infrastructure/vaultService.js';
+import { VaultCategory, VAULT_CATEGORIES } from '../../features/vault/infrastructure/vaultService.js';
 
 export function getVaultItems(vaultService: VaultService): VaultItem[] {
   return vaultService.listItems();

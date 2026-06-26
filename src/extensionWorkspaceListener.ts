@@ -1,10 +1,10 @@
 // [SCOPE] Workspace folder change listener — extracted from extension.ts (Rule 9 split).
 
 import * as vscode from 'vscode';
-import { ChatPanel } from './ui/panels/chat/chatPanel';
+import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { runAutoInit } from './commands/init.js';
-import { finalizeRedivivusLogger, initRedivivusLogger, redivivusLog } from './services/logging/redivivusLogger.js';
-import { resetProjectContext, initProjectContextLogger } from './services/logging/projectContextLogger.js';
+import { finalizeRedivivusLogger, initRedivivusLogger, redivivusLog } from './shared/logging/infrastructure/redivivusLogger.js';
+import { resetProjectContext, initProjectContextLogger } from './shared/logging/infrastructure/projectContextLogger.js';
 
 export function registerWorkspaceFolderListener(
   context: vscode.ExtensionContext,
@@ -22,7 +22,7 @@ export function registerWorkspaceFolderListener(
         finalizeRedivivusLogger(true);
         resetProjectContext();
       } else if (e.added.length > 0) {
-        const _cp = require('./ui/panels/chat/chatPanel.js').ChatPanel;
+        const _cp = require('./features/chat/ui/chatPanel.js').ChatPanel;
         if (_cp?.suppressAutoOpen) {
           _cp.suppressAutoOpen = false;
           context.globalState.update('redivivus.suppressAutoOpen', undefined);

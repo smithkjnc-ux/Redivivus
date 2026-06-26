@@ -3,13 +3,13 @@
 
 import * as vscode from 'vscode';
 import type { RedivivusService } from './services/redivivusService.js';
-import type { RoutingService } from './services/ai/routingService.js';
+import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
-import type { VaultService } from './services/vault/vaultService.js';
-import { ChatPanel } from './ui/panels/chat/chatPanel';
+import type { VaultService } from './features/vault/infrastructure/vaultService.js';
+import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { registerTerminalErrorService, getLastTerminalError } from './services/workspace/terminalErrorService.js';
-import { detectPostBuildInfo } from './core/build/chatPanelPostBuild';
-import { BuildHistoryService } from './services/build/buildHistoryService.js';
+import { detectPostBuildInfo } from './features/chat/build/chatPanelPostBuild.js';
+import { BuildHistoryService } from './features/chat/build/services/buildHistoryService.js';
 export function registerInlineCommandsC(
   context: vscode.ExtensionContext,
   redivivusService: RedivivusService,
@@ -28,7 +28,7 @@ export function registerInlineCommandsC(
       try { if (!rootOverride) { const _a = require('./ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); if (_a) { root = _a; } } } catch {}
       if (!root) { vscode.window.showWarningMessage('No project folder open.'); return; }
       // [CONSOLIDATE] One shared, type-aware runProject (web→http, .js→node, else→terminal + error monitor).
-      const { runProject } = await import('./core/project/runProject.js');
+      const { runProject } = await import('./features/project/domain/runProject.js');
       await runProject(root);
     })
   );
@@ -83,7 +83,7 @@ export function registerInlineCommandsC(
         };
         scan(root, 2);
       }
-      const { openVisualContractPanel } = require('./ui/panels/visualContract/visualContractPanel.js');
+      const { openVisualContractPanel } = require('./features/vault/ui/visualContractPanel.js');
       openVisualContractPanel(context, root, builtFiles, routingService);
     })
   );

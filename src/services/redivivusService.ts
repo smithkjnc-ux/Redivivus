@@ -3,9 +3,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { RedivivusPaths, isInitialized, hasWorkspace } from './project/redivivusPaths.js';
+import { RedivivusPaths, isInitialized, hasWorkspace } from '../features/project/application/redivivusPaths.js';
 import { loadConfig, saveConfig } from './redivivusConfig.js';
-import { initProject, scaffoldAt } from './project/redivivusInit.js';
+import { initProject, scaffoldAt } from '../features/project/application/redivivusInit.js';
 import { generateRules } from './redivivusRules.js';
 import { updateGitignore, appendWorkLog, appendRoadmap, appendDeadEnd } from './redivivusLogging.js';
 

@@ -3,8 +3,8 @@
 import * as vscode from 'vscode';
 import { ScopeCreepDetectionService } from '../services/code/scopeCreepDetection.js';
 import type { RedivivusService } from '../services/redivivusService.js';
-import type { RoutingService } from '../services/ai/routingService.js';
-import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import type { RoutingService } from '../shared/ai/infrastructure/routingService.js';
+import { ChatPanel } from '../features/chat/ui/chatPanel.js';
 
 export function registerScopeCreepCommand(
   context: vscode.ExtensionContext,

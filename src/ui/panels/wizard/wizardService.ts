@@ -4,12 +4,12 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RedivivusService } from '../../../services/redivivusService';
-import type { SessionService } from '../../../services/sessionService';
-import { handleNewProjectWizard } from './wizardNewProject';
-import { handleActiveSessionWizard } from './wizardActiveSession';
-import { handleBackupPendingWizard } from './wizardBackupPending';
-import { handleNormalWorkflowWizard } from './wizardNormalWorkflow';
+import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { SessionService } from '../../../services/sessionService.js';
+import { handleNewProjectWizard } from './wizardNewProject.js';
+import { handleActiveSessionWizard } from './wizardActiveSession.js';
+import { handleBackupPendingWizard } from './wizardBackupPending.js';
+import { handleNormalWorkflowWizard } from './wizardNormalWorkflow.js';
 
 export class WizardService {
   constructor(

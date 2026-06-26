@@ -3,10 +3,10 @@
 
 import * as vscode from 'vscode';
 import type { RedivivusService } from './services/redivivusService.js';
-import type { RoutingService } from './services/ai/routingService.js';
+import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
-import type { VaultService } from './services/vault/vaultService.js';
-import { ChatPanel } from './ui/panels/chat/chatPanel';
+import type { VaultService } from './features/vault/infrastructure/vaultService.js';
+import { ChatPanel } from './features/chat/ui/chatPanel.js';
 
 type ShowArgs = [RedivivusService, RoutingService, UsageTracker | undefined, VaultService];
 
@@ -21,7 +21,7 @@ async function openPanel(args: ShowArgs, delayMs = 800, innerDelayMs = 400): Pro
 // key init never hangs the build forever — it proceeds with whatever keys are available by then.
 async function awaitKeysReady(timeoutMs = 8000): Promise<void> {
   try {
-    const { onSecretKeyStoreReady } = await import('./services/ai/secretKeyStore.js');
+    const { onSecretKeyStoreReady } = await import('./shared/ai/infrastructure/secretKeyStore.js');
     await Promise.race([
       new Promise<void>(resolve => onSecretKeyStoreReady(() => resolve())),
       new Promise<void>(resolve => setTimeout(resolve, timeoutMs)),
@@ -96,7 +96,7 @@ export function resumePendingState(
           // Invalidate the roster cache after keys load so the right models are selected.
           await awaitKeysReady();
           try {
-            const { invalidateRosterCache } = await import('./services/ai/routingServiceRoster.js');
+            const { invalidateRosterCache } = await import('./shared/ai/infrastructure/routingServiceRoster.js');
             invalidateRosterCache();
           } catch { /* non-blocking */ }
           cp.resumeBuildTask(task, projectRoot);

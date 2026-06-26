@@ -1,7 +1,7 @@
 // [SCOPE] Blueprint Extractor — uses AI to infer 5W answers from a user's original build prompt.
 // Called before showing the New Project wizard so only genuinely unknown answers get asked.
 
-import type { RoutingService } from '../ai/routingService.js';
+import type { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 
 export interface ExtractedBlueprint {
   who: string;    // empty string means unknown — ask the user

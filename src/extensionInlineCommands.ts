@@ -3,19 +3,19 @@
 
 import * as vscode from 'vscode';
 import type { RedivivusService } from './services/redivivusService.js';
-import type { RoutingService } from './services/ai/routingService.js';
+import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
-import type { VaultService } from './services/vault/vaultService.js';
+import type { VaultService } from './features/vault/infrastructure/vaultService.js';
 import type { StatusBar } from './ui/views/statusBar.js';
-import type { GuardianService } from './services/ai/guardianService.js';
-import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel';
+import type { GuardianService } from './shared/ai/infrastructure/guardianService.js';
+import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel.js';
 import { MapPanel } from './ui/map/mapPanel.js';
-import type { GitHubBackupService } from './services/githubBackupService.js';
-import { registerGitHubBackupCommands } from './commands/githubBackup.js';
-import { registerSetupHubCommand } from './commands/setupHub.js';
-import { ChatPanel } from './ui/panels/chat/chatPanel';
+import type { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
+import { registerGitHubBackupCommands } from './features/workspace/application/githubBackup.js';
+import { registerSetupHubCommand } from './features/onboarding/application/setupHub.js';
+import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
-import { seedVault } from './services/vault/vaultSeeder.js';
+import { seedVault } from './features/vault/infrastructure/vaultSeeder.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
 import { registerInlineCommandsB } from './extensionInlineCommandsB.js';

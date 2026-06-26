@@ -5,8 +5,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { AnalyzerService } from '../ui/panels/analyzer/analyzerService';
-import type { GuardianService } from './ai/guardianService.js';
+import type { AnalyzerService } from '../ui/panels/analyzer/analyzerService.js';
+import type { GuardianService } from '../shared/ai/infrastructure/guardianService.js';
 
 export interface ElementMetadata {
   tagName?: string;
@@ -56,7 +56,7 @@ export class LensService {
 
   /** Inject element context and source reference into the active ChatPanel conversation. */
   async injectContext(snippet: string, sourceRef: SourceRef): Promise<void> {
-    const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
+    const { ChatPanel } = await import('../features/chat/ui/chatPanel.js');
     if (!ChatPanel.currentPanel) { return; }
     const content = [
       `&#x1F50D; **UI Inspector found:** \`${sourceRef.filePath}:${sourceRef.line}\``,

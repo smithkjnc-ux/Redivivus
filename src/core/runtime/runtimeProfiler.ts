@@ -5,9 +5,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { walkDir } from './runtimeProfilerScan';
-import { detectEntryPoints, detectLanguageMix, detectTopology } from './runtimeProfilerDetect';
-import { detectIpcPatterns, detectExternalServices } from './runtimeProfilerIpc';
+import { walkDir } from './runtimeProfilerScan.js';
+import { detectEntryPoints, detectLanguageMix, detectTopology } from './runtimeProfilerDetect.js';
+import { detectIpcPatterns, detectExternalServices } from './runtimeProfilerIpc.js';
 
 // [SCOPE] Shape of the output JSON
 export interface EntryPoint {

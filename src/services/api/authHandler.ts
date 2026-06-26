@@ -20,7 +20,7 @@ export class AuthUriHandler implements vscode.UriHandler {
         }
         
         try {
-          const { ChatPanel } = await import('../../ui/panels/chat/chatPanel.js');
+          const { ChatPanel } = await import('../../features/chat/ui/chatPanel.js');
           (ChatPanel as any).currentPanel?.refresh();
         } catch {}
       } else {

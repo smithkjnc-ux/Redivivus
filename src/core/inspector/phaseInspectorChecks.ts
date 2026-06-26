@@ -2,11 +2,11 @@
 // Extracted from phaseInspector.ts
 
 import * as fs from 'fs';
-import type { PhaseIssue} from './phaseInspector';
-import { CompatibilityCheck } from './phaseInspector';
-import { RoutingService } from '../../services/ai/routingService';
+import type { PhaseIssue} from './phaseInspector.js';
+import { CompatibilityCheck } from './phaseInspector.js';
+import { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 
-import { TestResult } from './phaseInspector';
+import { TestResult } from './phaseInspector.js';
 
 // Basic syntax checks
 function checkSyntax(content: string, file: string): PhaseIssue[] {
@@ -154,4 +154,4 @@ function checkBlueprintAlignment(
 // Check if current phase will work with future phases
 
 export { checkSyntax, detectDeadCode, detectPlaceholders, checkBlueprintAlignment };
-export { checkForwardCompatibility, runTest, generateSmokeTests } from './phaseInspectorTests';
+export { checkForwardCompatibility, runTest, generateSmokeTests } from './phaseInspectorTests.js';

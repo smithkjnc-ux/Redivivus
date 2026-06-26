@@ -3,11 +3,11 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { RetrofitBlueprintService } from '../core/retrofit/retrofitBlueprint';
-import type { RoutingService } from '../services/ai/routingService.js';
+import { RetrofitBlueprintService } from '../core/retrofit/retrofitBlueprint.js';
+import type { RoutingService } from '../shared/ai/infrastructure/routingService.js';
 import type { RedivivusService } from '../services/redivivusService.js';
 import { openBlueprintPanel } from '../ui/views/blueprintInterviewPanel.js';
-import type { Blueprint5W } from '../core/retrofit/retrofitBlueprint';
+import type { Blueprint5W } from '../core/retrofit/retrofitBlueprint.js';
 
 export function registerRetrofitBlueprintCommand(
   context: vscode.ExtensionContext,

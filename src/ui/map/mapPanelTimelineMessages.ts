@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
+import { BuildHistoryService } from '../../features/chat/build/services/buildHistoryService.js';
 import { SavePointService } from '../../services/savePointService.js';
 import { SnapshotService } from '../../services/snapshotService.js';
 import type { MapMsgCtx } from './mapMessageDispatcher.js';

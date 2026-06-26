@@ -3,26 +3,26 @@
 import * as vscode from 'vscode';
 import { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
 import { ProjectFilesProvider } from './ui/sidebar/projectFilesProvider.js';
-import { ChatPanel } from './ui/panels/chat/chatPanel';
-import { runDiagnostic } from './core/diagnostics/selfDiagnostic';
-import { initExtensionServices } from './extensionServices';
-import { registerWorkspaceFolderListener } from './extensionWorkspaceListener';
-import { registerPanelSerializer, scheduleAutoOpenPanel } from './extensionPanelSetup';
+import { ChatPanel } from './features/chat/ui/chatPanel.js';
+import { runDiagnostic } from './features/workspace/domain/selfDiagnostic.js';
+import { initExtensionServices } from './extensionServices.js';
+import { registerWorkspaceFolderListener } from './extensionWorkspaceListener.js';
+import { registerPanelSerializer, scheduleAutoOpenPanel } from './extensionPanelSetup.js';
 
 import { runAutoInit, registerOnNewProject } from './commands/init.js';
 import { registerAllCommands } from './extensionCommands.js';
 import { initApiClient } from './services/api/apiClient.js';
 import { logSessionStart } from './services/api/apiClientTelemetry.js';
-import { initSecretKeyStore, onSecretKeyStoreReady } from './services/ai/secretKeyStore.js';
+import { initSecretKeyStore, onSecretKeyStoreReady } from './shared/ai/infrastructure/secretKeyStore.js';
 import { resumePendingState } from './extensionResumeState.js';
-import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './services/logging/redivivusLogger.js';
-import { initProjectContextLogger, resetProjectContext } from './services/logging/projectContextLogger.js';
-import { wasProjectClosedRecently } from './services/project/closeMarker.js';
-import { ensureProjectsWorkspace } from './core/project/ensureProjectsWorkspace.js';
-import { registerActiveProjectWatcher } from './core/project/activeProjectWatcher.js';
-import { registerProjectFolderDecorations } from './core/project/projectFolderDecorations.js';
-import { invalidateRosterCache } from './services/ai/routingServiceRoster.js';
-import { initMasterLogger } from './core/logging/masterLogger.js';
+import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './shared/logging/infrastructure/redivivusLogger.js';
+import { initProjectContextLogger, resetProjectContext } from './shared/logging/infrastructure/projectContextLogger.js';
+import { wasProjectClosedRecently } from './features/project/application/closeMarker.js';
+import { ensureProjectsWorkspace } from './features/project/domain/ensureProjectsWorkspace.js';
+import { registerActiveProjectWatcher } from './features/project/domain/activeProjectWatcher.js';
+import { registerProjectFolderDecorations } from './features/project/domain/projectFolderDecorations.js';
+import { invalidateRosterCache } from './shared/ai/infrastructure/routingServiceRoster.js';
+import { initMasterLogger } from './shared/logging/domain/masterLogger.js';
 
 // [WARN] Synchronous suppress flag — set BEFORE updateWorkspaceFolders fires onDidChangeWorkspaceFolders.
 // globalState.update() is async and loses the race against the folder-change event, causing a duplicate panel.

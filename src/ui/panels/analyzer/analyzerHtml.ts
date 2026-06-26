@@ -1,7 +1,7 @@
 // [SCOPE] Recommendations panel HTML shell — document structure
 // Section HTML is built in analyzerSections.ts. CSS and JS are in separate files.
-import { RECOMMENDATIONS_CSS } from './analyzerStyles';
-import { RECOMMENDATIONS_SCRIPT } from './analyzerScript';
+import { RECOMMENDATIONS_CSS } from './analyzerStyles.js';
+import { RECOMMENDATIONS_SCRIPT } from './analyzerScript.js';
 
 export function buildRecommendationsHtml(sectionsHtml: string): string {
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">

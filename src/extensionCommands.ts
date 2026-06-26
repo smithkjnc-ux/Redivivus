@@ -3,24 +3,24 @@
 
 import * as vscode from 'vscode';
 import type { RedivivusService } from './services/redivivusService.js';
-import type { RoutingService } from './services/ai/routingService.js';
+import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
 import type { UsageTracker } from './services/usageTracker.js';
-import type { VaultService } from './services/vault/vaultService.js';
-import type { MeasureTwiceService } from './services/build/measureTwiceService.js';
-import type { ChangeTracker } from './services/build/changeTracker.js';
-import type { AnalyzerService } from './ui/panels/analyzer/analyzerService';
+import type { VaultService } from './features/vault/infrastructure/vaultService.js';
+import type { MeasureTwiceService } from './features/chat/build/services/measureTwiceService.js';
+import type { ChangeTracker } from './features/chat/build/services/changeTracker.js';
+import type { AnalyzerService } from './ui/panels/analyzer/analyzerService.js';
 import type { RulesService } from './services/rulesService.js';
-import type { RetrofitService } from './core/retrofit/retrofitService';
+import type { RetrofitService } from './core/retrofit/retrofitService.js';
 import type { SessionService } from './services/sessionService.js';
 import type { GuideService } from './services/guideService.js';
 import type { BlueprintService } from './services/blueprint/blueprintService.js';
 import type { StatusBar } from './ui/views/statusBar.js';
-import type { GuardianService } from './services/ai/guardianService.js';
-import type { GitHubBackupService } from './services/githubBackupService.js';
+import type { GuardianService } from './shared/ai/infrastructure/guardianService.js';
+import type { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
-import { registerVaultDedupCommand } from './commands/vaultDedup.js';
-import { registerCloseProjectCommand } from './commands/closeProject.js';
-import { registerCompileProjectCommand } from './commands/compileProject.js';
+import { registerVaultDedupCommand } from './features/vault/application/vaultDedup.js';
+import { registerCloseProjectCommand } from './features/project/application/closeProject.js';
+import { registerCompileProjectCommand } from './features/project/application/compileProject.js';
 import type { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
 import { registerOnNewProject } from './commands/init.js';
 import { registerInitCommands } from './commands/initCommands.js';
@@ -31,33 +31,33 @@ import { registerAnalysisCommands } from './commands/analysis.js';
 import { registerReviewCommands } from './commands/review.js';
 import { registerRestructureCommands } from './commands/restructure.js';
 import { registerRetrofitCommands } from './commands/retrofit.js';
-import { registerVaultCommands } from './commands/vault.js';
-import { registerVaultBrowseCommand } from './commands/vaultBrowse.js';
-import { registerVaultTranslateCommand } from './commands/vaultTranslate.js';
+import { registerVaultCommands } from './features/vault/application/vault.js';
+import { registerVaultBrowseCommand } from './features/vault/application/vaultBrowse.js';
+import { registerVaultTranslateCommand } from './features/vault/application/vaultTranslate.js';
 import { registerBuildFromVaultCommand } from './commands/buildFromVault.js';
 import { registerMiscCommands } from './commands/misc.js';
 import { registerAuthHandler } from './services/api/authHandler.js';
-import { registerApiSetupCommand } from './commands/apiSetup.js';
+import { registerApiSetupCommand } from './features/onboarding/application/apiSetup.js';
 import { registerUsageCommands } from './commands/usageCommands.js';
-import { registerSetupProgressCommand } from './commands/setupProgressCommand.js';
+import { registerSetupProgressCommand } from './features/onboarding/application/setupProgressCommand.js';
 import { registerSelectionCommands } from './commands/selection.js';
 import { registerTimelineCommand } from './commands/timeline.js';
 import { registerLoggingCommands } from './commands/logging.js';
 import { registerSavePointCommand } from './commands/savePoint.js';
-import { registerOrganizeProjects } from './commands/organizeProjects.js';
+import { registerOrganizeProjects } from './features/project/application/organizeProjects.js';
 import { registerFileSplitCommand } from './commands/fileSplit.js';
 import { registerRetrofitBlueprintCommand } from './commands/retrofitBlueprint.js';
 import { registerScopeCreepCommand } from './commands/scopeCreep.js';
 import { registerDuplicateCodeCommand } from './commands/duplicateCode.js';
-import { registerGitHubBackupCommands } from './commands/githubBackup.js';
-import { registerSetupHubCommand } from './commands/setupHub.js';
+import { registerGitHubBackupCommands } from './features/workspace/application/githubBackup.js';
+import { registerSetupHubCommand } from './features/onboarding/application/setupHub.js';
 import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
 import { registerInlineCommands } from './extensionInlineCommands.js';
-import { registerSignInCommand } from './commands/signIn.js';
+import { registerSignInCommand } from './features/onboarding/application/signIn.js';
 import { registerReportIssueCommand } from './commands/reportIssue.js';
 import { registerCheckForUpdatesCommand } from './commands/checkForUpdates.js';
-import { initOutputChannels } from './ui/logging/outputChannelManager.js';
+import { initOutputChannels } from './shared/logging/ui/outputChannelManager.js';
 
 export function registerAllCommands(
   context: vscode.ExtensionContext,
@@ -91,7 +91,7 @@ export function registerAllCommands(
   try {   registerVaultCommands(context, redivivusService, vaultService, routingService, refreshAll); } catch (e) { console.error('Failed to register ' + 'registerVaultCommands(context, redivivusService, vaultService, routingService, refreshAll);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerVaultCommands(context, redivivusService, vaultService, routingService, refreshAll); failed: ' + e + '\n'); }
   try {   registerVaultBrowseCommand(context, vaultService); } catch (e) { console.error('Failed to register ' + 'registerVaultBrowseCommand(context, vaultService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerVaultBrowseCommand(context, vaultService); failed: ' + e + '\n'); }
   try {   registerVaultTranslateCommand(context, vaultService, routingService); } catch (e) { console.error('Failed to register ' + 'registerVaultTranslateCommand(context, vaultService, routingService);', e); require('fs').appendFileSync('/tmp/redivivus_activation_errors.log', 'registerVaultTranslateCommand(context, vaultService, routingService); failed: ' + e + '\n'); }
-  try { const { BuildFromVaultService } = require('./services/vault/buildFromVaultService.js'); registerBuildFromVaultCommand(context, new BuildFromVaultService(vaultService, routingService)); } catch (e) { console.error('Failed to register buildFromVault', e); }
+  try { const { BuildFromVaultService } = require('./features/vault/infrastructure/buildFromVaultService.js'); registerBuildFromVaultCommand(context, new BuildFromVaultService(vaultService, routingService)); } catch (e) { console.error('Failed to register buildFromVault', e); }
   
   // [DONE] vaultDedup inline handler moved to commands/vaultDedup.ts (Rule 9 split)
   try { registerVaultDedupCommand(context, redivivusService, routingService, usageTracker, vaultService); } catch (e) { console.error('Failed to register vaultDedup command', e); }

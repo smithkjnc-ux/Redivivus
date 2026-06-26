@@ -1,7 +1,7 @@
 // [SCOPE] Phase Inspector Report Formatter — formats PhaseInspection results for chat display
 // Extracted from phaseInspector.ts
 
-import type { PhaseInspection } from './phaseInspector';
+import type { PhaseInspection } from './phaseInspector.js';
 
 // Format inspection results for chat display
 export function formatInspectionReport(inspection: PhaseInspection): string {

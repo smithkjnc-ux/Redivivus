@@ -3,7 +3,7 @@
 // the panel. See docs/REDIVIVUS_ADD_TO_PHONE.md.
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../features/project/application/activeProjectRoot.js';
 import { publishPwa } from '../../services/pwa/pwaPublish.js';
 import { showAddToPhonePanel } from '../../ui/panels/pwa/addToPhonePanel.js';
 

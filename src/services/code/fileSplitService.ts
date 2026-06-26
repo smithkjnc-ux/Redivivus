@@ -3,7 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import type { RoutingService } from '../ai/routingService.js';
+import type { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 
 export interface FileSuggestion {
   filePath: string;

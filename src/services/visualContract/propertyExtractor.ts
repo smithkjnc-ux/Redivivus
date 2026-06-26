@@ -1,7 +1,7 @@
 // [SCOPE] Visual Contract — extract editable properties from built HTML/CSS files
 import * as fs from 'fs';
 import * as path from 'path';
-import type { VisualProperty, VisualSection, VisualContract, PropCategory } from './visualContractTypes';
+import type { VisualProperty, VisualSection, VisualContract, PropCategory } from './visualContractTypes.js';
 
 let _seq = 0;
 function uid(prefix: string): string { return `${prefix}-${++_seq}`; }

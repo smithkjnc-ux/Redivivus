@@ -1,9 +1,9 @@
 // [SCOPE] Chat panel serializer and auto-open timer — extracted from extension.ts (Rule 9 split).
 
 import * as vscode from 'vscode';
-import { ChatPanel } from './ui/panels/chat/chatPanel';
-import { consolidatePanelLayout } from './ui/panels/chat/chatPanelShow.js';
-import { wasProjectClosedRecently } from './services/project/closeMarker.js';
+import { ChatPanel } from './features/chat/ui/chatPanel.js';
+import { consolidatePanelLayout } from './features/chat/ui/chatPanelShow.js';
+import { wasProjectClosedRecently } from './features/project/application/closeMarker.js';
 
 export function registerPanelSerializer(
   context: vscode.ExtensionContext,
@@ -20,7 +20,7 @@ export function registerPanelSerializer(
         const SENTINEL = { __sentinel: true };
         (ChatPanel as any)._instance = SENTINEL;
         webviewPanel.webview.options = { enableScripts: true };
-        const { ChatPanel: _CP2 } = await import('./ui/panels/chat/chatPanel.js');
+        const { ChatPanel: _CP2 } = await import('./features/chat/ui/chatPanel.js');
         if ((ChatPanel as any)._instance !== SENTINEL) { try { webviewPanel.dispose(); } catch {} (ChatPanel as any)._isDeserializing = false; return; }
         const panel = new (_CP2 as any)(webviewPanel, redivivusService, routingService, usageTracker, vaultService);
         (ChatPanel as any)._instance = panel;

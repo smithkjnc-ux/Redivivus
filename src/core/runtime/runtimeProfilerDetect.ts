@@ -3,8 +3,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { EntryPoint, RuntimeProfile } from './runtimeProfiler';
-import { readSafe } from './runtimeProfilerScan';
+import type { EntryPoint, RuntimeProfile } from './runtimeProfiler.js';
+import { readSafe } from './runtimeProfilerScan.js';
 
 // ── Entry point detection ─────────────────────────────────────────────────────
 

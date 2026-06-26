@@ -6,10 +6,10 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { BuildHistoryService } from '../../services/build/buildHistoryService.js';
+import { BuildHistoryService } from '../../features/chat/build/services/buildHistoryService.js';
 import { SnapshotService } from '../../services/snapshotService.js';
 import { buildHistoryHtml } from './buildHistoryPanelHtml.js';
-import { getActiveProjectRoot } from '../../services/project/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../../features/project/application/activeProjectRoot.js';
 
 let _panel: vscode.WebviewPanel | undefined;
 

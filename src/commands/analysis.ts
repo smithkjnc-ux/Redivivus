@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import type { RedivivusService } from '../services/redivivusService.js';
-import type { AnalyzerService } from '../ui/panels/analyzer/analyzerService';
+import type { AnalyzerService } from '../ui/panels/analyzer/analyzerService.js';
 
 export function registerAnalysisCommands(
   context: vscode.ExtensionContext,

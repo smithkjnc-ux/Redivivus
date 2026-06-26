@@ -5,7 +5,7 @@
 import * as vscode from 'vscode';
 import type { RedivivusService } from '../services/redivivusService.js';
 import type { RulesService } from '../services/rulesService.js';
-import { getActiveProjectRoot } from '../services/project/activeProjectRoot.js';
+import { getActiveProjectRoot } from '../features/project/application/activeProjectRoot.js';
 import { EDITOR_RULE_FILES, getEnabledEditorKeys, setEnabledEditorKeys, removeDisabledShims } from '../services/editorRuleFiles.js';
 
 export function registerConfigureEditorRules(

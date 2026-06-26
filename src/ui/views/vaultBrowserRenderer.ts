@@ -2,8 +2,8 @@
 // Card-based layout with search, plain-English category labels, warm colors, and "What is a Vault?" explainer.
 // [WARN] Keep non-technical friendly — no raw code visible by default. Code only shows on explicit "View Code" click.
 
-import type { VaultItem } from '../../services/vault/vaultTypes.js';
-import { VAULT_CATEGORIES } from '../../services/vault/vaultTypes.js';
+import type { VaultItem } from '../../features/vault/infrastructure/vaultTypes.js';
+import { VAULT_CATEGORIES } from '../../features/vault/infrastructure/vaultTypes.js';
 
 const FRIENDLY: Record<string, { title: string; subtitle: string; plainEnglish: string; icon: string; bg: string; accent: string }> = {
   component:  { title: 'Screen Pieces',    subtitle: 'Ready-made UI parts',              plainEnglish: 'Things that appear on screen — buttons, forms, menus, cards.',        icon: '🧩', bg: '#e8f4fd', accent: '#1a6fb8' },

@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { Blueprint } from '../types/index.js';
-import type { RedivivusPaths } from './project/redivivusPaths.js';
+import type { RedivivusPaths } from '../features/project/application/redivivusPaths.js';
 import { writeEnabledShims } from './editorRuleFiles.js';
 
 export function generateRules(paths: RedivivusPaths, projectName: string, blueprint: Blueprint, targetPath?: string): void {

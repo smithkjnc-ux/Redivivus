@@ -7,7 +7,7 @@ import * as path from 'path';
 
 export async function generateAndPostSessionSummary(): Promise<void> {
   try {
-    const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
+    const { ChatPanel } = await import('../features/chat/ui/chatPanel.js');
     const panel = ChatPanel.currentPanel;
     if (!panel) { return; }
 

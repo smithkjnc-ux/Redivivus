@@ -1,7 +1,7 @@
 // [SCOPE] Visual Contract Patcher — apply single-property edits back to source files
 import * as fs from 'fs';
 import * as path from 'path';
-import type { VisualProperty } from './visualContractTypes';
+import type { VisualProperty } from './visualContractTypes.js';
 
 export interface PatchResult {
   success: boolean;

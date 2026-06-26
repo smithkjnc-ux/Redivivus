@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RedivivusPaths } from './project/redivivusPaths.js';
+import type { RedivivusPaths } from '../features/project/application/redivivusPaths.js';
 
 export async function updateGitignore(root: string): Promise<void> {
   const gitignorePath = path.join(root, '.gitignore');

@@ -3,8 +3,8 @@
 import * as vscode from 'vscode';
 import type { RedivivusService } from '../services/redivivusService.js';
 import type { SessionService } from '../services/sessionService.js';
-import { ChatPanel } from '../ui/panels/chat/chatPanel';
-import { buildEvents } from '../services/build/buildEvents';
+import { ChatPanel } from '../features/chat/ui/chatPanel.js';
+import { buildEvents } from '../features/chat/build/services/buildEvents.js';
 
 export function registerSessionCommands(
   context: vscode.ExtensionContext,

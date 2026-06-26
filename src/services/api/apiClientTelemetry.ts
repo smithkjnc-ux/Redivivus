@@ -45,7 +45,7 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
       body: JSON.stringify({
         event, ...data,
         ide_version: getIdeVersion(),
-        configured_providers: (() => { try { return require('../ai/secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
+        configured_providers: (() => { try { return require('../../shared/ai/infrastructure/secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
       }),
     }).then(res => {
       if (res.status === 401) { clearAccountToken().then(() => vscode.commands.executeCommand('redivivus.refreshChat')); }
@@ -64,7 +64,7 @@ export function logSessionStart(): void {
       body: JSON.stringify({
         event: 'session_start',
         ide_version: getIdeVersion(),
-        configured_providers: (() => { try { return require('../ai/secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
+        configured_providers: (() => { try { return require('../../shared/ai/infrastructure/secretKeyStore.js').getConfiguredProviders(); } catch { return []; } })(),
       }),
     }).catch(() => {});
   }).catch(() => {});

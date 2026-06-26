@@ -22,10 +22,10 @@ export function registerSavePointCommand(context: vscode.ExtensionContext) {
   context.subscriptions.push(
     vscode.commands.registerCommand('redivivus.showBuildRecord', async () => {
       try {
-        const { getActiveProjectRoot } = await import('../services/project/activeProjectRoot.js');
+        const { getActiveProjectRoot } = await import('../features/project/application/activeProjectRoot.js');
         const root = getActiveProjectRoot();
         if (!root) { vscode.window.showWarningMessage('Open a Redivivus project to see its build record.'); return; }
-        const { writeBuildRecord } = await import('../services/build/buildRecordService.js');
+        const { writeBuildRecord } = await import('../features/chat/build/services/buildRecordService.js');
         const out = writeBuildRecord(root);
         const doc = await vscode.workspace.openTextDocument(out);
         await vscode.window.showTextDocument(doc, { preview: false });

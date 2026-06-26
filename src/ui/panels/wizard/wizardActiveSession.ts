@@ -2,7 +2,7 @@
 // Called by wizardService. No other wizard logic here.
 
 import * as vscode from 'vscode';
-import type { SessionInfo } from '../../../types/index';
+import type { SessionInfo } from '../../../types/index.js';
 
 export async function handleActiveSessionWizard(session: SessionInfo | null): Promise<void> {
   const options: any[] = [

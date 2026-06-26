@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
-import { BuildHistoryService } from '../services/build/buildHistoryService.js';
+import { BuildHistoryService } from '../features/chat/build/services/buildHistoryService.js';
 
 /** Read the deployed build-info.json (version, build timestamp, commit). */
 function readBuildInfo(): { version?: string; timestamp?: string; commit?: string } {

@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import type { RedivivusService } from '../services/redivivusService.js';
-import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import { ChatPanel } from '../features/chat/ui/chatPanel.js';
 import { TimelineService } from '../services/timelineService.js';
 
 export function registerTimelineCommand(

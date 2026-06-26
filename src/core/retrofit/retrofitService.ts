@@ -5,15 +5,15 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RedivivusService } from '../../services/redivivusService';
-import type { ChangeTracker } from '../../services/build/changeTracker';
-import type { MeasureTwiceService } from '../../services/build/measureTwiceService';
-import type { RoutingService } from '../../services/ai/routingService';
-import type { AnalyzerService } from '../../ui/panels/analyzer/analyzerService';
-import { getCodeFiles, backupFiles, restoreFiles, deleteDir } from './retrofitFileScanner';
+import type { RedivivusService } from '../../services/redivivusService.js';
+import type { ChangeTracker } from '../../features/chat/build/services/changeTracker.js';
+import type { MeasureTwiceService } from '../../features/chat/build/services/measureTwiceService.js';
+import type { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
+import type { AnalyzerService } from '../../ui/panels/analyzer/analyzerService.js';
+import { getCodeFiles, backupFiles, restoreFiles, deleteDir } from './retrofitFileScanner.js';
 
-import { processInChunks } from './retrofitChunker';
-import { handleAllAnnotated, showRetrofitSummary, buildReport } from './retrofitHelpers';
+import { processInChunks } from './retrofitChunker.js';
+import { handleAllAnnotated, showRetrofitSummary, buildReport } from './retrofitHelpers.js';
 
 export class RetrofitService {
   constructor(
@@ -68,8 +68,8 @@ export class RetrofitService {
         const recsEscaped = recsRaw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         const recsHtml = `<div style="padding:12px 0;"><h2 style="margin:0 0 10px;font-size:15px;">📋 Recommendations</h2><pre style="white-space:pre-wrap;font-size:12px;line-height:1.6;background:var(--vscode-editor-background);padding:12px;border-radius:6px;border:1px solid var(--vscode-input-border);overflow-y:auto;max-height:480px;">${recsEscaped}</pre></div>`;
         try {
-          const _CPr = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
-          if (!_CPr?.currentPanel) { vscode.commands.executeCommand('redivivus.openChatPanel'); setTimeout(() => { try { require('../../ui/panels/chat/chatPanel.js').ChatPanel?.currentPanel?.showPanel('recommendations', 'Recommendations', recsHtml); } catch {} }, 300); }
+          const _CPr = require('../../features/chat/ui/chatPanel.js').ChatPanel;
+          if (!_CPr?.currentPanel) { vscode.commands.executeCommand('redivivus.openChatPanel'); setTimeout(() => { try { require('../../features/chat/ui/chatPanel.js').ChatPanel?.currentPanel?.showPanel('recommendations', 'Recommendations', recsHtml); } catch {} }, 300); }
           else { _CPr.currentPanel.showPanel('recommendations', 'Recommendations', recsHtml); }
         } catch { /* non-blocking */ }
       }
@@ -151,11 +151,11 @@ export class RetrofitService {
       // [FIX] Dynamic require — retrofitService is in core/ and must not statically import ui/
       const _showRetrofitReport = () => {
         try {
-          const _CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+          const _CP = require('../../features/chat/ui/chatPanel.js').ChatPanel;
           if (_CP?.currentPanel) { _CP.currentPanel.showPanel('retrofit-report', 'Retrofit Report', html); }
         } catch { /* non-blocking */ }
       };
-      try { const _CP2 = require('../../ui/panels/chat/chatPanel.js').ChatPanel; if (!_CP2?.currentPanel) { vscode.commands.executeCommand('redivivus.openChatPanel'); setTimeout(_showRetrofitReport, 300); } else { _showRetrofitReport(); } } catch { /* non-blocking */ }
+      try { const _CP2 = require('../../features/chat/ui/chatPanel.js').ChatPanel; if (!_CP2?.currentPanel) { vscode.commands.executeCommand('redivivus.openChatPanel'); setTimeout(_showRetrofitReport, 300); } else { _showRetrofitReport(); } } catch { /* non-blocking */ }
     });
   }
 

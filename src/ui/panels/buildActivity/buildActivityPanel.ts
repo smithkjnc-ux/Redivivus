@@ -4,7 +4,7 @@
 // Steps arrive from cloudBuildClient via the build runner's onStep callback (backend @@RDV_STEP@@ frames).
 
 import * as vscode from 'vscode';
-import { buildActivityHtml } from './buildActivityHtml';
+import { buildActivityHtml } from './buildActivityHtml.js';
 
 export class BuildActivityPanel {
   private static _instance: BuildActivityPanel | undefined;

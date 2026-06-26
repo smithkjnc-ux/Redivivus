@@ -1,7 +1,7 @@
 // [SCOPE] Recommendations panel webview script — event handlers and assembly
 // Helper functions (variables, startNextInQueue, showToast) -> analyzerScriptHead.ts
 
-import { RECOMMENDATIONS_SCRIPT_HEAD } from './analyzerScriptHead';
+import { RECOMMENDATIONS_SCRIPT_HEAD } from './analyzerScriptHead.js';
 
 const RECOMMENDATIONS_SCRIPT_TAIL = `
   window.addEventListener('message', function(e) {

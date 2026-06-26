@@ -5,20 +5,20 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { RedivivusService } from '../../services/redivivusService.js';
 import type { SessionService } from '../../services/sessionService.js';
-import type { VaultItem, VaultCategory } from '../../services/vault/vaultService.js';
-import { VaultService } from '../../services/vault/vaultService.js';
-import { RoutingService } from '../../services/ai/routingService.js';
+import type { VaultItem, VaultCategory } from '../../features/vault/infrastructure/vaultService.js';
+import { VaultService } from '../../features/vault/infrastructure/vaultService.js';
+import { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 import { getStyles } from '../styles.js';
 import { getScripts } from './scripts.js';
 import { renderWelcomeView, renderRetrofitPendingView, renderNoKeyView } from './welcomeView.js';
-import { hasAnyKey } from '../../services/ai/secretKeyStore.js';
+import { hasAnyKey } from '../../shared/ai/infrastructure/secretKeyStore.js';
 import { renderWorkTab } from './workTab.js';
 import { renderFilesTab, renderSwitchForm } from './filesTab.js';
 import { renderHistoryTab, getSessionHistory, getReviews } from './historyTab.js';
 import { renderVaultTab, renderVaultScanSummary, getVaultItems } from './vaultTab.js';
 import { renderWizardStep } from './wizardSteps.js';
-import type { WizardPanelState } from '../messageRouter.js';
-import { attachMessageRouter } from '../messageRouter.js';
+import type { WizardPanelState } from '../../features/chat/routing/messageRouter.js';
+import { attachMessageRouter } from '../../features/chat/routing/messageRouter.js';
 
 export class RedivivusWebviewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'redivivusPanel';

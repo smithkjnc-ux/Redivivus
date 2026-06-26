@@ -4,9 +4,9 @@
 import * as vscode from 'vscode';
 import type { UsageTracker} from '../services/usageTracker.js';
 import { UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../services/usageTracker.js';
-import type { RoutingService } from '../services/ai/routingService.js';
-import { showInChatPanel } from '../services/chatPanelContent.js';
-import { getActiveProjectRoot } from '../services/project/activeProjectRoot.js';
+import type { RoutingService } from '../shared/ai/infrastructure/routingService.js';
+import { showInChatPanel } from '../features/chat/ui/chatPanelContent.js';
+import { getActiveProjectRoot } from '../features/project/application/activeProjectRoot.js';
 
 export function registerUsageCommands(context: vscode.ExtensionContext, usageTracker: UsageTracker, routing?: RoutingService): void {
   // View Usage Report (in separate panel)

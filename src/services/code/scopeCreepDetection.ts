@@ -3,7 +3,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type { RedivivusService } from '../redivivusService.js';
-import type { RoutingService } from '../ai/routingService.js';
+import type { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 
 export interface ScopeIssue {
   type: 'missing_file' | 'extra_file' | 'drift';

@@ -1,6 +1,6 @@
 // [SCOPE] Recommendations panel HTML section builders — one function per section type
 // Called only by analyzerPanel.ts. Returns HTML strings. No vscode imports needed here.
-import type { AnalysisResult } from './analyzerTypes';
+import type { AnalysisResult } from './analyzerTypes.js';
 
 // [WARN] All user content must pass through esc() before injection into HTML attributes or text
 export function esc(s: string): string {

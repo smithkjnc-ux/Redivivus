@@ -6,7 +6,7 @@ import type { SessionService } from '../services/sessionService.js';
 import type { GuideService } from '../services/guideService.js';
 import type { RulesService } from '../services/rulesService.js';
 import type { RedivivusWebviewProvider } from '../ui/views/redivivusWebviewProvider.js';
-import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import { ChatPanel } from '../features/chat/ui/chatPanel.js';
 import { registerConfigureEditorRules } from './configureEditorRules.js';
 
 export function registerMiscCommands(

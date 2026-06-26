@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
-import { getKeyCached, getConfiguredProviders } from '../ai/secretKeyStore.js';
+import { getKeyCached, getConfiguredProviders } from '../../shared/ai/infrastructure/secretKeyStore.js';
 
 const MAGIC = 'RDVKEYS1';            // format header + version. Bump trailing digit on any format change.
 const PROVIDERS = ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi', 'deepseek'];
@@ -97,7 +97,7 @@ export async function importKeysEncrypted(): Promise<number> {
     vscode.window.showErrorMessage('Redivivus: Could not decrypt — wrong passphrase or corrupted file.');
     return 0;
   }
-  const { storeKey } = await import('../ai/secretKeyStore.js');
+  const { storeKey } = await import('../../shared/ai/infrastructure/secretKeyStore.js');
   let count = 0;
   for (const p of PROVIDERS) {
     if (typeof keys[p] === 'string' && keys[p]) { await storeKey(p, keys[p]); count++; }

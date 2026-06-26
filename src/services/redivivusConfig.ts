@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import type { RedivivusConfig } from '../types/index.js';
-import type { RedivivusPaths } from './project/redivivusPaths.js';
+import type { RedivivusPaths } from '../features/project/application/redivivusPaths.js';
 
 export function loadConfig(paths: RedivivusPaths): RedivivusConfig | null {
   if (!fs.existsSync(paths.configPath)) { return null; }

@@ -3,7 +3,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RoutingService } from '../../services/ai/routingService';
+import type { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 
 export interface PhaseInspection {
   phase: string;
@@ -131,4 +131,4 @@ export async function inspectPhase(
   };
 }
 
-import { checkSyntax, detectDeadCode, detectPlaceholders, checkBlueprintAlignment, checkForwardCompatibility, runTest, generateSmokeTests } from './phaseInspectorChecks';
+import { checkSyntax, detectDeadCode, detectPlaceholders, checkBlueprintAlignment, checkForwardCompatibility, runTest, generateSmokeTests } from './phaseInspectorChecks.js';

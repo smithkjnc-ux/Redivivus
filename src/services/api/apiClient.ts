@@ -2,7 +2,7 @@
 // Keys: stored in settings.json on device only. Sent to backend as X-Provider-Keys header (not body).
 
 import * as vscode from 'vscode';
-import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from '../ai/routingKeys.js';
+import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from '../../shared/ai/infrastructure/routingKeys.js';
 
 const SECRET_KEY = 'redivivus.account.token';
 // [FIX] Default to PRODUCTION (Cloud Run), like any shipped client — so dev builds test the real deployed
@@ -80,8 +80,8 @@ export function collectKeyHeaders(): Record<string, string> {
 export function getPreferred(): string | undefined {
   // Use the top-ranked available AI (supervisor), not the manually-set defaultAI preference.
   // defaultAI is the user's chat default — it doesn't reflect which AI should be supervisor.
-  const { selectSupervisorAndWorker } = require('../ai/routingServiceRoster.js');
-  const { getGeminiKey: gk, getClaudeKey: ck, getOpenAIKey: ok, getGroqKey: gr, getXAIKey: xk, getKimiKey: km, getDeepseekKey: dk } = require('../ai/routingKeys.js');
+  const { selectSupervisorAndWorker } = require('../../shared/ai/infrastructure/routingServiceRoster.js');
+  const { getGeminiKey: gk, getClaudeKey: ck, getOpenAIKey: ok, getGroqKey: gr, getXAIKey: xk, getKimiKey: km, getDeepseekKey: dk } = require('../../shared/ai/infrastructure/routingKeys.js');
   const keyMap: Record<string, () => string | null> = { gemini: gk, claude: ck, openai: ok, groq: gr, xai: xk, kimi: km, deepseek: dk };
   const { supervisor } = selectSupervisorAndWorker(keyMap);
   // [STICKY-SKIP] If the top-ranked supervisor is already flagged out-of-credits/bad-key this session, lead a
@@ -89,9 +89,9 @@ export function getPreferred(): string | undefined {
   // fails over server-side, wasting a hop each time. Falls back to the top pick if ALL are flagged (recovery).
   let chosen = supervisor;
   try {
-    const { isProviderUnavailable } = require('../ai/providerTierState.js');
+    const { isProviderUnavailable } = require('../../shared/ai/infrastructure/providerTierState.js');
     if (chosen && isProviderUnavailable(chosen)) {
-      const { buildRoster } = require('../ai/routingServiceRoster.js');
+      const { buildRoster } = require('../../shared/ai/infrastructure/routingServiceRoster.js');
       const roster = buildRoster(keyMap);
       const ranked = [roster.supervisor, ...roster.workers].filter(Boolean);
       chosen = ranked.find((p: string) => !isProviderUnavailable(p)) || chosen;

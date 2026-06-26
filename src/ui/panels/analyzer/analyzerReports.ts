@@ -1,6 +1,6 @@
 // [SCOPE] Analyzer report generators — project map markdown, recommendations markdown, and per-file analysis
 import * as path from 'path';
-import type { AnalysisResult } from './analyzerTypes';
+import type { AnalysisResult } from './analyzerTypes.js';
 
 // [SCOPE] Generate project_map.md markdown from analysis result
 export function generateProjectMap(result: AnalysisResult, root: string): string {

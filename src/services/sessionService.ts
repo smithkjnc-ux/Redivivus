@@ -150,7 +150,7 @@ export class SessionService {
       const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (root) {
         const { LearnedMemoryService } = await import('./learnedMemoryService.js');
-        const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
+        const { ChatPanel } = await import('../features/chat/ui/chatPanel.js');
         const learned = new LearnedMemoryService(root);
         learned.pruneRecent();
         const panel = ChatPanel.currentPanel;

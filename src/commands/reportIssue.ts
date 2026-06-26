@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RoutingService } from '../services/ai/routingService.js';
+import type { RoutingService } from '../shared/ai/infrastructure/routingService.js';
 import { buildReportHtml } from './reportIssueHtml.js';
 import { handleReportMessage, resetPickedPaths } from './reportIssueHandler.js';
 

@@ -1,0 +1,39 @@
+// [SCOPE] Message handler dependency types — shared interface injected into all chatPanel message handlers.
+import type * as vscode from 'vscode';
+import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
+import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { ChatMessage } from '../ui/chatPanelHtml.js';
+
+export interface MessageHandlerDeps {
+  redivivus: RedivivusService;
+  routing: RoutingService;
+  usageTracker?: UsageTracker;
+  conversation: ChatMessage[];
+  panel: vscode.WebviewPanel;
+  isBuildRequest: (text: string) => Promise<boolean>;
+  classifyIntent?: (text: string) => Promise<{ type: 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service'; command?: string; subtype?: string }>;
+  handleBuildRequest: (task: string, skipComplex?: boolean, isFixRequest?: boolean) => Promise<void>;
+  buildFromVaultPrefill: () => { task?: string; targetFile?: string };
+  refresh: () => void;
+  setLastModel?: (model: string) => void;
+  onStartSession?: (goal: string, ai: string) => Promise<void>;
+  onSwitchAI?: (ai: string) => Promise<void>;
+  onNewProject?: (name: string, answers: Record<string, string>, folderPath?: string) => Promise<void>;
+  buildMode?: 'plan' | 'direct'; assistMode?: boolean; vault?: import('../../vault/infrastructure/vaultService').VaultService;
+  planInterview?: import('../ui/chatPanelPlanInterview').PlanInterviewState;
+  setBlueprintContext?: (ctx: string) => void;
+  onSaveAiTemperature?: (settings: any) => void;
+  // [PHASE 0] Shared per-turn context (see turnContext.ts + docs/REDIVIVUS_INTENT_ARCHITECTURE.md). Set at the
+  // top of handleSendMessage and threaded everywhere deps flows. SCAFFOLD ONLY — nothing reads it yet.
+  turnContext?: import('./turnContext').TurnContext;
+  // [SUPERVISOR_TIER] Per-turn hint of the complexity tier (from the chat pre-pass) used to size the fix
+  // Supervisor's own diagnosis model. Set after cloudChat; read in runPhase1Supervisor. Absent -> default 'pro'.
+  supervisorTierHint?: 'flash' | 'pro' | 'ultra';
+  // [ROUTING PANEL] Per-role manual provider overrides from the chat routing panel. Each is a provider id that
+  // FORCES that role's AI (no failover, like the manual pill). Honored client-side in the fix pipeline.
+  routingOverrides?: { supervisor?: string; worker?: string; guardian?: string };
+  // [MANUAL MODEL PICKER] The exact model id the user locked in the pill (e.g. 'claude-opus-4-8'). When set, the
+  // code-writing roles (build worker, fix worker) run EXACTLY this model — the model shown is the model used.
+  manualModel?: string;
+}

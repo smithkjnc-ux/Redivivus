@@ -1,5 +1,5 @@
 // [SCOPE] Redivivus RETROFIT Domain Logger
-import { masterLog } from '../../core/logging/masterLogger.js';
+import { masterLog } from '../../shared/logging/domain/masterLogger.js';
 
 const DOMAIN = 'RETROFIT';
 

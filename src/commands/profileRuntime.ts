@@ -2,12 +2,12 @@
 // posts plain-English summary to the chat panel with [Start] / [Not Now] buttons.
 
 import * as vscode from 'vscode';
-import { runRuntimeProfiler, buildProfileSummary } from '../core/runtime/runtimeProfiler';
+import { runRuntimeProfiler, buildProfileSummary } from '../core/runtime/runtimeProfiler.js';
 
 import type { RedivivusService } from '../services/redivivusService.js';
-import type { RoutingService } from '../services/ai/routingService.js';
+import type { RoutingService } from '../shared/ai/infrastructure/routingService.js';
 import type { UsageTracker } from '../services/usageTracker.js';
-import type { VaultService } from '../services/vault/vaultService.js';
+import type { VaultService } from '../features/vault/infrastructure/vaultService.js';
 
 export function registerProfileRuntimeCommand(
   context: vscode.ExtensionContext,
@@ -24,7 +24,7 @@ export function registerProfileRuntimeCommand(
         return;
       }
 
-      const { ChatPanel } = await import('../ui/panels/chat/chatPanel.js');
+      const { ChatPanel } = await import('../features/chat/ui/chatPanel.js');
       ChatPanel.show(redivivus, routing, usageTracker, vault);
       await new Promise(r => setTimeout(r, 300));
 

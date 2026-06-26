@@ -2,11 +2,11 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { ChatPanel } from '../ui/panels/chat/chatPanel';
+import { ChatPanel } from '../features/chat/ui/chatPanel.js';
 import type { RedivivusService } from '../services/redivivusService.js';
-import type { RoutingService } from '../services/ai/routingService.js';
+import type { RoutingService } from '../shared/ai/infrastructure/routingService.js';
 import type { UsageTracker } from '../services/usageTracker.js';
-import type { VaultService } from '../services/vault/vaultService.js';
+import type { VaultService } from '../features/vault/infrastructure/vaultService.js';
 
 export function registerSelectionCommands(
   context: vscode.ExtensionContext,

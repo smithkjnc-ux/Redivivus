@@ -3,8 +3,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { IpcPattern } from './runtimeProfiler';
-import { readSafe } from './runtimeProfilerScan';
+import type { IpcPattern } from './runtimeProfiler.js';
+import { readSafe } from './runtimeProfilerScan.js';
 
 // [WARN] Patterns are matched as substring/regex against raw file content.
 //        Keep patterns specific enough to avoid false positives on comments.

@@ -1,8 +1,8 @@
 // [SCOPE] Analyzer file scanner — walks workspace directories and builds FileInfo + AnalysisResult
 import * as fs from 'fs';
 import * as path from 'path';
-import { FileInfo, AnalysisResult } from './analyzerTypes';
-import { getResolvedPaths } from '../../../services/resolvedItems';
+import { FileInfo, AnalysisResult } from './analyzerTypes.js';
+import { getResolvedPaths } from '../../../services/resolvedItems.js';
 
 export { FileInfo, AnalysisResult };
 

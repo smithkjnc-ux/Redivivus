@@ -3,9 +3,9 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type { CompatibilityCheck, TestResult } from './phaseInspector';
-import { PhaseIssue } from './phaseInspector';
-import type { RoutingService } from '../../services/ai/routingService';
+import type { CompatibilityCheck, TestResult } from './phaseInspector.js';
+import { PhaseIssue } from './phaseInspector.js';
+import type { RoutingService } from '../../shared/ai/infrastructure/routingService.js';
 
 export function checkForwardCompatibility(
   phaseId: string,
