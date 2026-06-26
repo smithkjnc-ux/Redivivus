@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import type * as vscode from 'vscode';
-import { STORAGE_KEY, LIFETIME_KEY } from '../../../services/usageTracker.js';
+import { STORAGE_KEY, LIFETIME_KEY } from '../../telemetry/infrastructure/usageTracker.js';
 
 export interface BuildStats {
   total: number; success: number; failed: number; cloud: number; local: number; tokens: number; lastDate: string;

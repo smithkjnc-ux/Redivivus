@@ -3,11 +3,11 @@
 
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
 import type { VaultService } from '../../vault/infrastructure/vaultService.js';
-import type { RedivivusService } from '../../../services/redivivusService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { VaultSearchResult } from '../../vault/infrastructure/buildFromVaultSearch.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import type { BlueprintContract } from '../../../services/blueprint/blueprintContract.js';
+import type { BlueprintContract } from '../../project/infrastructure/blueprint/blueprintContract.js';
 
 export interface BuildContext {
   task: string; root: string; blueprintContext: string; vault?: VaultService; routing: RoutingService; conversation: ChatMessage[]; refresh: () => void; logError: (t: string, p: string, e: string, l: number) => void; postToWebview?: (msg: any) => void; onBuildFinished?: (t: string, f?: string[]) => void;

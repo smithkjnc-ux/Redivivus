@@ -2,7 +2,7 @@
 // Called by messageRouter orchestrator. No wizard or vault logic here.
 
 import * as vscode from 'vscode';
-import type { SessionService } from '../../../services/sessionService.js';
+import type { SessionService } from '../../project/application/sessionService.js';
 
 let isProcessingSession = false;
 

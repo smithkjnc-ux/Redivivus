@@ -10,7 +10,7 @@ import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds.js';
 import { fixActFinish } from './fixActivityPanel.js';
 import { runFixFinalize } from './chatPanelMsgFixFinalize.js';
 import { explainFixFailure, formatELI5Block } from '../../../shared/ai/infrastructure/fixFailureELI5.js';
-import { progressApplying } from '../../../services/ui/fixProgressStyle.js';
+import { progressApplying } from '../ui/fixProgressStyle.js';
 
 export interface FixPhase23Params {
   subtasks: string[];

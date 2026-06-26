@@ -5,7 +5,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { WizardPanelState } from './messageRouterTypes.js';
 
 export async function handleWizardMessage(

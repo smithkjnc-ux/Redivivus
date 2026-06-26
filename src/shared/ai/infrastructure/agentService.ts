@@ -7,7 +7,7 @@
 import type { AgentContext } from './agentTools.js';
 import { BUILT_IN_TOOLS } from './agentTools.js';
 import type { RoutingService } from './routingService.js';
-import { getAllTools } from '../../../services/mcpService.js';
+import { getAllTools } from '../../api/mcp/mcpService.js';
 import { BuildLedger } from '../../../features/chat/build/services/buildLedgerService.js';
 import { friendlyModelName } from './agentNarrator.js';
 import { runSupervisorPreplanning } from './agentSupervisor.js';

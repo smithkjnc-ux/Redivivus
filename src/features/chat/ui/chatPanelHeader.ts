@@ -2,12 +2,12 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { ChatHeaderInfo } from './chatPanelHtml.js';
 import { BuildHistoryService } from '../build/services/buildHistoryService.js';
-import { getAccountToken } from '../../../services/api/apiClient.js';
+import { getAccountToken } from '../../../shared/api/infrastructure/apiClient.js';
 import * as fs from 'fs';
 import { determineBlueprintStatus } from './chatPanelHeaderUtils.js';
 import { isProjectsContainer } from '../../project/application/redivivusPaths.js';

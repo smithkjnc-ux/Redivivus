@@ -1,6 +1,6 @@
 // [SCOPE] Fix pipeline file selection — isolates file picking logic to comply with Rule 9 limits.
 import * as path from 'path';
-import { listSourceFiles } from '../../../services/workspace/codebaseSearch.js';
+import { listSourceFiles } from '../../workspace/infrastructure/codebaseSearch.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
 
 // [FIX] Smart file selection: when userText is provided, send only files relevant to the bug

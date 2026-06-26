@@ -8,13 +8,13 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as cp from 'child_process';
-import { loadRuntimeProfile } from '../../../core/runtime/runtimeProfiler.js';
+import { loadRuntimeProfile } from '../infrastructure/runtimeProfiler.js';
 import { buildPythonTraceScript } from '../../../runtime/pythonInstrumentor.js';
 import { buildJsHookScript } from '../../../runtime/jsInstrumentor.js';
 
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from '../../vault/infrastructure/vaultService.js';
 import { postToChat, deleteSafe, readTraceEntries, summariseEntries, buildConnections, buildPlainEnglishReport } from './startRuntimeAnalysisHelpers.js';
 

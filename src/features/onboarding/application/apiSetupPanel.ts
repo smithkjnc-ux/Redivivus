@@ -74,10 +74,10 @@ export class ApiSetupPanel {
       } else if (msg.type === 'open-vscode-settings') {
         await vscode.commands.executeCommand('workbench.action.openSettings', 'redivivus');
       } else if (msg.type === 'export-all-keys') {
-        const { exportKeysEncrypted } = await import('../../../services/security/keyBackup.js');
+        const { exportKeysEncrypted } = await import('../../../shared/vscode/application/keyBackup.js');
         await exportKeysEncrypted();
       } else if (msg.type === 'import-keys') {
-        const { importKeysEncrypted } = await import('../../../services/security/keyBackup.js');
+        const { importKeysEncrypted } = await import('../../../shared/vscode/application/keyBackup.js');
         const imported = await importKeysEncrypted();
         if (imported > 0) {
           this._panel.webview.html = getApiSetupHtml();

@@ -2,7 +2,7 @@
 // Split from 327-line monolith. Each responsibility now lives in its own file under 200 lines.
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../vscode/application/redivivusService.js';
 import type { GuardianConfig, HealthScore, RiskReport, FileMetrics, ELI5Entry } from './guardianTypes.js';
 import { computeHealthScore } from './guardianHealth.js';
 import { scanForRisks, analyzeFileMetrics } from './guardianRisk.js';

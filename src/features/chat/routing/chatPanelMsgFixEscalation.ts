@@ -5,7 +5,7 @@
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
 import { fixActStep, fixActCode } from './fixActivityPanel.js';
-import { progressEscalating, progressRetrying } from '../../../services/ui/fixProgressStyle.js';
+import { progressEscalating, progressRetrying } from '../ui/fixProgressStyle.js';
 import {
   updateStatus, enrichDepsWithCritiques, renderGuardianVerdict,
   represcribeAfterRejection, logExhaustedDeadEnd, isTruncationText,

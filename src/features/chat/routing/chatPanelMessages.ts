@@ -3,8 +3,8 @@
 
 import type * as vscode from 'vscode';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import { resolveBuildConfirm, resolvePlacement } from '../../../shared/ai/domain/chatPanelResolvers.js';
 import { resolveVaultHit } from '../build/chatPanelBuild.js';

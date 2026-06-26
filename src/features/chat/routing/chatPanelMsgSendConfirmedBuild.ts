@@ -16,7 +16,7 @@ export async function runConfirmedLocalBuild(
   conversation: ChatMessage[],
   refresh: () => void,
 ): Promise<void> {
-  const { getAccountToken } = await import('../../../services/api/apiClient.js');
+  const { getAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js');
   const token = await getAccountToken();
   if (!token) {
     conversation.push({ role: 'assistant', content: '🔒 **Sign in to use Redivivus**\n\nRun **Redivivus: Sign In** from the command palette.', timestamp: Date.now() });
@@ -28,7 +28,7 @@ export async function runConfirmedLocalBuild(
   // Step 1: Extract blueprint from the task using Redivivus AI
   let extracted: any = { suggestedName: '', who: '', what: '', where: '', when: '', why: '' };
   try {
-    const { extractBlueprintFromPrompt } = await import('../../../services/blueprint/blueprintExtractor.js');
+    const { extractBlueprintFromPrompt } = await import('../../project/infrastructure/blueprint/blueprintExtractor.js');
     extracted = await extractBlueprintFromPrompt(task, deps.routing);
   } catch {
     // [WARN] AI extraction failed — use heuristic fallback
@@ -75,7 +75,7 @@ export async function runConfirmedLocalBuild(
   // Step 3: Build with full Redivivus context (supervisor->worker->guardian)
   const { readProjectDeadEnds } = await import('./chatPanelMsgFixDeadEnds.js');
   const { readProjectRules, getRecentBuildsContext } = await import('./chatPanelMsgFixUtils.js');
-  const { buildGitContextBlock } = await import('../../../services/workspace/gitContext.js');
+  const { buildGitContextBlock } = await import('../../workspace/infrastructure/gitContext.js');
   const deadEnds = readProjectDeadEnds(root);
   const projectRules = readProjectRules(root);
   const gitCtx = buildGitContextBlock(root);

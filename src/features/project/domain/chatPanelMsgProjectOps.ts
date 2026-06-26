@@ -7,7 +7,7 @@ import * as os from 'os';
 import * as path from 'path';
 import type { ChatMessage } from '../../chat/ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from '../../chat/routing/chatPanelMessages.js';
-import { debugLog } from '../../../services/workspace/diagnosticLogger.js';
+import { debugLog } from '../../workspace/infrastructure/diagnosticLogger.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { logProjectContextSwitch } from '../../../shared/logging/infrastructure/projectContextLogger.js';
 import { BuildHistoryService } from '../../chat/build/services/buildHistoryService.js';

@@ -1,11 +1,11 @@
 // [SCOPE] Redivivus Misc commands — core status, guides, AI switching, rules
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../services/redivivusService.js';
-import type { SessionService } from '../../services/sessionService.js';
-import type { GuideService } from '../../services/guideService.js';
-import type { RulesService } from '../../services/rulesService.js';
-import type { RedivivusWebviewProvider } from '../../ui/views/redivivusWebviewProvider.js';
+import type { RedivivusService } from './application/redivivusService.js';
+import type { SessionService } from '../../features/project/application/sessionService.js';
+import type { GuideService } from './application/guideService.js';
+import type { RulesService } from './domain/rules/rulesService.js';
+import type { RedivivusWebviewProvider } from './ui/redivivusWebviewProvider.js';
 import { ChatPanel } from '../../features/chat/ui/chatPanel.js';
 import { registerConfigureEditorRules } from '../../features/settings/application/configureEditorRules.js';
 

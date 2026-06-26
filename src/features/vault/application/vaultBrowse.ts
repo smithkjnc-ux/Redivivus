@@ -3,7 +3,7 @@
 
 import * as vscode from 'vscode';
 import type { VaultService } from '../infrastructure/vaultService.js';
-import { renderVaultBrowser } from '../../../ui/views/vaultBrowserRenderer.js';
+import { renderVaultBrowser } from '../ui/vaultBrowserRenderer.js';
 
 let _vaultPanel: vscode.WebviewPanel | undefined;
 

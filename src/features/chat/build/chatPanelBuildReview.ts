@@ -2,7 +2,7 @@
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import type { BuildContext } from './chatPanelBuild.js';
-import { LearnedMemoryService } from '../../../services/learnedMemoryService.js';
+import { LearnedMemoryService } from '../application/learnedMemoryService.js';
 
 export interface GuardianReviewResult {
   code: string;
@@ -25,7 +25,7 @@ export async function runGuardianReview(ctx: BuildContext, code: string, relPath
     if (result.finalIssues.length > 0) {
       const learned = new LearnedMemoryService(root);
       const ext = relPath.split('.').pop() || 'code';
-      const { logGotcha } = await import('../../../services/api/apiClientTelemetry.js');
+      const { logGotcha } = await import('../../../shared/api/infrastructure/apiClientTelemetry.js');
       result.finalIssues.forEach(issue => {
         learned.addNeverDo(issue, ext);
         logGotcha({ pattern: issue.slice(0, 200), issueText: issue, buildContext: ext, taskSummary: task.slice(0, 200) });
@@ -139,7 +139,7 @@ export async function runStaticCompilationGateForFix(workerResponse: string, roo
 
 export async function runStaticValidation(code: string, relPath: string): Promise<string> {
   try {
-    const { validateCode } = await import('../../../services/code/codeValidator.js');
+    const { validateCode } = await import('../../workspace/domain/code/codeValidator.js');
     const res = validateCode(code, relPath.split('.').pop() || '');
     if (res.autoFixed) {return res.code;}
   } catch {}

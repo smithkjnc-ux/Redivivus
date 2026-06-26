@@ -7,7 +7,7 @@ import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { buildAIPrefix, processAIResponse, getPreviewSnapshot } from '../../../shared/ai/domain/chatPanelAI.js';
 import { clearPendingScopeQuestion } from '../../project/application/templateScopeService.js';
-import { LearnedMemoryService } from '../../../services/learnedMemoryService.js';
+import { LearnedMemoryService } from '../application/learnedMemoryService.js';
 import { _architectReviews } from '../ui/chatPanelMsgArchitect.js';
 import { shouldAutoSave, extractAutoSaveTarget, autoSaveAndOpen, shouldDeleteFiles, deleteRequestedFiles, identifyFilesToDelete } from '../build/chatPanelAutoSave.js';
 import { runChunkedConvert } from './chatPanelMsgSendAIConvert.js';

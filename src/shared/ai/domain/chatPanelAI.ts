@@ -4,8 +4,8 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import type { RedivivusService } from '../../../services/redivivusService.js';
-import { LearnedMemoryService } from '../../../services/learnedMemoryService.js';
+import type { RedivivusService } from '../../vscode/application/redivivusService.js';
+import { LearnedMemoryService } from '../../../features/chat/application/learnedMemoryService.js';
 import { getSystemPrompt } from './chatPanelAIPrompt.js';
 import { buildProjectAnnotationContext } from '../../../features/project/domain/chatPanelProjectContext.js';
 import { Redivivus_WORKER_RULES } from '../infrastructure/redivivusWorkerRules.js';

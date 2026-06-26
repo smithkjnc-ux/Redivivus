@@ -7,7 +7,7 @@ import { appendMsg, updateLastMsg } from './chatPanelChunked.js';
 import { extractAllNarrators, encodeStoryToken } from './buildOutput.js';
 import { Redivivus_WORKER_RULES } from '../../../shared/ai/infrastructure/redivivusWorkerRules.js';
 import { generateFileCode } from './chatPanelChunkedBuildFile.js';
-import { extractContractFromCode, mergeContract, buildContractBlock, detectContractViolations, emptyContract } from '../../../services/blueprint/blueprintContract.js';
+import { extractContractFromCode, mergeContract, buildContractBlock, detectContractViolations, emptyContract } from '../../project/infrastructure/blueprint/blueprintContract.js';
 import { formatVaultContext } from '../../vault/infrastructure/vaultContextService.js';
 
 export interface FileBuildLoopContext {

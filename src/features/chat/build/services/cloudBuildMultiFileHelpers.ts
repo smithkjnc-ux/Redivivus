@@ -3,7 +3,7 @@
 
 import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
-import { calcCost } from '../../../../services/usageTracker.js';
+import { calcCost } from '../../../telemetry/infrastructure/usageTracker.js';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
 
 export type SingleFileResult = {
@@ -37,7 +37,7 @@ export async function buildSingleFileViaBuildEndpoint(
     body,
   });
   if (res.status === 401) {
-    const { clearAccountToken } = await import('../../../../services/api/apiClient.js');
+    const { clearAccountToken } = await import('../../../../shared/api/infrastructure/apiClient.js');
     await clearAccountToken();
     throw Object.assign(new Error('NOT_AUTHENTICATED'), { _authError: true });
   }

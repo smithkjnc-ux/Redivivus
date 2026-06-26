@@ -800,7 +800,7 @@
   },
   "scripts": {
     "vscode:prepublish": "tsc -p ./ && node scripts/postcompile-deploy.js",
-    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && mkdir -p out/ui/panels/pwa/vendor && cp src/ui/panels/pwa/vendor/qrcode.js out/ui/panels/pwa/vendor/qrcode.js && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
+    "compile": "tsc -p ./ && mkdir -p out/data && cp src/data/commands.json out/data/commands.json && mkdir -p out/features/pwa/ui/vendor && cp src/features/pwa/ui/vendor/qrcode.js out/features/pwa/ui/vendor/qrcode.js && node scripts/postcompile-deploy.js && node scripts/postcompile.js",
     "package": "npm run compile && vsce package --no-dependencies",
     "test:sanity": "npm run compile && node scripts/test-webview-sanity.js",
     "watch": "tsc -watch -p ./",

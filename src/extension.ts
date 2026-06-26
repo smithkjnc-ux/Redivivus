@@ -1,8 +1,8 @@
 // [SCOPE] Redivivus entry point — thin orchestrator
 
 import * as vscode from 'vscode';
-import { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
-import { ProjectFilesProvider } from './ui/sidebar/projectFilesProvider.js';
+import { RedivivusSidebarProvider } from './shared/vscode/ui/sidebar/redivivusSidebar.js';
+import { ProjectFilesProvider } from './shared/vscode/ui/sidebar/projectFilesProvider.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { runDiagnostic } from './features/workspace/domain/selfDiagnostic.js';
 import { initExtensionServices } from './extensionServices.js';
@@ -11,8 +11,8 @@ import { registerPanelSerializer, scheduleAutoOpenPanel } from './extensionPanel
 
 import { runAutoInit, registerOnNewProject } from './features/project/application/init.js';
 import { registerAllCommands } from './extensionCommands.js';
-import { initApiClient } from './services/api/apiClient.js';
-import { logSessionStart } from './services/api/apiClientTelemetry.js';
+import { initApiClient } from './shared/api/infrastructure/apiClient.js';
+import { logSessionStart } from './shared/api/infrastructure/apiClientTelemetry.js';
 import { initSecretKeyStore, onSecretKeyStoreReady } from './shared/ai/infrastructure/secretKeyStore.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './shared/logging/infrastructure/redivivusLogger.js';
@@ -110,7 +110,7 @@ export function activate(context: vscode.ExtensionContext) {
   const nudgeKey = 'redivivus.signInNudged.v1';
   setTimeout(async () => {
     try {
-      const { getAccountToken } = await import('./services/api/apiClient.js');
+      const { getAccountToken } = await import('./shared/api/infrastructure/apiClient.js');
       const token = await getAccountToken();
       if (!token && !context.globalState.get(nudgeKey)) {
         context.globalState.update(nudgeKey, true);
@@ -141,7 +141,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── Add to Phone (installable PWA) ──
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.addToPhone', async () => {
-    const { handleAddToPhone } = await import('./core/commands/addToPhoneCommand.js');
+    const { handleAddToPhone } = await import('./features/pwa/application/addToPhoneCommand.js');
     await handleAddToPhone();
   }));
 
@@ -185,7 +185,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── pipeline trace viewer ──
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.showPipelineTrace', async () => {
-    const { tracer } = await import('./services/pipelineTracer.js');
+    const { tracer } = await import('./features/project/application/pipelineTracer.js');
     tracer.show();
   }));
 

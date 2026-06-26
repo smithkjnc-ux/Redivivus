@@ -6,7 +6,7 @@ import * as path from 'path';
 import { TOK_OPEN_WORKSPACE, TOK_OPEN_WORKSPACE_END, TOK_PREVIEW_BROWSER, TOK_PREVIEW_BROWSER_END, TOK_RUN_PROJECT, TOK_RUN_PROJECT_END, DELIM } from '../ui/chatPanelTokens.js';
 import type { BuildRequestDeps } from '../../../shared/ai/domain/chatPanelIntent.js';
 import type { CloudBuildResult } from './services/cloudBuildTypes.js';
-import { getCommunityGotchas } from '../../../services/api/apiClientKnowledge.js';
+import { getCommunityGotchas } from '../../../shared/api/infrastructure/apiClientKnowledge.js';
 import { buildBreakdownToken, cleanBuildNarration } from './chatPanelBuildBreakdown.js';
 
 /** Refuse to build on a protected project (Redivivus's own source). Returns true if blocked. */
@@ -53,7 +53,7 @@ The Worker has no context beyond your instructions. Ambiguity becomes missing co
 
 /** Assemble the full build prompt with learned memory (never-do rules) and community gotchas. */
 export async function assembleBuildTask(task: string, root: string): Promise<string> {
-  return import('../../../services/learnedMemoryService.js')
+  return import('../application/learnedMemoryService.js')
     .then(({ LearnedMemoryService }) => {
       const nd = new LearnedMemoryService(root).getNeverDoForPrompt();
       const cg = getCommunityGotchas();

@@ -1,8 +1,8 @@
 // [SCOPE] Redivivus Session commands — start/end workflow with exit interview
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../services/redivivusService.js';
-import type { SessionService } from '../../../services/sessionService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { SessionService } from './sessionService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { buildEvents } from '../../chat/build/services/buildEvents.js';
 
@@ -54,7 +54,7 @@ export function registerSessionCommands(
   buildEvents.on('build:finished', async (task: string, files: string[], buildRoot?: string) => {
     const root = buildRoot || redivivus.getWorkspaceRoot();
     if (!root) { return; }
-    const { SavePointService } = await import('../../../services/savePointService.js');
+    const { SavePointService } = await import('./savePointService.js');
     const svc = new SavePointService(root);
     const description = `Redivivus build: ${task.slice(0, 60)} (${files.length} file${files.length !== 1 ? 's' : ''})`;
     try {
@@ -67,7 +67,7 @@ export function registerSessionCommands(
     try {
       const cfg = redivivus.loadConfig();
       if (cfg && !cfg.lastScan) {
-        const { scanDirectory, buildAnalysis } = await import('../../../ui/panels/analyzer/analyzerScanner.js');
+        const { scanDirectory, buildAnalysis } = await import('../../workspace/ui/analyzer/analyzerScanner.js');
         const scanFiles: any[] = [];
         scanDirectory(root, root, scanFiles);
         const result = buildAnalysis(scanFiles);

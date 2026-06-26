@@ -6,8 +6,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import type { BuildRequestDeps } from '../../../shared/ai/domain/chatPanelIntent.js';
-import type { ExtractedBlueprint } from '../../../services/blueprint/blueprintExtractor.js';
-import { extractBlueprintFromPrompt } from '../../../services/blueprint/blueprintExtractor.js';
+import type { ExtractedBlueprint } from '../../project/infrastructure/blueprint/blueprintExtractor.js';
+import { extractBlueprintFromPrompt } from '../../project/infrastructure/blueprint/blueprintExtractor.js';
 import { deriveFileBase } from './chatPanelBuildInference.js';
 import { scaffoldAt } from '../../project/application/redivivusInit.js';
 

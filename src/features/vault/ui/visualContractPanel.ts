@@ -3,9 +3,9 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { getVisualContractHtml } from './visualContractPanelHtml.js';
-import { extractVisualContract } from '../../../services/visualContract/propertyExtractor.js';
-import { applyBatchPatches, applyPropertyPatch } from '../../../services/visualContract/visualContractPatcher.js';
-import type { VisualContract, VisualProperty } from '../../../services/visualContract/visualContractTypes.js';
+import { extractVisualContract } from '../domain/propertyExtractor.js';
+import { applyBatchPatches, applyPropertyPatch } from '../domain/visualContractPatcher.js';
+import type { VisualContract, VisualProperty } from '../domain/visualContractTypes.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { postToChatWebview } from '../../chat/ui/chatPanelPublicAPI.js';
 

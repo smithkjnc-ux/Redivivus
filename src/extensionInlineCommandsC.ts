@@ -2,12 +2,12 @@
 // Extracted from extensionInlineCommandsB.ts to keep it under 200 lines.
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from './services/redivivusService.js';
+import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
 import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './services/usageTracker.js';
+import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from './features/vault/infrastructure/vaultService.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
-import { registerTerminalErrorService, getLastTerminalError } from './services/workspace/terminalErrorService.js';
+import { registerTerminalErrorService, getLastTerminalError } from './features/workspace/infrastructure/terminalErrorService.js';
 import { detectPostBuildInfo } from './features/chat/build/chatPanelPostBuild.js';
 import { BuildHistoryService } from './features/chat/build/services/buildHistoryService.js';
 export function registerInlineCommandsC(
@@ -38,7 +38,7 @@ export function registerInlineCommandsC(
     vscode.commands.registerCommand('redivivus.inspectElement', async () => {
       const input = await vscode.window.showInputBox({ prompt: 'Describe the UI element (class name, id, or description)', placeHolder: 'e.g., .submit-button, #navbar, the login form' });
       if (!input) { return; }
-      const { LensService } = await import('./services/lensService.js');
+      const { LensService } = await import('./features/workspace/application/lensService.js');
       const lens = new LensService(null as any, null as any);
       await lens.inspectAndInject({ description: input, className: input.startsWith('.') ? input.slice(1) : undefined, id: input.startsWith('#') ? input.slice(1) : undefined });
     })

@@ -2,29 +2,29 @@
 // Extracted from extension.ts
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from './services/redivivusService.js';
+import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
 import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './services/usageTracker.js';
+import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from './features/vault/infrastructure/vaultService.js';
 import type { MeasureTwiceService } from './features/chat/build/services/measureTwiceService.js';
 import type { ChangeTracker } from './features/chat/build/services/changeTracker.js';
-import type { AnalyzerService } from './ui/panels/analyzer/analyzerService.js';
-import type { RulesService } from './services/rulesService.js';
-import type { RetrofitService } from './core/retrofit/retrofitService.js';
-import type { SessionService } from './services/sessionService.js';
-import type { GuideService } from './services/guideService.js';
-import type { BlueprintService } from './services/blueprint/blueprintService.js';
-import type { StatusBar } from './ui/views/statusBar.js';
+import type { AnalyzerService } from './features/workspace/ui/analyzer/analyzerService.js';
+import type { RulesService } from './shared/vscode/domain/rules/rulesService.js';
+import type { RetrofitService } from './features/project/domain/retrofit/retrofitService.js';
+import type { SessionService } from './features/project/application/sessionService.js';
+import type { GuideService } from './shared/vscode/application/guideService.js';
+import type { BlueprintService } from './features/project/infrastructure/blueprint/blueprintService.js';
+import type { StatusBar } from './shared/vscode/ui/statusBar.js';
 import type { GuardianService } from './shared/ai/infrastructure/guardianService.js';
 import type { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
-import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
+import { openBlueprintPanel } from './features/project/ui/blueprint/blueprintInterviewPanel.js';
 import { registerVaultDedupCommand } from './features/vault/application/vaultDedup.js';
 import { registerCloseProjectCommand } from './features/project/application/closeProject.js';
 import { registerCompileProjectCommand } from './features/project/application/compileProject.js';
-import type { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
+import type { RedivivusSidebarProvider } from './shared/vscode/ui/sidebar/redivivusSidebar.js';
 import { registerOnNewProject } from './features/project/application/init.js';
 import { registerInitCommands } from './features/project/application/initCommands.js';
-import { DelegationCodeLensProvider } from './services/delegationCodeLens.js';
+import { DelegationCodeLensProvider } from './features/workspace/application/delegationCodeLens.js';
 import { registerSessionCommands } from './features/project/application/session.js';
 import { registerBlueprintCommands } from './features/project/application/blueprint.js';
 import { registerAnalysisCommands } from './features/workspace/application/analysis.js';
@@ -36,7 +36,7 @@ import { registerVaultBrowseCommand } from './features/vault/application/vaultBr
 import { registerVaultTranslateCommand } from './features/vault/application/vaultTranslate.js';
 import { registerBuildFromVaultCommand } from './features/vault/application/buildFromVault.js';
 import { registerMiscCommands } from './shared/vscode/misc.js';
-import { registerAuthHandler } from './services/api/authHandler.js';
+import { registerAuthHandler } from './shared/api/infrastructure/authHandler.js';
 import { registerApiSetupCommand } from './features/onboarding/application/apiSetup.js';
 import { registerUsageCommands } from './features/telemetry/application/usageCommands.js';
 import { registerSetupProgressCommand } from './features/onboarding/application/setupProgressCommand.js';
@@ -129,7 +129,7 @@ export function registerAllCommands(
   // Build Activity panel — reopen on demand (Command Palette / button). Reveals a running build's panel,
   // or replays the LAST build's timeline if the tab was closed. Lets the user review the pipeline anytime.
   context.subscriptions.push(vscode.commands.registerCommand('redivivus.showBuildActivity', async () => {
-    const { BuildActivityPanel } = await import('./ui/panels/buildActivity/buildActivityPanel.js');
+    const { BuildActivityPanel } = await import('./features/chat/ui/buildActivity/buildActivityPanel.js');
     BuildActivityPanel.reveal();
   }));
 

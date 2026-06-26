@@ -5,7 +5,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Blueprint } from '../../../types/index.js';
 import { RedivivusPaths } from './redivivusPaths.js';
-import { generateRules } from '../../../services/redivivusRules.js';
+import { generateRules } from '../../../shared/vscode/domain/rules/redivivusRules.js';
 
 export async function initProject(paths: RedivivusPaths, projectName: string): Promise<void> {
   const root = paths.getWorkspaceRoot();

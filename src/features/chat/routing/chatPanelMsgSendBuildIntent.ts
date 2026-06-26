@@ -6,9 +6,9 @@ import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { handleFixRequest } from './chatPanelMsgFix.js';
 import { runTemplateWizard } from '../../project/application/templateWizard.js';
-import { detectBlueprintGaps, buildGapPromptMessage } from '../../../services/blueprint/blueprintGapDetector.js';
+import { detectBlueprintGaps, buildGapPromptMessage } from '../../project/infrastructure/blueprint/blueprintGapDetector.js';
 import { _pendingGuidedBuilds } from './chatPanelMsgSpecial.js';
-import { inferBlueprintFields, buildBlueprintCardToken } from '../../../services/blueprint/blueprintInference.js';
+import { inferBlueprintFields, buildBlueprintCardToken } from '../../project/infrastructure/blueprint/blueprintInference.js';
 import { _pendingBlueprintCards } from './chatPanelMsgBlueprintCard.js';
 
 function isProjectsContainer(root: string): boolean {

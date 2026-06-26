@@ -2,10 +2,10 @@
 // Extracted from chatPanelBuild.ts. Keep under 200 lines.
 
 import type { BuildContext } from './chatPanelBuild.js';
-import { tracer } from '../../../services/pipelineTracer.js';
+import { tracer } from '../../project/application/pipelineTracer.js';
 import { Redivivus_WORKER_RULES } from '../../../shared/ai/infrastructure/redivivusWorkerRules.js';
 import { streamProvider } from '../../../shared/ai/infrastructure/streamingProviders.js';
-import { scanProjectExports, formatExportsForPrompt } from '../../../services/code/projectExportScanner.js';
+import { scanProjectExports, formatExportsForPrompt } from '../../workspace/domain/code/projectExportScanner.js';
 
 // AI display names for user messages
 const AI_LABELS: Record<string, string> = {

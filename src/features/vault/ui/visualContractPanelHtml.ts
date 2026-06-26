@@ -1,6 +1,6 @@
 // [SCOPE] Visual Contract Editor — webview HTML + embedded client JS
 
-import type { VisualContract } from '../../../services/visualContract/visualContractTypes.js';
+import type { VisualContract } from '../domain/visualContractTypes.js';
 
 export function getVisualContractHtml(nonce: string, initialContract?: VisualContract): string {
   const contractJson = initialContract ? JSON.stringify(initialContract).replace(/</g, '\\u003c') : 'null';

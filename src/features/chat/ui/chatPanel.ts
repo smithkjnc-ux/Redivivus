@@ -4,13 +4,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from '../../vault/infrastructure/vaultService.js';
 import type { ChatMessage } from './chatPanelHtml.js';
 import { buildChatHtml } from './chatPanelHtml.js';
-import { handleInterviewMessage } from '../../../ui/views/blueprintInterviewPanel.js';
+import { handleInterviewMessage } from '../../project/ui/blueprint/blueprintInterviewPanel.js';
 import type { BuildContext } from '../build/chatPanelBuild.js';
 import { classifyIntent, isBuildRequest, handleBuildRequest, handleEditRequest, BuildRequestDeps } from '../../../shared/ai/domain/chatPanelIntent.js';
 import { handleChatMessage } from '../routing/chatPanelMessages.js';

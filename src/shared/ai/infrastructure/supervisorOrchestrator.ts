@@ -4,7 +4,7 @@
 
 import { AI_CAPABILITIES } from './guardianAI.js';
 import type { AIResponse } from './routingTypes.js';
-import { getWorkerRules } from '../../../services/api/apiClientKnowledge.js';
+import { getWorkerRules } from '../../api/infrastructure/apiClientKnowledge.js';
 import { log } from '../../logging/infrastructure/redivivusLogger.js';
 import { buildCapabilityProfiles, buildPlanPrompt, parsePlan } from './supervisorPlanner.js';
 

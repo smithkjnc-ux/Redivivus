@@ -9,7 +9,7 @@ import type { AgentContext } from './agentTools.js';
 // to reality instead of inventing a conventional layout (src/routes/, controllers/, etc.).
 export async function realFilesHint(root: string): Promise<string> {
   try {
-    const { listSourceFiles } = await import('../../../services/workspace/codebaseSearch.js');
+    const { listSourceFiles } = await import('../../../features/workspace/infrastructure/codebaseSearch.js');
     const files = listSourceFiles(root, false, 30).map((f: any) => f.rel);
     if (files.length) {
       return ` This project's ACTUAL files are: ${files.join(', ')}. Do NOT assume a conventional layout — there is no routes/, controllers/, or utils/ here unless listed above. Read REAL paths only (list_dir / read_file).`;

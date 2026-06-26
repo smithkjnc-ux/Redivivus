@@ -2,9 +2,9 @@
 // Handles: pendingBuildTask, pendingVaultBuild, pendingNewProjectMode.
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from './services/redivivusService.js';
+import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
 import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './services/usageTracker.js';
+import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from './features/vault/infrastructure/vaultService.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
 

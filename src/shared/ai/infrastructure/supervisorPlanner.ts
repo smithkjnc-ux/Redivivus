@@ -5,7 +5,7 @@
 
 import { AI_CAPABILITIES } from './guardianAI.js';
 import { modelsForProvider } from './modelRegistry.js';
-import { getWorkerRules } from '../../../services/api/apiClientKnowledge.js';
+import { getWorkerRules } from '../../api/infrastructure/apiClientKnowledge.js';
 import { log } from '../../logging/infrastructure/redivivusLogger.js';
 import { isProviderConstrained, FREE_TIER_MODEL } from './providerTierState.js';
 import type { PlanStep } from './supervisorOrchestrator.js';

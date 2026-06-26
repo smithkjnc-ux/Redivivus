@@ -24,7 +24,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
   deps.manualModel = (msg.manualModel as string) || undefined;
 
   // ── Auth gate ──
-  const { getAccountToken } = await import('../../../services/api/apiClient.js');
+  const { getAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js');
   if (!(await getAccountToken())) {
     conversation.push({
       role: 'assistant',

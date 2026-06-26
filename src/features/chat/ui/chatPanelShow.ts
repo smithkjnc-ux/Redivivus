@@ -5,9 +5,9 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ChatPanel } from './chatPanel.js';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from '../../vault/infrastructure/vaultService.js';
 
 /** After reload, VS Code may restore the chat panel in a split group alongside other webviews.
@@ -90,7 +90,7 @@ export function doShowChatPanel(
   (ChatPanel as any)._instance = instance;
 
   // Fetch unread announcements
-  import('../../../services/api/apiClient.js').then(async ({ fetchAnnouncements }) => {
+  import('../../../shared/api/infrastructure/apiClient.js').then(async ({ fetchAnnouncements }) => {
     const announcements = await fetchAnnouncements();
     if (announcements.length > 0 && ctx) {
       const seen = ctx.globalState.get<string[]>('redivivus.seenAnnouncements', []);

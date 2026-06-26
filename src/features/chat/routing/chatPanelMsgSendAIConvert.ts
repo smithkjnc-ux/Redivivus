@@ -2,7 +2,7 @@
 // Returns null when source is small enough for a single API call (falls through to routing.prompt).
 
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import { findSourceFiles } from '../../../shared/ai/domain/chatPanelAI.js';
 import { splitSourceIntoSections, chunkedGenerate } from '../build/chatPanelChunkedGen.js';

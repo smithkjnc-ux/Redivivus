@@ -8,7 +8,7 @@ import { VAULT_CATEGORIES, VaultCategory, VaultItem } from './vaultTypes.js';
 import { extractFromFile, computeContentHash } from './vaultExtractor.js';
 import { aiCategorize as _aiCategorize, scanCodebase as _scanCodebase } from './vaultScanner.js';
 import { VaultStorage } from './vaultStorage.js';
-import { redivivusFormat } from '../../../services/code/redivivusFormatter.js';
+import { redivivusFormat } from '../../workspace/domain/code/redivivusFormatter.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
 
 export { VAULT_CATEGORIES, VaultCategory, VaultItem };

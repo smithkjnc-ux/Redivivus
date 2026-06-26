@@ -2,9 +2,9 @@
 // Extracted from chatPanelIntent.ts
 
 import type { RoutingService } from '../infrastructure/routingService.js';
-import { tracer } from '../../../services/pipelineTracer.js';
+import { tracer } from '../../../features/project/application/pipelineTracer.js';
 import { fallbackClassify } from './chatPanelClassifierOverrides.js';
-import { cloudClassify } from '../../../services/api/apiClient.js';
+import { cloudClassify } from '../../api/infrastructure/apiClient.js';
 
 export type IntentType = 'build' | 'convert' | 'command' | 'question' | 'offtopic' | 'run' | 'fix' | 'scaffold' | 'service';
 export type AvailableCommand =

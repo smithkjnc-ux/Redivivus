@@ -7,7 +7,7 @@
 import { callProvider } from '../domain/providers/providerFactory.js';
 import { AI_RANK } from './guardianAI.js';
 import { redivivusLog } from '../../logging/infrastructure/redivivusLogger.js';
-import { logTelemetry } from '../../../services/api/apiClientTelemetry.js';
+import { logTelemetry } from '../../api/infrastructure/apiClientTelemetry.js';
 import { logAICall } from './aiCallLogger.js';
 import type { RoutingService } from './routingService.js';
 import type { AIResponse } from './routingTypes.js';

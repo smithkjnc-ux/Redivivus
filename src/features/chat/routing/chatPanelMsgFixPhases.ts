@@ -8,7 +8,7 @@ import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { modelLabel } from './chatPanelMsgFixUtils.js';
 import { buildSupervisorNotes, buildWorkerRules } from './chatPanelMsgFixPatterns.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
-import { buildPromptInjection } from '../../../services/userMemoryService.js';
+import { buildPromptInjection } from '../application/userMemoryService.js';
 
 export async function runPhase1Supervisor(
   userText: string,

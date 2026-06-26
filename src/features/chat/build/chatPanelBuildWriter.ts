@@ -4,7 +4,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as vscode from 'vscode';
-import { SnapshotService } from '../../../services/snapshotService.js';
+import { SnapshotService } from '../../project/application/snapshotService.js';
 import { autoCaptureFile } from '../../vault/infrastructure/vaultAutoCapture.js';
 import type { BuildContext } from './chatPanelBuild.js';
 

@@ -3,7 +3,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { logProjectContextSwitch, validateProjectContext } from '../../../shared/logging/infrastructure/projectContextLogger.js';
 
@@ -33,7 +33,7 @@ export function registerOnNewProject(context: vscode.ExtensionContext): void {
     }
     
     if (!fs.existsSync(targetFolder)) { fs.mkdirSync(targetFolder, { recursive: true }); }
-    const { RedivivusService } = await import('../../../services/redivivusService.js');
+    const { RedivivusService } = await import('../../../shared/vscode/application/redivivusService.js');
     const redivivus = new RedivivusService(targetFolder);
     await redivivus.initProject(name);
     if (answers && Object.keys(answers).length > 0) {

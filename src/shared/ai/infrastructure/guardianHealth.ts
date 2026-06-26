@@ -1,7 +1,7 @@
 // [SCOPE] Guardian health score computation — computes real-time Blueprint Health Score for status bar display
 // Called by guardianService. No risk scanning or ELI5 logic here.
 
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../vscode/application/redivivusService.js';
 import type { HealthScore } from './guardianTypes.js';
 
 export function computeHealthScore(redivivusService: RedivivusService): HealthScore {

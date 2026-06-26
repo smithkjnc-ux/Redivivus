@@ -2,19 +2,19 @@
 // Extracted from extensionCommands.ts
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from './services/redivivusService.js';
+import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
 import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './services/usageTracker.js';
+import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from './features/vault/infrastructure/vaultService.js';
-import type { StatusBar } from './ui/views/statusBar.js';
+import type { StatusBar } from './shared/vscode/ui/statusBar.js';
 import type { GuardianService } from './shared/ai/infrastructure/guardianService.js';
-import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel.js';
-import { MapPanel } from './ui/map/mapPanel.js';
+import { RecommendationsPanel } from './features/workspace/ui/analyzer/analyzerPanel.js';
+import { MapPanel } from './features/map/ui/mapPanel.js';
 import type { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
 import { registerGitHubBackupCommands } from './features/workspace/application/githubBackup.js';
 import { registerSetupHubCommand } from './features/onboarding/application/setupHub.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
-import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
+import { openBlueprintPanel } from './features/project/ui/blueprint/blueprintInterviewPanel.js';
 import { seedVault } from './features/vault/infrastructure/vaultSeeder.js';
 import { registerProfileRuntimeCommand } from './features/runtime/application/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './features/runtime/application/startRuntimeAnalysis.js';

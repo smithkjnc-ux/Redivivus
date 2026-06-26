@@ -1,7 +1,7 @@
 // [SCOPE] Redivivus Chat Panel HTML builder — slim shell. Assembles webview HTML from extracted modules.
 // Split complete: renderer → chatPanelRenderer.ts, CSS → chatPanelStyles.ts, script → chatPanelScript.ts
 import type { SetupProgress } from '../../project/application/setupProgressService.js';
-import { getNonce } from '../../../ui/getNonce.js';
+import { getNonce } from '../../../shared/ui/getNonce.js';
 import { renderMessages, escapeHtml } from './chatPanelRenderer.js';
 import { buildChatCss } from './chatPanelStyles.js';
 import { buildChatScript } from './chatPanelScript.js';
@@ -33,7 +33,7 @@ export interface ChatHeaderInfo {
   sessionGoal?: string;
   currentTime: string;
   isInitialized: boolean;
-  usageReport?: import('../../../services/usageTracker').UsageReport;
+  usageReport?: import('../../telemetry/infrastructure/usageTracker').UsageReport;
   lastModel?: string;
   hasProjectOpen: boolean;
   workspaceHasRedivivus: boolean;

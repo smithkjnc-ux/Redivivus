@@ -5,7 +5,7 @@ import { resolvePendingClarify } from '../ui/chatPanelClarifyBridge.js';
 import * as vscode from 'vscode';
 import { ChatPanel } from '../ui/chatPanel.js';
 import { handleEditRequest } from '../../../shared/ai/domain/chatPanelIntent.js';
-import { handleInterviewMessage } from '../../../ui/views/blueprintInterviewPanel.js';
+import { handleInterviewMessage } from '../../project/ui/blueprint/blueprintInterviewPanel.js';
 import { handlePreviewMessages } from './chatPanelMessageRouterPreview.js';
 import { handleScaffoldQuickstart } from './chatPanelMessageRouterScaffold.js';
 import { handleBuildSimple, handleBuildTask, handleCreateFolder, handleNewProjectCancel, handleOpenWorkspaceBtn, handleSetMode, handleSwitchMode } from './chatPanelMessageRouterBuild.js';

@@ -5,7 +5,7 @@
 import type { ChatMessage } from '../../../features/chat/ui/chatPanelHtml.js';
 import type { RoutingService } from '../infrastructure/routingService.js';
 import type { VaultService } from '../../../features/vault/infrastructure/vaultService.js';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../vscode/application/redivivusService.js';
 import type { BuildContext } from '../../../features/chat/build/chatPanelBuild.js';
 
 export interface BuildRequestDeps {
@@ -21,6 +21,6 @@ export interface BuildRequestDeps {
   setActiveBuildCtx: (ctx: BuildContext | undefined) => void;
   pendingTask: string | undefined;
   setPendingTask: (t: string | undefined) => void;
-  usageTracker?: import('../../../services/usageTracker').UsageTracker;
+  usageTracker?: import('../../../features/telemetry/infrastructure/usageTracker').UsageTracker;
   buildMode?: 'plan' | 'direct';
 }

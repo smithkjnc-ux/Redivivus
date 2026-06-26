@@ -9,7 +9,7 @@ import { bestModelForRole } from './modelRegistry.js';
 import type { RoutingService } from './routingService.js';
 import { logAICall } from './aiCallLogger.js';
 import { detectProjectType, getFolderStructureTemplate } from './routingGuardianUtils.js';
-import { collectKeys } from '../../../services/api/apiClient.js';
+import { collectKeys } from '../../api/infrastructure/apiClient.js';
 
 export async function supervisorPlanImpl(
   svc: RoutingService,

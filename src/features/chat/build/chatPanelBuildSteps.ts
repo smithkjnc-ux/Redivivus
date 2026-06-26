@@ -17,8 +17,8 @@ import { autoCommitIfEnabled } from '../../workspace/infrastructure/gitAutoCommi
 import { writeProjectRoadmapEntry } from '../routing/chatPanelMsgFixUtils.js';
 import { runCompileAutoFix } from './services/compileAutoFix.js';
 import { runTestAutoFix } from './services/testAutoFix.js';
-import { LearnedMemoryService } from '../../../services/learnedMemoryService.js';
-import { recordBuild } from '../../../services/userMemoryService.js';
+import { LearnedMemoryService } from '../application/learnedMemoryService.js';
+import { recordBuild } from '../application/userMemoryService.js';
 
 export interface BuildTarget {
   relPath: string;

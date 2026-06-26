@@ -4,7 +4,7 @@
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
 import { fixActStep } from './fixActivityPanel.js';
-import { progressEscalating } from '../../../services/ui/fixProgressStyle.js';
+import { progressEscalating } from '../ui/fixProgressStyle.js';
 
 export async function runSupervisorSelfFix(params: {
   currentDiagnosis: string;

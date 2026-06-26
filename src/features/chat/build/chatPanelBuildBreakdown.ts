@@ -5,7 +5,7 @@
 // the Supervisor (e.g. Claude) was never shown even though it ran. Extracted from chatPanelBuildRunner.
 
 import type { CloudBuildResult } from './services/cloudBuildClient.js';
-import { calcCost } from '../../../services/usageTracker.js';
+import { calcCost } from '../../telemetry/infrastructure/usageTracker.js';
 import { consumeRoutingCost } from './services/buildRoutingCostTracker.js';
 
 // Field delimiter is '~' and row delimiter is '|||' — strip both from free text so a stray

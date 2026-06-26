@@ -4,7 +4,7 @@
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
 import { ProjectOperations } from '../../project/application/projectOperations.js';
-import { _scanRedivivusProjects } from '../../../ui/redivivusProjectScanner.js';
+import { _scanRedivivusProjects } from '../../workspace/infrastructure/redivivusProjectScanner.js';
 import { markProjectClosed } from '../../project/application/closeMarker.js';
 
 export async function handleKeywordShortcuts(

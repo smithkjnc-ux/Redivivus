@@ -5,7 +5,7 @@
 
 import type { AgentContext } from './agentTools.js';
 import { BUILT_IN_TOOLS } from './agentTools.js';
-import { getAllTools, callTool } from '../../../services/mcpService.js';
+import { getAllTools, callTool } from '../../api/mcp/mcpService.js';
 import { BuildLedger } from '../../../features/chat/build/services/buildLedgerService.js';
 import { extractAgentThought, narrateTool, friendlyModelName } from './agentNarrator.js';
 import { executionNudge, budgetNudge, ceilingMessage, proactiveTestNudge } from './agentCompletionGuard.js';

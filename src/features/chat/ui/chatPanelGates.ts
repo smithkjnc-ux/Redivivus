@@ -7,7 +7,7 @@ import { _pendingPlacements, _pendingBuildConfirms } from '../../../shared/ai/do
 import { estimateBuild } from '../../../shared/ai/domain/costEstimatorService.js';
 import { checkBuildPlacement } from '../build/services/buildPlacementCheck.js';
 import { autoCreateProject } from '../build/chatPanelBuildAutoCreate.js';
-import { tracer } from '../../../services/pipelineTracer.js';
+import { tracer } from '../../project/application/pipelineTracer.js';
 
 export async function awaitPlacementConfirmation(
   task: string,

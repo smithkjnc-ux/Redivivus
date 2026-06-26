@@ -10,8 +10,8 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { SnapshotService } from '../../../services/snapshotService.js';
-import { listSourceFiles } from '../../../services/workspace/codebaseSearch.js';
+import { SnapshotService } from '../../project/application/snapshotService.js';
+import { listSourceFiles } from '../../workspace/infrastructure/codebaseSearch.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
 
 /** Maps raw model ID strings to friendly display names for chat messages. */

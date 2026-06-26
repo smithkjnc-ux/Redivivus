@@ -10,10 +10,10 @@ import type { VaultSearchResult } from '../../vault/infrastructure/buildFromVaul
 import { isValidBuildRoot } from './chatPanelBuildUtils.js';
 import { autoCreateProject } from './chatPanelBuildAutoCreate.js';
 import { callCloudBuild } from './services/cloudBuildClient.js';
-import { getAccountToken } from '../../../services/api/apiClient.js';
-import { fetchCommunityGotchas } from '../../../services/api/apiClientKnowledge.js';
+import { getAccountToken } from '../../../shared/api/infrastructure/apiClient.js';
+import { fetchCommunityGotchas } from '../../../shared/api/infrastructure/apiClientKnowledge.js';
 import { appendBuildLog } from './services/buildLogger.js';
-import { BuildActivityPanel } from '../../../ui/panels/buildActivity/buildActivityPanel.js';
+import { BuildActivityPanel } from '../ui/buildActivity/buildActivityPanel.js';
 import { checkParadoxGuard, setupProjectFilesTree, assembleBuildTask, handleBuildSuccess } from './chatPanelBuildRunnerHelpers.js';
 
 function isProjectsContainer(root: string): boolean {
@@ -61,7 +61,7 @@ export async function runBuildAfterGates(
       
       // [FIX] Update the Redivivus service to point to the newly created project
       // so downstream systems (like the Living Blueprint distiller) save to the right config
-      const { RedivivusService } = await import('../../../services/redivivusService.js');
+      const { RedivivusService } = await import('../../../shared/vscode/application/redivivusService.js');
       deps.redivivus = new RedivivusService(root);
       
       autoCreated = true;

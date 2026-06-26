@@ -17,7 +17,7 @@ export async function handleUndoBuild(msg: any, deps: MessageHandlerDeps, conver
     refresh(); return;
   }
   try {
-    const { SnapshotService } = await import('../../../services/snapshotService.js');
+    const { SnapshotService } = await import('../application/snapshotService.js');
     const snap = new SnapshotService(root);
     const { restored, deleted, error } = snap.restore(snapshotId);
     if (error) {
@@ -38,7 +38,7 @@ export async function handleBuildFeedback(msg: any, deps: MessageHandlerDeps, co
   const root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (root && msg.rating === 'bad') {
     try {
-      const { LearnedMemoryService } = await import('../../../services/learnedMemoryService.js');
+      const { LearnedMemoryService } = await import('../../chat/application/learnedMemoryService.js');
       const learned = new LearnedMemoryService(root);
       const note = msg.note?.trim();
       if (note && note.length > 5) {

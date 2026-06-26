@@ -6,7 +6,7 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import type { ChatResult } from '../../../services/api/apiClientChat.js';
+import type { ChatResult } from '../../../shared/api/infrastructure/apiClientChat.js';
 import { handleKeywordShortcuts } from './chatPanelMsgSendKeywords.js';
 import { handleUrlRead, handleWebSearch, handleRememberIntent, handleReadResult } from './chatPanelMsgSendEarlyExits.js';
 import { checkBuildConfirmation, getWorkspaceFileList } from './chatPanelMsgSendConfirmCheck.js';
@@ -79,7 +79,7 @@ export async function runPreCloudRouting(
   }
 
   // ── Call cloudChat (AI intent classifier) ──
-  const { cloudChat } = await import('../../../services/api/apiClientChat.js');
+  const { cloudChat } = await import('../../../shared/api/infrastructure/apiClientChat.js');
   const _cfgBlueprint = deps.redivivus.isInitialized() ? (deps.redivivus.loadConfig?.() as any)?.blueprint : undefined;
   const hasProjectOpen = effectiveRoot
     ? require('fs').existsSync(require('path').join(effectiveRoot, '.redivivus', 'config.json'))

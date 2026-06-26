@@ -2,11 +2,11 @@
 // posts plain-English summary to the chat panel with [Start] / [Not Now] buttons.
 
 import * as vscode from 'vscode';
-import { runRuntimeProfiler, buildProfileSummary } from '../../../core/runtime/runtimeProfiler.js';
+import { runRuntimeProfiler, buildProfileSummary } from '../infrastructure/runtimeProfiler.js';
 
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from '../../../services/usageTracker.js';
+import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from '../../vault/infrastructure/vaultService.js';
 
 export function registerProfileRuntimeCommand(

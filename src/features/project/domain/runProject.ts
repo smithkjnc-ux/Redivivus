@@ -8,7 +8,7 @@ import * as vscode from 'vscode';
 import { openWebInBrowser } from './openWebInBrowser.js';
 import { BuildHistoryService } from '../../chat/build/services/buildHistoryService.js';
 import { detectPostBuildInfo, createHtmlWrapperIfNeeded } from '../../chat/build/chatPanelPostBuild.js';
-import { getLastTerminalError } from '../../../services/workspace/terminalErrorService.js';
+import { getLastTerminalError } from '../../workspace/infrastructure/terminalErrorService.js';
 
 export async function runProject(root: string): Promise<void> {
   const recentFiles = new BuildHistoryService(root).list().filter(e => !e.undone).slice(0, 1).flatMap(e => e.files);

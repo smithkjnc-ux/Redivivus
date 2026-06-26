@@ -8,7 +8,7 @@ import { appendProjectDeadEnd } from './chatPanelMsgFixDeadEnds.js';
 import { parseFixResponse, takeSnapshot, writeProjectRoadmapEntry } from './chatPanelMsgFixUtils.js';
 import { validateOutputFiles } from './chatPanelMsgFixPatterns.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../build/services/buildHistoryService.js';
-import { recordFix, learnFromFile } from '../../../services/userMemoryService.js';
+import { recordFix, learnFromFile } from '../application/userMemoryService.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
 
 function extractPlain(diagnosis: string): string {

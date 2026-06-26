@@ -1,7 +1,7 @@
 // [SCOPE] Application of code fixes (Surgical or Full-file fallback)
 
 import * as fs from 'fs';
-import { validateCode } from '../../../services/code/codeValidator.js';
+import { validateCode } from '../../workspace/domain/code/codeValidator.js';
 import * as path from 'path';
 import { parseFixResponse, takeSnapshot } from './chatPanelMsgFixUtils.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';

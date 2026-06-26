@@ -6,7 +6,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import { BuildHistoryService } from '../build/services/buildHistoryService.js';
-import { buildGitContextBlock } from '../../../services/workspace/gitContext.js';
+import { buildGitContextBlock } from '../../workspace/infrastructure/gitContext.js';
 
 const MAX_RULES_BYTES = 4_000;
 

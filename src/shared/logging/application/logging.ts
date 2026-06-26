@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../vscode/application/redivivusService.js';
 import { asChatPanel } from '../../../features/chat/ui/IChatPanel.js';
 
 export function registerLoggingCommands(

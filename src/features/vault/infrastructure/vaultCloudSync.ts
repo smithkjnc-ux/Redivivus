@@ -1,7 +1,7 @@
 // [SCOPE] Cloud vault sync — push local vault items to Supabase, pull community items
 // Additive: local vault still works as before. Cloud sync is optional background operation.
 
-import { getApiBase, getAccountToken } from '../../../services/api/apiClient.js';
+import { getApiBase, getAccountToken } from '../../../shared/api/infrastructure/apiClient.js';
 import type { VaultItem } from './vaultTypes.js';
 import type { VaultService } from './vaultService.js';
 
@@ -34,7 +34,7 @@ export async function syncVaultToCloud(vaultService: VaultService): Promise<{ sy
 
     if (!res.ok) {
       if (res.status === 401) {
-        const { clearAccountToken } = await import('../../../services/api/apiClient.js');
+        const { clearAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js');
         await clearAccountToken();
         const vscode = require('vscode');
         vscode.commands.executeCommand('redivivus.refreshChat');
@@ -77,7 +77,7 @@ export async function fetchCommunityVault(language?: string): Promise<{ items: C
 
     if (!res.ok) {
       if (res.status === 401) {
-        const { clearAccountToken } = await import('../../../services/api/apiClient.js');
+        const { clearAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js');
         await clearAccountToken();
         const vscode = require('vscode');
         vscode.commands.executeCommand('redivivus.refreshChat');
@@ -106,7 +106,7 @@ export async function fetchMyCloudVault(): Promise<{ items: CloudVaultItem[]; er
 
     if (!res.ok) {
       if (res.status === 401) {
-        const { clearAccountToken } = await import('../../../services/api/apiClient.js');
+        const { clearAccountToken } = await import('../../../shared/api/infrastructure/apiClient.js');
         await clearAccountToken();
         const vscode = require('vscode');
         vscode.commands.executeCommand('redivivus.refreshChat');

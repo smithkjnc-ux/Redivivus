@@ -5,11 +5,11 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import type { MessageHandlerDeps } from '../../chat/routing/chatPanelMessages.js';
-import { debugLog } from '../../../services/workspace/diagnosticLogger.js';
+import { debugLog } from '../../workspace/infrastructure/diagnosticLogger.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';
 import { BuildHistoryService } from '../../chat/build/services/buildHistoryService.js';
 import { detectPostBuildInfo, createHtmlWrapperIfNeeded } from '../../chat/build/chatPanelPostBuild.js';
-import { getLastTerminalError } from '../../../services/workspace/terminalErrorService.js';
+import { getLastTerminalError } from '../../workspace/infrastructure/terminalErrorService.js';
 import { getActiveProjectRoot } from '../application/activeProjectRoot.js';
 
 export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel: vscode.WebviewPanel): Promise<void> {

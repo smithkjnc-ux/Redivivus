@@ -1,7 +1,7 @@
 // [SCOPE] Redivivus Vault commands — save, scan, cleanup + panel helpers
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { VaultService } from '../infrastructure/vaultService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
 import { ChatPanel } from '../../chat/ui/chatPanel.js';

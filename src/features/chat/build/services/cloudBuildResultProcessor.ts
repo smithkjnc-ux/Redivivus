@@ -12,7 +12,7 @@ import type { BuildMeta } from './buildLogger.js';
 import { autoCaptureFiles } from '../../../vault/infrastructure/vaultAutoCapture.js';
 import { extractFilesFromRawText } from './cloudBuildFileNamer.js';
 import { writeBuildContractDocs } from './buildContractDocs.js';
-import { fireLivingBlueprintSeed } from '../../../../services/blueprint/livingBlueprintService.js';
+import { fireLivingBlueprintSeed } from '../../../project/infrastructure/blueprint/livingBlueprintService.js';
 
 export async function processBuildResults(
   data: any,
@@ -61,7 +61,7 @@ export async function processBuildResults(
     // [FIX] Run static validator before writing — catches AI-generated runtime bugs (const reassignment, bad transform reset, etc.)
     let content = file.content;
     try {
-      const { validateCode } = await import('../../../../services/code/codeValidator.js');
+      const { validateCode } = await import('../../../workspace/domain/code/codeValidator.js');
       const ext = path.extname(relPath).replace('.', '');
       const validation = validateCode(content, ext);
       if (validation.autoFixed) { content = validation.code; }
@@ -85,7 +85,7 @@ export async function processBuildResults(
 
   if (newRelPaths.length > 0) {
     try {
-      const { SnapshotService } = await import('../../../../services/snapshotService.js');
+      const { SnapshotService } = await import('../../../project/application/snapshotService.js');
       new SnapshotService(root).captureInitial(`First build: ${task.slice(0, 60)}`, newRelPaths);
     } catch {}
   }

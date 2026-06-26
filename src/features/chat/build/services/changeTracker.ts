@@ -1,7 +1,7 @@
 // [SCOPE] Change Tracker — auto-summarizes every modification Redivivus makes
 
 import * as fs from 'fs';
-import type { RedivivusService } from '../../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../../shared/vscode/application/redivivusService.js';
 
 interface ChangeSummary {
   file: string;

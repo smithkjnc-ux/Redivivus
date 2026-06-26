@@ -2,8 +2,8 @@
 // Commands: view usage report, reset session/day/week/month/all with lifetime preservation
 
 import * as vscode from 'vscode';
-import type { UsageTracker} from '../../../services/usageTracker.js';
-import { UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../../../services/usageTracker.js';
+import type { UsageTracker} from '../infrastructure/usageTracker.js';
+import { UsageReport, AIBreakdown, UsagePeriodWithBreakdown } from '../infrastructure/usageTracker.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
 import { showInChatPanel } from '../../chat/ui/chatPanelContent.js';
 import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';

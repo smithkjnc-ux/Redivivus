@@ -8,7 +8,7 @@ import type { RoutingService } from '../../../shared/ai/infrastructure/routingSe
 import { BuildPlan } from './buildFromVaultTypes.js';
 import type { VaultSearchResult } from './buildFromVaultSearch.js';
 import { findRelevantByTask } from './buildFromVaultSearch.js';
-import { BuildFromVaultModal } from '../../../ui/views/buildFromVaultModal.js';
+import { BuildFromVaultModal } from '../ui/buildFromVaultModal.js';
 import { handleBuildOutput } from './buildFromVaultOutput.js';
 
 export class BuildFromVaultService {

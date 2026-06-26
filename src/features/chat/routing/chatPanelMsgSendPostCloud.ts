@@ -7,14 +7,14 @@
 
 import * as vscode from 'vscode';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import type { ChatResult } from '../../../services/api/apiClientChat.js';
+import type { ChatResult } from '../../../shared/api/infrastructure/apiClientChat.js';
 import { handleFixRequest } from './chatPanelMsgFix.js';
 import { handleAIChat } from './chatPanelMsgSendAI.js';
 import { handleRunIntent, handleScaffoldIntent, handleServiceIntent } from './chatPanelMsgIntentActions.js';
 import { runChatClarifyStep } from './chatPanelMsgSendClarify.js';
 import { handleBuildIntent } from './chatPanelMsgSendBuildIntent.js';
 import { fixLog } from '../../../shared/logging/infrastructure/fixPipelineLogger.js';
-import { calcCost } from '../../../services/usageTracker.js';
+import { calcCost } from '../../telemetry/infrastructure/usageTracker.js';
 import { isProjectsContainer } from '../../project/application/redivivusPaths.js';
 import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
 import { handleChangeRequest } from './handleChangeRequest.js';

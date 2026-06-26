@@ -1,8 +1,8 @@
 // [SCOPE] Redivivus Sign In — opens browser auth, receives token via localhost callback
 import * as vscode from 'vscode';
 import * as http from 'http';
-import { setAccountToken, getAccountToken, clearAccountToken } from '../../../services/api/apiClient.js';
-import type { StatusBar } from '../../../ui/views/statusBar.js';
+import { setAccountToken, getAccountToken, clearAccountToken } from '../../../shared/api/infrastructure/apiClient.js';
+import type { StatusBar } from '../../../shared/vscode/ui/statusBar.js';
 
 function getFreePort(server: http.Server): Promise<number> {
   return new Promise((resolve, reject) => {

@@ -3,8 +3,8 @@
 // [WARN] All handler modules share the same state object — mutations must be coordinated.
 
 import type * as vscode from 'vscode';
-import type { RedivivusService } from '../../../services/redivivusService.js';
-import type { SessionService } from '../../../services/sessionService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
+import type { SessionService } from '../../project/application/sessionService.js';
 import type { VaultService } from '../../vault/infrastructure/vaultService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
 import type { GuardianService } from '../../../shared/ai/infrastructure/guardianService.js';

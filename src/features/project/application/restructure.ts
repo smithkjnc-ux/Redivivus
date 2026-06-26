@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import type { RedivivusService } from '../../../services/redivivusService.js';
+import type { RedivivusService } from '../../../shared/vscode/application/redivivusService.js';
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
 import type { MeasureTwiceService } from '../../chat/build/services/measureTwiceService.js';
 import type { ChangeTracker } from '../../chat/build/services/changeTracker.js';

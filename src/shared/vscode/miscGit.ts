@@ -1,8 +1,8 @@
 // [SCOPE] Redivivus Misc commands — git auto-commit
 
 import * as vscode from 'vscode';
-import type { RedivivusService } from '../../services/redivivusService.js';
-import { SessionService } from '../../services/sessionService.js';
+import type { RedivivusService } from './application/redivivusService.js';
+import { SessionService } from '../../features/project/application/sessionService.js';
 
 export function registerGitCommands(context: vscode.ExtensionContext, redivivus: RedivivusService): void {
   context.subscriptions.push(

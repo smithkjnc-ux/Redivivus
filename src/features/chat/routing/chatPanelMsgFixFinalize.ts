@@ -80,7 +80,7 @@ export async function runFixFinalize(params: {
   // [POST-FIX VERIFICATION] Re-run the command that originally failed to confirm the fix worked
   if (written.length > 0 && params.verificationCommand) {
     try {
-      const { runPostFixVerification } = await import('../../../services/workspace/postFixVerification.js');
+      const { runPostFixVerification } = await import('../../workspace/infrastructure/postFixVerification.js');
       const { fixActStep } = await import('./fixActivityPanel.js');
       fixActStep({ phase: 'verify', status: 'running', label: `Verifying: ${params.verificationCommand}` });
       const pfResult = await runPostFixVerification(params.verificationCommand, root);
@@ -113,7 +113,7 @@ export async function runFixFinalize(params: {
       const { verifyPreviewRuns } = await import('../ui/chatPanelPreviewVerify.js');
       const v = await verifyPreviewRuns(root);
       if (v.applicable) {
-        const { BuildActivityPanel } = await import('../../../ui/panels/buildActivity/buildActivityPanel.js');
+        const { BuildActivityPanel } = await import('../ui/buildActivity/buildActivityPanel.js');
         if (v.ok) {
           BuildActivityPanel.current?.step({ phase: 'guardian', status: 'pass', label: 'Ran the preview - it works' });
         } else {
@@ -145,8 +145,8 @@ export async function runFixFinalize(params: {
   if (written.length > 0) {
     (async () => {
       try {
-        const { distillFixRevision } = await import('../../../services/blueprint/livingBlueprintDistill.js');
-        const { appendRevision, nextRev, setMechanics } = await import('../../../services/blueprint/livingBlueprintService.js');
+        const { distillFixRevision } = await import('../../project/infrastructure/blueprint/livingBlueprintDistill.js');
+        const { appendRevision, nextRev, setMechanics } = await import('../../project/infrastructure/blueprint/livingBlueprintService.js');
         const d = await distillFixRevision(deps.routing, deps, userText, diagnosis);
         if (d) {
           appendRevision(root, { rev: nextRev(root), ts: new Date().toISOString(), kind: 'fix', request: userText.slice(0, 400), summary: d.summary, mechanics_delta: d.delta, files: written, by: workerLabel, snapshotId: fixSnapId });

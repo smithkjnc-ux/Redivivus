@@ -7,7 +7,7 @@ import { buildPostBuildGuidance } from './chatPanelPostBuild.js';
 import { generateDocs } from '../ui/chatPanelDocs.js';
 import { autoCaptureFiles } from '../../vault/infrastructure/vaultAutoCapture.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from './services/buildHistoryService.js';
-import { tracer } from '../../../services/pipelineTracer.js';
+import { tracer } from '../../project/application/pipelineTracer.js';
 import { writeProjectRoadmapEntry } from '../routing/chatPanelMsgFixUtils.js';
 import { autoCommitIfEnabled } from '../../workspace/infrastructure/gitAutoCommitService.js';
 import { refreshSetupProgressIfOpen } from '../../project/application/setupProgressPanel.js';

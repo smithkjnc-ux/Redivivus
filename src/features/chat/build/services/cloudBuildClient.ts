@@ -4,12 +4,12 @@
 // On error: surfaces a clean message — no local fallback (cloud is required for quality builds).
 
 import * as vscode from 'vscode';
-import { getAccountToken, getApiBase, collectKeyHeaders, getPreferred } from '../../../../services/api/apiClient.js';
+import { getAccountToken, getApiBase, collectKeyHeaders, getPreferred } from '../../../../shared/api/infrastructure/apiClient.js';
 import { collectBuildContext, budgetContext } from './buildContextCollector.js';
 import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
 import type { VaultService } from '../../../vault/infrastructure/vaultService.js';
 import { processBuildResults } from './cloudBuildResultProcessor.js';
-import { calcCost } from '../../../../services/usageTracker.js';
+import { calcCost } from '../../../telemetry/infrastructure/usageTracker.js';
 import { runBuildPlanStep, applySkeletonMeta, makeTimeout } from './cloudBuildPlan.js';
 import { drainBuildStream } from './cloudBuildStream.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
@@ -84,7 +84,7 @@ export async function callCloudBuild(
     ]);
 
     if (instructionRes.status === 401) {
-      const { clearAccountToken } = await import('../../../../services/api/apiClient.js');
+      const { clearAccountToken } = await import('../../../../shared/api/infrastructure/apiClient.js');
       await clearAccountToken();
       vscode.commands.executeCommand('redivivus.refreshChat');
       return { success: false, error: 'NOT_AUTHENTICATED' };

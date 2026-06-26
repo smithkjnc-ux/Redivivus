@@ -15,7 +15,7 @@ import { initFixLogger, fixLog, finalizeFixLogger } from '../../../shared/loggin
 import { fixActStart, fixActSupervisor } from './fixActivityPanel.js';
 import { fixSessionCostBefore, fixCostByline, fixErrorHint } from './chatPanelMsgFixUsage.js';
 import { runFixPhase23 } from './chatPanelMsgFixPhase23.js';
-import { progressScanning } from '../../../services/ui/fixProgressStyle.js';
+import { progressScanning } from '../ui/fixProgressStyle.js';
 
 // [DEAD] _fixErrorHint moved to chatPanelMsgFixUsage.ts as fixErrorHint (Rule 9 split)
 // [DEAD] Phase 2+3 loop moved to chatPanelMsgFixPhase23.ts (Rule 9 split)

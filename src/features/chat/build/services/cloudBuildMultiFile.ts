@@ -5,7 +5,7 @@
 // [WARN] processBuildResults MUST be called here — returning raw files without writing is a silent no-op.
 
 import * as path from 'path';
-import { getApiBase } from '../../../../services/api/apiClient.js';
+import { getApiBase } from '../../../../shared/api/infrastructure/apiClient.js';
 import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
 import { buildSingleFileViaBuildEndpoint, finalizeMultiFileBuild } from './cloudBuildMultiFileHelpers.js';

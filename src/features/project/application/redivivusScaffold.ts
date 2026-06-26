@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import type { Blueprint } from '../../../types/index.js';
 import { RedivivusPaths } from './redivivusPaths.js';
-import { generateRules } from '../../../services/redivivusRules.js';
+import { generateRules } from '../../../shared/vscode/domain/rules/redivivusRules.js';
 
 export async function scaffoldAt(targetPath: string, projectName: string, blueprint?: Blueprint): Promise<void> {
   const paths = new RedivivusPaths(targetPath);

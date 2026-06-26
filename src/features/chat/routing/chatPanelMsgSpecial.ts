@@ -4,8 +4,8 @@
 import * as vscode from 'vscode';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
 import type { MessageHandlerDeps } from './chatPanelMessages.js';
-import { applyGapAnswers } from '../../../services/blueprint/blueprintGapDetector.js';
-import { syncBlueprintMd } from '../../../services/blueprint/blueprintWriter.js';
+import { applyGapAnswers } from '../../project/infrastructure/blueprint/blueprintGapDetector.js';
+import { syncBlueprintMd } from '../../project/infrastructure/blueprint/blueprintWriter.js';
 
 // [Redivivus] Guided Blueprint Mode — pending build tasks waiting for gap answers (sessionId -> original task)
 export const _pendingGuidedBuilds = new Map<string, string>();

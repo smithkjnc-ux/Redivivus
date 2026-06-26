@@ -4,7 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import { walk, extractScope, countPattern } from '../../../services/mapBuilderHelpers.js';
+import { walk, extractScope, countPattern } from '../../map/application/mapBuilderHelpers.js';
 
 // [WARN] Cache the annotation context to avoid rescanning on every message.
 // Invalidated after 30 seconds so new files are picked up reasonably fast.

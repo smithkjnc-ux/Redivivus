@@ -2,22 +2,22 @@
 // redivivus.runProject + redivivus.inspectElement + redivivus.injectTerminalError extracted to extensionInlineCommandsC.ts.
 
 import * as vscode from 'vscode';
-import { debugLog } from './services/workspace/diagnosticLogger.js';
-import type { RedivivusService } from './services/redivivusService.js';
+import { debugLog } from './features/workspace/infrastructure/diagnosticLogger.js';
+import type { RedivivusService } from './shared/vscode/application/redivivusService.js';
 import type { RoutingService } from './shared/ai/infrastructure/routingService.js';
-import type { UsageTracker } from './services/usageTracker.js';
+import type { UsageTracker } from './features/telemetry/infrastructure/usageTracker.js';
 import type { VaultService } from './features/vault/infrastructure/vaultService.js';
-import type { StatusBar } from './ui/views/statusBar.js';
+import type { StatusBar } from './shared/vscode/ui/statusBar.js';
 import type { GuardianService } from './shared/ai/infrastructure/guardianService.js';
-import { RecommendationsPanel } from './ui/panels/analyzer/analyzerPanel.js';
-import { MapPanel } from './ui/map/mapPanel.js';
+import { RecommendationsPanel } from './features/workspace/ui/analyzer/analyzerPanel.js';
+import { MapPanel } from './features/map/ui/mapPanel.js';
 import type { GitHubBackupService } from './features/workspace/infrastructure/githubBackupService.js';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { getActiveProjectRoot } from './features/project/application/activeProjectRoot.js';
-import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
+import { openBlueprintPanel } from './features/project/ui/blueprint/blueprintInterviewPanel.js';
 import { registerProfileRuntimeCommand } from './features/runtime/application/profileRuntime.js';
 import { registerStartRuntimeAnalysisCommand } from './features/runtime/application/startRuntimeAnalysis.js';
-import { showBuildHistoryPanel } from './ui/views/buildHistoryPanel.js';
+import { showBuildHistoryPanel } from './features/chat/ui/buildHistoryPanel.js';
 import { MemoryPanel } from './features/chat/ui/memoryPanel.js';
 import { registerInlineCommandsC } from './extensionInlineCommandsC.js';
 
@@ -116,7 +116,7 @@ export function registerInlineCommandsB(
         ChatPanel.show(redivivusService, routingService, usageTracker, vaultService);
         await new Promise(resolve => setTimeout(resolve, 600));
       }
-      const { getMemoryForDisplay } = await import('./services/userMemoryService.js');
+      const { getMemoryForDisplay } = await import('./features/chat/application/userMemoryService.js');
       const memory = getMemoryForDisplay();
       const topLangs = Object.entries(memory.stack.languages).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([l, c]) => `${l} (${c})`).join(', ') || 'none yet';
       const content = [
