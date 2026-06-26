@@ -16,8 +16,8 @@ import { registerSetupHubCommand } from './features/onboarding/application/setup
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
 import { seedVault } from './features/vault/infrastructure/vaultSeeder.js';
-import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
-import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
+import { registerProfileRuntimeCommand } from './features/runtime/application/profileRuntime.js';
+import { registerStartRuntimeAnalysisCommand } from './features/runtime/application/startRuntimeAnalysis.js';
 import { registerInlineCommandsB } from './extensionInlineCommandsB.js';
 
 export function registerInlineCommands(

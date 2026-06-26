@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
-import { runAutoInit } from './commands/init.js';
+import { runAutoInit } from './features/project/application/init.js';
 import { finalizeRedivivusLogger, initRedivivusLogger, redivivusLog } from './shared/logging/infrastructure/redivivusLogger.js';
 import { resetProjectContext, initProjectContextLogger } from './shared/logging/infrastructure/projectContextLogger.js';
 

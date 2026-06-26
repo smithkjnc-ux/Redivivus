@@ -22,41 +22,41 @@ import { registerVaultDedupCommand } from './features/vault/application/vaultDed
 import { registerCloseProjectCommand } from './features/project/application/closeProject.js';
 import { registerCompileProjectCommand } from './features/project/application/compileProject.js';
 import type { RedivivusSidebarProvider } from './ui/sidebar/redivivusSidebar.js';
-import { registerOnNewProject } from './commands/init.js';
-import { registerInitCommands } from './commands/initCommands.js';
+import { registerOnNewProject } from './features/project/application/init.js';
+import { registerInitCommands } from './features/project/application/initCommands.js';
 import { DelegationCodeLensProvider } from './services/delegationCodeLens.js';
-import { registerSessionCommands } from './commands/session.js';
-import { registerBlueprintCommands } from './commands/blueprint.js';
-import { registerAnalysisCommands } from './commands/analysis.js';
-import { registerReviewCommands } from './commands/review.js';
-import { registerRestructureCommands } from './commands/restructure.js';
-import { registerRetrofitCommands } from './commands/retrofit.js';
+import { registerSessionCommands } from './features/project/application/session.js';
+import { registerBlueprintCommands } from './features/project/application/blueprint.js';
+import { registerAnalysisCommands } from './features/workspace/application/analysis.js';
+import { registerReviewCommands } from './features/workspace/application/review.js';
+import { registerRestructureCommands } from './features/project/application/restructure.js';
+import { registerRetrofitCommands } from './features/project/application/retrofit.js';
 import { registerVaultCommands } from './features/vault/application/vault.js';
 import { registerVaultBrowseCommand } from './features/vault/application/vaultBrowse.js';
 import { registerVaultTranslateCommand } from './features/vault/application/vaultTranslate.js';
-import { registerBuildFromVaultCommand } from './commands/buildFromVault.js';
-import { registerMiscCommands } from './commands/misc.js';
+import { registerBuildFromVaultCommand } from './features/vault/application/buildFromVault.js';
+import { registerMiscCommands } from './shared/vscode/misc.js';
 import { registerAuthHandler } from './services/api/authHandler.js';
 import { registerApiSetupCommand } from './features/onboarding/application/apiSetup.js';
-import { registerUsageCommands } from './commands/usageCommands.js';
+import { registerUsageCommands } from './features/telemetry/application/usageCommands.js';
 import { registerSetupProgressCommand } from './features/onboarding/application/setupProgressCommand.js';
-import { registerSelectionCommands } from './commands/selection.js';
-import { registerTimelineCommand } from './commands/timeline.js';
-import { registerLoggingCommands } from './commands/logging.js';
-import { registerSavePointCommand } from './commands/savePoint.js';
+import { registerSelectionCommands } from './features/workspace/application/selection.js';
+import { registerTimelineCommand } from './features/project/application/timeline.js';
+import { registerLoggingCommands } from './shared/logging/application/logging.js';
+import { registerSavePointCommand } from './features/project/application/savePoint.js';
 import { registerOrganizeProjects } from './features/project/application/organizeProjects.js';
-import { registerFileSplitCommand } from './commands/fileSplit.js';
-import { registerRetrofitBlueprintCommand } from './commands/retrofitBlueprint.js';
-import { registerScopeCreepCommand } from './commands/scopeCreep.js';
-import { registerDuplicateCodeCommand } from './commands/duplicateCode.js';
+import { registerFileSplitCommand } from './features/project/application/fileSplit.js';
+import { registerRetrofitBlueprintCommand } from './features/project/application/retrofitBlueprint.js';
+import { registerScopeCreepCommand } from './features/workspace/application/scopeCreep.js';
+import { registerDuplicateCodeCommand } from './features/workspace/application/duplicateCode.js';
 import { registerGitHubBackupCommands } from './features/workspace/application/githubBackup.js';
 import { registerSetupHubCommand } from './features/onboarding/application/setupHub.js';
-import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
-import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
+import { registerProfileRuntimeCommand } from './features/runtime/application/profileRuntime.js';
+import { registerStartRuntimeAnalysisCommand } from './features/runtime/application/startRuntimeAnalysis.js';
 import { registerInlineCommands } from './extensionInlineCommands.js';
 import { registerSignInCommand } from './features/onboarding/application/signIn.js';
-import { registerReportIssueCommand } from './commands/reportIssue.js';
-import { registerCheckForUpdatesCommand } from './commands/checkForUpdates.js';
+import { registerReportIssueCommand } from './features/workspace/application/reportIssue.js';
+import { registerCheckForUpdatesCommand } from './features/settings/application/checkForUpdates.js';
 import { initOutputChannels } from './shared/logging/ui/outputChannelManager.js';
 
 export function registerAllCommands(
@@ -120,7 +120,7 @@ export function registerAllCommands(
   try { registerReportIssueCommand(context, routingService); } catch (e) { console.error('Failed to register reportIssue command', e); }
   try {
     context.subscriptions.push(vscode.commands.registerCommand('redivivus.changePersonality', () =>
-      import('./commands/personalityPicker.js').then(m => m.pickPersonality())
+      import('./features/settings/application/personalityPicker.js').then(m => m.pickPersonality())
     ));
   } catch (e) { console.error('Failed to register changePersonality command', e); }
   try { registerCheckForUpdatesCommand(context); } catch (e) { console.error('Failed to register checkForUpdates command', e); }

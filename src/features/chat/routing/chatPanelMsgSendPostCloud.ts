@@ -105,7 +105,7 @@ export async function routeCloudChatResult(
   if (chatResult.action === 'personality-picker') {
     conversation.push({ role: 'assistant', content: `${chatResult.text}\n\n---\n*-- ${_byline}*`, timestamp: Date.now() });
     refresh(); releaseInput();
-    setTimeout(() => import('../../../commands/personalityPicker.js').then(m => m.pickPersonality()), 400);
+    setTimeout(() => import('../../settings/application/personalityPicker.js').then(m => m.pickPersonality()), 400);
     return;
   }
 

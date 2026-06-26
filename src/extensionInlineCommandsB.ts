@@ -15,10 +15,10 @@ import type { GitHubBackupService } from './features/workspace/infrastructure/gi
 import { ChatPanel } from './features/chat/ui/chatPanel.js';
 import { getActiveProjectRoot } from './features/project/application/activeProjectRoot.js';
 import { openBlueprintPanel } from './ui/views/blueprintInterviewPanel.js';
-import { registerProfileRuntimeCommand } from './commands/profileRuntime.js';
-import { registerStartRuntimeAnalysisCommand } from './commands/startRuntimeAnalysis.js';
+import { registerProfileRuntimeCommand } from './features/runtime/application/profileRuntime.js';
+import { registerStartRuntimeAnalysisCommand } from './features/runtime/application/startRuntimeAnalysis.js';
 import { showBuildHistoryPanel } from './ui/views/buildHistoryPanel.js';
-import { MemoryPanel } from './commands/memoryPanel.js';
+import { MemoryPanel } from './features/chat/ui/memoryPanel.js';
 import { registerInlineCommandsC } from './extensionInlineCommandsC.js';
 
 export function registerInlineCommandsB(

@@ -18,7 +18,7 @@ export async function handlePanelMessage(panel: ChatPanel, msg: any): Promise<vo
 
   // Easter egg: Konami code in the webview triggers the personality picker
   if (msg.type === 'easter-egg-personality') {
-    import('../../../commands/personalityPicker.js').then(m => m.pickPersonality());
+    import('../../settings/application/personalityPicker.js').then(m => m.pickPersonality());
     return;
   }
 

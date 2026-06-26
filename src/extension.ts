@@ -9,7 +9,7 @@ import { initExtensionServices } from './extensionServices.js';
 import { registerWorkspaceFolderListener } from './extensionWorkspaceListener.js';
 import { registerPanelSerializer, scheduleAutoOpenPanel } from './extensionPanelSetup.js';
 
-import { runAutoInit, registerOnNewProject } from './commands/init.js';
+import { runAutoInit, registerOnNewProject } from './features/project/application/init.js';
 import { registerAllCommands } from './extensionCommands.js';
 import { initApiClient } from './services/api/apiClient.js';
 import { logSessionStart } from './services/api/apiClientTelemetry.js';
@@ -125,7 +125,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   // ── update check — 1-hour cooldown + snooze, 10s after startup, non-blocking ──
   setTimeout(async () => {
-    const { runStartupUpdateCheck } = await import('./commands/checkForUpdates.js');
+    const { runStartupUpdateCheck } = await import('./features/settings/application/checkForUpdates.js');
     await runStartupUpdateCheck(context, statusBar);
   }, 10_000);
 
