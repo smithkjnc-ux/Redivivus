@@ -1,6 +1,14 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+- **`src/features/chat/build/chatPanelEditBuild.ts`**: Extracted prompt generation into `chatPanelEditBuildPrompts.ts` to enforce Rule 9.
+- **`src/features/chat/build/services/cloudBuildMultiFile.ts`**: Extracted fallback logic to `cloudBuildProviderFallback.ts` and Guardian step logic to `cloudBuildMultiFileHelpers.ts` to enforce Rule 9.
+- **`src/features/chat/build/services/smokeTestGenerator.ts`**: Extracted helpers to `smokeTestHelpers.ts` to enforce Rule 9.
+- **`src/features/chat/routing/chatPanelMessages.ts`**: Extracted architect router to `chatPanelMsgArchitectRouter.ts` to enforce Rule 9.
+- **`src/features/chat/routing/chatPanelMsgSendAI.ts`**: Extracted Guardian and auto-save logics into `chatPanelMsgSendAIHelpers.ts` to enforce Rule 9.
+- **`src/features/chat/ui/memoryPanelHtml.ts`**: Extracted CSS and JS strings into `memoryPanelHtmlStyles.ts` and `memoryPanelHtmlScripts.ts` to enforce Rule 9.
+- **`src/shared/ai/domain/chatPanelAI.ts`**: Extracted code-generation prompts into `chatPanelAICodeGen.ts` to enforce Rule 9.
+- **`src/shared/vscode/ui/filesTab.ts`**: Extracted switch form logic to `filesTabForms.ts` to enforce Rule 9.
 - **`src/` (Global Phase 1, 2, 3)**: Fully migrated extension to the Hybrid Modular Monolith Architecture. 
   - Phase 1: Moved 407 primary files into `features/` (`chat`, `vault`, `project`, `workspace`, `onboarding`) and `shared/`.
   - Phase 2: Dissolved legacy `src/commands` bucket into 37 feature-specific bounded contexts (`telemetry`, `runtime`, `settings`).

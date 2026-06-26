@@ -7,11 +7,11 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 26, 2026 — Fully migrated the codebase to a Hybrid Modular Monolith Architecture. Extracted 573 legacy monolithic files across 3 phases via `ts-morph` AST manipulation. Established highly cohesive bounded contexts (`features/`, `shared/`) and auto-patched static/dynamic runtime imports. Full entries in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 26, 2026 — Enforced Rule 9 by extracting and refactoring 8 oversized files in the features/chat routing and build paths to stay under the 200-line hard stop limit. Full entries in docs/REDIVIVUS_FIXES.md.
+
+*Prior:* June 26, 2026 — Fully migrated the codebase to a Hybrid Modular Monolith Architecture. Extracted 573 legacy monolithic files across 3 phases via `ts-morph` AST manipulation. Established highly cohesive bounded contexts (`features/`, `shared/`) and auto-patched static/dynamic runtime imports. Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* June 25, 2026 — Enforced Bottom-Up Build Sequence and Strict JSDoc Interface Contracts in the Supervisor prompt to prevent API hallucinations in multi-file generations. Full entries in docs/REDIVIVUS_FIXES.md.
-
-*Prior:* June 23, 2026 — Vite Port Detection + AI Domain Reasoning: updated `chatPanelPreview.ts` to read `server.port` from `vite.config.js` instead of hardcoding 5173. Added domain reasoning to all AI prompts (Supervisor, Worker, Guardian, Q&A) so models recall specific training knowledge before answering. Full entries in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* June 23, 2026 — Supervisor Architecture Hardening: added strict rules to `SUPERVISOR_CONTRACT_GUIDANCE` to enforce the generation of `package.json` and build systems whenever the AI prescribes a frontend framework. Full entries in docs/REDIVIVUS_FIXES.md.
 

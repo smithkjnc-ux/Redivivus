@@ -8,35 +8,11 @@ import * as path from 'path';
 import { getApiBase } from '../../../../shared/api/infrastructure/apiClient.js';
 import type { BuildRequestDeps } from '../../../../shared/ai/domain/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
-import { buildSingleFileViaBuildEndpoint, finalizeMultiFileBuild } from './cloudBuildMultiFileHelpers.js';
+import { buildSingleFileViaBuildEndpoint, finalizeMultiFileBuild, logGuardianStep } from './cloudBuildMultiFileHelpers.js';
 import { looksLikeQuotaError, markProviderUnavailable, isProviderUnavailable } from '../../../../shared/ai/infrastructure/providerTierState.js';
 import { AI_RANK } from '../../../../shared/ai/infrastructure/guardianAI.js';
 
-/** Pick the next available provider from AI_RANK, skipping unavailable ones and the current one. */
-function nextAvailableProvider(current: string, keyHeaders: Record<string, string>): string | null {
-  // X-Provider-Keys header value is a JSON object of { provider: key } — check inside it
-  let availableProviders: Set<string>;
-  try {
-    const parsed = JSON.parse(keyHeaders['X-Provider-Keys'] || '{}') as Record<string, string>;
-    availableProviders = new Set(Object.keys(parsed).filter(p => !!parsed[p]));
-  } catch { availableProviders = new Set(); }
-  return Object.entries(AI_RANK)
-    .sort(([, a], [, b]) => b - a)
-    .map(([p]) => p)
-    .find(p => p !== current && availableProviders.has(p) && !isProviderUnavailable(p)) ?? null;
-}
-
-/** Return a copy of keyHeaders with unavailable providers removed from X-Provider-Keys. */
-function filterKeyHeaders(keyHeaders: Record<string, string>): Record<string, string> {
-  const raw = keyHeaders['X-Provider-Keys'];
-  if (!raw) { return keyHeaders; }
-  try {
-    const keys = JSON.parse(raw) as Record<string, string>;
-    const filtered = Object.fromEntries(Object.entries(keys).filter(([p]) => !isProviderUnavailable(p)));
-    if (Object.keys(filtered).length === Object.keys(keys).length) { return keyHeaders; } // nothing to filter
-    return { ...keyHeaders, 'X-Provider-Keys': JSON.stringify(filtered) };
-  } catch { return keyHeaders; }
-}
+import { nextAvailableProvider, filterKeyHeaders } from './cloudBuildProviderFallback.js';
 
 export async function executeMultiFileBuild(
   task: string,
@@ -147,29 +123,7 @@ export async function executeMultiFileBuild(
       // SHOWS its real work — the code it wrote — the same way the Supervisor row shows its plan. Multi-file
       // builds are non-streaming JSON per file, so there's no live stream; the finished content is all we have.
       // If the Guardian split the file, normalised has 2+ entries — show a split step with all parts.
-      // [GUARDIAN] Capture what the Guardian did to THIS file. The backend may return structured signals
-      // (guardianSplit, guardianRetries, guardianIssues/guardianNote) — surface whatever it gives us, else
-      // record a clean pass. This feeds the expandable Guardian step so a non-passing file is visible at a glance.
-      const _gd = data as any;
-      const _gIssues = Array.isArray(_gd.guardianIssues) ? _gd.guardianIssues.filter(Boolean)
-        : (typeof _gd.guardianNote === 'string' && _gd.guardianNote.trim() ? [_gd.guardianNote.trim()] : []);
-      const _gRetries = typeof _gd.guardianRetries === 'number' ? _gd.guardianRetries : 0;
-      if (_gd.guardianSplit && normalised.length >= 2) {
-        guardianLog.push(`⚠ ${file.path} — too large/mixed concerns → split into ${normalised.map(f => f.path).join(', ')}`);
-      } else if (_gIssues.length > 0) {
-        guardianLog.push(`⚠ ${file.path} — fixed: ${_gIssues.join('; ')}${_gRetries ? ` (${_gRetries} retr${_gRetries === 1 ? 'y' : 'ies'})` : ''}`);
-      } else if (_gRetries > 0) {
-        guardianLog.push(`⚠ ${file.path} — auto-corrected after ${_gRetries} retr${_gRetries === 1 ? 'y' : 'ies'}`);
-      } else {
-        guardianLog.push(`✓ ${file.path} — passed all checks`);
-      }
-      if (_gd.guardianSplit && normalised.length >= 2) {
-        const splitDetail = normalised.map(f => `// === ${f.path} ===\n${f.content}`).join('\n\n');
-        onStep?.({ label: `Guardian: split → ${normalised.map(f => f.path.split('/').pop()).join(', ')}`, model: `${supervisorName} → Guardian`, status: 'success', detail: splitDetail, kind: 'code', index: i, total: planFiles.length, updateLatest: true });
-      } else {
-        const workerCode = normalised.map(f => f.content).join('\n\n');
-        onStep?.({ label: `Built ${file.path}`, model: `${supervisorName} → ${lastModel}`, status: 'success', detail: workerCode, kind: 'code', index: i, total: planFiles.length, updateLatest: true });
-      }
+      logGuardianStep(data, file, normalised, guardianLog, onStep, supervisorName, planFiles.length, i, lastModel);
       // [FIX] Emit completed file content so the chat bubble can show it for review.
       // Multi-file builds use non-streaming JSON per file, so onChunk never fires — this is the hook
       // that lets the user see the code that was written without waiting for the full build to finish.

@@ -11,7 +11,7 @@ import { resolveVaultHit } from '../build/chatPanelBuild.js';
 import { handleSendMessage } from './chatPanelMsgSendMessage.js';
 import { handleUndoBuild, handleBuildFeedback, handleOpenFile, handleOpenInBrowser, handleCreateFile, handlePreviewBrowser, handleOpenHtmlByName } from '../../project/domain/chatPanelMsgFileOps.js';
 import { handleRunCommand, handleOpenProject, handleOpenExistingProject, handleOpenRecentProject, handleToggleSetting, handleBrowseFolder, handleStartNewProject } from '../../project/domain/chatPanelMsgProjectOps.js';
-import { handleArchitectExplain, handleArchitectAddTodos, handleArchitectFixAll, handleArchitectFixOne, handleArchitectPerAction, handleArchitectActionConfirm } from '../ui/chatPanelMsgArchitect.js';
+import { routeArchitectMessage } from './chatPanelMsgArchitectRouter.js';
 import { handleBlueprintGapAnswer, handleBlueprintGapSkip, handleVaultDedupPreview, handleVaultDedupMerge, handleInjectTerminalError, handleFixTerminalError } from './chatPanelMsgSpecial.js';
 import { handleBlueprintCardConfirm, handleBlueprintCardSkip } from './chatPanelMsgBlueprintCard.js';
 import { handleMapContext } from '../ui/chatPanelMsgMapContext.js';
@@ -129,30 +129,8 @@ export async function handleChatMessage(msg: any, deps: MessageHandlerDeps): Pro
   } else if (msg.type === 'template-wizard-submit' || msg.type === 'template-wizard-cancel') {
     await handleTemplateWizard(msg);
 
-  } else if (msg.type === 'architect-explain') {
-    await handleArchitectExplain(msg, routing, conversation, refresh);
-
-  } else if (msg.type === 'architect-add-todos') {
-    handleArchitectAddTodos(msg, conversation, refresh);
-
-  } else if (msg.type === 'architect-fix-all') {
-    await handleArchitectFixAll(msg, conversation, refresh, panel, deps);
-
-  } else if (msg.type === 'architect-deep-fix') {
-    const { handleArchitectDeepFix } = await import('../ui/chatPanelMsgArchitectDeepFix.js');
-    await handleArchitectDeepFix(msg, conversation, refresh, deps, panel);
-
-  } else if (msg.type === 'architect-fix-one') {
-    await handleArchitectFixOne(msg, conversation, refresh, panel, deps);
-
-  } else if (msg.type === 'architect-per-action') {
-    await handleArchitectPerAction(msg, conversation, refresh);
-
-  } else if (msg.type === 'architect-action-confirm') {
-    await handleArchitectActionConfirm(msg, conversation, refresh);
-
-  } else if (msg.type === 'architect-action-cancel') {
-    conversation.push({ role: 'assistant', content: 'Cancelled.', timestamp: Date.now() }); refresh();
+  } else if (msg.type.startsWith('architect-')) {
+    await routeArchitectMessage(msg, deps);
 
   } else if (msg.type === 'blueprint-card-confirm') { await handleBlueprintCardConfirm(msg, deps, conversation, refresh);
   } else if (msg.type === 'blueprint-card-skip') { await handleBlueprintCardSkip(msg, deps, conversation, refresh);

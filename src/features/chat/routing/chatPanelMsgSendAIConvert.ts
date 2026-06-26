@@ -4,7 +4,7 @@
 import type { RoutingService } from '../../../shared/ai/infrastructure/routingService.js';
 import type { UsageTracker } from '../../telemetry/infrastructure/usageTracker.js';
 import type { ChatMessage } from '../ui/chatPanelHtml.js';
-import { findSourceFiles } from '../../../shared/ai/domain/chatPanelAI.js';
+import { findSourceFiles } from '../../../shared/ai/domain/chatPanelAICodeGen.js';
 import { splitSourceIntoSections, chunkedGenerate } from '../build/chatPanelChunkedGen.js';
 
 const CHUNKED_THRESHOLD = 300;

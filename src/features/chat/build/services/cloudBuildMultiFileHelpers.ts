@@ -80,6 +80,39 @@ export async function buildSingleFileViaBuildEndpoint(
   return payloadResult as SingleFileResult;
 }
 
+export function logGuardianStep(
+  data: SingleFileResult,
+  file: { path: string },
+  normalised: Array<{ path: string; content: string }>,
+  guardianLog: string[],
+  onStep?: (step: any) => void,
+  supervisorName?: string,
+  planFilesLength?: number,
+  i?: number,
+  lastModel?: string
+) {
+  const _gd = data as any;
+  const _gIssues = Array.isArray(_gd.guardianIssues) ? _gd.guardianIssues.filter(Boolean)
+    : (typeof _gd.guardianNote === 'string' && _gd.guardianNote.trim() ? [_gd.guardianNote.trim()] : []);
+  const _gRetries = typeof _gd.guardianRetries === 'number' ? _gd.guardianRetries : 0;
+  if (_gd.guardianSplit && normalised.length >= 2) {
+    guardianLog.push(`⚠ ${file.path} — too large/mixed concerns → split into ${normalised.map(f => f.path).join(', ')}`);
+  } else if (_gIssues.length > 0) {
+    guardianLog.push(`⚠ ${file.path} — fixed: ${_gIssues.join('; ')}${_gRetries ? ` (${_gRetries} retr${_gRetries === 1 ? 'y' : 'ies'})` : ''}`);
+  } else if (_gRetries > 0) {
+    guardianLog.push(`⚠ ${file.path} — auto-corrected after ${_gRetries} retr${_gRetries === 1 ? 'y' : 'ies'}`);
+  } else {
+    guardianLog.push(`✓ ${file.path} — passed all checks`);
+  }
+  if (_gd.guardianSplit && normalised.length >= 2) {
+    const splitDetail = normalised.map(f => `// === ${f.path} ===\n${f.content}`).join('\n\n');
+    onStep?.({ label: `Guardian: split → ${normalised.map(f => f.path.split('/').pop()).join(', ')}`, model: `${supervisorName} → Guardian`, status: 'success', detail: splitDetail, kind: 'code', index: i, total: planFilesLength, updateLatest: true });
+  } else {
+    const workerCode = normalised.map(f => f.content).join('\n\n');
+    onStep?.({ label: `Built ${file.path}`, model: `${supervisorName} → ${lastModel}`, status: 'success', detail: workerCode, kind: 'code', index: i, total: planFilesLength, updateLatest: true });
+  }
+}
+
 /**
  * Emit the final Guardian validation step, compute cost, and call processBuildResults.
  * Called after all per-file Workers have finished.

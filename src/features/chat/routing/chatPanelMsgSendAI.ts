@@ -9,8 +9,9 @@ import { buildAIPrefix, processAIResponse, getPreviewSnapshot } from '../../../s
 import { clearPendingScopeQuestion } from '../../project/application/templateScopeService.js';
 import { LearnedMemoryService } from '../application/learnedMemoryService.js';
 import { _architectReviews } from '../ui/chatPanelMsgArchitect.js';
-import { shouldAutoSave, extractAutoSaveTarget, autoSaveAndOpen, shouldDeleteFiles, deleteRequestedFiles, identifyFilesToDelete } from '../build/chatPanelAutoSave.js';
+import { shouldDeleteFiles, deleteRequestedFiles, identifyFilesToDelete } from '../build/chatPanelAutoSave.js';
 import { runChunkedConvert } from './chatPanelMsgSendAIConvert.js';
+import { runGuardianReviewOnCode, handleAutoSaveLogic } from './chatPanelMsgSendAIHelpers.js';
 
 // [WARN] PREFERENCE_RE detects user preferences to save to learned memory.
 // This is the only remaining regex — it matches explicit preference declarations, not intent.
@@ -123,29 +124,8 @@ export async function handleAIChat(
       finalText = aiResponse.text || '';
     }
 
-    // [WARN] hasCodeBlock must only match FENCED code blocks, not inline backticks.
-    const hasCodeBlock = /```[a-z]*\n/i.test(finalText);
-    // [GUARDIAN] Only run if this is a conversion task (isConvert) AND it contains a code block.
-    // Running a code-review prompt on a conversational Q&A answer causes Guardian to strip the conversation and hallucinate file replacements.
-    if (routing.isGuardianActive() && isConvert && hasCodeBlock) {
-      const workerAI = routing.getAvailableAI().ai;
-      const blueprintCtx = redivivus.isInitialized() ? (redivivus.loadConfig()?.blueprint ? JSON.stringify(redivivus.loadConfig()!.blueprint) : '') : '';
-      const guardianTask = isConvert ? `Code conversion/transform task: ${userText}` : userText;
-      const review = await routing.guardianReview(guardianTask, finalText, workerAI, blueprintCtx).catch(() => null);
-      if (review && review.guardianAI && review.guardianAI !== 'none') {
-        const reviewInput = guardianTask.length + finalText.length;
-        const reviewOutput = review.correctedText ? review.correctedText.length : 50;
-        const guardianTokens = Math.ceil((reviewInput + reviewOutput) / 4);
-        const guardianCost = (guardianTokens / 1_000_000) * 0.30;
-        await usageTracker?.recordUsage(guardianTokens, guardianCost, review.guardianAI, review.inputTokens, review.outputTokens);
-      }
-      if (review && !review.passed && review.correctedText) {
-        finalText = review.correctedText + `\n\n---\n*Guardian (${review.guardianAI}) reviewed and corrected this response.*`;
-      }
-      if (review?.scopeAlerts?.length) {
-        finalText += `\n\n---\n**Guardian also noticed (not applied -- say "also fix..." to address):**\n${review.scopeAlerts.map(a => `- ${a}`).join('\n')}`;
-      }
-    }
+    const blueprintCtx = redivivus.isInitialized() ? (redivivus.loadConfig()?.blueprint ? JSON.stringify(redivivus.loadConfig()!.blueprint) : '') : '';
+    finalText = await runGuardianReviewOnCode(finalText, userText, isConvert, routing, usageTracker, blueprintCtx);
 
     const { text: processedResponse, executedCommand } = processAIResponse(finalText);
     void executedCommand;
@@ -164,34 +144,7 @@ export async function handleAIChat(
     conversation.push({ role: 'assistant', content: finalContent + `\n\n---\n*-- ${answeredBy}*`, timestamp: Date.now(), tokens: estimatedTokens, cost: estimatedCost });
     refresh();
 
-    // [FIX] Auto-save ONLY fires on explicit build/convert paths (isConvert=true).
-    // Q&A answers stay in the chat — questions get answers, not actions.
-    // The user can copy the code or say "save this" / "apply this" to trigger the build pipeline.
-    // [DEAD] Previous behavior: auto-saved ANY substantial code block from Q&A into a new file,
-    // causing garbage files like "the.html" when users asked conversational questions.
-    if (isConvert) {
-      let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath || '';
-      // Don't auto-save into the projects container — land in an auto-created subfolder instead
-      if (root) {
-        const os = require('os') as typeof import('os');
-        const path = require('path') as typeof import('path');
-        const cfg = vscode.workspace.getConfiguration('redivivus').get<string>('projectsDirectory', '~/projects')!.replace('~', os.homedir());
-        if (path.resolve(root) === path.resolve(cfg)) {
-          const { lastAutoCreatedDir } = await import('../build/chatPanelBuildAutoCreate.js');
-          root = (lastAutoCreatedDir && require('fs').existsSync(lastAutoCreatedDir)) ? lastAutoCreatedDir : '';
-        }
-      }
-      if (await shouldAutoSave(finalText, userText, routing)) {
-        const target = extractAutoSaveTarget(finalText, userText, root);
-        if (target) {
-          const confirmation = await autoSaveAndOpen(target.code, target.filename, root, {
-            model: answeredBy,
-            tokens: estimatedTokens,
-          });
-          if (confirmation) { conversation.push({ role: 'assistant', content: confirmation, timestamp: Date.now() }); refresh(); }
-        }
-      }
-    }
+    await handleAutoSaveLogic(isConvert, finalText, userText, routing, answeredBy, estimatedTokens, conversation, refresh);
     if (PREFERENCE_RE.test(userText)) {
       const prefRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (prefRoot) {

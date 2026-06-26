@@ -5,6 +5,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
 import { getActiveProjectRoot } from '../../project/application/activeProjectRoot.js';
+import { getMemoryPanelScript } from './memoryPanelHtmlScripts.js';
+import { getMemoryPanelStyles } from './memoryPanelHtmlStyles.js';
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -112,33 +114,10 @@ export function getMemoryPanelHtml(): string {
   }
 
   const SCRIPT = getMemoryPanelScript();
+  const STYLES = getMemoryPanelStyles();
 
   return `<!DOCTYPE html><html><head><style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 20px; max-width: 680px; margin: 0 auto; background: var(--vscode-editor-background); color: var(--vscode-foreground); }
-    h1 { font-size: 22px; margin-bottom: 4px; }
-    .page-sub { color: var(--vscode-descriptionForeground); font-size: 12px; margin-bottom: 24px; }
-    .section { background: var(--vscode-input-background); border: 1px solid var(--vscode-input-border); border-radius: 8px; padding: 14px 16px; margin-bottom: 14px; }
-    .section-header { font-weight: 700; font-size: 13px; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
-    .section-sub { font-size: 11px; color: var(--vscode-descriptionForeground); margin-bottom: 10px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    td { padding: 4px 6px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-    td:first-child { color: var(--vscode-descriptionForeground); width: 40%; }
-    .count { opacity: 0.55; font-size: 11px; }
-    .entry-list { list-style: none; padding: 0; margin: 0; }
-    .entry-row { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px; line-height: 1.5; }
-    .entry-row:last-child { border-bottom: none; }
-    .neverdo-label { font-size: 10px; font-weight: 700; color: #ff534f; background: rgba(255,83,79,0.12); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
-    .recent-row { opacity: 0.7; }
-    .empty-note { font-size: 11px; color: var(--vscode-descriptionForeground); padding: 4px 0; font-style: italic; }
-    .del-btn { margin-left: auto; flex-shrink: 0; background: transparent; border: 1px solid rgba(255,83,79,0.3); color: #ff534f; border-radius: 4px; padding: 1px 6px; font-size: 10px; cursor: pointer; transition: background 0.15s; }
-    .del-btn:hover { background: rgba(255,83,79,0.15); }
-    .secondary-btn { background: transparent; border: 1px solid var(--vscode-input-border); color: var(--vscode-descriptionForeground); border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
-    .secondary-btn:hover { border-color: var(--vscode-focusBorder); color: var(--vscode-foreground); }
-    .rules-block { font-size: 11px; font-family: monospace; background: var(--vscode-editor-background); border: 1px solid var(--vscode-input-border); border-radius: 4px; padding: 10px; white-space: pre-wrap; word-break: break-word; margin: 0; max-height: 200px; overflow-y: auto; }
-    .add-row { display: flex; gap: 8px; margin-top: 10px; }
-    .add-row input { flex: 1; padding: 6px 10px; background: var(--vscode-editor-background); border: 1px solid var(--vscode-input-border); border-radius: 4px; color: var(--vscode-input-foreground); font-size: 12px; font-family: inherit; }
-    .add-row input:focus { outline: none; border-color: var(--vscode-focusBorder); }
-    .add-btn { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 4px; padding: 6px 14px; font-size: 12px; cursor: pointer; white-space: nowrap; }
+    ${STYLES}
   </style></head><body>
   <h1>🧠 Memory</h1>
   <div class="page-sub">Everything Redivivus has learned about you and your projects. Delete anything that's wrong.</div>
@@ -176,50 +155,4 @@ export function getMemoryPanelHtml(): string {
 </body></html>`;
 }
 
-function getMemoryPanelScript(): string {
-  return `
-    const vscode = acquireVsCodeApi();
-    document.addEventListener('click', (e) => {
-      const t = e.target;
-      // Delete explicit preference
-      if (t.dataset.type === 'explicit') {
-        vscode.postMessage({ type: 'delete-explicit', index: parseInt(t.dataset.index) });
-        return;
-      }
-      // Delete knowledge entry
-      if (t.dataset.type === 'knowledge') {
-        vscode.postMessage({ type: 'delete-knowledge', root: t.dataset.root, index: parseInt(t.dataset.index) });
-        return;
-      }
-      // Clear recent
-      if (t.id === 'clear-recent-btn') {
-        vscode.postMessage({ type: 'clear-recent', root: t.dataset.root });
-        return;
-      }
-      // Open rules file
-      if (t.id === 'open-rules-btn') {
-        vscode.postMessage({ type: 'open-rules-file', path: t.dataset.path });
-        return;
-      }
-      // Add explicit preference
-      if (t.id === 'add-pref-btn') {
-        const input = document.getElementById('new-pref-input');
-        if (input && input.value.trim()) {
-          vscode.postMessage({ type: 'add-explicit', text: input.value.trim() });
-          input.value = '';
-        }
-        return;
-      }
-    });
-    // Enter key on add-preference input
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && e.target && e.target.id === 'new-pref-input') {
-        const input = e.target;
-        if (input.value.trim()) {
-          vscode.postMessage({ type: 'add-explicit', text: input.value.trim() });
-          input.value = '';
-        }
-      }
-    });
-  `;
-}
+
