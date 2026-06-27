@@ -49,7 +49,9 @@ export async function handleBuildIntent(
         // userText may be short ("can you make this?") -- prefer the enriched task if it's longer.
         const inferText = (routedText && routedText.length > userText.length) ? routedText : userText;
         const inferred = await inferBlueprintFields(inferText.slice(0, 800), deps.routing).catch(() => null);
-        if (inferred) {
+        // [FIX] Only show card when inference produced at least one field — unknownCount===5 means AI
+        // completely failed (rate limit, timeout, empty response). Skip → go straight to build.
+        if (inferred && inferred.unknownCount < 5) {
           _pendingBlueprintCards.set(inferred.sessionId, userText);
           conversation.push({ role: 'assistant', content: buildBlueprintCardToken(inferred), timestamp: Date.now() });
           refresh(); return;

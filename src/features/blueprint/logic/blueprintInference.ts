@@ -76,7 +76,10 @@ export async function inferBlueprintFields(
   try {
     const prompt = INFERENCE_PROMPT.replace('{REQUEST}', request.slice(0, 800));
     const res = await (routing as any).prompt(prompt, 15_000);
-    if (!res?.text) { return makeFallback(request, sessionId); }
+    if (!res?.text) {
+      try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[blueprint] inference empty: success=${res?.success} error=${res?.error}\n`); } catch {}
+      return makeFallback(request, sessionId);
+    }
     let clean = res.text.trim();
     const match = clean.match(/\{[\s\S]*\}/);
     if (match) { clean = match[0]; }
@@ -96,7 +99,8 @@ export async function inferBlueprintFields(
     });
     const unknownCount = fields.filter(f => f.confidence === 'unknown').length;
     return { title: String(parsed.title || request.slice(0, 40)), fields, unknownCount, sessionId };
-  } catch {
+  } catch (e: any) {
+    try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[blueprint] inference threw: ${e?.message || String(e)}\n`); } catch {}
     return makeFallback(request, sessionId);
   }
 }
