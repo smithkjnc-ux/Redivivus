@@ -84,9 +84,14 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     const _viteRoot = filesBlock.match(/root:\s*['"]([^.'"'][^'"]*)['"]/)?.[1] || 'custom-folder';
     userText = `STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY VISUAL CHANGES:\n` +
       `vite.config.js has root:'${_viteRoot}'. HTML asset paths use "../" which goes ABOVE the Vite root. CSS/JS are silently 404 — the app looks unstyled even when CSS content is correct.\n` +
-      `REQUIRED: (1) set root:'.' in vite.config.js, (2) change HTML <link>/<script> "../src/..." paths to "./src/...", (3) fix any CSS .class selectors that should be class= not id=.\n` +
+      `REQUIRED (ALL changes in one fix — do not omit any):\n` +
+      `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +
+      `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — relative path shifts when root changes\n` +
+      `(3) The project root index.html (not public/index.html) must be the real HTML entry with ./src/... link paths\n` +
+      `(4) HTML <link>/<script> paths: change "../src/..." to "./src/..."\n` +
+      `(5) Fix CSS .class selectors to match HTML class="..." attributes (not id="..." attributes)\n` +
       `AFTER the wiring is fixed: ${userText}`;
-    fixLog('[WIRING-GATE] Structural path mismatch detected — userText prefixed with structural fix instruction');
+    fixLog('[WIRING-GATE] Structural path mismatch detected — userText prefixed with full structural fix instruction');
   }
 
   // [PREVIEW-AUTOFIX Phase 1] Pre-flight Run-Check

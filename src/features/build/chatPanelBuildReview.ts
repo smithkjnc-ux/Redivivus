@@ -90,18 +90,42 @@ export async function runStaticCompilationGate(code: string, absPath: string, ro
 export async function runStaticCompilationGateForFix(workerResponse: string, root: string): Promise<string | null> {
   const fs = await import('fs');
   const path = await import('path');
-  const { detectResponseFormat, parseSurgicalEdits, applySurgicalEdits } = await import('./services/surgicalEditService.js');
-  const { runCompileCheck } = await import('./services/compileRunner.js');
+  const { detectResponseFormat, parseSurgicalEdits } = await import('./services/surgicalEditService.js');
 
   const format = detectResponseFormat(workerResponse);
   if (format !== 'surgical') {
-    return null; // Skip static check for full-file fixes for now as file routing is ambiguous
+    return null; // Skip static check for full-file fixes — file routing is ambiguous
   }
 
   const edits = parseSurgicalEdits(workerResponse);
   if (edits.length === 0) { return null; }
 
-  // Snapshot original file states
+  // [DRY-RUN] Check that every search block exists in the current file WITHOUT writing to disk.
+  // The old approach (write→compile→revert) was leaving files mutated when the finally revert
+  // silently failed, causing every subsequent retry to report "Search block not found" for text
+  // that was already replaced — a cascade of false compile errors.
+  // We mirror the first two matching strategies from applySurgicalEdits (exact + whitespace-norm).
+  for (const edit of edits) {
+    if (!edit.searchBlock?.trim()) { continue; }
+    const absPath = path.join(root, edit.filePath);
+    if (!fs.existsSync(absPath)) { continue; } // New file — no search required
+    const current = fs.readFileSync(absPath, 'utf8').replace(/\r\n/g, '\n');
+    const searchTrimmed = edit.searchBlock.trim();
+    const exactMatch = current.includes(edit.searchBlock);
+    const normMatch = current.replace(/[ \t]+/g, ' ').includes(searchTrimmed.replace(/[ \t]+/g, ' '));
+    if (!exactMatch && !normMatch) {
+      return `Surgical edit failed to apply to ${edit.filePath}: Search block not found: "${searchTrimmed.slice(0, 80)}"`;
+    }
+  }
+
+  // For TypeScript projects only: write→compile→revert to catch type errors.
+  // CSS/HTML/JS/config files produce no useful tsc output, so skip the disk write entirely.
+  const hasTS = edits.some(e => e.filePath.endsWith('.ts') || e.filePath.endsWith('.tsx'));
+  if (!hasTS) { return null; }
+
+  const { applySurgicalEdits } = await import('./services/surgicalEditService.js');
+  const { runCompileCheck } = await import('./services/compileRunner.js');
+
   const snapshots = new Map<string, string>();
   for (const edit of edits) {
     const absPath = path.join(root, edit.filePath);
@@ -116,10 +140,8 @@ export async function runStaticCompilationGateForFix(workerResponse: string, roo
     if (failed) {
       return `Surgical edit failed to apply to ${failed.filePath}: ${failed.error}`;
     }
-
     const result = runCompileCheck(root);
     if (!result.success) {
-      // Find errors relevant to touched files
       const relPaths = [...new Set(edits.map(e => e.filePath))];
       const lines = result.output.split('\n');
       const relevantErrors = lines.filter(l => relPaths.some(rp => l.includes(rp)));
@@ -130,9 +152,10 @@ export async function runStaticCompilationGateForFix(workerResponse: string, roo
     }
     return null;
   } finally {
-    // Perfect revert
+    // [CRITICAL] Revert without silent catch — a failed revert leaves files mutated and
+    // poisons every subsequent retry in the escalation loop.
     for (const [absPath, content] of snapshots) {
-      try { fs.writeFileSync(absPath, content, 'utf8'); } catch {}
+      fs.writeFileSync(absPath, content, 'utf8');
     }
   }
 }

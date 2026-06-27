@@ -1,6 +1,11 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — Static Gate dry-run fix: eliminate disk-mutation cascade in escalation loop**
+- **Root cause**: `runStaticCompilationGateForFix` in `src/features/build/chatPanelBuildReview.ts` was writing surgical edits to disk, running a compile check, then reverting via `try { fs.writeFileSync(...) } catch {}`. The silent catch caused the revert to fail without trace — leaving files mutated (e.g. `root: 'public'` → `root: '.'`). Every subsequent retry in the escalation loop then searched for the original text and reported "Search block not found", generating false `[COMPILATION ERROR]` critiques that burned 2–3 retry slots for zero gain.
+- **Fix**: Replaced write→compile→revert with an in-memory dry-run for the search-block presence check: reads each file, checks if `searchBlock` (exact + whitespace-normalized) exists — returns error immediately if not, with zero disk mutation. Real write→compile→revert is now only triggered for TypeScript files (where `tsc` produces useful output) and uses `fs.writeFileSync` without a silent catch so revert failures are visible.
+- **File**: `src/features/build/chatPanelBuildReview.ts` — `runStaticCompilationGateForFix` (~49 lines, rewrote the function body)
+
 **2026-06-26 — Hybrid Architecture: ai promotion**
 - **`src/features/ai/`**: Promoted from `shared/ai/`. 91 files. Layer split: `domain/` (20 files) + `domain/providers/` (9 files, subfolder preserved) → `logic/`; `infrastructure/` (62 files) → `data/`. No depth changes — all layers at depth 3/4 in both source and target. Fixed 4 internal cross-layer ref patterns: `'../infrastructure/` → `'../data/` (logic/ files); `'../../infrastructure/` → `'../../data/` (logic/providers/ files); `'../domain/providers/` → `'../logic/providers/` (data/ files); `'../domain/` → `'../logic/` (data/ files — dynamic import in routingServiceSupervisor.ts was missed by first pass, caught by TSC). Broad 3-way sweep (providers/ before domain/ to avoid double-match). All `'../../../features/` refs were already correct from prior migrations. TSC: 0 errors. `shared/` now contains only `shared/ui/` — blueprint target state reached.
 
