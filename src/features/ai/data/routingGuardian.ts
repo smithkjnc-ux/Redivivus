@@ -101,25 +101,34 @@ export async function guardianReviewImpl(
 ): Promise<GuardianReviewResult> {
   const keyMap = svc.getKeyMap();
   const preferred = forceProvider || selectGuardianAI(workerAI, keyMap);
-  if (!preferred) {
-    // [H3] No independent Guardian (a provider different from the Worker) is configured — fail CLOSED.
-    // Previously returned passed:true, silently shipping unreviewed code. Surface a blocking verdict.
-    return { passed: false, correctedText: null,
-      issues: ['Guardian review unavailable: no second AI provider (different from the Worker) is configured. Add another provider to enable independent review — code was NOT reviewed.'],
-      scopeAlerts: [], guardianAI: 'none', workerAI };
-  }
   // [FIX][FAILOVER] Step the Guardian DOWN across configured AIs (preferred Guardian first, then the rest by
   // rank). If providers run out it degrades to whatever is left — even ONE AI doing Supervisor+Worker+Guardian
   // (Workshop principle 7). Only return "skipped/none" when EVERY provider failed. Previously the Guardian used
   // a single provider and silently skipped on any error (e.g. a capped Claude), shipping the fix unreviewed.
   // (PapaJoe: "they should all step down... could be one AI doing all three positions.")
-  const ranked = Object.entries(AI_RANK)
-    // [H2] Never fail over to the Worker's own provider — the Guardian must stay independent.
+  const independentRanked = Object.entries(AI_RANK)
+    // [H2] Prefer independent providers — Guardian should not be the same AI as the Worker.
     .filter(([ai]: any) => ai !== workerAI && keyMap[ai]?.())
     .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
     .map(([ai]: any) => ai);
+  // [SINGLE-AI FALLBACK] If no independent provider is available, allow the Worker's own provider
+  // to act as Guardian rather than skipping review entirely. Same AI reviewing its own work is
+  // less ideal but better than shipping unreviewed code.
+  const ranked = independentRanked.length > 0
+    ? independentRanked
+    : Object.entries(AI_RANK)
+        .filter(([ai]: any) => keyMap[ai]?.())
+        .sort((a: any, b: any) => (b[1] as number) - (a[1] as number))
+        .map(([ai]: any) => ai);
+  if (!preferred && ranked.length === 0) {
+    // [H3] Truly no provider at all — fail CLOSED.
+    return { passed: false, correctedText: null,
+      issues: ['Guardian review unavailable: no AI provider is configured. Add a provider to enable review — code was NOT reviewed.'],
+      scopeAlerts: [], guardianAI: 'none', workerAI };
+  }
   // [ROUTING PANEL] A user-forced Guardian uses ONLY that provider (no failover, like the manual pill).
-  const order = forceProvider ? [forceProvider] : [preferred, ...ranked.filter((p) => p !== preferred)];
+  const effectivePreferred = preferred || ranked[0];
+  const order = forceProvider ? [forceProvider] : [effectivePreferred, ...ranked.filter((p) => p !== effectivePreferred)];
 
   const fetchFn = (svc as any).fetchWithTimeout.bind(svc);
   // getApiBase and getAccountToken are static imports above (fixed from broken require path)
