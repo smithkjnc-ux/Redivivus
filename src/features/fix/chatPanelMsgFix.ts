@@ -79,11 +79,13 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   // request is clearly visual. Intercept userText itself so the Supervisor treats the structural issue
   // as the primary task — not an optional suggestion buried in context.
   const _hasNonDefaultViteRoot = /root:\s*['"][^.'"]/.test(filesBlock);
-  const _hasAboveRootLinks = /<(?:link|script)[^>]+(?:href|src)=["']\.\.\//.test(filesBlock);
+  // [FIX] Also catch ./src/ links — with root:'public', public/index.html using ./src/styles/...
+  // causes Vite to look for public/src/styles/... which doesn't exist (src/ is at project root).
+  const _hasAboveRootLinks = /<(?:link|script)[^>]+(?:href|src)=["'](?:\.\.\/|\.\/(src|styles|js|css|assets)\/)/.test(filesBlock);
   if (_hasNonDefaultViteRoot && _hasAboveRootLinks) {
     const _viteRoot = filesBlock.match(/root:\s*['"]([^.'"'][^'"]*)['"]/)?.[1] || 'custom-folder';
     userText = `STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY VISUAL CHANGES:\n` +
-      `vite.config.js has root:'${_viteRoot}'. HTML asset paths use "../" which goes ABOVE the Vite root. CSS/JS are silently 404 — the app looks unstyled even when CSS content is correct.\n` +
+      `vite.config.js has root:'${_viteRoot}'. HTML asset paths (../src/ or ./src/) resolve inside the Vite root folder, NOT at the project root — CSS/JS silently 404.\n` +
       `REQUIRED (ALL changes in one fix — do not omit any):\n` +
       `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +
       `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — relative path shifts when root changes\n` +

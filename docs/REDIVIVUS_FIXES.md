@@ -1,6 +1,11 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — Wiring gate blind spot: ./src/ paths also wrong under non-default Vite root**
+- **Root cause**: `_hasAboveRootLinks` only checked for `../` in HTML link/script paths. After a partial fix changed `../src/` → `./src/`, the gate stopped firing. But `./src/styles/global.css` inside `public/index.html` with `root: 'public'` also 404s — Vite looks for `public/src/styles/global.css` which doesn't exist.
+- **Fix**: Expanded regex to also match `./src/`, `./styles/`, `./js/`, `./css/`, `./assets/` — common source directories at project root that would be wrong inside a non-default Vite root subfolder. Gate still requires `_hasNonDefaultViteRoot` so it won't fire for `root: '.'` projects.
+- **File**: `src/features/fix/chatPanelMsgFix.ts` line 82
+
 **2026-06-27 — PRESCRIPTION_CHECK false-positive retry trigger fixed**
 - **Root cause (from log)**: `PRESCRIPTION_CHECK` in `chatPanelMsgFixPhase23.ts` lines 79–84 extracted every filename mentioned anywhere in the prescription text — including CSS files cited as path-references, not as files that needed writing. Condition `unwrittenPrescribed.length > 0` triggered when SOME mentioned files weren't written to disk, even though the files that WERE written (vite.config.js, public/index.html) were correct. This nulled `written = []` and discarded a successful fix, launching a second escalation loop against already-modified files → "Search block not found" × 3 → Supervisor self-fix → HTML written to vite.config.js via legacy parser fallback.
 - **Fix**: Changed condition to `unwrittenPrescribed.length === prescribedFiles.length` — only force retry when ALL prescribed files were unwritten (Worker fixed completely wrong file). If some were written, the fix was on-target and the partial miss is logged as info only.
