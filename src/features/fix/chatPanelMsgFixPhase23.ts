@@ -77,10 +77,16 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       const prescribedFiles = [...prescriptionSection.matchAll(/`?([a-zA-Z0-9_\-./]+\.[a-zA-Z]+)`?/g)]
         .map(m => m[1]).filter(f => [...allowedRels].some(r => r.endsWith(f) || f.endsWith(r)));
       const unwrittenPrescribed = prescribedFiles.filter(f => !written.some(w => w.endsWith(f) || f.endsWith(w)));
-      if (unwrittenPrescribed.length > 0 && written.length > 0) {
-        fixLog('[PRESCRIPTION_CHECK] Prescribed files not written', { unwritten: unwrittenPrescribed, written });
+      // [FIX] Only force retry when ALL prescribed files went unwritten (Worker fixed completely wrong file).
+      // "unwrittenPrescribed.length > 0" was too aggressive: CSS files mentioned as path-references
+      // (not files that needed writing) triggered false retries, discarding correct fixes and
+      // starting a second escalation loop against already-modified files → cascade failure.
+      if (unwrittenPrescribed.length > 0 && unwrittenPrescribed.length === prescribedFiles.length && written.length > 0) {
+        fixLog('[PRESCRIPTION_CHECK] ALL prescribed files unwritten — Worker likely fixed wrong file entirely', { unwritten: unwrittenPrescribed, written });
         failed = [...failed, ...unwrittenPrescribed.map(f => `${f}: prescribed but not written`)];
         written = []; // Force retry
+      } else if (unwrittenPrescribed.length > 0) {
+        fixLog('[PRESCRIPTION_CHECK] Some prescribed files unwritten (likely path-refs, not write targets) — not forcing retry', { unwritten: unwrittenPrescribed, written });
       }
     }
   } catch (err) {

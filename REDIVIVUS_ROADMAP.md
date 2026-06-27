@@ -7,7 +7,9 @@
 > - Architecture change / design rule? → `docs/REDIVIVUS_ARCHITECTURE.md`
 > - This file stays under 80 lines. If you are about to make it longer, you are in the wrong file.
 
-*Last updated:* June 27, 2026 — Static gate dry-run fix: `runStaticCompilationGateForFix` now checks search-block presence in memory before any disk write, eliminating the silent-revert cascade that caused false "Search block not found" compile errors across all escalation retries. Full entry in docs/REDIVIVUS_FIXES.md.
+*Last updated:* June 27, 2026 — PRESCRIPTION_CHECK false-positive fix: condition tightened from "any unwritten file" to "all prescribed files unwritten" — prevents second escalation loop when CSS path-references appear in prescription but don't need writing. Also: static gate dry-run fix. Full entries in docs/REDIVIVUS_FIXES.md.
+
+*Prior:* June 27, 2026 — Static gate dry-run fix: `runStaticCompilationGateForFix` now checks search-block presence in memory before any disk write, eliminating the silent-revert cascade that caused false "Search block not found" compile errors across all escalation retries. Full entry in docs/REDIVIVUS_FIXES.md.
 
 *Prior:* June 26, 2026 — `features/ai/` promoted from `shared/ai/`; 91 files, logic/providers + data. All 17 of 17 features converted. `shared/` reduced to `shared/ui/` only — blueprint target state reached. Migration tracker in `.redivivus/blueprint.md`. Full entries in docs/REDIVIVUS_FIXES.md.
 

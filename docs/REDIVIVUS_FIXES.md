@@ -1,6 +1,11 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — PRESCRIPTION_CHECK false-positive retry trigger fixed**
+- **Root cause (from log)**: `PRESCRIPTION_CHECK` in `chatPanelMsgFixPhase23.ts` lines 79–84 extracted every filename mentioned anywhere in the prescription text — including CSS files cited as path-references, not as files that needed writing. Condition `unwrittenPrescribed.length > 0` triggered when SOME mentioned files weren't written to disk, even though the files that WERE written (vite.config.js, public/index.html) were correct. This nulled `written = []` and discarded a successful fix, launching a second escalation loop against already-modified files → "Search block not found" × 3 → Supervisor self-fix → HTML written to vite.config.js via legacy parser fallback.
+- **Fix**: Changed condition to `unwrittenPrescribed.length === prescribedFiles.length` — only force retry when ALL prescribed files were unwritten (Worker fixed completely wrong file). If some were written, the fix was on-target and the partial miss is logged as info only.
+- **File**: `src/features/fix/chatPanelMsgFixPhase23.ts` lines 79–84
+
 **2026-06-27 — Static Gate dry-run fix: eliminate disk-mutation cascade in escalation loop**
 - **Root cause**: `runStaticCompilationGateForFix` in `src/features/build/chatPanelBuildReview.ts` was writing surgical edits to disk, running a compile check, then reverting via `try { fs.writeFileSync(...) } catch {}`. The silent catch caused the revert to fail without trace — leaving files mutated (e.g. `root: 'public'` → `root: '.'`). Every subsequent retry in the escalation loop then searched for the original text and reported "Search block not found", generating false `[COMPILATION ERROR]` critiques that burned 2–3 retry slots for zero gain.
 - **Fix**: Replaced write→compile→revert with an in-memory dry-run for the search-block presence check: reads each file, checks if `searchBlock` (exact + whitespace-normalized) exists — returns error immediately if not, with zero disk mutation. Real write→compile→revert is now only triggered for TypeScript files (where `tsc` produces useful output) and uses `fs.writeFileSync` without a silent catch so revert failures are visible.
