@@ -1053,3 +1053,19 @@ Auto-managed by Redivivus. Append-only session history.
 - Verify Compliance Verifier catches all 4 broken ID items and attributes them to index.html correctly
 - If passing: roll two-layer Guardian architecture into other pipelines (Agent pipeline, build pipeline)
 - Split `chatPanelMsgFixGuardianPhase.ts` (217 lines, Rule 9 limit 200)
+
+### Follow-up fixes — same session
+
+**Backend: `fix-supervisor/route.ts`** (commit 5577929)
+- Added PRESCRIPTION SELF-CONSISTENCY CHECK: Supervisor must simulate applying all items before outputting. Common contradictions to detect: HTML ID rename + JS referencing old ID, function rename without updating callers, CSS class vs ID mismatch.
+
+**Extension: `chatPanelMsgFixGuardianPhase.ts`** (commit 257a977)
+- Fixed Code Inspector stale-state bug: after pre-apply writes files to disk, re-read each applied file and replace its stale entry in `guardianBlueprint`. Inspector now judges post-fix state, not pipeline-start snapshot.
+
+**Test project reverted to broken state** for retest:
+- `index.html` JS: `getElementById('stopwatch-display')`, `'btn-start'`, `'btn-stop'`, `'btn-reset'`
+
+### [NEXT] After retest
+- Verify Supervisor outputs non-contradictory prescription (one consistent end state)
+- Verify Code Inspector sees post-fix file state and doesn't false-positive on already-fixed code
+- If clean single-pass fix: roll two-layer Guardian into Agent pipeline and build pipeline
