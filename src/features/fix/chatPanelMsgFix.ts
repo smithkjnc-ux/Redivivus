@@ -84,15 +84,38 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   const _hasAboveRootLinks = /<(?:link|script)[^>]+(?:href|src)=["'](?:\.\.\/|\.\/(src|styles|js|css|assets)\/)/.test(filesBlock);
   if (_hasNonDefaultViteRoot && _hasAboveRootLinks) {
     const _viteRoot = filesBlock.match(/root:\s*['"]([^.'"'][^'"]*)['"]/)?.[1] || 'custom-folder';
+
+    // [WIRING-GATE-EXACT-HTML] Compute the EXACT corrected index.html content here, in TypeScript,
+    // so the Worker writes verbatim output — no path interpretation, no transformation guessing.
+    // The retry loop was: Worker interprets "copy and fix paths" → gets paths wrong → Guardian rejects
+    // → 3 retries → Supervisor writes directly. By computing the content ourselves we remove the
+    // interpretation step entirely.
+    const _srcHtmlKey = `${_viteRoot}/index.html`;
+    const _srcHtmlRegex = new RegExp(
+      `// === FILE: ${_srcHtmlKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ===\\n([\\s\\S]*?)(?=\\n// === FILE:|$)`
+    );
+    const _srcHtmlRaw = filesBlock.match(_srcHtmlRegex)?.[1]?.trim() ?? null;
+    // Fix paths: ../src/ → ./src/  AND  ../styles/ → ./styles/  (relative-to-root → relative-to-project-root)
+    const _fixedHtml = _srcHtmlRaw
+      ? _srcHtmlRaw.replace(/(['"(])\.\.\/(?=(?:src|styles|js|css|assets|images|fonts)\/)/, '$1./')
+      : null;
+    fixLog(`[WIRING-GATE] HTML pre-computed: srcFile=${_srcHtmlKey} found=${!!_srcHtmlRaw} fixedLen=${_fixedHtml?.length ?? 0}`);
+
+    const _htmlInstruction = _fixedHtml
+      ? `(3) index.html (ROOT file — NOT ${_viteRoot}/index.html): write this EXACT content verbatim — do not alter it:\n` +
+        `\`\`\`html\n${_fixedHtml}\n\`\`\`\n` +
+        `(4) ${_viteRoot}/index.html: replace entire content with a single HTML comment: <!-- moved to root index.html -->`
+      : `(3) Move HTML entry: COPY the full HTML content from ${_viteRoot}/index.html into the ROOT index.html. Replace all ../src/ paths with ./src/ paths.\n` +
+        `(4) ${_viteRoot}/index.html: replace entire content with: <!-- moved to root index.html -->`;
+
     userText = `STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY VISUAL CHANGES:\n` +
       `THIS IS A PURE FILE EDIT TASK — do NOT emit [AGENT_HANDOFF]. No commands need to run. Edit the files directly.\n` +
-      `vite.config.js has root:'${_viteRoot}'. HTML asset paths (../src/ or ./src/) resolve inside the Vite root folder, NOT at the project root — CSS/JS silently 404.\n` +
-      `REQUIRED (ALL changes in one fix — do not omit any):\n` +
+      `vite.config.js has root:'${_viteRoot}'. HTML asset paths resolve inside the Vite root folder, NOT at the project root — CSS/JS silently 404.\n` +
+      `REQUIRED changes (write ALL of these, do not omit any):\n` +
       `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +
-      `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — THIS IS MANDATORY. outDir is relative to root. With root:'.', outDir:'../dist' places the build output OUTSIDE the project directory. Do NOT question this change.\n` +
-      `(3) Move HTML entry: COPY the full HTML content from ${_viteRoot}/index.html into the ROOT index.html (project root, not the subfolder). The root index.html currently contains only a placeholder comment — replace it entirely with the real HTML. Update link/script paths to ./src/... format. Do NOT just empty ${_viteRoot}/index.html without first writing the full HTML to the root index.html.\n` +
-      `(4) HTML <link>/<script> paths in the NEW root index.html: must use ./src/... (not ../src/...)\n` +
-      `STOP after points 1-4. Do NOT attempt CSS/class changes in this pass — CSS must match the final HTML which only exists after point 3 is complete. A second pass will handle CSS.\n` +
+      `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — MANDATORY. With root:'.', outDir:'../dist' places build output OUTSIDE the project.\n` +
+      `${_htmlInstruction}\n` +
+      `STOP — do NOT touch CSS or class names in this pass. A second pass will handle CSS.\n` +
       `AFTER the wiring is fixed: ${userText}`;
     fixLog('[WIRING-GATE] Structural path mismatch detected — userText prefixed with full structural fix instruction');
   }
