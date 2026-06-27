@@ -161,7 +161,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   let approvedPlan: string | undefined;
   {
     let planFirst = false;
-    try { planFirst = !!require('../../ui/panels/chat/chatPanel.js').ChatPanel.extensionContext?.globalState.get('redivivus.planFirst'); } catch { /* default off */ }
+    try { planFirst = !!require('../chat/ui/chatPanel.js').ChatPanel.extensionContext?.globalState.get('redivivus.planFirst'); } catch { /* default off */ }
     const { shouldGateFix, runFixPlanGate } = await import('./chatPanelMsgFixPlanGate.js');
     if (shouldGateFix(diagnosis, subtasks, planFirst)) {
       const gate = await runFixPlanGate(deps, diagnosis, subtasks, fileNames, userText);

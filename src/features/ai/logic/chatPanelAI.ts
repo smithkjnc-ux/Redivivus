@@ -99,7 +99,7 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
  *  Used by Q&A path to attach a screenshot to the AI call so it can reason visually. */
 export function getPreviewSnapshot(): { data: string; mimeType: string } | undefined {
   try {
-    const { getRuntimeReports } = require('../../ui/panels/chat/chatPanelPreview.js');
+    const { getRuntimeReports } = require('../../chat/ui/chatPanelPreview.js');
     const reports: Array<{ kind: string; msg: string; image?: string }> = getRuntimeReports();
     const snap = [...reports].reverse().find(r => (r.kind === 'snapshot' || r.kind === 'probe') && r.image);
     if (snap?.image) {

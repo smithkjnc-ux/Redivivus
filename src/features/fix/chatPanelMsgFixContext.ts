@@ -79,7 +79,7 @@ export function collectFixContext(root: string, sourceFiles: { rel: string }[]):
     }
 
     // [PREVIEW-AUTOFIX] Read from the local HTTP server's beacon receiver
-    const { getRuntimeReports } = require('../../ui/panels/chat/chatPanelPreview.js');
+    const { getRuntimeReports } = require('../chat/ui/chatPanelPreview.js');
     const reports = getRuntimeReports();
     if (reports && reports.length > 0) {
       reports.forEach((r: { kind: string; msg: string }) => {

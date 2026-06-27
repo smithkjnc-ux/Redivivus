@@ -95,7 +95,7 @@ export async function runConfirmedLocalBuild(
     redivivus: deps.redivivus, usageTracker: deps.usageTracker,
     onBuildFinished: (_t: string, _f?: string[]) => {
       if (autoCreated && root) {
-        const CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+        const CP = require('../ui/chatPanel.js').ChatPanel;
         if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.skipConversationRestore', true); }
         vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
       }

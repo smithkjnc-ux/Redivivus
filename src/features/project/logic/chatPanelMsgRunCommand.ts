@@ -62,7 +62,7 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
         // At home: deactivate the active project ONLY if one is active (idempotent — repeated closeFolder
         // can't thrash). Never remove the home folder.
         try {
-          const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
+          const PFP = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
           const activeRoot = PFP.instance?.getRoot();
           if (activeRoot && !isProjectsContainer(activeRoot)) {
             await vscode.commands.executeCommand('redivivus.closeProject');
@@ -118,8 +118,8 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
         const scan = (dir: string, depth: number) => { try { for (const f of fs.readdirSync(dir)) { const abs = path.join(dir, f); if (fs.statSync(abs).isDirectory() && depth > 0) { scan(abs, depth - 1); } else if (/\.(html|css)$/i.test(f)) { builtFiles.push(path.relative(root, abs)); } } } catch {} };
         scan(root, 2);
       }
-      const { openVisualContractPanel } = require('../../ui/panels/visualContract/visualContractPanel.js');
-      const { ChatPanel: _CP } = require('../../ui/panels/chat/chatPanel.js');
+      const { openVisualContractPanel } = require('../../vault/ui/visualContractPanel.js');
+      const { ChatPanel: _CP } = require('../../chat/ui/chatPanel.js');
       openVisualContractPanel(_CP.extensionContext, root, builtFiles, deps.routing);
       debugLog(root, 'run-command', `openVisualEditor: opened for ${root}`);
     } else {

@@ -14,7 +14,7 @@ export function getActiveProjectRoot(panel?: any): string | undefined {
   // entry point" and Preview serve a random sibling (asteroids) via findHtmlRoot. Prefer the active subfolder.
   if (ws && !isProjectsContainer(ws)) { return ws; }
   try {
-    const r = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot();
+    const r = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot();
     if (r && !isProjectsContainer(r)) { return r; }
   } catch { /* provider not available */ }
   try {

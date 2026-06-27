@@ -122,7 +122,7 @@ export async function handleEarlyExits(panel: ChatPanel, msg: any): Promise<bool
     await config.update('disabledProviders', newDisabled, true);
     
     // Refresh the API Status view in the chat panel
-    const { ChatPanel } = require('../../ui/panels/chat/chatPanel.js');
+    const { ChatPanel } = require('../ui/chatPanel.js');
     if (ChatPanel.currentPanel) {
       // Re-trigger the api status render
       vscode.commands.executeCommand('redivivus.openSettingsInChat');

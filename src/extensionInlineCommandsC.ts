@@ -25,7 +25,7 @@ export function registerInlineCommandsC(
     vscode.commands.registerCommand('redivivus.runProject', async (rootOverride?: string) => {
       // [Model A] Prefer the ACTIVE project subfolder over workspaceFolders[0] (which is ~/projects home).
       let root = rootOverride || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      try { if (!rootOverride) { const _a = require('./ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); if (_a) { root = _a; } } } catch {}
+      try { if (!rootOverride) { const _a = require('./features/vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); if (_a) { root = _a; } } } catch {}
       if (!root) { vscode.window.showWarningMessage('No project folder open.'); return; }
       // [CONSOLIDATE] One shared, type-aware runProject (web→http, .js→node, else→terminal + error monitor).
       const { runProject } = await import('./features/project/logic/runProject.js');

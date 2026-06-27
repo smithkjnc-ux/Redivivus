@@ -69,7 +69,7 @@ export function handleNewProjectCancel(panel: ChatPanel): boolean {
 }
 
 export function handleOpenWorkspaceBtn(panel: ChatPanel, msg: any): boolean {
-  const { ChatPanel: CP } = require('../../ui/panels/chat/chatPanel.js');
+  const { ChatPanel: CP } = require('../ui/chatPanel.js');
   if (CP.extensionContext) {
     CP.extensionContext.globalState.update('redivivus.suppressAutoOpen', msg.path);
     CP.extensionContext.globalState.update('redivivus.suppressConversationClear', true);

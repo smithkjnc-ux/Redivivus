@@ -17,7 +17,7 @@ export function registerCloseProjectCommand(context: vscode.ExtensionContext): v
         const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
         const { isProjectsContainer } = require('./redivivusPaths.js');
         if (wsRoot && isProjectsContainer(wsRoot)) {
-          const PFP = require('../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
+          const PFP = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
           PFP.instance?.setRoot(wsRoot);
           try { require('../core/project/projectFolderDecorations.js').refreshProjectFolderDecorations(); } catch {}
           try { import('./projectFocusMode.js').then(m => m.clearFocus()).catch(() => {}); } catch {}

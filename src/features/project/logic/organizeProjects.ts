@@ -73,7 +73,7 @@ export function registerOrganizeProjects(context: vscode.ExtensionContext): void
     if (choice !== 'Organize') { return; }
 
     let activeRoot: string | undefined;
-    try { activeRoot = require('../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); } catch { /* */ }
+    try { activeRoot = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); } catch { /* */ }
     let moved = 0; let activeMovedTo: string | undefined;
     for (const m of moves) {
       try {

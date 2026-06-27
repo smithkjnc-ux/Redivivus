@@ -37,7 +37,7 @@ export async function runProject(root: string): Promise<void> {
   setTimeout(() => {
     const err = getLastTerminalError();
     if (err && err.errorBlock) {
-      const { ChatPanel } = require('../../ui/panels/chat/chatPanel.js');
+      const { ChatPanel } = require('../../chat/ui/chatPanel.js');
       if (ChatPanel.currentPanel) {
         ChatPanel.currentPanel.handleMessage({ type: 'inject-terminal-error', error: err });
         ChatPanel.currentPanel['_panel']?.reveal(undefined, false);

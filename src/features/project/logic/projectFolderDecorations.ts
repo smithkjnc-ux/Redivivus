@@ -25,7 +25,7 @@ function projectsDir(): string {
 }
 
 function activeProjectRoot(): string | undefined {
-  try { return require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); }
+  try { return require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); }
   catch { return undefined; }
 }
 

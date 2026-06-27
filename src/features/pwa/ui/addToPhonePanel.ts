@@ -6,7 +6,7 @@ import { addToPhoneHtml } from './addToPhonePanelHtml.js';
 
 // Vendored qrcode-generator (Kazuhiko Arase, MIT) — copied to out/ by the compile step; required in Node, not the webview.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const qrcode = require('../../../ui/panels/pwa/vendor/qrcode.js');
+const qrcode = require('./vendor/qrcode.js');
 
 // QR for a URL as a scalable SVG string. Error-correction 'M', auto type number (0).
 function qrSvg(url: string): string {

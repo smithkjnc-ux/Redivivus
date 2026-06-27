@@ -38,10 +38,10 @@ export function projectForFile(filePath: string): string | undefined {
 /** Sets the active project and refreshes the chat header to follow it. No-op if it's already active. */
 export function activateProject(projectDir: string): void {
   try {
-    const PFP = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
+    const PFP = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
     if (PFP.instance?.getRoot() === projectDir) { return; } // already the active project
     PFP.instance?.setRoot(projectDir);
-    const chatPanel = require('../../ui/panels/chat/chatPanel.js').ChatPanel;
+    const chatPanel = require('../../chat/ui/chatPanel.js').ChatPanel;
     chatPanel.currentPanel?.refresh();
     // [FIX] Update the webview panel tab title so the "projects" label tracks the active project.
     // The tab title is set once at creation time from the workspace folder name; since we never

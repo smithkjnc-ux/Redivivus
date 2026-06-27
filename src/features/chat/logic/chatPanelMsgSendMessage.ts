@@ -48,7 +48,7 @@ export async function handleSendMessage(msg: any, deps: MessageHandlerDeps, buil
       });
     }
     refresh();
-    if (!/\bdone.*session\b|\bstart.*session\b/i.test(userText)) { try { const _CP = require('../../ui/panels/chat/chatPanel.js').ChatPanel; const ss = (_CP as any).startSessionSilent; if (ss) { ss(userText); } } catch {} }
+    if (!/\bdone.*session\b|\bstart.*session\b/i.test(userText)) { try { const _CP = require('../ui/chatPanel.js').ChatPanel; const ss = (_CP as any).startSessionSilent; if (ss) { ss(userText); } } catch {} }
   }
 
   // ── TurnContext creation (Phase 0 scaffold) ──

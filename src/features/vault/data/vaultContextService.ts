@@ -185,7 +185,7 @@ export class VaultContextService {
 /** Returns false when user has disabled vault context injection in Setup Hub. Defaults to true. */
 export function isVaultEnabled(): boolean {
   try {
-    const ctx = (require('../../ui/panels/chat/chatPanel.js') as any).ChatPanel?.extensionContext;
+    const ctx = (require('../../chat/ui/chatPanel.js') as any).ChatPanel?.extensionContext;
     return ctx ? ctx.globalState.get('redivivus.vaultEnabled', true) !== false : true;
   } catch { return true; }
 }

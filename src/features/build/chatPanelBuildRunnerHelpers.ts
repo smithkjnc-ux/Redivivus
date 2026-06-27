@@ -99,6 +99,16 @@ export async function handleBuildSuccess(result: CloudBuildResult, root: string,
   deps.conversation.push({ role: 'assistant', content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''} in ${elapsedStr}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${readinessToken}${breakdownToken}`, timestamp: Date.now() });
   deps.refresh();
 
+  // Auto-launch browser preview for HTML projects immediately after build
+  if (htmlFile && root) {
+    try {
+      const { handlePreviewBrowser } = await import('../project/logic/chatPanelMsgFileOps.js');
+      const absHtmlPath = path.join(root, htmlFile.path);
+      const b64 = Buffer.from(absHtmlPath).toString('base64');
+      handlePreviewBrowser({ path: b64 }).catch(() => {});
+    } catch { /* preview is best-effort — never block result display */ }
+  }
+
   if (root) {
     import('./services/securityScanner.js').then(({ scanProject, formatSecurityReport }) => {
       const findings = scanProject(root!);

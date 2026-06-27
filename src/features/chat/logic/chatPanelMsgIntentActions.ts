@@ -11,7 +11,7 @@ export async function handleRunIntent(intent: any, deps: MessageHandlerDeps, con
   // [Model A] Prefer the ACTIVE project subfolder (the built/opened one). Under Model A the workspace root
   // is ~/projects (home), which has no runnable main file — the project is a subfolder.
   let root = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  try { const _a = require('../../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); if (_a) { root = _a; } } catch {}
+  try { const _a = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); if (_a) { root = _a; } } catch {}
   if (!root) {
     conversation.push({ role: 'assistant', content: 'No project is open -- open a project folder first.', timestamp: Date.now() });
     refresh(); return;
