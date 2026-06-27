@@ -1,6 +1,11 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — Guardian trust-and-verify: three gaps closed**
+- **Gap 2** `chatPanelMsgFixGuardianPhase.ts`: `buildContext` (pre-fix runtime errors) now included in `guardianContext` as "PRE-FIX RUNTIME STATE". Guardian sees what was broken before, not just the Worker's code text.
+- **Gap 3** `chatPanelMsgFixGuardianPhase.ts`: Format instructions added asking Guardian to prefix rejection issues with `[FILE: path/to/file.ext]`. Re-prescription now receives file-specific failure targets.
+- **Gap 1** New `chatPanelMsgFixGuardianPreview.ts` + wiring: Fix applied to disk before Guardian reviews. Preview runs (1500ms), runtime output added as "POST-FIX RUNTIME STATE". Guardian reject → rollback via in-memory snapshot. Guardian approve → `EscalationResult.preApplied=true` → Phase23 skips re-apply. Guardian now reviews execution evidence, not just code text.
+
 **2026-06-27 — Worker refresh + full-file format for small projects**
 - **Problem**: Worker generated surgical search/replace blocks based on the file snapshot from the START of the fix session. After retries (or after prior fix runs modified the files), the exact text the Worker searched for no longer existed verbatim → "Search block not found" → false compile errors → escalation to Supervisor self-fix.
 - **Fix 1 (file refresh)** `chatPanelMsgFixEscalation.ts`: Before each retry (attempt > 0), re-read all files in `fileNames` from disk and rebuild `filesBlock`. Worker now always sees current file state, not the initial scan snapshot.
