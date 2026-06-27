@@ -2,6 +2,8 @@
 // Extracted from chatPanelBuildOrchestrated.ts to comply with Rule 9 (200-line limit).
 
 import type { PlanStep } from '../../features/ai/data/supervisorOrchestrator.js';
+import { reviewLayer } from '../../features/ai/data/supervisorLayerReview.js';
+import type { AIResponse } from '../../features/ai/data/routingTypes.js';
 import type { BuildPlan } from './services/buildOrchestrator.js';
 import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
 
@@ -102,4 +104,41 @@ export function pushReviewOutcome(
     deps.refresh();
   }
   return false;
+}
+
+/**
+ * Runs a per-layer Guardian review after a Worker step completes.
+ * Fails OPEN: a transient Guardian error passes the layer through — the integration review is the hard gate.
+ * Returns { blocked: true } if the Guardian explicitly blocked this layer; blocked layers stop the build.
+ */
+export async function runLayerReview(
+  deps: OrchestratorDeps,
+  step: PlanStep,
+  layerCode: string,
+  phaseTask: string,
+  blueprintContext: string,
+  guardianAI: string,
+  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
+): Promise<{ blocked: boolean; code: string }> {
+  if (!layerCode || !guardianAI) {
+    return { blocked: false, code: layerCode };
+  }
+  const layerReview = await reviewLayer(
+    phaseTask, step.description, layerCode, blueprintContext,
+    step.exactInstructions || step.description, guardianAI, callAI,
+  );
+  if (layerReview.blocked) {
+    deps.conversation.push({ role: 'assistant',
+      content: `🛑 **Layer ${step.stepNumber} blocked** (${step.description}): ${layerReview.error}`,
+      timestamp: Date.now() });
+    deps.refresh();
+    return { blocked: true, code: '' };
+  }
+  if (!layerReview.passed && layerReview.notes) {
+    deps.conversation.push({ role: 'assistant',
+      content: `✍️ **Layer ${step.stepNumber} corrected** — ${layerReview.notes}`,
+      timestamp: Date.now() });
+    deps.refresh();
+  }
+  return { blocked: false, code: layerReview.corrected };
 }

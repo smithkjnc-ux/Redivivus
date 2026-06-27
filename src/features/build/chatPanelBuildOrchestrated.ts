@@ -1,10 +1,12 @@
-// [SCOPE] Orchestrated phase build — full multi-AI pipeline for deep complexity phases
-// Flow: Supervisor plans → each step assigned to best-fit AI → user approves → Workers execute → Walkthrough
+// [SCOPE] Orchestrated phase build — full multi-AI pipeline, including single-AI serialized mode.
+// Flow: Supervisor plans → steps assigned → user approves → Workers execute with per-layer Guardian → integration check
 // Utilities (AI_LABELS, parseFileMarkers, etc.) extracted to chatPanelBuildOrchestratedUtils.ts (Rule 9).
 
 import * as path from 'path';
 import { AI_RANK, selectGuardianAI } from '../../features/ai/data/guardianAI.js';
-import { createPlan, executeStep, reviewOutput } from '../../features/ai/data/supervisorOrchestrator.js';
+import { createPlan, executeStep } from '../../features/ai/data/supervisorOrchestrator.js';
+import { reviewIntegration } from '../../features/ai/data/supervisorLayerReview.js';
+import { buildCapabilityProfiles } from '../../features/ai/data/supervisorPlanner.js';
 import { callProvider } from '../../features/ai/logic/providers/providerFactory.js';
 import type { BuildPlan, BuildPhase } from './services/buildOrchestrator.js';
 import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
@@ -14,16 +16,13 @@ import { readProjectRules } from '../fix/chatPanelMsgFixUtils.js';
 import { generatePlanId, formatOrchestratedPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate.js';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough.js';
 import { log } from '../../features/logging/data/redivivusLogger.js';
-import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown, pushReviewOutcome } from './chatPanelBuildOrchestratedUtils.js';
+import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown, pushReviewOutcome, runLayerReview } from './chatPanelBuildOrchestratedUtils.js';
 
 // Re-export utilities so existing importers don't break
 export { isOrchestratedAvailable, buildPhaseTask } from './chatPanelBuildOrchestratedUtils.js';
 
-/**
- * Runs a single phase using the full multi-AI orchestration pipeline.
- * Returns the list of written file paths, or [] on failure.
- * [WARN] Only called when isOrchestratedAvailable() returns true (2+ AIs configured).
- */
+/** Runs a single phase using the multi-AI (or single-AI serialized) orchestration pipeline.
+ *  Returns the list of written file paths, or [] on failure. */
 export async function runOrchestratedPhaseBuild(
   phase: { id: BuildPhase; name: string; description: string; icon: string; outputs: string[] },
   plan: BuildPlan,
@@ -44,12 +43,15 @@ export async function runOrchestratedPhaseBuild(
   const phaseTask = buildPhaseTask(phase, plan);
   const [_de, _pr] = [readProjectDeadEnds(root), readProjectRules(root)];
   const context = [blueprintContext||'', _de?`PREVIOUSLY FAILED APPROACHES:\n${_de}`:'', _pr?`PROJECT RULES:\n${_pr}`:''].filter(Boolean).join('\n\n');
-  const supervisorLabel = AI_LABELS[ranked[0]] || ranked[0];
+  // Guardian + profiles set up before the loop — used in per-layer review and integration check.
+  const profiles = buildCapabilityProfiles(ranked);
+  const guardianAI = selectGuardianAI(ranked[0], keyMap);
+  const singleProvider = !guardianAI && ranked.length <= 1;
 
   // ── Step 1: Supervisor plans ──────────────────────────────────────────────
   deps.conversation.push({
     role: 'assistant',
-    content: `🧠 **${supervisorLabel} (Supervisor)** planning architecture...`,
+    content: `🧠 **${AI_LABELS[ranked[0]] || ranked[0]} (Supervisor)** planning architecture...`,
     timestamp: Date.now(),
   });
   deps.refresh();
@@ -97,7 +99,7 @@ export async function runOrchestratedPhaseBuild(
   deps.conversation.push({ role: 'assistant', content: '\u2705 Plan approved \u2014 each AI working in sequence...', timestamp: Date.now() });
   deps.refresh();
 
-  // ── Step 2: Execute each step with its assigned AI ────────────────────────
+  // ── Step 2: Execute each step with per-layer Guardian review ─────────────
   let assembledCode = '';
   let totalTokens = 0;
 
@@ -109,49 +111,32 @@ export async function runOrchestratedPhaseBuild(
     });
     deps.refresh();
 
-    const result = await executeStep(step, phaseTask, assembledCode, callAI, planSteps);
-    if (result.code) {
-      assembledCode = assembledCode ? assembledCode + '\n\n' + result.code : result.code;
-    }
-    // [M1] Surface a failed step instead of silently dropping it — otherwise the build continues with a
-    // missing piece and the user never learns why the result is incomplete.
+    const result = await executeStep(step, phaseTask, assembledCode, callAI, planSteps, profiles, blueprintContext);
+    totalTokens += result.tokens;
     if (result.failed) {
       deps.conversation.push({
         role: 'assistant',
-        content: `⚠️ **Step ${step.stepNumber} (${step.assignedLabel}) failed** and produced no output: ${result.error}. Continuing with the remaining steps — the result may be incomplete.`,
+        content: `⚠️ **Step ${step.stepNumber} (${step.assignedLabel}) failed**: ${result.error}. Continuing — result may be incomplete.`,
         timestamp: Date.now(),
       });
       deps.refresh();
+      continue;
     }
-    totalTokens += result.tokens;
+
+    // Per-layer Guardian: catch errors before the next step builds on them. Fails OPEN.
+    const { blocked, code: layerCode } = await runLayerReview(deps, step, result.code, phaseTask, blueprintContext || '', guardianAI || '', callAI);
+    if (blocked) { return []; }
+    assembledCode = assembledCode ? `${assembledCode}\n\n${layerCode}` : layerCode;
   }
 
-  // ── Step 3: Independent Guardian reviews assembled output ─────────────────
-  // [H1] The reviewer must NOT be the planner (ranked[0]) — that AI authored the plan and would be
-  // grading its own work. Select an independent Guardian (a different provider). [H3] If the review
-  // FAILS (timeout/error/ambiguous), BLOCK the ship — never write unreviewed code to disk.
-  // [DEGRADED] If the user has only one provider configured there is no independent Guardian to call;
-  // that is an expected config state, not a failure — proceed but mark the build unreviewed and warn.
-  const guardianAI = selectGuardianAI(ranked[0], keyMap);
-  const singleProvider = !guardianAI && ranked.length <= 1;
+  // ── Step 3: Final integration check — do the layers fit together? ─────────
+  // [H3] Fails CLOSED: unreviewed code never ships. [DEGRADED] single-provider: proceeds with ⚠️ warning.
   if (guardianAI) {
-    deps.conversation.push({
-      role: 'assistant',
-      content: `🛡️ **${AI_LABELS[guardianAI] || guardianAI} (Guardian)** reviewing assembled output...`,
-      timestamp: Date.now(),
-    });
+    deps.conversation.push({ role: 'assistant', content: `🛡️ **${AI_LABELS[guardianAI] || guardianAI} (Guardian)** checking layer integration...`, timestamp: Date.now() });
     deps.refresh();
   }
 
-  const review = await reviewOutput(
-    phaseTask,
-    assembledCode,
-    guardianAI || '',
-    callAI,
-    planSteps.map(s => `Step ${s.stepNumber}: Create ${s.filesToCreate?.join(', ')} -> ${s.exactInstructions}`).join('\\n'),
-    singleProvider,
-  );
-  // [H3] blocked → stop, write nothing. [DEGRADED] degraded → persistent ⚠️ warning, proceed unreviewed.
+  const review = await reviewIntegration(phaseTask, assembledCode, planSteps, blueprintContext || '', guardianAI || '', callAI, singleProvider);
   if (pushReviewOutcome(deps, review)) { return []; }
   const finalCode = review.corrected;
 

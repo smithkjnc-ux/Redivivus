@@ -75,9 +75,16 @@ function aiSpecs(profiles: WorkerProfile[]): string {
 
 // [WARN] The plan prompt must return strict JSON. Any deviation and parsing fails.
 export function buildPlanPrompt(task: string, profiles: WorkerProfile[], context: string): string {
+  const minOutputK = Math.min(...profiles.map(p => p.outputK));
+  const maxSteps = minOutputK <= 10 ? 8 : 4;
+  const isSingleAI = profiles.length === 1;
+  // Single-AI mode: the planner IS the builder — it plans steps it will execute itself, serialized.
+  const stepDirective = isSingleAI
+    ? `You are BOTH the planner AND the builder (only one AI is configured). Create ${maxSteps} or fewer steps — each step is a layer you will execute yourself, one at a time. Size each step so the complete output fits within your ~${minOutputK}k token output budget.`
+    : `Create a build plan with ${maxSteps === 8 ? '4-8' : '1-4'} steps (${maxSteps === 4 ? 'fewer is better' : 'sized to each worker output budget'}).`;
   return `You are the shop foreman. You size the job before anyone picks up a wrench. Direct, warm, efficient -- you've seen every kind of job.
 - No jargon with the user. You have opinions and share them. If the request doesn't match the goal, say so first.
-- Assign work to the right AI for each step. Fewer steps is better.
+- ${isSingleAI ? 'You are both planner and builder — assign all steps to yourself.' : 'Assign work to the right AI for each step. Fewer steps is better.'}
 
 You are a senior software architect planning a build task. Create a step-by-step plan and assign each step to the best-fit AI.
 
@@ -96,7 +103,7 @@ ASSIGNMENT RULES:
 PROJECT RULES (MUST COMPLY):
 ${getWorkerRules()}
 
-Create a build plan with 1-4 steps (fewer is better). Each step produces code.
+${stepDirective} Each step produces code.
 
 ARCHITECTURAL REASONING (Follow these steps before generating the plan):
 1. Environment Assessment: Evaluate the runtime environment. If there is no build tool (e.g. Vite, Webpack) prescribed in the blueprint, you MUST use natively executable languages (e.g. standard HTML, CSS, Vanilla JS) for browsers. Do NOT use TypeScript or JSX unless you also prescribe the build configuration to compile it.
@@ -144,7 +151,9 @@ export function parsePlan(text: string, profiles: WorkerProfile[]): PlanStep[] {
     const parsed = JSON.parse(clean);
     if (!Array.isArray(parsed)) { throw new Error('Not an array'); }
 
-    const plan = parsed.slice(0, 4).map((item: any, i: number) => {
+    const minOutputK = Math.min(...profiles.map(p => p.outputK));
+    const maxSteps = minOutputK <= 10 ? 8 : 4;
+    const plan = parsed.slice(0, maxSteps).map((item: any, i: number) => {
       const hasFiles = Array.isArray(item.filesToCreate) && item.filesToCreate.length > 0;
       let ai = availableAIs.includes(item.ai) ? item.ai : fallback;
       ai = clampAssignment(ai, hasFiles, profiles);
