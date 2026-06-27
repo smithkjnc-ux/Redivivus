@@ -85,39 +85,82 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   if (_hasNonDefaultViteRoot && _hasAboveRootLinks) {
     const _viteRoot = filesBlock.match(/root:\s*['"]([^.'"'][^'"]*)['"]/)?.[1] || 'custom-folder';
 
-    // [WIRING-GATE-EXACT-HTML] Compute the EXACT corrected index.html content here, in TypeScript,
-    // so the Worker writes verbatim output — no path interpretation, no transformation guessing.
-    // The retry loop was: Worker interprets "copy and fix paths" → gets paths wrong → Guardian rejects
-    // → 3 retries → Supervisor writes directly. By computing the content ourselves we remove the
-    // interpretation step entirely.
-    const _srcHtmlKey = `${_viteRoot}/index.html`;
-    const _srcHtmlRegex = new RegExp(
-      `// === FILE: ${_srcHtmlKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ===\\n([\\s\\S]*?)(?=\\n// === FILE:|$)`
-    );
-    const _srcHtmlRaw = filesBlock.match(_srcHtmlRegex)?.[1]?.trim() ?? null;
-    // Fix paths: ../src/ → ./src/  AND  ../styles/ → ./styles/  (relative-to-root → relative-to-project-root)
-    const _fixedHtml = _srcHtmlRaw
-      ? _srcHtmlRaw.replace(/(['"(])\.\.\/(?=(?:src|styles|js|css|assets|images|fonts)\/)/, '$1./')
-      : null;
-    fixLog(`[WIRING-GATE] HTML pre-computed: srcFile=${_srcHtmlKey} found=${!!_srcHtmlRaw} fixedLen=${_fixedHtml?.length ?? 0}`);
+    // [Rule 18 — AI for understanding, code for execution]
+    // The wiring gate has already done the understanding: it detected the structural mismatch
+    // and knows exactly what files need to change and exactly how. These are deterministic
+    // string transformations — no AI judgment required. Apply them directly in TypeScript.
+    // The AI pipeline then runs only for the user's actual request (visual changes etc).
+    let _wiringApplied = false;
+    try {
+      const _wfs = require('fs') as typeof import('fs');
+      const _wpath = require('path') as typeof import('path');
 
-    const _htmlInstruction = _fixedHtml
-      ? `(3) index.html (ROOT file — NOT ${_viteRoot}/index.html): write this EXACT content verbatim — do not alter it:\n` +
-        `\`\`\`html\n${_fixedHtml}\n\`\`\`\n` +
-        `(4) ${_viteRoot}/index.html: replace entire content with a single HTML comment: <!-- moved to root index.html -->`
-      : `(3) Move HTML entry: COPY the full HTML content from ${_viteRoot}/index.html into the ROOT index.html. Replace all ../src/ paths with ./src/ paths.\n` +
-        `(4) ${_viteRoot}/index.html: replace entire content with: <!-- moved to root index.html -->`;
+      // 1. Extract public/index.html content and fix asset paths
+      const _srcHtmlKey = `${_viteRoot}/index.html`;
+      const _srcHtmlRegex = new RegExp(
+        `// === FILE: ${_srcHtmlKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ===\\n([\\s\\S]*?)(?=\\n// === FILE:|$)`
+      );
+      const _srcHtmlRaw = filesBlock.match(_srcHtmlRegex)?.[1]?.trim() ?? null;
+      // ../src/ → ./src/ (outDir-relative paths break when root moves from subfolder to project root)
+      const _fixedHtml = _srcHtmlRaw
+        ? _srcHtmlRaw.replace(/(['"])\.\.\/(src|styles|js|css|assets|images|fonts)\//g, '$1./$2/')
+        : null;
 
-    userText = `STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY VISUAL CHANGES:\n` +
-      `THIS IS A PURE FILE EDIT TASK — do NOT emit [AGENT_HANDOFF]. No commands need to run. Edit the files directly.\n` +
-      `vite.config.js has root:'${_viteRoot}'. HTML asset paths resolve inside the Vite root folder, NOT at the project root — CSS/JS silently 404.\n` +
-      `REQUIRED changes (write ALL of these, do not omit any):\n` +
-      `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +
-      `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — MANDATORY. With root:'.', outDir:'../dist' places build output OUTSIDE the project.\n` +
-      `${_htmlInstruction}\n` +
-      `STOP — do NOT touch CSS or class names in this pass. A second pass will handle CSS.\n` +
-      `AFTER the wiring is fixed: ${userText}`;
-    fixLog('[WIRING-GATE] Structural path mismatch detected — userText prefixed with full structural fix instruction');
+      // 2. Patch vite.config.js
+      const _vcPath = ['vite.config.js', 'vite.config.ts', 'vite.config.mjs']
+        .map(n => _wpath.join(root, n)).find(p => _wfs.existsSync(p));
+      if (_vcPath) {
+        let _vc = _wfs.readFileSync(_vcPath, 'utf8');
+        _vc = _vc.replace(/root:\s*['"][^'"]+['"]/, "root: '.'");
+        _vc = _vc.replace(/outDir:\s*['"]\.\.\/dist['"]/, "outDir: './dist'");
+        _wfs.writeFileSync(_vcPath, _vc, 'utf8');
+        fixLog(`[WIRING-GATE] Patched ${_wpath.basename(_vcPath)}: root→'.' outDir→'./dist'`);
+      }
+
+      // 3. Write corrected HTML to root index.html
+      if (_fixedHtml) {
+        _wfs.writeFileSync(_wpath.join(root, 'index.html'), _fixedHtml + '\n', 'utf8');
+        fixLog(`[WIRING-GATE] Wrote corrected HTML to root index.html (${_fixedHtml.length} chars)`);
+      }
+
+      // 4. Clear public/index.html (leave a comment so the file isn't orphaned)
+      const _pubHtmlPath = _wpath.join(root, _viteRoot, 'index.html');
+      if (_wfs.existsSync(_pubHtmlPath)) {
+        _wfs.writeFileSync(_pubHtmlPath, `<!-- entry point moved to root index.html -->\n`, 'utf8');
+        fixLog(`[WIRING-GATE] Cleared ${_srcHtmlKey}`);
+      }
+
+      // 5. Refresh filesBlock so the AI sees the corrected state, not the stale snapshot
+      const _fresh = [...allowedRels]
+        .filter(rel => _wfs.existsSync(_wpath.join(root, rel)))
+        .map(rel => `// === FILE: ${rel} ===\n${_wfs.readFileSync(_wpath.join(root, rel), 'utf8')}`);
+      if (_fresh.length > 0) {
+        filesBlock = _fresh.join('\n\n');
+        fixLog(`[WIRING-GATE] Refreshed filesBlock after direct apply (${_fresh.length} files)`);
+      }
+
+      _wiringApplied = true;
+    } catch (_we) {
+      fixLog(`[WIRING-GATE] Direct apply failed — falling back to AI prescription: ${String(_we).slice(0, 120)}`);
+    }
+
+    if (_wiringApplied) {
+      // Structural fix is done. Let the AI handle the user's actual request only.
+      fixLog('[WIRING-GATE] Structural wiring fixed by code — AI will handle user visual request only');
+    } else {
+      // Fallback: ask the AI to apply the structural fix (original behavior)
+      userText = `STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY VISUAL CHANGES:\n` +
+        `THIS IS A PURE FILE EDIT TASK — do NOT emit [AGENT_HANDOFF]. No commands need to run.\n` +
+        `vite.config.js has root:'${_viteRoot}'. HTML asset paths resolve inside the Vite root folder, NOT at the project root — CSS/JS silently 404.\n` +
+        `REQUIRED changes (write ALL of these, do not omit any):\n` +
+        `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +
+        `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — MANDATORY.\n` +
+        `(3) Move HTML: copy ${_viteRoot}/index.html content to root index.html, fixing ../src/ → ./src/ paths.\n` +
+        `(4) ${_viteRoot}/index.html: write only: <!-- entry point moved to root index.html -->\n` +
+        `STOP — do NOT touch CSS in this pass.\n` +
+        `AFTER the wiring is fixed: ${userText}`;
+      fixLog('[WIRING-GATE] Structural path mismatch detected — falling back to AI fix instruction');
+    }
   }
 
   // [PREVIEW-AUTOFIX Phase 1] Pre-flight Run-Check
