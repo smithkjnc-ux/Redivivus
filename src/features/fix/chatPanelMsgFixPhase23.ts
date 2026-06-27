@@ -64,12 +64,19 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       }
 
       fixLog('Phase 3: Applying fix content...');
-      const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
       const targetFiles = fileNames.split(', ').slice(0, 3).join(', ');
       conversation[conversation.length - 1].content = progressApplying({ supervisorLabel, targetFiles });
       refresh();
-      const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
-      written = applyRes.written; failed = applyRes.failed; skipped = applyRes.skipped; fixSnapId = applyRes.fixSnapId;
+      // [GAP1] Guardian pre-applied the fix before reviewing — skip disk write to avoid double-apply.
+      // preAppliedFiles carries the written list so PRESCRIPTION_CHECK still works correctly.
+      if (escalation.preApplied && escalation.preAppliedFiles?.length) {
+        written = escalation.preAppliedFiles; failed = []; skipped = []; fixSnapId = undefined;
+        fixLog('[PRE-APPLY] Skipping applyFixContent — Guardian already applied and approved this fix', { written });
+      } else {
+        const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
+        const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);
+        written = applyRes.written; failed = applyRes.failed; skipped = applyRes.skipped; fixSnapId = applyRes.fixSnapId;
+      }
       fixLog('Phase 3: Application complete', { written, failed, skipped });
 
       // [FIX] Verify prescribed files were actually written — catches false success where Worker fixes wrong file.

@@ -41,10 +41,33 @@ export async function runGuardianPhase(params: {
 
   try {
     const userRequest = conversation.map(m => m.role === 'user' ? m.content : '').filter(Boolean).pop() || 'Fix the issue';
-    const guardianContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${currentDiagnosis}`;
+
+    // [GAP2] Include pre-fix runtime state so Guardian knows what was broken BEFORE the fix.
+    // buildContext is captured before the Supervisor runs (runtime errors, failed loads, etc.)
+    const _runtimeBefore = buildContext?.trim()
+      ? `\n\nPRE-FIX RUNTIME STATE (errors that existed before the Worker's fix — the correct fix must address these):\n${buildContext.slice(0, 800)}`
+      : '';
+
+    // [GAP3] Request structured per-file rejection format so re-prescription knows exactly which files failed.
+    const _structuredFmt = `\n\nSTRUCTURED REJECTION FORMAT — if rejecting, prefix each GUARDIAN_ISSUES line with [FILE: path/to/file.ext] so the re-prescription AI knows which file to target:\n- [FILE: exact/path.ext] specific reason this file\'s change is wrong or incomplete\nOutput GUARDIAN_PASS if the fix is correct.`;
+
+    let guardianContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${currentDiagnosis}${_runtimeBefore}${_structuredFmt}`;
     fixLog(`Guardian review (attempt ${attempt + 1}): Starting...`);
     fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
-    
+
+    // [GAP1] Apply fix to disk before Guardian reviews — gives Guardian real execution evidence,
+    // not just code text. Rollback if Guardian rejects. If approved, files are already on disk.
+    let _preApply: import('./chatPanelMsgFixGuardianPreview.js').PreApplyResult | null = null;
+    try {
+      const { runPreApplyCapture } = await import('./chatPanelMsgFixGuardianPreview.js');
+      const _allowedRels = new Set([...filesBlock.matchAll(/^\/\/ === FILE: (.+?) ===/gm)].map(m => m[1]));
+      _preApply = await runPreApplyCapture(workerResponse, root, _allowedRels, userText || '');
+      if (_preApply?.runtimeSummary) {
+        guardianContext += `\n\nPOST-FIX RUNTIME STATE (what the app does AFTER applying the Worker\'s fix):\n${_preApply.runtimeSummary}`;
+        fixLog(`[PRE-APPLY] Applied and captured runtime: ${_preApply.runtimeSummary}`);
+      }
+    } catch (e) { fixLog(`[PRE-APPLY] Skipped (non-blocking): ${String(e).slice(0, 80)}`); }
+
     // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
     const guardianWorkerHint = escalated && originalWorkerProvider ? originalWorkerProvider : workerLabel.toLowerCase();
     const guardianResult = await deps.routing.guardianReview(guardianContext, workerResponse, guardianWorkerHint, '', deps.routingOverrides?.guardian);
@@ -73,7 +96,8 @@ export async function runGuardianPhase(params: {
         ? `Guardian (${guardianLabel}): Approved`
         : `Guardian: skipped (no reviewer available — fix applied without final review)`;
       fixLog(guardianRan ? `Guardian APPROVED the fix` : `Guardian SKIPPED (no provider) — fix passed through unreviewed`);
-      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
+      // [GAP1] Files already on disk from pre-apply — signal Phase23 to skip re-apply
+      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles } };
     }
 
     // [H2 degraded] Guardian infrastructure failure (no providers available / all failed) — NOT a code rejection.
@@ -95,6 +119,12 @@ export async function runGuardianPhase(params: {
       guardianNote = `Guardian: inconclusive (response format mismatch — fix applied, verify manually)`;
       fixLog('Guardian format-mismatch rejection — treating as inconclusive, skipping retry loop');
       return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianLabel || 'Guardian', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
+    }
+
+    // [GAP1] Guardian rejected — rollback pre-applied changes so the next Worker attempt starts clean
+    if (_preApply) {
+      _preApply.rollback();
+      fixLog('[PRE-APPLY] Guardian rejected — rolled back pre-applied changes');
     }
 
     accumulatedCritiques.push(critique);
