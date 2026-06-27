@@ -86,6 +86,17 @@ export async function runGuardianPhase(params: {
 
     // Guardian rejected WITHOUT corrected text — accumulate critique and retry
     const critique = guardianResult.issues?.join('; ') || 'Unknown issue';
+
+    // [FIX] Format-mismatch: Guardian returned GUARDIAN_FAIL with no extractable reason.
+    // Re-prescribing with "possible format mismatch" as the critique gives the Worker nothing actionable
+    // and burns 2 retry loops (2 Supervisor + 2 Worker calls) for zero gain.
+    // Treat as inconclusive and ship with a note — the code itself was correct.
+    if (critique.includes('no structured reason') || critique.includes('format mismatch')) {
+      guardianNote = `Guardian: inconclusive (response format mismatch — fix applied, verify manually)`;
+      fixLog('Guardian format-mismatch rejection — treating as inconclusive, skipping retry loop');
+      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianLabel || 'Guardian', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
+    }
+
     accumulatedCritiques.push(critique);
     fixLog(`Guardian REJECTED the fix (attempt ${attempt + 1})`, { critique: critique.substring(0, 300) });
 

@@ -40,6 +40,35 @@ export function collectFixContext(root: string, sourceFiles: { rel: string }[]):
     }
   } catch {}
 
+  // Structural wiring check — Vite custom root + HTML path mismatch makes CSS/JS silently 404.
+  // Injected as a CRITICAL diagnostic so the server-side Supervisor sees it before planning CSS changes.
+  try {
+    const fs = require('fs') as typeof import('fs');
+    const viteConfigFile = ['vite.config.js', 'vite.config.ts', 'vite.config.mjs'].find(f => fs.existsSync(path.join(root, f)));
+    if (viteConfigFile) {
+      const viteSrc = fs.readFileSync(path.join(root, viteConfigFile), 'utf-8');
+      const rootMatch = viteSrc.match(/root:\s*['"]([^.'"'][^'"]*)['"]/);
+      if (rootMatch) {
+        const viteRoot = rootMatch[1];
+        const htmlEntry = [path.join(root, viteRoot, 'index.html'), path.join(root, 'index.html')].find(p => fs.existsSync(p));
+        if (htmlEntry) {
+          const htmlSrc = fs.readFileSync(htmlEntry, 'utf-8');
+          const badPaths = [...htmlSrc.matchAll(/<(?:link|script)[^>]+(?:href|src)=["'](\.\.[^'"]+)["']/gi)].map(m => m[1]);
+          if (badPaths.length > 0) {
+            parts.push(
+              `🚨 CRITICAL STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY STYLE CHANGES:\n` +
+              `${viteConfigFile} sets root:'${viteRoot}'. ${path.relative(root, htmlEntry)} has asset paths that go ABOVE the Vite root:\n` +
+              badPaths.map(l => `  "${l}" → browser requests /${l.replace(/^\.\.\//,'')} → Vite looks in ${viteRoot}/ → NOT FOUND → CSS/JS never loads`).join('\n') +
+              `\nREQUIRED FIX: (1) set root:'.' in ${viteConfigFile}, (2) change HTML link/script paths to ./src/...\n` +
+              `ALSO check: CSS class selectors (.foo) must match HTML class="foo" attributes — NOT id="foo".\n` +
+              `The app looks unstyled NOT because the CSS is wrong — the CSS file is never loaded.`
+            );
+          }
+        }
+      }
+    }
+  } catch {}
+
   // Live VS Code diagnostics — real TypeScript/ESLint errors currently shown in the editor gutter.
   try {
     const diagLines: string[] = [];
