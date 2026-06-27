@@ -36,17 +36,35 @@ export async function runSubtasksLoop(params: {
 
   for (let i = 0; i < subtasks.length; i++) {
     const stepLabel = `[${i + 1}/${subtasks.length}]`;
-    fixLog(`--- Starting Subtask ${stepLabel} ---`, { subtask: subtasks[i] });
+    // [SEQUENTIAL-DEP] Steps marked [DEPENDS_ON_PREV] cannot be correctly prescribed until
+    // the previous step's output exists on disk. The Worker for these steps receives ONLY
+    // its own step instruction + the fresh file state — not the full multi-step diagnosis.
+    // This prevents the Worker from seeing prescriptions written against a file state that
+    // no longer reflects reality (e.g. "fix CSS to match HTML" before the HTML was written).
+    const dependsOnPrev = subtasks[i].startsWith('[DEPENDS_ON_PREV]');
+    const stepInstruction = subtasks[i].replace(/^\[DEPENDS_ON_PREV\]\s*/, '');
+
+    fixLog(`--- Starting Subtask ${stepLabel} ---`, { subtask: stepInstruction, dependsOnPrev });
     deps.conversation[deps.conversation.length - 1].content =
-      `Supervisor (${supervisorLabel}): done\nWorker: fix ${stepLabel} — ${subtasks[i].slice(0, 60)}...\nVerify: pending\nGuardian: pending`;
+      `Supervisor (${supervisorLabel}): done\nWorker: fix ${stepLabel} — ${stepInstruction.slice(0, 60)}...\nVerify: pending\nGuardian: pending`;
     deps.refresh();
 
-    const chunkDiagnosis = `${diagnosis}\n\nSubtask ${stepLabel}: ${subtasks[i]}`;
+    // [SCOPE ISOLATION] Dependent steps get only their own instruction + fresh files.
+    // Independent steps get the full diagnosis so the Worker has full context.
+    const chunkDiagnosis = dependsOnPrev
+      ? [
+          `TASK: ${userText || stepInstruction}`,
+          `\nPREVIOUS STEP(S) COMPLETE — files below are re-read from disk and reflect the current state.`,
+          `\nEXECUTE ONLY THIS STEP (${stepLabel}):`,
+          stepInstruction,
+          `\nWrite ONLY the file(s) this step requires. Do not redo any previous step's work.`
+        ].join('\n')
+      : `${diagnosis}\n\nSubtask ${stepLabel}: ${stepInstruction}`;
 
     try {
       const escalation = await runEscalationLoop({
         diagnosis: chunkDiagnosis, fileNames, filesBlock: currentFilesBlock,
-        activePatterns, deps, root, supervisorLabel, maxRetries: 1
+        activePatterns, deps, root, supervisorLabel, maxRetries: 1, userText
       });
 
       finalWorkerLabel = escalation.workerLabel;
