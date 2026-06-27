@@ -14,6 +14,7 @@ import { registerAllCommands } from './extensionCommands.js';
 import { initApiClient } from './features/api/data/apiClient.js';
 import { logSessionStart } from './features/api/data/apiClientTelemetry.js';
 import { initSecretKeyStore, onSecretKeyStoreReady } from './features/ai/data/secretKeyStore.js';
+import { initQuotaTracker } from './features/ai/data/providerQuotaTracker.js';
 import { resumePendingState } from './extensionResumeState.js';
 import { initRedivivusLogger, redivivusLog, finalizeRedivivusLogger } from './features/logging/data/redivivusLogger.js';
 import { initProjectContextLogger, resetProjectContext } from './features/logging/data/projectContextLogger.js';
@@ -40,6 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
   // mid-build host reload). One-time + idle; no-op after the first establish. See ensureProjectsWorkspace.
   ensureProjectsWorkspace(context);
   initApiClient(context);
+  initQuotaTracker(context);
   // [FIX] After init resolves, invalidate the roster cache and re-render the panel — the panel
   // auto-opens at 500ms and reads the roster BEFORE SecretStorage finishes, so the badge shows
   // a stale pre-init value (Gemini +2). Refreshing here gives it the real key set (Claude +5).
