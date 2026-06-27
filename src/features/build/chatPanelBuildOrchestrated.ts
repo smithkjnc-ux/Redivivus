@@ -7,6 +7,7 @@ import { AI_RANK, selectGuardianAI } from '../../features/ai/data/guardianAI.js'
 import { createPlan, executeStep } from '../../features/ai/data/supervisorOrchestrator.js';
 import { reviewIntegration } from '../../features/ai/data/supervisorLayerReview.js';
 import { buildCapabilityProfiles } from '../../features/ai/data/supervisorPlanner.js';
+import { resolveRoleTemps } from '../../features/ai/data/roleTemperature.js';
 import { callProvider } from '../../features/ai/logic/providers/providerFactory.js';
 import type { BuildPlan, BuildPhase } from './services/buildOrchestrator.js';
 import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
@@ -38,7 +39,9 @@ export async function runOrchestratedPhaseBuild(
     .map(([ai]) => ai);
 
   const fetchFn = (url: string, opts: RequestInit) => (routing as any).fetchWithTimeout(url, opts, 90_000);
-  const callAI = (ai: string, prompt: string) => callProvider(ai, prompt, fetchFn);
+  const storedTemps = (deps.redivivus as any)?.getSessionAiTemperature?.();
+  const roleTemps = resolveRoleTemps(storedTemps);
+  const callAI = (ai: string, prompt: string, temperature?: number) => callProvider(ai, prompt, fetchFn, undefined, undefined, undefined, undefined, temperature);
 
   const phaseTask = buildPhaseTask(phase, plan);
   const [_de, _pr] = [readProjectDeadEnds(root), readProjectRules(root)];
@@ -62,12 +65,7 @@ export async function runOrchestratedPhaseBuild(
     projectRoot: root
   });
 
-  const planSteps = await createPlan(
-    phaseTask,
-    ranked,
-    context,
-    callAI
-  );
+  const planSteps = await createPlan(phaseTask, ranked, context, callAI, roleTemps);
 
   deps.conversation.push({
     role: 'assistant',
@@ -111,7 +109,7 @@ export async function runOrchestratedPhaseBuild(
     });
     deps.refresh();
 
-    const result = await executeStep(step, phaseTask, assembledCode, callAI, planSteps, profiles, blueprintContext);
+    const result = await executeStep(step, phaseTask, assembledCode, callAI, planSteps, profiles, blueprintContext, roleTemps);
     totalTokens += result.tokens;
     if (result.failed) {
       deps.conversation.push({
@@ -124,7 +122,7 @@ export async function runOrchestratedPhaseBuild(
     }
 
     // Per-layer Guardian: catch errors before the next step builds on them. Fails OPEN.
-    const { blocked, code: layerCode } = await runLayerReview(deps, step, result.code, phaseTask, blueprintContext || '', guardianAI || '', callAI);
+    const { blocked, code: layerCode } = await runLayerReview(deps, step, result.code, phaseTask, blueprintContext || '', guardianAI || '', callAI, roleTemps);
     if (blocked) { return []; }
     assembledCode = assembledCode ? `${assembledCode}\n\n${layerCode}` : layerCode;
   }
@@ -136,7 +134,7 @@ export async function runOrchestratedPhaseBuild(
     deps.refresh();
   }
 
-  const review = await reviewIntegration(phaseTask, assembledCode, planSteps, blueprintContext || '', guardianAI || '', callAI, singleProvider);
+  const review = await reviewIntegration(phaseTask, assembledCode, planSteps, blueprintContext || '', guardianAI || '', callAI, singleProvider, roleTemps);
   if (pushReviewOutcome(deps, review)) { return []; }
   const finalCode = review.corrected;
 

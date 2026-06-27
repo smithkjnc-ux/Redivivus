@@ -10,6 +10,7 @@ import type { AIResponse } from './routingTypes.js';
 import { getWorkerRules } from '../../../features/api/data/apiClientKnowledge.js';
 import { log } from '../../../features/logging/data/redivivusLogger.js';
 import { buildCapabilityProfiles, buildPlanPrompt, parsePlan, type WorkerProfile } from './supervisorPlanner.js';
+import { ROLE_TEMP_DEFAULTS, type RoleTemperatures } from './roleTemperature.js';
 
 export interface PlanStep {
   stepNumber: number;
@@ -40,33 +41,31 @@ export async function createPlan(
   task: string,
   availableAIs: string[],
   context: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>
+  callAI: (ai: string, prompt: string, temperature?: number) => Promise<AIResponse>,
+  temperatures?: RoleTemperatures,
 ): Promise<PlanStep[]> {
   if (availableAIs.length === 0) { return []; }
+  const supervisorTemp = temperatures?.supervisor ?? ROLE_TEMP_DEFAULTS.supervisor;
 
   // [DONE] Fix 1: Single AI now plans its own serialized work — no more single-step dump.
-  // Groq (8K output) planning 3-8 small steps is far more reliable than one prompt with a
-  // non-trivial project that silently truncates at token limit.
   if (availableAIs.length === 1) {
     const ai = availableAIs[0];
     const profiles = buildCapabilityProfiles([ai]);
     const prompt = buildPlanPrompt(task, profiles, context);
-    const res = await callAI(ai, prompt);
+    const res = await callAI(ai, prompt, supervisorTemp);
     if (!res.success || !res.text) {
-      // Planning call itself failed — last-resort single step fallback only.
       const cap = AI_CAPABILITIES[ai];
       return [{ stepNumber: 1, description: task, assignedAI: ai, assignedLabel: cap?.label || ai, type: 'code' }];
     }
     return parsePlan(res.text, profiles);
   }
 
-  const supervisor = availableAIs[0]; // highest-ranked = supervisor
+  const supervisor = availableAIs[0];
   const profiles = buildCapabilityProfiles(availableAIs);
   const prompt = buildPlanPrompt(task, profiles, context);
-  const res = await callAI(supervisor, prompt);
+  const res = await callAI(supervisor, prompt, supervisorTemp);
 
   if (!res.success || !res.text) {
-    // Supervisor failed to plan — assign everything to best worker as fallback.
     const worker = availableAIs[1] || availableAIs[0];
     const cap = AI_CAPABILITIES[worker];
     return [{ stepNumber: 1, description: task, assignedAI: worker, assignedLabel: cap?.label || worker, type: 'code' }];
@@ -80,10 +79,11 @@ export async function executeStep(
   step: PlanStep,
   task: string,
   previousOutput: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
+  callAI: (ai: string, prompt: string, temperature?: number) => Promise<AIResponse>,
   allSteps?: PlanStep[],
   profiles?: WorkerProfile[],    // Fix 3: caps previousOutput to the worker's context window
   blueprintContext?: string,      // Fix 4: injected into every step — Worker never loses the spec
+  temperatures?: RoleTemperatures,
 ): Promise<{ code: string; tokens: number; failed?: boolean; error?: string }> {
   let specText = '';
   if (step.filesToCreate || step.dependencies || step.exactInstructions) {
@@ -124,7 +124,8 @@ export async function executeStep(
     ai: step.assignedAI, contract: specText, contextCap: maxPrevChars, fullPrompt: stepPrompt
   });
 
-  const res = await callAI(step.assignedAI, stepPrompt);
+  const workerTemp = temperatures?.worker ?? ROLE_TEMP_DEFAULTS.worker;
+  const res = await callAI(step.assignedAI, stepPrompt, workerTemp);
 
   log('debug', 'services', 'supervisorOrchestrator', 'executeStep', `Worker Output for Step ${step.stepNumber}`, {
     success: res.success, tokens: Math.ceil((res.text || '').length / 4), fullResponse: res.text

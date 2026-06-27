@@ -6,6 +6,7 @@
 // Split from supervisorOrchestrator.ts so that file stays under Rule 9.
 import type { AIResponse } from './routingTypes.js';
 import type { PlanStep } from './supervisorOrchestrator.js';
+import { ROLE_TEMP_DEFAULTS, type RoleTemperatures } from './roleTemperature.js';
 import { log } from '../../../features/logging/data/redivivusLogger.js';
 
 // ── Per-layer check ───────────────────────────────────────────────────────
@@ -17,12 +18,13 @@ export async function reviewLayer(
   blueprintContext: string,
   prescription: string,
   guardianAI: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
+  callAI: (ai: string, prompt: string, temperature?: number) => Promise<AIResponse>,
+  temperatures?: RoleTemperatures,
 ): Promise<{ passed: boolean; corrected: string; notes: string; blocked?: boolean; error?: string }> {
   if (!guardianAI) {
-    // No guardian available — pass through. Integration review is the hard gate.
     return { passed: true, corrected: layerCode, notes: '' };
   }
+  const guardianTemp = temperatures?.guardian ?? ROLE_TEMP_DEFAULTS.guardian;
 
   const prompt = `You are the Guardian reviewing one layer of a build. Your job is correctness of THIS layer only.
 
@@ -38,7 +40,7 @@ Check: (1) Does it correctly implement the prescription? (2) Does it match the b
 
   log('debug', 'services', 'supervisorLayerReview', 'reviewLayer', 'Layer review', { guardianAI, layerDescription });
 
-  const res = await callAI(guardianAI, prompt);
+  const res = await callAI(guardianAI, prompt, guardianTemp);
   if (!res.success || !res.text) {
     // [FAIL OPEN] Layer review errors pass through — integration review is the hard gate.
     log('warn', 'services', 'supervisorLayerReview', 'reviewLayer', 'Layer review call failed — passing through', { error: res.error });
@@ -65,8 +67,9 @@ export async function reviewIntegration(
   steps: PlanStep[],
   blueprintContext: string,
   guardianAI: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
+  callAI: (ai: string, prompt: string, temperature?: number) => Promise<AIResponse>,
   allowDegradedSingleProvider = false,
+  temperatures?: RoleTemperatures,
 ): Promise<{ passed: boolean; corrected: string; notes: string; blocked?: boolean; degraded?: boolean; error?: string; warning?: string }> {
   if (!guardianAI) {
     if (allowDegradedSingleProvider) {
@@ -101,7 +104,8 @@ Check ONLY: (1) Do layer interfaces match? (2) Are imports/exports consistent ac
 
   log('debug', 'services', 'supervisorLayerReview', 'reviewIntegration', 'Integration review', { guardianAI, stepCount: steps.length });
 
-  const res = await callAI(guardianAI, prompt);
+  const guardianTemp = temperatures?.guardian ?? ROLE_TEMP_DEFAULTS.guardian;
+  const res = await callAI(guardianAI, prompt, guardianTemp);
   if (!res.success || !res.text) {
     // [H3] Integration review failure — fail closed.
     return { passed: false, corrected: assembledCode, notes: '', blocked: true,

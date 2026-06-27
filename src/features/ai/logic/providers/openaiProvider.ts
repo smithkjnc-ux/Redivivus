@@ -3,6 +3,7 @@
 import type { AIResponse } from '../../data/routingTypes.js';
 import { getOpenAIKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
+import { clampTemp } from '../../data/roleTemperature.js';
 
 export async function executeOpenAI(
   text: string,
@@ -10,7 +11,8 @@ export async function executeOpenAI(
   systemMessage?: string,
   tier?: 'flash' | 'pro' | 'ultra',
   imageBase64?: string,
-  imageType?: string
+  imageType?: string,
+  temperature?: number,
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getOpenAIKey()!;
   const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
@@ -27,7 +29,10 @@ export async function executeOpenAI(
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: userContent }]
         : [{ role: 'user', content: userContent }];
       // [FIX] max_tokens set to GPT-4o maximum (16384) — Worker needs full output for large files
-      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 16384 });
+      // [NOTE] o-series reasoning models don't support temperature; omit for those.
+      const bodyObj: any = { model, messages: _msgs, max_tokens: 16384 };
+      if (!isOSeries) { bodyObj.temperature = clampTemp('openai', temperature ?? 0.2); }
+      const body = JSON.stringify(bodyObj);
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
     if (!res.ok) {return { text: '', model, success: false, error: `OpenAI API error ${res.status}: ${data.error?.message || res.statusText}` };}

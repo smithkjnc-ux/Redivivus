@@ -4,6 +4,7 @@
 import type { PlanStep } from '../../features/ai/data/supervisorOrchestrator.js';
 import { reviewLayer } from '../../features/ai/data/supervisorLayerReview.js';
 import type { AIResponse } from '../../features/ai/data/routingTypes.js';
+import type { RoleTemperatures } from '../../features/ai/data/roleTemperature.js';
 import type { BuildPlan } from './services/buildOrchestrator.js';
 import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
 
@@ -118,14 +119,15 @@ export async function runLayerReview(
   phaseTask: string,
   blueprintContext: string,
   guardianAI: string,
-  callAI: (ai: string, prompt: string) => Promise<AIResponse>,
+  callAI: (ai: string, prompt: string, temperature?: number) => Promise<AIResponse>,
+  temperatures?: RoleTemperatures,
 ): Promise<{ blocked: boolean; code: string }> {
   if (!layerCode || !guardianAI) {
     return { blocked: false, code: layerCode };
   }
   const layerReview = await reviewLayer(
     phaseTask, step.description, layerCode, blueprintContext,
-    step.exactInstructions || step.description, guardianAI, callAI,
+    step.exactInstructions || step.description, guardianAI, callAI, temperatures,
   );
   if (layerReview.blocked) {
     deps.conversation.push({ role: 'assistant',

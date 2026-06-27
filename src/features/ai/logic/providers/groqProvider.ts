@@ -3,12 +3,14 @@
 import type { AIResponse } from '../../data/routingTypes.js';
 import { getGroqKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
+import { clampTemp } from '../../data/roleTemperature.js';
 
 export async function executeGroq(
   text: string,
   fetchWithTimeout: (url: string, options: RequestInit, timeoutMs?: number) => Promise<Response>,
   systemMessage?: string,
-  tier?: 'flash' | 'pro' | 'ultra'
+  tier?: 'flash' | 'pro' | 'ultra',
+  temperature?: number,
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getGroqKey()!;
   const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
@@ -19,7 +21,7 @@ export async function executeGroq(
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }]
         : [{ role: 'user', content: text }];
       // [FIX] max_tokens set to Groq maximum (8000) — Worker needs full output for large files
-      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 8000 });
+      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 8000, temperature: clampTemp('groq', temperature ?? 0.2) });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
     if (!res.ok) {return { text: '', model: 'llama-3.3-70b', success: false, error: `Groq API error ${res.status}: ${data.error?.message || res.statusText}` };}

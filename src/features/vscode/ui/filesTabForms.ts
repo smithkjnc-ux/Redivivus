@@ -26,6 +26,9 @@ export function renderSwitchForm(currentAI: string): string {
     logic:     'Logic (0-1): Controls algorithms, conditions and data flow. Low = more deterministic, reliable code. High = novel but riskier logic.',
     data:      'Data (0-1): Controls data structures and persistence patterns. Low = safer, conventional patterns. High = experimental data design.',
     security:  'Security: Always fixed at 0.00. Security code must be fully deterministic with zero creativity — no exceptions.',
+    supervisor: 'Supervisor (0-1): Controls creativity in planning. Default 0.4 — enough variety to explore multiple architectural approaches without going off the rails.',
+    worker:     'Worker (0-1): Controls creativity in code generation. Default 0.2 — precise and deterministic. Higher values risk hallucinated APIs and off-spec code.',
+    guardian:   'Guardian (0-1): Controls creativity in review. Default 0.0 — deterministic. A reviewing AI should always reach the same conclusion given the same code.',
   };
 
   function renderThermometer(id: string, icon: string, label: string, defaultVal: string, locked: boolean = false): string {
@@ -48,8 +51,9 @@ export function renderSwitchForm(currentAI: string): string {
     <div id="behavior-panel-form" style="display:none; margin:16px 0; padding:16px; background:var(--card-bg, #1e293b); border-radius:8px; border:1px solid var(--border, #334455);">
       <h3 style="margin:0 0 4px 0; font-size:14px;">🎛️ AI Behavior Panel</h3>
       <p style="margin:0 0 14px 0; font-size:11px; color:var(--vscode-descriptionForeground);">Configure the temperature settings for specific architectural domains. Settings are saved to the project blueprint.</p>
-      
-      <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:16px; align-items:flex-end;">
+
+      <div style="font-size:10px; font-weight:bold; color:var(--vscode-descriptionForeground); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Build Domains</div>
+      <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:20px; align-items:flex-end;">
         <div style="display:flex; flex-direction:column; justify-content:space-between; height:150px; font-size:9px; color:var(--vscode-descriptionForeground); text-align:right; padding-right:4px; padding-bottom:24px;">
           <div>🔥 Experimental</div>
           <div>Creative</div>
@@ -62,6 +66,21 @@ export function renderSwitchForm(currentAI: string): string {
         ${renderThermometer('logic', '🧠', 'Logic', '0.25')}
         ${renderThermometer('data', '🗄️', 'Data', '0.1')}
         ${renderThermometer('security', '🔒', 'Security', '0.0', true)}
+      </div>
+
+      <div style="font-size:10px; font-weight:bold; color:var(--vscode-descriptionForeground); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px;">Pipeline Roles</div>
+      <div style="display:flex; justify-content:space-between; gap:8px; margin-bottom:16px; align-items:flex-end;">
+        <div style="display:flex; flex-direction:column; justify-content:space-between; height:150px; font-size:9px; color:var(--vscode-descriptionForeground); text-align:right; padding-right:4px; padding-bottom:24px;">
+          <div>🔥 Experimental</div>
+          <div>Creative</div>
+          <div>Balanced</div>
+          <div>Stable</div>
+          <div>❄️ Consistent</div>
+        </div>
+        ${renderThermometer('supervisor', '🧠', 'Supervisor', '0.4')}
+        ${renderThermometer('worker', '🔧', 'Worker', '0.2')}
+        ${renderThermometer('guardian', '🛡️', 'Guardian', '0.0', true)}
+        <div style="flex:2;"></div>
       </div>
 
       <div style="display:flex; justify-content:flex-end; gap:8px;">

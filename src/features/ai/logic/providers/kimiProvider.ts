@@ -4,12 +4,14 @@ import type { AIResponse } from '../../data/routingTypes.js';
 import { getKimiKey } from '../../data/routingKeys.js';
 import { detectKimiBase } from '../../data/kimiEndpoint.js';
 import { classifyError } from './providerUtils.js';
+import { clampTemp } from '../../data/roleTemperature.js';
 
 export async function executeKimi(
   text: string,
   fetchWithTimeout: (url: string, options: RequestInit, timeoutMs?: number) => Promise<Response>,
   systemMessage?: string,
-  tier?: 'flash' | 'pro' | 'ultra'
+  tier?: 'flash' | 'pro' | 'ultra',
+  temperature?: number,
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getKimiKey()!;
   const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
@@ -20,7 +22,7 @@ export async function executeKimi(
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }]
         : [{ role: 'user', content: text }];
       // [FIX] max_tokens set to Kimi maximum (16000) — Worker needs full output for large files
-      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 16000 });
+      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 16000, temperature: clampTemp('kimi', temperature ?? 0.2) });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
     if (!res.ok) {return { text: '', model: 'kimi', success: false, error: `Kimi API error ${res.status}: ${data.error?.message || res.statusText}` };}
