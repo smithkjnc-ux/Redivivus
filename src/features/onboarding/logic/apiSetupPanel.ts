@@ -103,7 +103,7 @@ export class ApiSetupPanel {
   }
 
   private async testAllKeys(): Promise<void> {
-    const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../features/ai/data/secretKeyStore');
+    const { getKeyCached } = require('../../ai/data/secretKeyStore.js') as typeof import('../../../features/ai/data/secretKeyStore');
     const providers = [
       { id: 'gemini', name: 'Gemini' }, { id: 'claude', name: 'Claude' },
       { id: 'openai', name: 'OpenAI' }, { id: 'groq', name: 'Groq' },

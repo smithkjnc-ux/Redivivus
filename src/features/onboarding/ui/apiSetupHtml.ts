@@ -9,7 +9,7 @@ import { API_SETUP_SCRIPT } from './apiSetupScript.js';
 import { modelsForProvider } from '../../../features/ai/data/modelRegistry.js';
 
 export function getApiSetupHtml(): string {
-  const { getKeyCached } = require('../services/ai/secretKeyStore.js') as typeof import('../../../features/ai/data/secretKeyStore');
+  const { getKeyCached } = require('../../ai/data/secretKeyStore.js') as typeof import('../../../features/ai/data/secretKeyStore');
   const config = vscode.workspace.getConfiguration('redivivus');
   const [geminiKey, claudeKey, openaiKey, groqKey, xaiKey, kimiKey, deepseekKey] =
     ['gemini', 'claude', 'openai', 'groq', 'xai', 'kimi', 'deepseek'].map(p => getKeyCached(p) || '');
