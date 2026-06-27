@@ -9,7 +9,8 @@ import { getApiBase } from '../../../features/api/data/apiClient.js';
 import type { BuildRequestDeps } from '../../../features/ai/logic/chatPanelIntent.js';
 import type { CloudBuildResult } from './cloudBuildTypes.js';
 import { buildSingleFileViaBuildEndpoint, finalizeMultiFileBuild, logGuardianStep } from './cloudBuildMultiFileHelpers.js';
-import { looksLikeQuotaError, markProviderUnavailable, isProviderUnavailable } from '../../../features/ai/data/providerTierState.js';
+import { looksLikeQuotaError } from '../../../features/ai/data/providerTierState.js';
+import { recordUnavailable } from '../../../features/ai/data/providerQuotaTracker.js';
 import { AI_RANK } from '../../../features/ai/data/guardianAI.js';
 
 import { nextAvailableProvider, filterKeyHeaders } from './cloudBuildProviderFallback.js';
@@ -145,7 +146,7 @@ export async function executeMultiFileBuild(
           : ['openai', 'gpt'].some(k => errMsg.toLowerCase().includes(k)) ? 'openai'
           : ['gemini', 'google'].some(k => errMsg.toLowerCase().includes(k)) ? 'gemini'
           : preferred;
-        markProviderUnavailable(_failedProvider, errMsg.slice(0, 200));
+        recordUnavailable(_failedProvider, errMsg.slice(0, 200));
         const fallback = nextAvailableProvider(_failedProvider, keyHeaders);
         if (fallback) {
           try {

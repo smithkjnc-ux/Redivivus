@@ -64,14 +64,15 @@ export async function executeAgentTask(
 
   const keysPayload = require('../api/apiClient.js').collectKeys();
   const { bestModelForRole, MODEL_REGISTRY } = require('./modelRegistry.js');
-  const { isProviderUnavailable, unavailableReason } = require('./providerTierState.js');
+  const { getSkipInfo } = require('./providerQuotaTracker.js');
   const _roster = routing.buildRoster();
   const _order = [supervisor, ..._roster.workers, _roster.supervisor].filter((p: string, i: number, a: string[]) => p && a.indexOf(p) === i);
-  const _usable = _order.filter((p: string) => !isProviderUnavailable(p));
+  const _usable = _order.filter((p: string) => !getSkipInfo(p));
   const _chainOrder = _usable.length ? _usable : _order;
   const _skipped = _order.filter((p: string) => !_usable.includes(p));
   if (_usable.length && _skipped.length) {
-    onUpdate(`Info: Skipping ${_skipped.map((p: string) => friendlyModelName(p)).join(', ')} this session (${unavailableReason(_skipped[0]) || 'unavailable'}) -- using ${friendlyModelName(_chainOrder[0])}.`);
+    const skipInfo = getSkipInfo(_skipped[0]);
+    onUpdate(`Info: Skipping ${_skipped.map((p: string) => friendlyModelName(p)).join(', ')} (${skipInfo?.reason ?? 'unavailable'}) -- using ${friendlyModelName(_chainOrder[0])}.`);
   }
   const chain: Array<{ provider: string; model: string; thinkingBudget: number }> = _chainOrder.map((p: string) => {
     const m = bestModelForRole(p, 'pro');

@@ -391,6 +391,10 @@
         "title": "Redivivus: Change Personality"
       },
       {
+        "command": "redivivus.clearProviderQuota",
+        "title": "Redivivus: Clear AI Provider Quota Block"
+      },
+      {
         "command": "redivivus.checkForUpdates",
         "title": "Redivivus: Check for Updates",
         "category": "Redivivus"

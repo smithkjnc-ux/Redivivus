@@ -10,9 +10,9 @@ export interface QuotaHit {
   skipReason?: string;
 }
 
-/** Format ms as human-readable: "45s", "12m", "2h 15m". */
+/** Format ms as human-readable: "45s", "12m", "2h 15m". Clamps to 0 to avoid negative values. */
 export function fmtMs(ms: number): string {
-  const s = Math.round(ms / 1_000);
+  const s = Math.round(Math.max(0, ms) / 1_000);
   if (s < 120) { return `${s}s`; }
   const m = Math.floor(s / 60); const rs = s % 60;
   if (m < 120) { return rs > 0 ? `${m}m ${rs}s` : `${m}m`; }

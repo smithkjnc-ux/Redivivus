@@ -15,14 +15,20 @@ export interface SwPair { supervisor: string; worker: string | null; }
 export function invalidateRosterCache(): void { /* intentionally empty */ }
 
 function _rankedProviders(keyMap: Record<string, () => string | null>): string[] {
+  const { shouldSkipProvider } = require('./providerQuotaTracker.js');
   const available: Record<string, boolean> = Object.fromEntries(
-    Object.entries(keyMap).map(([k, fn]) => [k, !!fn()])
+    Object.entries(keyMap).map(([k, fn]) => [k, !!fn() && !shouldSkipProvider(k)])
   );
   const scored = scoreModels(DEFAULT_PROFILE, available);
   const seen = new Set<string>();
   const providers: string[] = [];
   for (const m of scored) {
     if (!seen.has(m.provider)) { seen.add(m.provider); providers.push(m.provider); }
+  }
+  // If quota blocks knocked out ALL providers, fall back to the full keyed set so the user isn't stranded
+  if (providers.length === 0) {
+    const allKeyed = scoreModels(DEFAULT_PROFILE, Object.fromEntries(Object.entries(keyMap).map(([k, fn]) => [k, !!fn()])));
+    for (const m of allKeyed) { if (!seen.has(m.provider)) { seen.add(m.provider); providers.push(m.provider); } }
   }
   return providers;
 }

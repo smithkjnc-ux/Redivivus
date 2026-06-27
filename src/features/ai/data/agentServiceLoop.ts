@@ -34,7 +34,7 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
   const { task, systemPrompt, messages, toolSchemas, chain, msgsFor, ledger, agentCtx, alog, onUpdate, keysPayload } = p;
   const mcpTools = getAllTools();
   const testFw = detectTestFramework(agentCtx.root);
-  const { isProviderUnavailable, markProviderUnavailable, unavailableReason } = require('./providerTierState.js');
+  const { recordUnavailable } = require('./providerQuotaTracker.js');
   const MAX_ITERATIONS = 40;
   let iterations = 0;
   let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false; let budgetWarned = false;
@@ -56,7 +56,7 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
       for (let fi = providerIdx + 1; fi < chain.length; fi++) {
         const { provider, model, thinkingBudget } = chain[fi];
         const errMsg = callResult.type === 'error' ? callResult.error : '';
-        if (isSustainedFailure(errMsg)) { markProviderUnavailable(chain[providerIdx].provider, describeProviderError(errMsg)); }
+        if (isSustainedFailure(errMsg)) { recordUnavailable(chain[providerIdx].provider, describeProviderError(errMsg)); }
         onUpdate(`Warning: ${friendlyModelName(chain[providerIdx].provider)} unavailable (${describeProviderError(errMsg)}) -- switching to ${friendlyModelName(provider)}...`);
         callResult = await nativeAgentCall(provider, model, systemPrompt, msgsFor(model), toolSchemas, keysPayload, thinkingBudget);
         if (callResult.type !== 'error') { providerIdx = fi; recovered = true; break; }

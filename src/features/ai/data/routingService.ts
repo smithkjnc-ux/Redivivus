@@ -5,18 +5,12 @@ import type { VaultContextService } from '../../../features/vault/data/vaultCont
 import type { AIResponse } from './routingTypes.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
 import { callProvider } from '../logic/providers/providerFactory.js';
-import { AI_RANK } from './guardianAI.js';
 import { routeByComplexityImpl } from './routingComplexity.js';
 import { supervisorPlanImpl, guardianReviewImpl } from './routingGuardian.js';
 import { supervisorPlanWithFailover } from './routingServiceSupervisor.js';
-import { redivivusLog } from '../../../features/logging/data/redivivusLogger.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
-import { logTelemetry } from '../../../features/api/data/apiClientTelemetry.js';
-import { logAICall } from './aiCallLogger.js';
 import { promptCheapImpl } from './routingServiceCheap.js';
-import { recordQuotaError } from './providerTierState.js';
-import { shouldSkipProvider, getSkipInfo, recordUnavailable } from './providerQuotaTracker.js';
-import { isSustainedFailure, describeProviderError } from './agentFailoverReason.js';
+import { promptImpl } from './routingServicePrompt.js';
 
 import {
   selectSupervisorAndWorker,
@@ -66,96 +60,13 @@ export class RoutingService {
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
   supervisorFailoverCallback?: (msg: string) => void;
 
+  // [SCOPE] Prompt body extracted to routingServicePrompt.ts (Rule 9 split — was 208 lines)
+  // [DEAD] Body was inline here — loop logic, skip-check, failover, quota recording all in routingServicePrompt.ts
   async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string, role = 'worker', maxOutputTokens?: number): Promise<AIResponse & { usingFallback?: string }> {
-
-    const keyMap = this.getKeyMap();
-    // Build ranked list of available AIs
-    const ranked = Object.entries(AI_RANK)
-      .filter(([ai]) => keyMap[ai]?.())
-      .sort(([, a], [, b]) => b - a)
-      .map(([ai]) => ai);
-
-    if (ranked.length === 0) {
-      redivivusLog({ operation: 'system', message: 'No AI keys configured', success: false });
-      return {
-        text: 'To build with Redivivus, you\'ll need at least one AI API key. I can walk you through adding one -- which AI service do you have access to?\n\n- **Anthropic (Claude)** -- console.anthropic.com\n- **Google (Gemini)** -- aistudio.google.com (free tier available)\n- **OpenAI (GPT)** -- platform.openai.com\n- **Other** -- Groq, xAI, Kimi also supported\n\nOpen **Redivivus Settings** (Ctrl+Shift+P -> "Redivivus: Open Settings") to add your key.',
-        model: 'none',
-        success: false,
-        error: 'NO_API_KEY',
-      };
-    }
-    
-    const startTime = Date.now();
-    const promptPreview = text.substring(0, 200);
-    redivivusLog({ operation: 'chat', message: 'AI prompt sent', data: { ai: ranked[0], promptLength: text.length, hasImage: !!imageBase64 } });
-
-    // [WARN] Try each AI in rank order — failover on timeout/network errors only
-    let lastError = '';
-    for (let i = 0; i < ranked.length; i++) {
-      const ai = ranked[i];
-      // Skip providers that are rate-limited or out of credits (persisted across reloads)
-      if (shouldSkipProvider(ai)) {
-        const info = getSkipInfo(ai);
-        const eta = info ? Math.ceil((info.resumesAt - Date.now()) / 60_000) + 'm' : 'later';
-        lastError = `${ai} skipped — ${info?.reason ?? 'unavailable'} (resumes in ~${eta})`;
-        if (i < ranked.length - 1 && this.promptFailoverCallback) { this.promptFailoverCallback(ai, ranked[i + 1]); }
-        continue;
-      }
-      const fetchFn = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
-      // [FIX] Hard full-call deadline. fetchWithTimeout's AbortController aborts the CONNECTION but NOT
-      // the body read in Electron's fetch — so a provider that connects then hangs mid-response would
-      // freeze the whole UI forever and never fail over. Promise.race guarantees we always move on to the
-      // next AI. The +3s buffer over the fetch timeout avoids cutting off a slow-but-working provider.
-      const deadlineMs = timeoutMs + 3000;
-      const result = await Promise.race([
-        callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage, undefined, maxOutputTokens),
-        new Promise<AIResponse>(resolve => setTimeout(() => resolve({ text: '', model: ai, success: false, error: `${ai} timed out after ${deadlineMs}ms (no response)` }), deadlineMs)),
-      ]);
-
-      if (result.success) {
-        // Fire-and-forget telemetry so admin analytics reflect direct calls too
-        logTelemetry('ai_prompt', {
-          model: result.model, input_tokens: result.inputTokens, output_tokens: result.outputTokens, success: true,
-        });
-        logAICall({
-          role,
-          model: result.model || ai,
-          prompt: text,
-          response: result.text || '',
-          inputTokens: result.inputTokens,
-          outputTokens: result.outputTokens,
-          durationMs: Date.now() - startTime,
-        });
-        return { ...result, usingFallback: i > 0 ? ai : undefined };
-      }
-
-      // [FIX] Fail over on ANY error, not just network/capacity. User's rule: when an AI stops for ANY
-      // reason (timeout, hang, quota, auth, bad/empty response, 4xx/5xx, content filter), drop to the
-      // next-ranked AI and continue. Trying the next provider can only help; if every provider fails we
-      // return the aggregate error below. The only non-failover case is "no keys", handled before the loop.
-      const err = (result.error || '').toLowerCase();
-      lastError = result.error || 'Unknown error';
-
-      // Feed the tier detector: repeated quota/capacity errors mark a free-capable provider as constrained
-      // so future build plans match its real ceiling. Silent, soft, self-recovering.
-      const isCapacityError = err.includes('credit') || err.includes('balance') || err.includes('quota')
-        || err.includes('rate limit') || err.includes('rate_limit') || err.includes('429')
-        || err.includes('402') || err.includes('insufficient') || err.includes('overloaded')
-        || err.includes('capacity') || err.includes('billing');
-      if (isCapacityError) { recordQuotaError(ai); }
-      // Persist sustained failures (out of credits / bad key) across reloads via quota tracker
-      if (isSustainedFailure(result.error)) { recordUnavailable(ai, describeProviderError(result.error)); }
-
-      // Notify caller about the failover so the chat can show "Claude stalled -> trying Gemini".
-      if (i < ranked.length - 1 && this.promptFailoverCallback) {
-        this.promptFailoverCallback(ai, ranked[i + 1]);
-      }
-    }
-
-    return { text: '', model: 'none', success: false, error: `All AI providers failed. Last error: ${lastError}` };
+    return promptImpl(this, text, timeoutMs, imageBase64, imageType, systemMessage, role, maxOutputTokens);
   }
 
-  // [SCOPE] Cheap-first prompt — extracted to routingServiceCheap.ts (203-line split)
+  // [SCOPE] Cheap-first prompt — extracted to routingServiceCheap.ts (Rule 9 split)
   // [DEAD] Body was inline here — moved to keep routingService.ts under 200 lines (Rule 9)
   async promptCheap(text: string, timeoutMs = 30_000, imageBase64?: string, imageType?: string, systemMessage?: string, role = 'cheap'): Promise<AIResponse & { usingFallback?: string }> {
     return promptCheapImpl(this, text, timeoutMs, imageBase64, imageType, systemMessage, role);

@@ -138,6 +138,33 @@ export function registerAllCommands(
     openBlueprintPanel(context, redivivusService, routingService);
   }));
 
+  // Clear provider quota blocks — lets users unblock a provider after topping up credits or after a rate-limit
+  context.subscriptions.push(vscode.commands.registerCommand('redivivus.clearProviderQuota', async () => {
+    const { getAllQuotaStates, clearProviderQuota, formatUsageSummary } = await import('./features/ai/data/providerQuotaTracker.js');
+    const states = getAllQuotaStates();
+    const now = Date.now();
+    const blocked = Object.entries(states).filter(([, st]) =>
+      (st.skipUntilMs && now < st.skipUntilMs) || (st.unavailableUntilMs && now < st.unavailableUntilMs)
+    );
+    if (blocked.length === 0) {
+      vscode.window.showInformationMessage('No AI providers are currently blocked.');
+      return;
+    }
+    const items = [
+      { label: 'Clear ALL provider blocks', provider: undefined },
+      ...blocked.map(([p, st]) => {
+        const reason = (st.skipUntilMs && now < st.skipUntilMs) ? st.skipReason : st.unavailableReason;
+        const usage = formatUsageSummary(p);
+        return { label: p, description: reason ?? 'blocked', detail: usage ?? undefined, provider: p };
+      }),
+    ];
+    const pick = await vscode.window.showQuickPick(items, { placeHolder: 'Select provider to unblock' });
+    if (!pick) { return; }
+    clearProviderQuota(pick.provider);
+    const msg = pick.provider ? `${pick.provider} quota block cleared.` : 'All provider quota blocks cleared.';
+    vscode.window.showInformationMessage(msg);
+  }));
+
   // [DONE] compileProject inline handler moved to commands/compileProject.ts (Rule 9 split)
   try { registerCompileProjectCommand(context); } catch (e) { console.error('Failed to register compileProject command', e); }
 
