@@ -72,11 +72,19 @@ export async function runEscalationLoop(params: {
     originalWorkerProvider = workerPhaseResult.originalWorkerProvider;
 
     // ── Check for Trivial Fast-Path ──
-    const isTrivial = currentDiagnosis.includes('[TRIVIAL: SKIP REVIEW]');
+    // [FIX] Block trivial fast-path for structural fixes. A diagnosis that touches config files
+    // (vite.config.js, index.html, package.json) or explicitly moves an HTML entry point is never
+    // trivial — a missing file write (e.g. emptying public/index.html without populating root
+    // index.html) goes undetected when both Verify and Guardian are skipped.
+    const _structuralFiles = /vite\.config|index\.html|package\.json|tsconfig|webpack\.config/i;
+    const isTrivial = currentDiagnosis.includes('[TRIVIAL: SKIP REVIEW]') && !_structuralFiles.test(currentDiagnosis);
     if (isTrivial) {
       fixLog(`Supervisor flagged fix as trivial — skipping Verify and Guardian`);
       guardianNote = `Guardian: Skipped (trivial fix)`;
       return { finalResponse: workerResponse, workerLabel, guardianLabel: 'skipped (trivial)', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated };
+    }
+    if (currentDiagnosis.includes('[TRIVIAL: SKIP REVIEW]') && _structuralFiles.test(currentDiagnosis)) {
+      fixLog(`[TRIVIAL-OVERRIDE] Structural files in diagnosis — forcing Verify+Guardian despite trivial flag`);
     }
 
     // ── Phase 2.5: Supervisor verifies Worker logic ──

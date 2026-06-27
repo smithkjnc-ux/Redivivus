@@ -1,6 +1,16 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — Trivial fast-path blocked for structural fixes**
+- **Root cause (from log)**: Supervisor put `[TRIVIAL: SKIP REVIEW]` in diagnosis for a multi-file structural rewrite that included moving the HTML entry point. `isTrivial` check in `chatPanelMsgFixEscalation.ts` returned immediately, skipping both Verify and Guardian. Worker emptied `public/index.html` without populating root `index.html` — undetected since no review ran.
+- **Fix**: Added `_structuralFiles` check — trivial fast-path is blocked when diagnosis mentions `vite.config`, `index.html`, `package.json`, `tsconfig`, or `webpack.config`. Logs `[TRIVIAL-OVERRIDE]` when overridden.
+- **File**: `src/features/fix/chatPanelMsgFixEscalation.ts` lines 74–87
+
+**2026-06-27 — Wiring gate instruction (3) made explicit about HTML content migration**
+- **Root cause (from log)**: Wiring gate said "root index.html must be the real HTML entry" — Worker interpreted this as "clear public/index.html since it's not the entry anymore" but never populated root index.html. Placeholder comment remained; app loaded blank.
+- **Fix**: Instruction (3) now explicitly says "COPY the full HTML content from `${_viteRoot}/index.html` into the ROOT index.html — the root index.html currently contains only a placeholder comment — replace it entirely." Also adds explicit warning: "Do NOT just empty ${_viteRoot}/index.html without first writing the full HTML to the root index.html."
+- **File**: `src/features/fix/chatPanelMsgFix.ts` line 92
+
 **2026-06-27 — Wiring gate blind spot: ./src/ paths also wrong under non-default Vite root**
 - **Root cause**: `_hasAboveRootLinks` only checked for `../` in HTML link/script paths. After a partial fix changed `../src/` → `./src/`, the gate stopped firing. But `./src/styles/global.css` inside `public/index.html` with `root: 'public'` also 404s — Vite looks for `public/src/styles/global.css` which doesn't exist.
 - **Fix**: Expanded regex to also match `./src/`, `./styles/`, `./js/`, `./css/`, `./assets/` — common source directories at project root that would be wrong inside a non-default Vite root subfolder. Gate still requires `_hasNonDefaultViteRoot` so it won't fire for `root: '.'` projects.
