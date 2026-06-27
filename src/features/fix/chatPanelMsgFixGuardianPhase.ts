@@ -109,6 +109,8 @@ export async function runGuardianPhase(params: {
     // ────────────────────────────────────────────────────────────────────────
     let _preApply: import('./chatPanelMsgFixGuardianPreview.js').PreApplyResult | null = null;
     let inspectorContext = baseContext + _runtimeBefore + _structuredFmt;
+    // Start with original blueprint — will be refreshed with post-apply disk state below
+    let refreshedBlueprint = guardianBlueprint;
     try {
       const { runPreApplyCapture } = await import('./chatPanelMsgFixGuardianPreview.js');
       const _allowedRels = new Set([...filesBlock.matchAll(/^\/\/ === FILE: (.+?) ===/gm)].map(m => m[1]));
@@ -117,10 +119,30 @@ export async function runGuardianPhase(params: {
         inspectorContext += `\n\nPOST-FIX RUNTIME STATE (what the app does AFTER applying the Worker\'s fix):\n${_preApply.runtimeSummary}`;
         fixLog(`[PRE-APPLY] Applied and captured runtime: ${_preApply.runtimeSummary}`);
       }
+      // [FIX] Refresh blueprint with post-apply disk content so Inspector sees CURRENT file state,
+      // not the pipeline-start snapshot. Only re-reads files the Worker actually wrote.
+      if (_preApply?.appliedFiles?.length) {
+        const fs = await import('fs');
+        const path = await import('path');
+        let updatedBlock = filesBlock;
+        for (const rel of _preApply.appliedFiles) {
+          try {
+            const diskContent = fs.readFileSync(path.join(root, rel), 'utf8');
+            const marker = `// === FILE: ${rel} ===`;
+            // Replace the stale entry with fresh disk content
+            const entryRe = new RegExp(`(\\/\\/ === FILE: ${rel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ===)[\\s\\S]*?(?=\\/\\/ === FILE:|$)`);
+            updatedBlock = updatedBlock.replace(entryRe, `${marker}\n${diskContent}\n`);
+            fixLog(`[PRE-APPLY] Refreshed blueprint entry for ${rel} (${diskContent.length} bytes)`);
+          } catch { /* non-blocking — keep stale entry if read fails */ }
+        }
+        refreshedBlueprint = updatedBlock
+          ? `COMPLETE FILE STATE (post-fix, read from disk):\n${updatedBlock.slice(0, 12000)}`
+          : guardianBlueprint;
+      }
     } catch (e) { fixLog(`[PRE-APPLY] Skipped (non-blocking): ${String(e).slice(0, 80)}`); }
 
     const guardianResult = await deps.routing.guardianReview(
-      inspectorContext, workerResponse, guardianWorkerHint, guardianBlueprint, deps.routingOverrides?.guardian, 'inspect'
+      inspectorContext, workerResponse, guardianWorkerHint, refreshedBlueprint, deps.routingOverrides?.guardian, 'inspect'
     );
     fixLog(`Code Inspector result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
 
