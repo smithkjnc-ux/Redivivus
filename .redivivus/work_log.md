@@ -1032,3 +1032,24 @@ Auto-managed by Redivivus. Append-only session history.
 - **Bug 7 fixed:** Missing `chassis.helpMeRefine` command
   - Root cause: The orchestrator's "Help Me Refine This" button was pointing to an unregistered command.
   - Fix: Registered `chassis.helpMeRefine` in `extension.ts` to invoke `chassis.postToChat` with a refined prompt request.
+
+---
+## Session 2026-06-27 — Two-Layer Guardian: Compliance Verifier Precision
+
+### Changes Made
+
+**Backend: `redivivus-backend/src/lib/ai/guardianAIPrompt.ts`**
+- Fixed Compliance Verifier (Layer 1) recall: added mandatory Step 1 extraction — AI must enumerate every prescription item before checking any. Fixes 2/7 items being skipped.
+- Fixed Compliance Verifier file attribution: explicit rule that [FILE: ...] in issues MUST be copied verbatim from the ## header, never inferred from the code. Fixes wrong file label being reported.
+- Deployed: commit e4f8006, pushed to main → Cloud Run deploy triggered.
+
+**Test project: `apps/stopwatch-app-start/index.html`**
+- Deliberately broke JS element ID lookups:
+  - `document.getElementById(elementId)` → `'stopwatch-display'` (timer won't render)
+  - `'start-button'` → `'btn-start'`, `'stop-button'` → `'btn-stop'`, `'reset-button'` → `'btn-reset'`
+- Purpose: retest Compliance Verifier with a multi-item JS prescription (4 items across 1 file)
+
+### [NEXT] After retest
+- Verify Compliance Verifier catches all 4 broken ID items and attributes them to index.html correctly
+- If passing: roll two-layer Guardian architecture into other pipelines (Agent pipeline, build pipeline)
+- Split `chatPanelMsgFixGuardianPhase.ts` (217 lines, Rule 9 limit 200)
