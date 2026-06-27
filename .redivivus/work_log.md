@@ -1069,3 +1069,21 @@ Auto-managed by Redivivus. Append-only session history.
 - Verify Supervisor outputs non-contradictory prescription (one consistent end state)
 - Verify Code Inspector sees post-fix file state and doesn't false-positive on already-fixed code
 - If clean single-pass fix: roll two-layer Guardian into Agent pipeline and build pipeline
+
+### Round 3 fixes — same session
+
+**Backend: `guardianAIPrompt.ts`** (commit 221e549)
+- Added DETERMINISM RULE to Compliance Verifier: all Step 1 items must get explicit PRESENT/MISSING verdict. Uncertainty = MISSING. Verdict cannot change between retries for the same Worker output. Removed escape hatch that let AI flip to PASS when unsure.
+
+**Backend: `fix-supervisor/route.ts`** (commit 221e549)
+- Added PRESCRIPTION EXISTENCE RULE: before prescribing any change, Supervisor must verify the 'before' text exists in the current file. Prevents phantom prescriptions against code that is already correct.
+
+**Test project: `src/styles/stopwatch.css`**
+- Broke `.timer-container { display: none }` — timer area hidden
+- Changed `#start-button`, `#stop-button`, `#reset-button` `background-color` → `transparent` — buttons invisible
+- CSS break is linter-immune (no JS logic to auto-revert)
+- Creates 4-item prescription target all in one file
+
+### [NEXT] After retest
+- If single-pass clean: roll two-layer Guardian into Agent pipeline + build pipeline
+- Rule 9 split queue: chatPanelMsgFixGuardianPhase.ts (239 lines), chatPanelMsgFix.ts (279), chatPanelMsgFixEscalation.ts (202), chatPanelMsgFixEscalationUtils.ts (202)
