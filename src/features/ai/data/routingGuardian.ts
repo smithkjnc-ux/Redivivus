@@ -97,6 +97,7 @@ export async function guardianReviewImpl(
   workerAI: string,
   blueprintContext: string,
   forceProvider?: string,
+  mode?: 'verify' | 'inspect',
 ): Promise<GuardianReviewResult> {
   const keyMap = svc.getKeyMap();
   const preferred = forceProvider || selectGuardianAI(workerAI, keyMap);
@@ -138,7 +139,7 @@ export async function guardianReviewImpl(
       const res = await fetchFn(`${base}/guardian`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, 'X-Provider-Keys': JSON.stringify(keys) },
-        body: JSON.stringify({ task: originalTask, workerResponse, blueprintContext, provider: guardianAI, model: guardianModel }),
+        body: JSON.stringify({ task: originalTask, workerResponse, blueprintContext, provider: guardianAI, model: guardianModel, ...(mode ? { mode } : {}) }),
       }, 50_000);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { gLastError = (data && data.error) || `Guardian API ${res.status}`; continue; }

@@ -77,17 +77,20 @@ export function enrichDepsWithCritiques(deps: MessageHandlerDeps, critiques: str
 /** Renders the Guardian verdict row + records its usage. Returns the derived guardianLabel + scopeNote. */
 export function renderGuardianVerdict(p: {
   guardianRan: boolean; guardianResult: any; guardianProvider: string; workerResponse: string; root: string; deps: MessageHandlerDeps;
+  layerName?: string; // 'Compliance Verifier' | 'Code Inspector' — omit for legacy single-pass label
 }): { guardianLabel: string; scopeNote: string } {
-  const { guardianRan, guardianResult, guardianProvider, workerResponse, root, deps } = p;
+  const { guardianRan, guardianResult, guardianProvider, workerResponse, root, deps, layerName } = p;
   let guardianLabel: string;
   let scopeNote = '';
+  const passLabel = layerName ? `${layerName} — passed` : 'Final review — approved';
+  const failLabel = layerName ? `${layerName} — issues found` : 'Final review found issues — improving';
   if (guardianRan) {
     fixActStep({ phase: 'guardian', status: guardianResult.passed ? 'pass' : 'fix',
-      label: guardianResult.passed ? 'Final review — approved' : 'Final review found issues — improving',
+      label: guardianResult.passed ? passLabel : failLabel,
       detail: (guardianResult.issues || []).join('\n') || undefined,
       model: modelLabel(guardianProvider) });
     if (guardianResult.issues?.length) {
-      fixLog(`Guardian issues found`, { issues: guardianResult.issues });
+      fixLog(`${layerName || 'Guardian'} issues found`, { issues: guardianResult.issues });
     }
     deps.usageTracker?.recordUsage(
       Math.ceil(workerResponse.length / 4), 0,
@@ -96,8 +99,8 @@ export function renderGuardianVerdict(p: {
     );
     guardianLabel = modelLabel(guardianProvider);
   } else {
-    fixLog(`Guardian could not run on any provider — fix applied WITHOUT final review`);
-    fixActStep({ phase: 'guardian', status: 'failover', label: 'Final review skipped — no AI reviewer available' });
+    fixLog(`${layerName || 'Guardian'} could not run on any provider — fix applied WITHOUT review`);
+    fixActStep({ phase: 'guardian', status: 'failover', label: `${layerName || 'Final review'} skipped — no AI reviewer available` });
     guardianLabel = 'skipped';
   }
   if (guardianResult.scopeAlerts?.length) {

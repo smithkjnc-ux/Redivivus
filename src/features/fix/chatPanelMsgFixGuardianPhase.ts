@@ -43,96 +43,129 @@ export async function runGuardianPhase(params: {
   try {
     const userRequest = conversation.map(m => m.role === 'user' ? m.content : '').filter(Boolean).pop() || 'Fix the issue';
 
-    // [GAP2] Include pre-fix runtime state so Guardian knows what was broken BEFORE the fix.
-    // buildContext is captured before the Supervisor runs (runtime errors, failed loads, etc.)
+    // [GAP2] Include pre-fix runtime state so Code Inspector knows what was broken BEFORE the fix.
     const _runtimeBefore = buildContext?.trim()
       ? `\n\nPRE-FIX RUNTIME STATE (errors that existed before the Worker's fix — the correct fix must address these):\n${buildContext.slice(0, 800)}`
       : '';
+    // [GAP3] Structured rejection format so re-prescription targets the right files.
+    const _structuredFmt = `\n\nSTRUCTURED REJECTION FORMAT — if rejecting, prefix each GUARDIAN_ISSUES line with [FILE: path/to/file.ext]:\n- [FILE: exact/path.ext] specific reason\nOutput GUARDIAN_PASS if the fix is correct.`;
 
-    // [GAP3] Request structured per-file rejection format so re-prescription knows exactly which files failed.
-    const _structuredFmt = `\n\nSTRUCTURED REJECTION FORMAT — if rejecting, prefix each GUARDIAN_ISSUES line with [FILE: path/to/file.ext] so the re-prescription AI knows which file to target:\n- [FILE: exact/path.ext] specific reason this file\'s change is wrong or incomplete\nOutput GUARDIAN_PASS if the fix is correct.`;
+    const baseContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${currentDiagnosis}`;
+    const guardianWorkerHint = escalated && originalWorkerProvider ? originalWorkerProvider : workerLabel.toLowerCase();
+    const guardianBlueprint = filesBlock
+      ? `COMPLETE FILE STATE (all project files — use these to verify any uncertainty):\n${filesBlock.slice(0, 12000)}`
+      : '';
 
-    let guardianContext = `Original user request: "${userRequest}"\nSupervisor diagnosis:\n${currentDiagnosis}${_runtimeBefore}${_structuredFmt}`;
-    fixLog(`Guardian review (attempt ${attempt + 1}): Starting...`);
-    fixLog(`Guardian context preview`, { context: guardianContext.substring(0, 300) });
+    fixLog(`Two-layer Guardian review (attempt ${attempt + 1}): starting...`);
 
-    // [GAP1] Apply fix to disk before Guardian reviews — gives Guardian real execution evidence,
-    // not just code text. Rollback if Guardian rejects. If approved, files are already on disk.
+    // ── LAYER 1: Compliance Verifier ────────────────────────────────────────
+    // Pure mechanical check: did the Worker implement every prescription item?
+    // No pre-apply needed — this is a text comparison only.
+    // ────────────────────────────────────────────────────────────────────────
+    const verifyResult = await deps.routing.guardianReview(
+      baseContext + _structuredFmt, workerResponse, guardianWorkerHint, '', deps.routingOverrides?.guardian, 'verify'
+    );
+    const verifyRan = !!verifyResult.guardianAI && verifyResult.guardianAI !== 'none';
+    const verifyProvider = verifyRan ? verifyResult.guardianAI
+      : ((() => { try { return deps.routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude');
+
+    fixLog(`Compliance Verifier result`, { passed: verifyResult.passed, issues: verifyResult.issues?.length || 0 });
+    const verifyVerdict = renderGuardianVerdict({ guardianRan: verifyRan, guardianResult: verifyResult, guardianProvider: verifyProvider, workerResponse, root, deps, layerName: 'Compliance Verifier' });
+    guardianLabel = verifyVerdict.guardianLabel;
+
+    // Infrastructure failure on Verifier — treat as skipped (not a code rejection)
+    if (!verifyRan && verifyResult.guardianAI === 'none') {
+      guardianNote = `Compliance Verifier: skipped (${verifyResult.issues?.[0]?.slice(0, 120) || 'all providers unavailable'})`;
+      fixLog('Compliance Verifier SKIPPED — infrastructure failure. Proceeding to Code Inspector.');
+      // Fall through to Layer 2 — skipping verifier is better than blocking
+    } else if (!verifyResult.passed) {
+      // Prescription items missing — reject immediately, skip pre-apply and Code Inspector
+      const critique = verifyResult.issues?.join('; ') || 'Prescription items not implemented';
+      const _isFormatMismatch = critique.includes('no structured reason') || critique.includes('format mismatch');
+      if (_isFormatMismatch) {
+        guardianNote = `Compliance Verifier (${verifyProvider}): inconclusive — fix applied`;
+        fixLog('Compliance Verifier format-mismatch — shipping fix as inconclusive');
+        return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
+      }
+      accumulatedCritiques.push(critique);
+      fixLog(`Compliance Verifier REJECTED (attempt ${attempt + 1})`, { critique: critique.substring(0, 300) });
+      if (escalated) {
+        guardianNote = `⚠️ Compliance Verifier flagged unimplemented items after Supervisor self-fix: ${critique.slice(0, 200)}. Please review manually or retry.`;
+        return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
+      }
+      if (isTruncationText(critique) && attempt < maxRetries) { forceSurgical = true; accumulatedCritiques.push(`[FORMAT CHANGE] Output was truncated. Use SURGICAL EDITS on retry.`); }
+      const rp = await represcribeAfterRejection({ attempt, maxRetries, userText, root, filesBlock, currentDiagnosis, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, deps });
+      filesBlock = rp.filesBlock; currentDiagnosis = rp.diagnosis;
+      const doNotFiles: string[] = [];
+      for (const c of accumulatedCritiques) { const matches = c.matchAll(/(?:leaving|unchanged|do not (?:touch|modify)|should not (?:touch|modify)|must not (?:touch|modify)|only involve[^,]+,\s*leaving)\s+[`']?([\w./\\-]+\.[a-zA-Z0-9]{1,6})[`']?/gi); for (const m of matches) { if (!doNotFiles.includes(m[1])) { doNotFiles.push(m[1]); } } }
+      if (doNotFiles.length > 0) { currentDiagnosis = currentDiagnosis + `\n\n[WORKER CONSTRAINTS — ABSOLUTE]\nDO NOT MODIFY: ${doNotFiles.join(', ')}`; }
+      if (/\[AGENT_HANDOFF\]/i.test(currentDiagnosis)) { return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote: 'Re-prescription routed to Agent pipeline', scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated } }; }
+      return { action: 'continue', forceSurgical, filesBlock, currentDiagnosis };
+    }
+
+    // ── LAYER 2: Code Inspector ──────────────────────────────────────────────
+    // Prescription verified ✓. Now check: does the code actually work correctly?
+    // Pre-apply here so Inspector sees post-fix runtime state.
+    // ────────────────────────────────────────────────────────────────────────
     let _preApply: import('./chatPanelMsgFixGuardianPreview.js').PreApplyResult | null = null;
+    let inspectorContext = baseContext + _runtimeBefore + _structuredFmt;
     try {
       const { runPreApplyCapture } = await import('./chatPanelMsgFixGuardianPreview.js');
       const _allowedRels = new Set([...filesBlock.matchAll(/^\/\/ === FILE: (.+?) ===/gm)].map(m => m[1]));
       _preApply = await runPreApplyCapture(workerResponse, root, _allowedRels, userText || '');
       if (_preApply?.runtimeSummary) {
-        guardianContext += `\n\nPOST-FIX RUNTIME STATE (what the app does AFTER applying the Worker\'s fix):\n${_preApply.runtimeSummary}`;
+        inspectorContext += `\n\nPOST-FIX RUNTIME STATE (what the app does AFTER applying the Worker\'s fix):\n${_preApply.runtimeSummary}`;
         fixLog(`[PRE-APPLY] Applied and captured runtime: ${_preApply.runtimeSummary}`);
       }
     } catch (e) { fixLog(`[PRE-APPLY] Skipped (non-blocking): ${String(e).slice(0, 80)}`); }
 
-    // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
-    const guardianWorkerHint = escalated && originalWorkerProvider ? originalWorkerProvider : workerLabel.toLowerCase();
-    // Pass the full file state as blueprintContext so the Guardian can verify uncertainties
-    // by looking up answers in the actual code — not guessing. "Do class names match HTML?"
-    // is a binary question answerable by reading both files. Guardian has no excuse to guess.
-    const guardianBlueprint = filesBlock
-      ? `COMPLETE FILE STATE (all project files — use these to verify any uncertainty):\n${filesBlock.slice(0, 12000)}`
-      : '';
-    const guardianResult = await deps.routing.guardianReview(guardianContext, workerResponse, guardianWorkerHint, guardianBlueprint, deps.routingOverrides?.guardian);
-    fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
-    
-    // [FIX] Distinguish a REAL guardian verdict from the "couldn't run on any provider" fallback.
+    const guardianResult = await deps.routing.guardianReview(
+      inspectorContext, workerResponse, guardianWorkerHint, guardianBlueprint, deps.routingOverrides?.guardian, 'inspect'
+    );
+    fixLog(`Code Inspector result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
+
     const guardianRan = !!guardianResult.guardianAI && guardianResult.guardianAI !== 'none';
     const guardianProvider = guardianRan
       ? guardianResult.guardianAI
       : ((() => { try { return deps.routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude');
 
-    // [FIX] Extract critique BEFORE renderGuardianVerdict so format-mismatch cases never show
-    // "[!] Final review found issues — improving" — that label fired even when we immediately
-    // shipped the fix as inconclusive, making it look like a retry happened when it didn't.
     const critique = guardianResult.issues?.join('; ') || 'Unknown issue';
     const _isFormatMismatch = !guardianResult.passed && (critique.includes('no structured reason') || critique.includes('format mismatch'));
 
     if (_isFormatMismatch) {
-      fixActStep({ phase: 'guardian', status: 'failover', label: `Guardian (${guardianProvider}): inconclusive — no reason given, fix applied`, model: guardianProvider });
+      fixActStep({ phase: 'guardian', status: 'failover', label: `Code Inspector (${guardianProvider}): inconclusive — no reason given, fix applied`, model: guardianProvider });
       deps.usageTracker?.recordUsage(Math.ceil(workerResponse.length / 4), 0, guardianProvider, guardianResult.inputTokens, guardianResult.outputTokens, 'guardian', require('path').basename(root));
-      guardianNote = `Guardian (${guardianProvider}): inconclusive — no reason given, fix applied`;
-      fixLog('Guardian format-mismatch: returned GUARDIAN_FAIL with no extractable reason — shipping fix as inconclusive');
-      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianProvider || 'Guardian', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles } };
+      guardianNote = `Code Inspector (${guardianProvider}): inconclusive — no reason given, fix applied`;
+      fixLog('Code Inspector format-mismatch: returned GUARDIAN_FAIL with no extractable reason — shipping fix as inconclusive');
+      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianProvider || 'Inspector', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles } };
     }
 
-    const verdict = renderGuardianVerdict({ guardianRan, guardianResult, guardianProvider, workerResponse, root, deps });
+    const verdict = renderGuardianVerdict({ guardianRan, guardianResult, guardianProvider, workerResponse, root, deps, layerName: 'Code Inspector' });
     guardianLabel = verdict.guardianLabel;
     scopeNote = verdict.scopeNote;
 
-    // Hand off when the Guardian uses any of its explicit "this needs the Agent" phrasings.
     if (guardianResult.issues?.some((issue: string) => /Simple Pipeline is insufficient|Routing to Agent|Agent Pipeline/i.test(issue))) {
       needsAgentHandoff = true;
-      fixLog('Guardian routed to Agent Pipeline — handing off immediately (skipping Worker retries)');
-      guardianNote = `Guardian (${guardianLabel}): routing to Agent for environment verification`;
+      fixLog('Code Inspector routed to Agent Pipeline');
+      guardianNote = `Code Inspector (${guardianLabel}): routing to Agent for environment verification`;
       return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated, forceSurgical } };
     }
 
     if (guardianResult.passed) {
-      guardianNote = guardianRan
-        ? `Guardian (${guardianLabel}): Approved`
-        : `Guardian: skipped (no reviewer available — fix applied without final review)`;
-      fixLog(guardianRan ? `Guardian APPROVED the fix` : `Guardian SKIPPED (no provider) — fix passed through unreviewed`);
-      // [GAP1] Files already on disk from pre-apply — signal Phase23 to skip re-apply
+      guardianNote = guardianRan ? `Code Inspector (${guardianLabel}): Approved` : `Code Inspector: skipped (no reviewer available — fix applied without review)`;
+      fixLog(guardianRan ? `Code Inspector APPROVED the fix` : `Code Inspector SKIPPED — fix applied unreviewed`);
       return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles } };
     }
 
-    // [H2 degraded] Guardian infrastructure failure (no providers available / all failed) — NOT a code rejection.
-    // Treat as skipped, not rejected — re-prescription with an infra error message is nonsensical and causes cascading errors.
     if (!guardianRan && guardianResult.guardianAI === 'none') {
-      guardianNote = `Guardian: skipped (${guardianResult.issues?.[0]?.slice(0, 120) || 'all providers unavailable'})`;
-      fixLog('Guardian SKIPPED — infrastructure failure, not a code rejection. Fix applied unreviewed.');
+      guardianNote = `Code Inspector: skipped (${guardianResult.issues?.[0]?.slice(0, 120) || 'all providers unavailable'})`;
+      fixLog('Code Inspector SKIPPED — infrastructure failure, fix applied unreviewed.');
       return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: 'skipped (unavailable)', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
     }
 
-    // [GAP1] Guardian rejected — rollback pre-applied changes so the next Worker attempt starts clean
     if (_preApply) {
       _preApply.rollback();
-      fixLog('[PRE-APPLY] Guardian rejected — rolled back pre-applied changes');
+      fixLog('[PRE-APPLY] Code Inspector rejected — rolled back pre-applied changes');
     }
 
     accumulatedCritiques.push(critique);
