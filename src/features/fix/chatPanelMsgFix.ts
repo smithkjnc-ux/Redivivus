@@ -146,7 +146,10 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
     }
 
     if (_wiringApplied) {
-      // Structural fix is done. Let the AI handle the user's actual request only.
+      // Tell the Supervisor exactly what was already changed so it does NOT re-prescribe those same
+      // changes. Without this, the Supervisor prescribes "change root:'public' → root:'.'" and the
+      // Worker generates a surgical search block that no longer exists on disk → compile gate fails.
+      userText = `${userText}\n\n[WIRING-GATE ALREADY APPLIED — DO NOT RE-PRESCRIBE THESE]\nThe following were auto-patched before you ran. The files on disk already reflect these changes:\n- vite.config.js: root is already '.'\n- vite.config.js: outDir is already './dist'\n- index.html (project root): HTML entry point with corrected src/ paths (no ../ or ./)\n- ${_viteRoot}/index.html: placeholder comment only\nFocus ONLY on what the user asked for. Do NOT prescribe any of the above.`;
       fixLog('[WIRING-GATE] Structural wiring fixed by code — AI will handle user visual request only');
     } else {
       // Fallback: ask the AI to apply the structural fix (original behavior)
