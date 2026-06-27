@@ -57,7 +57,7 @@ export async function handleRunCommand(msg: any, deps: MessageHandlerDeps, panel
       // "Activating Extensions…" hang). At home, "close" means "deactivate the active project" (back to the
       // launcher), NOT remove the folder. Only a genuine standalone-folder workspace still closes the folder.
       const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      const { isProjectsContainer } = require('../../services/project/redivivusPaths.js');
+      const { isProjectsContainer } = require('./redivivusPaths.js');
       if (wsRoot && isProjectsContainer(wsRoot)) {
         // At home: deactivate the active project ONLY if one is active (idempotent — repeated closeFolder
         // can't thrash). Never remove the home folder.

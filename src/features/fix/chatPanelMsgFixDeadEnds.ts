@@ -70,8 +70,8 @@ export function revalidateProjectDeadEnds(root: string): void {
 /** Queries the global (community) dead-end vault for patterns matching this user request. Returns context string or empty. */
 export async function queryGlobalDeadEnds(userText: string): Promise<string> {
   try {
-    const base = require('../../services/api/apiClient.js').getApiBase();
-    const token = await require('../../services/api/apiClient.js').getAccountToken();
+    const base = require('../api/data/apiClient.js').getApiBase();
+    const token = await require('../api/data/apiClient.js').getAccountToken();
     const keywords = userText.toLowerCase().split(/\s+/).filter((w: string) => w.length > 3).slice(0, 10);
     const dqRes = await fetch(`${base}/dead-end-query/`, {
       method: 'POST',

@@ -33,16 +33,16 @@ export async function runPhase2Worker(
   const totalSize = files.reduce((sum, f) => sum + f.size, 0);
   const largestFile = files.reduce((max, f) => f.size > max.size ? f : max, files[0] || { path: '', size: 0 });
 
-  const base = require('../../services/api/apiClient.js').getApiBase();
-  const token = await require('../../services/api/apiClient.js').getAccountToken();
-  const keysPayload = require('../../services/api/apiClient.js').collectKeys();
+  const base = require('../api/data/apiClient.js').getApiBase();
+  const token = await require('../api/data/apiClient.js').getAccountToken();
+  const keysPayload = require('../api/data/apiClient.js').collectKeys();
   const { supervisor, worker } = deps.routing.selectSupervisorAndWorker();
   const workerAI = escalated ? supervisor : (worker || deps.routing.getAvailableAI().ai);
-  const { bestModelForRole } = require('../../services/ai/modelRegistry.js');
+  const { bestModelForRole } = require('../ai/data/modelRegistry.js');
 
   // [FIX][FAILOVER] When an AI fails (bad key, quota, empty response, network), drop to the NEXT
   // key-configured provider in rank order. Only throw when EVERY provider has failed.
-  const { AI_RANK } = require('../../services/ai/guardianAI.js');
+  const { AI_RANK } = require('../ai/data/guardianAI.js');
   const _keyMap = deps.routing.getKeyMap();
   const _ranked: string[] = Object.entries(AI_RANK)
     .filter(([ai]: any) => _keyMap[ai]?.())
@@ -54,7 +54,7 @@ export async function runPhase2Worker(
   // [MANUAL MODEL PICKER] Exact model locked by user → run that model, no failover.
   const _manualModel = deps.manualModel;
   const _manualModelProvider = _manualModel
-    ? (require('../../services/ai/modelRegistry.js').MODEL_REGISTRY.find((m: { modelId: string }) => m.modelId === _manualModel)?.provider)
+    ? (require('../ai/data/modelRegistry.js').MODEL_REGISTRY.find((m: { modelId: string }) => m.modelId === _manualModel)?.provider)
     : undefined;
   const _effProviderOrder = (_manualModel && _manualModelProvider) ? [_manualModelProvider] : providerOrder;
 
@@ -83,7 +83,7 @@ export async function runPhase2Worker(
   }
   
   const workerTier = determineFixWorkerTier(files);
-  const fixLog = require('../../services/logging/fixPipelineLogger.js').fixLog;
+  const fixLog = require('../logging/data/fixPipelineLogger.js').fixLog;
   fixLog(`[WORKER_TIER_ROUTING] Fix Worker | Assigned Tier: ${workerTier.toUpperCase()}`);
   for (const provider of _effProviderOrder) {
     const pModel = (_manualModel && provider === _manualModelProvider) ? _manualModel : (bestModelForRole(provider, workerTier)?.modelId || provider);

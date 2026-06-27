@@ -20,7 +20,7 @@ export function collectFixContext(root: string, sourceFiles: { rel: string }[]):
   // Provide the full project file tree so the Supervisor doesn't hallucinate that files are missing
   // just because they were excluded from the 12-file content window.
   try {
-    const { buildFileTree } = require('../../services/workspace/codebaseSearch.js');
+    const { buildFileTree } = require('../workspace/data/codebaseSearch.js');
     const tree = buildFileTree(root);
     if (tree) {
       parts.push(`PROJECT FILE TREE (These files exist on disk. If a file is listed here but its content is not shown below, DO NOT assume it is missing!):\n${tree}`);

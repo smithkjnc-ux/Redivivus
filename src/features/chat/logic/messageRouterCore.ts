@@ -113,7 +113,7 @@ export async function handleCoreMessage(
         let revisions = undefined as any;
         if (cfg.blueprint && cfg.blueprint.who) {
           try {
-            const { snapshotBeforeUpdate } = require('../services/blueprint/blueprintRevisions.js');
+            const { snapshotBeforeUpdate } = require('../../blueprint/data/blueprintRevisions.js');
             const snap = snapshotBeforeUpdate(cfg.blueprint, 'Updated via wizard');
             revision = snap.revision;
             revisions = snap.revisions;

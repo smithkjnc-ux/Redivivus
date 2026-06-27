@@ -46,7 +46,13 @@ export function saveConversation(state: any, root?: string): void {
 export async function panelRefresh(panel: any): Promise<void> {
   const state = panel.state;
   const usageTracker = panel.usageTracker;
-  const headerInfo = buildHeaderInfo(panel.redivivus, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
+  let headerInfo: ReturnType<typeof buildHeaderInfo>;
+  try {
+    headerInfo = buildHeaderInfo(panel.redivivus, panel.routing, usageTracker, state.lastModel, ChatPanel.extensionContext, state.buildMode, state.assistMode);
+  } catch (err: any) {
+    require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[panelRefresh] buildHeaderInfo THREW: ${err?.message || err}\n`);
+    return;
+  }
   // [PANEL-CONTEXT] Detect current conversation mode and filter pills accordingly.
   // Only check the last few messages (O(1)) instead of scanning the full conversation (O(n)).
   const recentMsgs = state.conversation?.slice(-3) || [];

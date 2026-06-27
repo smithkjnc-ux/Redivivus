@@ -15,7 +15,7 @@ export function registerCloseProjectCommand(context: vscode.ExtensionContext): v
       // Do NOT remove ~/projects from the workspace — that left "NO FOLDER OPENED".
       try {
         const wsRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-        const { isProjectsContainer } = require('../services/project/redivivusPaths.js');
+        const { isProjectsContainer } = require('./redivivusPaths.js');
         if (wsRoot && isProjectsContainer(wsRoot)) {
           const PFP = require('../ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
           PFP.instance?.setRoot(wsRoot);

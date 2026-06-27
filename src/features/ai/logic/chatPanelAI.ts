@@ -89,7 +89,7 @@ export async function buildAIPrefix(redivivus: RedivivusService, recentMessages:
   const projectContext = buildProjectAnnotationContext(workspaceRoot);
   // [FIX] Inject user memory profile (~30 tokens, 0 AI cost to learn)
   let userProfileCtx = '';
-  try { const { buildPromptInjection } = require('../../services/userMemoryService.js'); userProfileCtx = buildPromptInjection(); } catch {}
+  try { const { buildPromptInjection } = require('../../chat/logic/userMemoryService.js'); userProfileCtx = buildPromptInjection(); } catch {}
   // Attach snapshot note to prompt if we have a visual — multimodal models will see the image alongside
   const snapshotNote = previewSnapshot ? '\n[VISUAL CONTEXT: A screenshot of the running preview is attached. Use it to answer visual questions accurately.]\n' : '';
   return `${prompt}\n${userProfileCtx ? userProfileCtx + '\n' : ''}${projectContext}${activeFileContext}${conversationContext}${snapshotNote}\nUser:`;

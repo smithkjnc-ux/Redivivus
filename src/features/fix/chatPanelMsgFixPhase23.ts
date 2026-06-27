@@ -120,9 +120,9 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       const _eli5NoOutBlock = _eli5NoOut ? formatELI5Block(_eli5NoOut) : '';
       // [Stage 3] Extract failure pattern to global dead end vault
       try {
-        const base3 = require('../../services/api/apiClient.js').getApiBase();
-        const token3 = await require('../../services/api/apiClient.js').getAccountToken();
-        const keysPayload3 = require('../../services/api/apiClient.js').collectKeys();
+        const base3 = require('../api/data/apiClient.js').getApiBase();
+        const token3 = await require('../api/data/apiClient.js').getAccountToken();
+        const keysPayload3 = require('../api/data/apiClient.js').collectKeys();
         const { supervisor: sup3 } = deps.routing.selectSupervisorAndWorker();
         const extractRes3 = await fetch(`${base3}/dead-end-extract/`, {
           method: 'POST',

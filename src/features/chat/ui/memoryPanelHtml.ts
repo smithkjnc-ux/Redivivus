@@ -18,7 +18,7 @@ function deleteBtn(type: string, extra: string): string {
 
 export function getMemoryPanelHtml(): string {
   // --- Global memory ---
-  const { loadUserMemory } = require('../../../services/userMemoryService.js') as typeof import('../logic/userMemoryService');
+  const { loadUserMemory } = require('../logic/userMemoryService.js') as typeof import('../logic/userMemoryService');
   const mem = loadUserMemory();
   const topLangs = Object.entries(mem.stack.languages).sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 5);
 
@@ -57,7 +57,7 @@ export function getMemoryPanelHtml(): string {
 
     let knowledgeEntries: any[] = [];
     try {
-      const { readKnowledge } = require('../../../services/learnedMemoryServiceIO.js') as typeof import('../logic/learnedMemoryServiceIO');
+      const { readKnowledge } = require('../logic/learnedMemoryServiceIO.js') as typeof import('../logic/learnedMemoryServiceIO');
       knowledgeEntries = readKnowledge(root).entries || [];
     } catch {}
 

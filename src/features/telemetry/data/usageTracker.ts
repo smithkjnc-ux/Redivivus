@@ -170,12 +170,12 @@ export class UsageTracker {
 
   // Generate comprehensive usage report with per-AI breakdowns
   getReport(projectName?: string): UsageReport {
-    const { buildUsageReport } = require('../../../services/usageTrackerReport.js');
+    const { buildUsageReport } = require('./usageTrackerReport.js');
     return buildUsageReport(this, projectName);
   }
 
   async reset(period: 'session' | 'day' | 'week' | 'month' | 'all-resettable'): Promise<void> {
-    const { resetUsagePeriod } = require('../../../services/usageTrackerReport.js');
+    const { resetUsagePeriod } = require('./usageTrackerReport.js');
     return resetUsagePeriod(this, period);
   }
 

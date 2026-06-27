@@ -31,7 +31,7 @@ export function isProtectedProject(projectDir: string): boolean {
  *  at the projects home. Supports both flat (~/projects/tetris) and category-nested (~/projects/games/tetris)
  *  layouts. Returns undefined for files in the home itself or in a category folder (not a project). */
 export function projectForFile(filePath: string): string | undefined {
-  const { nearestProjectRoot } = require('../../services/project/projectResolver.js');
+  const { nearestProjectRoot } = require('./projectResolver.js');
   return nearestProjectRoot(filePath, projectsDir());
 }
 

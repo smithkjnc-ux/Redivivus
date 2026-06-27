@@ -177,7 +177,7 @@ export function logExhaustedDeadEnd(root: string, accumulatedCritiques: string[]
   );
   // Also write to knowledge.json as never_do entries so future Supervisor prompts are informed
   try {
-    const { LearnedMemoryService } = require('../../services/learnedMemoryService.js');
+    const { LearnedMemoryService } = require('../chat/logic/learnedMemoryService.js');
     const mem = new LearnedMemoryService(root);
     for (const critique of failureCritiques) {
       if (critique.length > 20 && !critique.startsWith('[FORMAT CHANGE]')) {

@@ -33,7 +33,7 @@ export async function autoCreateProject(task: string, deps: BuildRequestDeps): P
   // [CATEGORY] AI-first classification — understands project type from the full task description even
   // when no exact keywords appear (e.g. "create a hello file" → utilities, not uncategorised).
   // [Rule 18] Regex classifyCategory() is kept as catch-block fallback only.
-  const { classifyCategory } = require('../../services/project/projectResolver.js');
+  const { classifyCategory } = require('../project/logic/projectResolver.js');
   let category = '';
   try {
     const catPrompt = `Reply with ONE category name only, or NONE if it truly doesn't fit any.

@@ -49,18 +49,18 @@ export async function runPhase1Supervisor(
   let roadmapSnippet = '';
   try { const rp = path.join(root, 'REDIVIVUS_ROADMAP.md'); if (fs.existsSync(rp)) { roadmapSnippet = fs.readFileSync(rp, 'utf-8').slice(-700).trim(); } } catch {}
 
-  const base = require('../../services/api/apiClient.js').getApiBase();
-  const token = await require('../../services/api/apiClient.js').getAccountToken();
+  const base = require('../api/data/apiClient.js').getApiBase();
+  const token = await require('../api/data/apiClient.js').getAccountToken();
   const fetchFn = (deps.routing as any).fetchWithTimeout;
-  const keysPayload = require('../../services/api/apiClient.js').collectKeys();
+  const keysPayload = require('../api/data/apiClient.js').collectKeys();
   const { supervisor } = deps.routing.selectSupervisorAndWorker();
-  const { bestModelForRole } = require('../../services/ai/modelRegistry.js');
+  const { bestModelForRole } = require('../ai/data/modelRegistry.js');
 
   // [FIX][FAILOVER] Mirror the Worker's failover for the SUPERVISOR: if the chosen provider fails for ANY reason
   // (usage/quota limit, bad key, network), PROMOTE the next key-configured provider in rank order to Supervisor
   // and continue. A capped Claude must not kill the whole fix when Gemini/etc. are configured. Throw only when
   // EVERY provider fails. (PapaJoe: "it should have fallen back to the next-in-line AI and promoted it to supervisor.")
-  const { AI_RANK } = require('../../services/ai/guardianAI.js');
+  const { AI_RANK } = require('../ai/data/guardianAI.js');
   const _supKeyMap = deps.routing.getKeyMap();
   const _rankedSup: string[] = Object.entries(AI_RANK)
     .filter(([ai]: any) => _supKeyMap[ai]?.())
@@ -79,7 +79,7 @@ export async function runPhase1Supervisor(
 
   // [CAPABILITY-AWARE SUPERVISOR] Tell the Supervisor who its workers ACTUALLY are and what they can do, so it
   // sizes WORKER_TIER to real capability instead of guessing at an abstract label. Built from the model registry.
-  const { buildCrewRoster } = require('../../services/ai/modelRegistry.js');
+  const { buildCrewRoster } = require('../ai/data/modelRegistry.js');
   const _supModelId = bestModelForRole(supervisor, supervisorTier)?.modelId;
   const workerRoster = buildCrewRoster(supervisor, _supModelId) || undefined;
 
@@ -112,7 +112,7 @@ export async function runPhase1Supervisor(
             workerRoster,
             // [LIVING BLUEPRINT Phase 3] The trail of accepted changes (how the project got to its present state),
             // so the Supervisor can reason about recent history, not just the current HEAD contract.
-            revisions: (() => { try { return require('../../services/blueprint/livingBlueprintService.js').recentRevisionsBlock(root) || undefined; } catch { return undefined; } })(),
+            revisions: (() => { try { return require('../blueprint/logic/livingBlueprintService.js').recentRevisionsBlock(root) || undefined; } catch { return undefined; } })(),
             projectRules: projectRules || undefined,
             deadEnds: projectDeadEnds || undefined,
             roadmapSnippet: roadmapSnippet || undefined,

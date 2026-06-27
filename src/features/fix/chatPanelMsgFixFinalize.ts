@@ -48,7 +48,7 @@ export async function runFixFinalize(params: {
   // [Stage 3] Extract success pattern to global dead end vault
   if (written.length > 0) {
     try {
-      const { getApiBase, getAccountToken } = require('../../services/api/apiClient.js');
+      const { getApiBase, getAccountToken } = require('../api/data/apiClient.js');
       const base = getApiBase();
       const token = await getAccountToken();
       fixLog('[GLOBAL_VAULT] Firing success extract from finalize...');
