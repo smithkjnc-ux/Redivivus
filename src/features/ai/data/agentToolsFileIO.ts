@@ -46,7 +46,7 @@ export const FILE_IO_TOOLS: AgentTool[] = [
         if (ctx.routing && ctx.routing.isGuardianActive()) {
           ctx.log(`🛡️ **Guardian AI** reviewing proposed write to \`${args.filePath}\`...`);
           try {
-            const review = await ctx.routing.guardianReview(ctx.task, contentToWrite, 'agent', ctx.blueprintContext || '');
+            const review = await ctx.routing.guardianReview(ctx.task, contentToWrite, 'agent', ctx.blueprintContext || '', undefined, 'inspect');
             if (review && !review.passed && review.correctedText) {
               const issues = review.issues && review.issues.length ? review.issues.join('; ') : 'Quality/correctness improvements';
               ctx.log(`⚠️ **Guardian AI** corrected proposed write to \`${args.filePath}\` (Issues: ${issues})`);

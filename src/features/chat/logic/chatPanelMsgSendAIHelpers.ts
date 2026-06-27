@@ -19,7 +19,7 @@ export async function runGuardianReviewOnCode(
   }
   const workerAI = routing.getAvailableAI().ai;
   const guardianTask = isConvert ? `Code conversion/transform task: ${userText}` : userText;
-  const review = await routing.guardianReview(guardianTask, finalText, workerAI, blueprintCtx).catch(() => null);
+  const review = await routing.guardianReview(guardianTask, finalText, workerAI, blueprintCtx, undefined, 'inspect').catch(() => null);
   if (review && review.guardianAI && review.guardianAI !== 'none') {
     const reviewInput = guardianTask.length + finalText.length;
     const reviewOutput = review.correctedText ? review.correctedText.length : 50;
