@@ -80,7 +80,7 @@ export function collectKeyHeaders(): Record<string, string> {
 export function getPreferred(): string | undefined {
   // Use the top-ranked available AI (supervisor), not the manually-set defaultAI preference.
   // defaultAI is the user's chat default — it doesn't reflect which AI should be supervisor.
-  const { selectSupervisorAndWorker } = require('../../ai/infrastructure/routingServiceRoster.js');
+  const { selectSupervisorAndWorker } = require('../../ai/data/routingServiceRoster.js');
   const { getGeminiKey: gk, getClaudeKey: ck, getOpenAIKey: ok, getGroqKey: gr, getXAIKey: xk, getKimiKey: km, getDeepseekKey: dk } = require('../../../features/ai/data/routingKeys.js');
   const keyMap: Record<string, () => string | null> = { gemini: gk, claude: ck, openai: ok, groq: gr, xai: xk, kimi: km, deepseek: dk };
   const { supervisor } = selectSupervisorAndWorker(keyMap);
@@ -89,9 +89,9 @@ export function getPreferred(): string | undefined {
   // fails over server-side, wasting a hop each time. Falls back to the top pick if ALL are flagged (recovery).
   let chosen = supervisor;
   try {
-    const { isProviderUnavailable } = require('../../ai/infrastructure/providerTierState.js');
+    const { isProviderUnavailable } = require('../../ai/data/providerTierState.js');
     if (chosen && isProviderUnavailable(chosen)) {
-      const { buildRoster } = require('../../ai/infrastructure/routingServiceRoster.js');
+      const { buildRoster } = require('../../ai/data/routingServiceRoster.js');
       const roster = buildRoster(keyMap);
       const ranked = [roster.supervisor, ...roster.workers].filter(Boolean);
       chosen = ranked.find((p: string) => !isProviderUnavailable(p)) || chosen;
