@@ -101,9 +101,10 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
         `// === FILE: ${_srcHtmlKey.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')} ===\\n([\\s\\S]*?)(?=\\n// === FILE:|$)`
       );
       const _srcHtmlRaw = filesBlock.match(_srcHtmlRegex)?.[1]?.trim() ?? null;
-      // ../src/ → ./src/ (outDir-relative paths break when root moves from subfolder to project root)
+      // ../src/ → src/ (outDir-relative paths break when root moves from subfolder to project root)
+      // Note: ./src/ also causes Vite to fail — must strip the ./ prefix entirely
       const _fixedHtml = _srcHtmlRaw
-        ? _srcHtmlRaw.replace(/(['"])\.\.\/(src|styles|js|css|assets|images|fonts)\//g, '$1./$2/')
+        ? _srcHtmlRaw.replace(/(['"])(\.\.?\/)?(src|styles|js|css|assets|images|fonts)\//g, '$1$3/')
         : null;
 
       // 2. Patch vite.config.js
@@ -155,7 +156,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
         `REQUIRED changes (write ALL of these, do not omit any):\n` +
         `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +
         `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — MANDATORY.\n` +
-        `(3) Move HTML: copy ${_viteRoot}/index.html content to root index.html, fixing ../src/ → ./src/ paths.\n` +
+        `(3) Move HTML: copy ${_viteRoot}/index.html content to root index.html, fixing ../src/ → src/ paths (no leading ./ — Vite requires bare relative paths).\n` +
         `(4) ${_viteRoot}/index.html: write only: <!-- entry point moved to root index.html -->\n` +
         `STOP — do NOT touch CSS in this pass.\n` +
         `AFTER the wiring is fixed: ${userText}`;
