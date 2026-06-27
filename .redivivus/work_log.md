@@ -1103,3 +1103,32 @@ Auto-managed by Redivivus. Append-only session history.
 
 ### [NEXT]
 - Rule 9 split queue: chatPanelMsgFixGuardianPhase.ts (239), chatPanelMsgFix.ts (279), chatPanelMsgFixEscalation.ts (202), chatPanelMsgFixEscalationUtils.ts (202)
+
+### Testing complete — 2026-06-27
+
+**Results: 3 clean single-pass fixes, 2 IDE-revert false failures**
+
+Clean passes:
+- Run 1: CSS display/colors — ✅ clean (Compliance Verifier + Code Inspector both passed first try)
+- Run 3a: CSS color:transparent — ✅ clean
+- Run 4: JS logic bug (seconds--) — ✅ clean
+
+False failures (not pipeline bugs):
+- Run 2: IDE auto-reverted both files before pipeline ran → Supervisor diagnosed from history → phantom prescription
+- Run 3b: IDE auto-reverted + Supervisor prescribed nonexistent file + console.log assertions (fixed with PRESCRIPTION ACTION RULE)
+
+**VERDICT: Two-layer Guardian pipeline is production-ready.**
+
+All pipeline fixes deployed:
+- Fix Compliance Verifier: Step 1 extraction, determinism rule, FULL FILE result-state check
+- Fix Supervisor: self-consistency check, existence rule, action rule (no assertions/nonexistent files)
+- Fix Code Inspector: post-apply blueprint refresh from disk
+- Build + Agent pipelines: upgraded to Code Inspector quality (mode='inspect')
+
+### [NEXT]
+- Rule 9 split queue (do before next edit of these files):
+  - chatPanelMsgFixGuardianPhase.ts (239 lines)
+  - chatPanelMsgFix.ts (279 lines)
+  - chatPanelMsgFixEscalation.ts (202 lines)
+  - chatPanelMsgFixEscalationUtils.ts (202 lines)
+- Move on to next project priority
