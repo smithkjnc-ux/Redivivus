@@ -1,6 +1,11 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — Worker refresh + full-file format for small projects**
+- **Problem**: Worker generated surgical search/replace blocks based on the file snapshot from the START of the fix session. After retries (or after prior fix runs modified the files), the exact text the Worker searched for no longer existed verbatim → "Search block not found" → false compile errors → escalation to Supervisor self-fix.
+- **Fix 1 (file refresh)** `chatPanelMsgFixEscalation.ts`: Before each retry (attempt > 0), re-read all files in `fileNames` from disk and rebuild `filesBlock`. Worker now always sees current file state, not the initial scan snapshot.
+- **Fix 2 (full-file format)** `chatPanelMsgFixPhase2Worker.ts`: When `largestFile.size < 5000` (~100 lines) and not `forceSurgical`, append `FORMAT REQUIREMENT` to `patternRules` instructing the Worker to write FULL FILE content instead of surgical search/replace blocks. Also sends `preferFullFile: true` in context for server-side use. Eliminates the "search text drift" class of failures entirely for small projects.
+
 **2026-06-27 — Trivial fast-path blocked for structural fixes**
 - **Root cause (from log)**: Supervisor put `[TRIVIAL: SKIP REVIEW]` in diagnosis for a multi-file structural rewrite that included moving the HTML entry point. `isTrivial` check in `chatPanelMsgFixEscalation.ts` returned immediately, skipping both Verify and Guardian. Worker emptied `public/index.html` without populating root `index.html` — undetected since no review ran.
 - **Fix**: Added `_structuralFiles` check — trivial fast-path is blocked when diagnosis mentions `vite.config`, `index.html`, `package.json`, `tsconfig`, or `webpack.config`. Logs `[TRIVIAL-OVERRIDE]` when overridden.

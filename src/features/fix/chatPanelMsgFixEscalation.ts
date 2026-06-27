@@ -63,6 +63,20 @@ export async function runEscalationLoop(params: {
   let filesBlock = initialFilesBlock;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    // ── Refresh files from disk before each retry ──
+    // The first attempt gets the Supervisor's original scan. On retries, re-read actual disk state
+    // so the Worker sees current file content — not a snapshot from before attempt 0 may have
+    // partially applied changes. Guards against stale surgical search blocks on retry 2+.
+    if (attempt > 0) {
+      try {
+        const _fs = require('fs'), _nodePath = require('path');
+        const _fresh = fileNames.split(', ').filter(Boolean)
+          .filter(rel => _fs.existsSync(_nodePath.join(root, rel)))
+          .map(rel => `// === FILE: ${rel} ===\n${_fs.readFileSync(_nodePath.join(root, rel), 'utf8')}`);
+        if (_fresh.length > 0) { filesBlock = _fresh.join('\n\n'); fixLog(`[RETRY-REFRESH] Re-read ${_fresh.length} files from disk for retry ${attempt}`); }
+      } catch (e) { fixLog(`[RETRY-REFRESH] Skipped (non-blocking): ${String(e).slice(0, 80)}`); }
+    }
+
     // ── Phase 2: Worker generates fix ──
     const workerPhaseResult = await runWorkerPhase({
       escalated, originalWorkerProvider, deps, conversation, supervisorLabel, attempt, refresh, accumulatedCritiques, currentDiagnosis, fileNames, filesBlock, activePatterns, root, forceSurgical

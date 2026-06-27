@@ -85,6 +85,17 @@ export async function runPhase2Worker(
   const workerTier = determineFixWorkerTier(files);
   const fixLog = require('../logging/data/fixPipelineLogger.js').fixLog;
   fixLog(`[WORKER_TIER_ROUTING] Fix Worker | Assigned Tier: ${workerTier.toUpperCase()}`);
+
+  // [FIX] For small projects (largest file < 5000 chars / ~100 lines), instruct the Worker to
+  // use FULL FILE format instead of surgical search/replace. Surgical edits are brittle against
+  // files that have been through multiple AI passes — exact search text drifts. Full file
+  // rewrites always succeed and are safe for files small enough to output in their entirety.
+  const _isSmallProject = largestFile.size < 5000 && !forceSurgical;
+  const _formatHint = _isSmallProject
+    ? `\nFORMAT REQUIREMENT: All files in this project are small (under 100 lines). You MUST write FULL FILE content for every change — do NOT use <search>/<replace> or surgical edit blocks. Write the complete corrected file from top to bottom.`
+    : '';
+  const _patternRules = ((buildWorkerRules(activePatterns, 9) || '') + _formatHint).trim() || undefined;
+
   for (const provider of _effProviderOrder) {
     const pModel = (_manualModel && provider === _manualModelProvider) ? _manualModel : (bestModelForRole(provider, workerTier)?.modelId || provider);
     let attempt = '';
@@ -96,9 +107,10 @@ export async function runPhase2Worker(
           diagnosis,
           files: files.map(f => ({ path: f.path, content: f.content, size: f.size })),
           context: {
-            patternRules: buildWorkerRules(activePatterns, 9) || undefined,
+            patternRules: _patternRules,
             fileMetrics: { totalSize, largestFile: { path: largestFile.path, size: largestFile.size }, fileCount: files.length },
-            forceSurgical: !!forceSurgical
+            forceSurgical: !!forceSurgical,
+            preferFullFile: _isSmallProject,
           },
           worker: provider, workerModel: pModel, supervisorProvider: supervisor,
           escalated: !!escalated, keys: keysPayload, stream: true,
