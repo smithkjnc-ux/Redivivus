@@ -148,7 +148,6 @@ export async function runBuildAfterGates(
   try {
     const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk, onStep, onCode, onFileComplete });
     buildOk = !!result.success;
-    require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[build] callCloudBuild returned success=${result.success} error=${result.error || 'none'} preferred=${require('../../api/data/apiClient.js').getPreferred?.() || '?'}\n`);
 
     if (!result.success) {
       if (result.error === 'NOT_AUTHENTICATED') {
