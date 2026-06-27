@@ -27,7 +27,7 @@ export async function runGuardianWithRetry(
   for (let attempt = 0; attempt <= MAX_GUARDIAN_RETRIES; attempt++) {
     let review: Awaited<ReturnType<typeof routing.guardianReview>> | undefined;
     try {
-      review = await routing.guardianReview(task, code, 'worker', guardianContext);
+      review = await routing.guardianReview(task, code, 'worker', guardianContext, undefined, 'inspect');
     } catch {
       break; // guardian unavailable -- return current code
     }
