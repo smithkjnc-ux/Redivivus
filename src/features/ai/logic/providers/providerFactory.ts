@@ -22,6 +22,7 @@ export async function callProvider(
   imageType?: string,
   systemMessage?: string,
   temperature?: number,
+  maxOutputTokens?: number,
 ): Promise<AIResponse & { usingFallback?: string }> {
   switch (ai) {
     case 'gemini':
@@ -36,7 +37,7 @@ export async function callProvider(
     case 'deepseek': {
       // [VISION-WARN] These providers are text-only in the extension-side path. Image silently dropped.
       if (imageBase64) { console.warn(`[Redivivus] ${ai} does not support vision — image attachment ignored. Switch to Claude, OpenAI, or Gemini to analyze images.`); }
-      if (ai === 'groq') { return executeGroq(text, fetchWithTimeout, systemMessage, tier, temperature); }
+      if (ai === 'groq') { return executeGroq(text, fetchWithTimeout, systemMessage, tier, temperature, maxOutputTokens); }
       if (ai === 'xai')  { return executeXAI(text, fetchWithTimeout, systemMessage, tier, temperature); }
       if (ai === 'kimi') { return executeKimi(text, fetchWithTimeout, systemMessage, tier, temperature); }
       return executeDeepseek(text, fetchWithTimeout, systemMessage, tier, temperature);

@@ -64,7 +64,7 @@ export class RoutingService {
   promptFailoverCallback?: (failedAI: string, nextAI: string) => void;
   supervisorFailoverCallback?: (msg: string) => void;
 
-  async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string, role = 'worker'): Promise<AIResponse & { usingFallback?: string }> {
+  async prompt(text: string, timeoutMs = 60_000, imageBase64?: string, imageType?: string, systemMessage?: string, role = 'worker', maxOutputTokens?: number): Promise<AIResponse & { usingFallback?: string }> {
 
     const keyMap = this.getKeyMap();
     // Build ranked list of available AIs
@@ -98,7 +98,7 @@ export class RoutingService {
       // next AI. The +3s buffer over the fetch timeout avoids cutting off a slow-but-working provider.
       const deadlineMs = timeoutMs + 3000;
       const result = await Promise.race([
-        callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage),
+        callProvider(ai, text, fetchFn, undefined, imageBase64, imageType, systemMessage, undefined, maxOutputTokens),
         new Promise<AIResponse>(resolve => setTimeout(() => resolve({ text: '', model: ai, success: false, error: `${ai} timed out after ${deadlineMs}ms (no response)` }), deadlineMs)),
       ]);
 

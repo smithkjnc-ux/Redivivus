@@ -75,7 +75,7 @@ export async function inferBlueprintFields(
   const sessionId = Date.now().toString(36);
   try {
     const prompt = INFERENCE_PROMPT.replace('{REQUEST}', request.slice(0, 800));
-    const res = await (routing as any).prompt(prompt, 15_000);
+    const res = await (routing as any).prompt(prompt, 15_000, undefined, undefined, undefined, 'worker', 300);
     if (!res?.text) {
       try { require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[blueprint] inference empty: success=${res?.success} error=${res?.error}\n`); } catch {}
       return makeFallback(request, sessionId);

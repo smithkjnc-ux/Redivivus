@@ -11,6 +11,7 @@ export async function executeGroq(
   systemMessage?: string,
   tier?: 'flash' | 'pro' | 'ultra',
   temperature?: number,
+  maxOutputTokens?: number,
 ): Promise<AIResponse & { usingFallback?: string }> {
   const key = getGroqKey()!;
   const { bestModelForRole, tierToRole } = await import('../../data/modelRegistry.js');
@@ -20,8 +21,10 @@ export async function executeGroq(
     const _msgs: any[] = systemMessage
         ? [{ role: 'system', content: systemMessage }, { role: 'user', content: text }]
         : [{ role: 'user', content: text }];
-      // [FIX] max_tokens set to Groq maximum (8000) — Worker needs full output for large files
-      const body = JSON.stringify({ model, messages: _msgs, max_tokens: 8000, temperature: clampTemp('groq', temperature ?? 0.2) });
+      // [FIX] max_tokens set to Groq maximum (8000) — Worker needs full output for large files.
+      // Callers that only need short outputs (e.g. blueprint inference JSON) pass maxOutputTokens to avoid
+      // burning 8000 reserved tokens against the TPM budget (12000 TPM / 8000 reserved = only 1 call/min).
+      const body = JSON.stringify({ model, messages: _msgs, max_tokens: maxOutputTokens ?? 8000, temperature: clampTemp('groq', temperature ?? 0.2) });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
     if (!res.ok) {return { text: '', model: 'llama-3.3-70b', success: false, error: `Groq API error ${res.status}: ${data.error?.message || res.statusText}` };}
