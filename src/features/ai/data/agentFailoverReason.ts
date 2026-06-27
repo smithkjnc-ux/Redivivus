@@ -12,13 +12,15 @@ export function describeProviderError(raw: string | undefined | null): string {
   const s = (raw || '').toString();
   const low = s.toLowerCase();
 
+  // Rate limit check FIRST — Groq 429 errors include a "settings/billing" URL that would otherwise
+  // trigger the out-of-credits path below before we reach this check.
+  if (low.includes('rate_limit') || low.includes('rate limit') || low.includes('too many requests') || low.includes('429')) {
+    return 'rate limited';
+  }
   // Out of funds — Anthropic: 400 "credit balance is too low"; OpenAI: "insufficient_quota" / "billing".
   if (low.includes('credit balance') || low.includes('insufficient_quota') || low.includes('insufficient funds') ||
       low.includes('billing') || low.includes('exceeded your current quota')) {
     return 'out of API credits';
-  }
-  if (low.includes('rate_limit') || low.includes('rate limit') || low.includes('too many requests') || low.includes('429')) {
-    return 'rate limited';
   }
   if (low.includes('overloaded') || low.includes('529') || low.includes('503') || low.includes('temporarily unavailable')) {
     return 'provider overloaded';

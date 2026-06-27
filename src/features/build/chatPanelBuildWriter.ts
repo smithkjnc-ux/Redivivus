@@ -41,6 +41,17 @@ export function writeBuiltFile(absPath: string, code: string, options?: WriteOpt
   const isNewFile = !fs.existsSync(absPath);
   let finalCode = code;
 
+  // Strip leading markdown code fence (e.g. ```html, ```css). AI occasionally wraps output in
+  // a fence even when asked for raw file content — the fence literal ends up in the written file.
+  const leadingFence = finalCode.match(/^```[\w]*\r?\n/);
+  if (leadingFence) {
+    finalCode = finalCode.slice(leadingFence[0].length);
+    const trailingFence = finalCode.lastIndexOf('\n```');
+    if (trailingFence !== -1 && trailingFence === finalCode.length - 4) {
+      finalCode = finalCode.slice(0, trailingFence);
+    }
+  }
+
   // Strip JSON line comments (invalid JSON syntax)
   if (absPath.toLowerCase().endsWith('.json')) {
     finalCode = code.split('\n')
