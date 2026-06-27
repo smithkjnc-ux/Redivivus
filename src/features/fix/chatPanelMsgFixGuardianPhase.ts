@@ -71,7 +71,13 @@ export async function runGuardianPhase(params: {
 
     // [ROUTING PANEL] Force the user-chosen Guardian AI if set (no failover).
     const guardianWorkerHint = escalated && originalWorkerProvider ? originalWorkerProvider : workerLabel.toLowerCase();
-    const guardianResult = await deps.routing.guardianReview(guardianContext, workerResponse, guardianWorkerHint, '', deps.routingOverrides?.guardian);
+    // Pass the full file state as blueprintContext so the Guardian can verify uncertainties
+    // by looking up answers in the actual code — not guessing. "Do class names match HTML?"
+    // is a binary question answerable by reading both files. Guardian has no excuse to guess.
+    const guardianBlueprint = filesBlock
+      ? `COMPLETE FILE STATE (all project files — use these to verify any uncertainty):\n${filesBlock.slice(0, 12000)}`
+      : '';
+    const guardianResult = await deps.routing.guardianReview(guardianContext, workerResponse, guardianWorkerHint, guardianBlueprint, deps.routingOverrides?.guardian);
     fixLog(`Guardian review result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
     
     // [FIX] Distinguish a REAL guardian verdict from the "couldn't run on any provider" fallback.

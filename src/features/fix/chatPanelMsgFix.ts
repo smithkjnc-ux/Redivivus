@@ -89,7 +89,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       `vite.config.js has root:'${_viteRoot}'. HTML asset paths (../src/ or ./src/) resolve inside the Vite root folder, NOT at the project root — CSS/JS silently 404.\n` +
       `REQUIRED (ALL changes in one fix — do not omit any):\n` +
       `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +
-      `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — relative path shifts when root changes\n` +
+      `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — THIS IS MANDATORY. outDir is relative to root. With root:'.', outDir:'../dist' places the build output OUTSIDE the project directory. Do NOT question this change.\n` +
       `(3) Move HTML entry: COPY the full HTML content from ${_viteRoot}/index.html into the ROOT index.html (project root, not the subfolder). The root index.html currently contains only a placeholder comment — replace it entirely with the real HTML. Update link/script paths to ./src/... format. Do NOT just empty ${_viteRoot}/index.html without first writing the full HTML to the root index.html.\n` +
       `(4) HTML <link>/<script> paths in the NEW root index.html: must use ./src/... (not ../src/...)\n` +
       `(5) Fix CSS .class selectors to match HTML class="..." attributes (not id="..." attributes)\n` +
