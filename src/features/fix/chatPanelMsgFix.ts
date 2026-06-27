@@ -92,7 +92,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
       `(2) vite.config.js: change outDir:'../dist' to outDir:'./dist' — THIS IS MANDATORY. outDir is relative to root. With root:'.', outDir:'../dist' places the build output OUTSIDE the project directory. Do NOT question this change.\n` +
       `(3) Move HTML entry: COPY the full HTML content from ${_viteRoot}/index.html into the ROOT index.html (project root, not the subfolder). The root index.html currently contains only a placeholder comment — replace it entirely with the real HTML. Update link/script paths to ./src/... format. Do NOT just empty ${_viteRoot}/index.html without first writing the full HTML to the root index.html.\n` +
       `(4) HTML <link>/<script> paths in the NEW root index.html: must use ./src/... (not ../src/...)\n` +
-      `(5) Fix CSS .class selectors to match HTML class="..." attributes (not id="..." attributes)\n` +
+      `STOP after points 1-4. Do NOT attempt CSS/class changes in this pass — CSS must match the final HTML which only exists after point 3 is complete. A second pass will handle CSS.\n` +
       `AFTER the wiring is fixed: ${userText}`;
     fixLog('[WIRING-GATE] Structural path mismatch detected — userText prefixed with full structural fix instruction');
   }
