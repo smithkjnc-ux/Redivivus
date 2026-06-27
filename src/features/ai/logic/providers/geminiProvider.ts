@@ -4,6 +4,8 @@ import type { AIResponse } from '../../data/routingTypes.js';
 import { getGeminiKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 import { clampTemp } from '../../data/roleTemperature.js';
+import { recordSuccess, recordRateLimit, recordUnavailable } from '../../data/providerQuotaTracker.js';
+import { parseGenericRateLimit } from '../../data/parseRateLimitInfo.js';
 
 export async function executeGemini(
   text: string,

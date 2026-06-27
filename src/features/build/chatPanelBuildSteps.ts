@@ -168,7 +168,7 @@ export async function runPostBuildActions(opts: {
       );
     } else {
       try {
-        const CP = require('../../panels/chat/chatPanel.js').ChatPanel;
+        const CP = require('../../chat/ui/chatPanel.js').ChatPanel;
         if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); }
       } catch {}
       vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });

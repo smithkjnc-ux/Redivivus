@@ -68,10 +68,10 @@ export async function runChunkedBuildFinalize(
     if (_wsf.length > 0) {
       vscode.workspace.updateWorkspaceFolders(_wsf.length, null, { uri: vscode.Uri.file(root) });
       // Update the custom Project Files tree to the newly built project
-      try { const PFP = require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider; PFP.instance?.setRoot(root); PFP.instance?.startLiveRefresh(); vscode.commands.executeCommand('redivivusProjectFiles.focus').then(undefined, () => {}); } catch {}
+      try { const PFP = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider; PFP.instance?.setRoot(root); PFP.instance?.startLiveRefresh(); vscode.commands.executeCommand('redivivusProjectFiles.focus').then(undefined, () => {}); } catch {}
       vscode.commands.executeCommand('workbench.view.explorer').then(() => { vscode.commands.executeCommand('workbench.files.action.focusFilesExplorer'); }, () => {});
     } else {
-      try { const CP = require('../../panels/chat/chatPanel.js').ChatPanel; if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); } } catch {}
+      try { const CP = require('../../chat/ui/chatPanel.js').ChatPanel; if (CP?.extensionContext) { CP.extensionContext.globalState.update('redivivus.pendingRescueConversation', ctx.conversation); } } catch {}
       vscode.commands.executeCommand('vscode.openFolder', vscode.Uri.file(root), { forceNewWindow: false });
     }
   }

@@ -4,6 +4,8 @@ import type { AIResponse } from '../../data/routingTypes.js';
 import { getOpenAIKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 import { clampTemp } from '../../data/roleTemperature.js';
+import { recordSuccess, recordRateLimit, recordUnavailable } from '../../data/providerQuotaTracker.js';
+import { parseOpenAIHeaders } from '../../data/parseRateLimitInfo.js';
 
 export async function executeOpenAI(
   text: string,
@@ -35,9 +37,18 @@ export async function executeOpenAI(
       const body = JSON.stringify(bodyObj);
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + key }, body });
     const data = await res.json() as any;
-    if (!res.ok) {return { text: '', model, success: false, error: `OpenAI API error ${res.status}: ${data.error?.message || res.statusText}` };}
+    if (!res.ok) {
+      const errMsg = `OpenAI API error ${res.status}: ${data.error?.message || res.statusText}`;
+      if (res.status === 429) {
+        // insufficient_quota = out of credits (not a rate limit that will auto-recover)
+        if (data.error?.code === 'insufficient_quota') { recordUnavailable('openai', 'out of API credits'); }
+        else { recordRateLimit('openai', parseOpenAIHeaders(res.headers)); }
+      } else if (res.status === 402 || /credit|balance|insufficient/i.test(data.error?.message || '')) { recordUnavailable('openai', 'out of API credits'); }
+      return { text: '', model, success: false, error: errMsg };
+    }
     const inputTokens  = data.usage?.prompt_tokens     ?? undefined;
     const outputTokens = data.usage?.completion_tokens ?? undefined;
+    recordSuccess('openai', inputTokens ?? 0, outputTokens ?? 0);
     return { text: (data.choices?.[0]?.message?.content || '').trim(), model, success: true, usingFallback: undefined, inputTokens, outputTokens };
   } catch (err: any) { return { text: '', model, success: false, error: classifyError(err, 'OpenAI') }; }
 }

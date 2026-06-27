@@ -5,6 +5,8 @@ import { getClaudeKey } from '../../data/routingKeys.js';
 import { classifyError } from './providerUtils.js';
 import { bestModelForRole, tierToRole } from '../../data/modelRegistry.js';
 import { clampTemp } from '../../data/roleTemperature.js';
+import { recordSuccess, recordRateLimit, recordUnavailable } from '../../data/providerQuotaTracker.js';
+import { parseAnthropicHeaders } from '../../data/parseRateLimitInfo.js';
 
 export async function executeClaude(
   text: string,
@@ -25,9 +27,15 @@ export async function executeClaude(
     const body = JSON.stringify({ model, max_tokens: 64000, temperature: clampTemp('claude', temperature ?? 0.2), ...(systemMessage ? { system: systemMessage } : {}), messages: [{ role: 'user', content: _content }] });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body });
     const data = await res.json() as any;
-    if (!res.ok) {return { text: '', model: modelLabel, success: false, error: `Claude API error ${res.status}: ${data.error?.message || res.statusText}` };}
+    if (!res.ok) {
+      const errMsg = `Claude API error ${res.status}: ${data.error?.message || res.statusText}`;
+      if (res.status === 429) { recordRateLimit('claude', parseAnthropicHeaders(res.headers)); }
+      else if (/credit|balance/i.test(data.error?.message || '')) { recordUnavailable('claude', 'out of API credits'); }
+      return { text: '', model: modelLabel, success: false, error: errMsg };
+    }
     const inputTokens  = data.usage?.input_tokens  ?? undefined;
     const outputTokens = data.usage?.output_tokens ?? undefined;
+    recordSuccess('claude', inputTokens ?? 0, outputTokens ?? 0);
     return { text: (data.content?.[0]?.text || '').trim(), model: modelLabel, success: true, usingFallback: undefined, inputTokens, outputTokens };
   } catch (err: any) { return { text: '', model: modelLabel, success: false, error: classifyError(err, 'Claude') }; }
 }

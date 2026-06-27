@@ -30,7 +30,7 @@ export function setupProjectFilesTree(root: string): void {
   const _rootInWs = _wsfNow.some(f => path.resolve(f.uri.fsPath) === path.resolve(root));
   if (!_rootInWs) {
     try {
-      const PFP = require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider;
+      const PFP = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider;
       PFP.instance?.setRoot(root);
       PFP.instance?.startLiveRefresh();
       vscode.commands.executeCommand('redivivusProjectFiles.focus').then(undefined, () => {});

@@ -20,7 +20,7 @@ export function getEffectiveProjectRoot(fallbackRoot?: string): string | undefin
 
   if (!effectiveRoot || isProjectsContainer(effectiveRoot)) {
     let activeRoot: string | undefined;
-    try { activeRoot = require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); } catch {}
+    try { activeRoot = require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.getRoot(); } catch {}
     if (!activeRoot && fallbackRoot) { activeRoot = fallbackRoot; }
     if (activeRoot && !isProjectsContainer(activeRoot)) { 
       effectiveRoot = activeRoot; 

@@ -195,7 +195,7 @@ export async function runBuildAfterGates(
     deps.setActiveBuildCtx(undefined);
     deps.postToWebview({ type: 'set-status', status: 'ready' });
     // Stop the live poll and do a final render so the Project Files tree shows the completed file set.
-    try { require('../../sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.stopLiveRefresh(); } catch {}
+    try { require('../../vscode/ui/sidebar/projectFilesProvider.js').ProjectFilesProvider.instance?.stopLiveRefresh(); } catch {}
   }
 }
 
