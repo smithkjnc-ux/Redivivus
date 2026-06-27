@@ -138,6 +138,27 @@ export const KNOWN_PATTERNS: FailurePattern[] = [
     whyFails: 'On short screens, 80vw can exceed viewport height, so the element overflows vertically and gets cut off at the bottom. vw only considers width; height needs vh consideration too.',
     doInstead: 'Use --max-size: min(80vw, calc(100vh - 160px), 314px) so the element is constrained by whichever dimension is smaller.',
   },
+  {
+    id: 'vite-root-css-path',
+    name: 'Vite custom root — CSS/JS paths in HTML resolve to wrong location',
+    detect: [/root:\s*['"][^.'"]/], outputFail: [],
+    supervisorNote:
+`- Vite custom root path mismatch (CSS silently fails to load — STRUCTURAL BUG, fix FIRST):
+  vite.config.js sets root to a subfolder (e.g., root:'public'). The browser origin IS that folder.
+  <link href="../src/styles/x.css"> from public/index.html resolves to /src/styles/x.css in the browser —
+  but Vite serves from public/, so it looks for public/src/styles/x.css which DNE. No 404 shown. CSS never loads.
+  STEP 0 (REQUIRED before ANY style changes): check vite.config.js root setting, then verify every
+  <link>/<script> path in the HTML entry point resolves correctly.
+  FIX: set root:'.' in vite.config.js AND update HTML paths to ./src/... (relative to project root).
+  ALSO check: CSS class selectors (.foo) must match HTML class="foo", NOT id="foo" (common companion bug).`,
+    workerRule:
+`VITE ROOT RULE: non-default root (e.g., root:'public') means ../src paths in HTML silently 404 at runtime.
+  REQUIRED: (1) set root:'.' in vite.config.js, (2) update HTML <link>/<script> paths to ./src/...,
+  (3) fix class/id mismatches: CSS .foo selector requires HTML class="foo", not id="foo".`,
+    triedWhat: 'editing CSS color/font content without checking Vite root or path resolution',
+    whyFails: 'npm run build succeeds but dev server cannot serve ../src paths from a non-default root. Browser silently gets 404, no error shown, CSS changes are invisible.',
+    doInstead: 'fix root in vite.config.js first, then fix HTML link paths, then make visual changes',
+  },
 ];
 
 /** Returns patterns whose detect regexes match the source AND whose relevanceTest (if any) matches userText. */

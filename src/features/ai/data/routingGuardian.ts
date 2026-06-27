@@ -9,7 +9,7 @@ import { bestModelForRole } from './modelRegistry.js';
 import type { RoutingService } from './routingService.js';
 import { logAICall } from './aiCallLogger.js';
 import { detectProjectType, getFolderStructureTemplate } from './routingGuardianUtils.js';
-import { collectKeys } from '../../../features/api/data/apiClient.js';
+import { collectKeys, getApiBase, getAccountToken } from '../../../features/api/data/apiClient.js';
 
 export async function supervisorPlanImpl(
   svc: RoutingService,
@@ -121,7 +121,7 @@ export async function guardianReviewImpl(
   const order = forceProvider ? [forceProvider] : [preferred, ...ranked.filter((p) => p !== preferred)];
 
   const fetchFn = (svc as any).fetchWithTimeout.bind(svc);
-  const { getApiBase, getAccountToken } = require('../api/apiClient.js');
+  // getApiBase and getAccountToken are static imports above (fixed from broken require path)
   const base = getApiBase();
   const token = await getAccountToken();
   // [FIX] Keys go in the X-Provider-Keys header, NOT the body (keyMap holds function refs -> JSON drops them).

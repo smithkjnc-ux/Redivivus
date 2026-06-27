@@ -76,6 +76,14 @@ export async function runGuardianPhase(params: {
       return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
     }
 
+    // [H2 degraded] Guardian infrastructure failure (no providers available / all failed) — NOT a code rejection.
+    // Treat as skipped, not rejected — re-prescription with an infra error message is nonsensical and causes cascading errors.
+    if (!guardianRan && guardianResult.guardianAI === 'none') {
+      guardianNote = `Guardian: skipped (${guardianResult.issues?.[0]?.slice(0, 120) || 'all providers unavailable'})`;
+      fixLog('Guardian SKIPPED — infrastructure failure, not a code rejection. Fix applied unreviewed.');
+      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: 'skipped (unavailable)', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
+    }
+
     // Guardian rejected WITHOUT corrected text — accumulate critique and retry
     const critique = guardianResult.issues?.join('; ') || 'Unknown issue';
     accumulatedCritiques.push(critique);

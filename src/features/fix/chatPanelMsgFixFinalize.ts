@@ -125,6 +125,24 @@ export async function runFixFinalize(params: {
     } catch { /* preview verify is best-effort — never block finalize */ }
   }
 
+  // [Gap 2b — fix pipeline] Vision AI reviews screenshot for visual correctness after the preview runs
+  if (written.length > 0) {
+    try {
+      const { runVisualVerification } = await import('../chat/ui/chatPanelVisualVerify.js');
+      const vv = await runVisualVerification(root, userText, deps.routing, 3500);
+      if (vv.applicable) {
+        const { BuildActivityPanel } = await import('../chat/ui/buildActivity/buildActivityPanel.js');
+        const icon = vv.passed === true ? '✅' : vv.passed === false ? '⚠️' : '🔍';
+        const label = vv.passed === true ? 'Visual check passed' : vv.passed === false ? 'Visual issue — may need another pass' : 'Visual check inconclusive';
+        BuildActivityPanel.current?.step({ phase: 'guardian', status: vv.passed === true ? 'pass' : vv.passed === false ? 'fix' : 'running', label });
+        if (vv.passed === false) {
+          conversation.push({ role: 'assistant', content: `${icon} **${label}**\n\n${vv.aiVerdict}\n\n_The code was changed but the visual result may not match your request. Review or click Fix again._`, timestamp: Date.now() });
+          refresh();
+        }
+      }
+    } catch { /* visual verify is best-effort */ }
+  }
+
   if (needsAgentHandoff) {
     const { executeAgentHandoff } = await import('./chatPanelMsgFixAgentHandoff.js');
     await executeAgentHandoff(deps, root, userText, written, fixSnapId, conversation);
