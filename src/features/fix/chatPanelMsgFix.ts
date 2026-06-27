@@ -85,6 +85,7 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   if (_hasNonDefaultViteRoot && _hasAboveRootLinks) {
     const _viteRoot = filesBlock.match(/root:\s*['"]([^.'"'][^'"]*)['"]/)?.[1] || 'custom-folder';
     userText = `STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY VISUAL CHANGES:\n` +
+      `THIS IS A PURE FILE EDIT TASK — do NOT emit [AGENT_HANDOFF]. No commands need to run. Edit the files directly.\n` +
       `vite.config.js has root:'${_viteRoot}'. HTML asset paths (../src/ or ./src/) resolve inside the Vite root folder, NOT at the project root — CSS/JS silently 404.\n` +
       `REQUIRED (ALL changes in one fix — do not omit any):\n` +
       `(1) vite.config.js: change root:'${_viteRoot}' to root:'.'\n` +

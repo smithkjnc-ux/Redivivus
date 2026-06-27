@@ -1,6 +1,10 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — Wiring gate: block AGENT_HANDOFF + plan textarea `<br>` bug**
+- **Bug 1** `chatPanelMsgFix.ts`: Wiring gate structural fix was routing to Agent pipeline because Supervisor read "ensure changes are correctly applied" as needing execution. Fix: added "THIS IS A PURE FILE EDIT TASK — do NOT emit [AGENT_HANDOFF]. No commands need to run." to the wiring gate userText prefix. Prevents the double-confirmation UX (Plan Gate + Agent Setup) for a simple file edit.
+- **Bug 2** `chatPanelRenderMessages.ts`: Plan gate textarea showed literal `<br>` tags instead of line breaks. Root cause: line 155 runs `html.replace(/\n/g, '<br>')` on the entire HTML string AFTER the textarea is built at line 43 — including the textarea content. Fix: encode newlines as `&#10;` in textarea text before insertion; browser renders `&#10;` as newlines inside textarea, and it's invisible to the global `\n→<br>` substitution.
+
 **2026-06-27 — Guardian inconclusive label fix**
 - **Bug**: `renderGuardianVerdict` fired `[!] Final review found issues — improving` BEFORE the format-mismatch check ran, making the activity panel show "improving" even when the pipeline immediately shipped the fix as inconclusive (no retry ever happened). The label was a lie.
 - **Fix** `chatPanelMsgFixGuardianPhase.ts`: Extract `critique` and check for format-mismatch BEFORE calling `renderGuardianVerdict`. Format-mismatch case now calls `fixActStep` directly with label `"Guardian: inconclusive — no reason given, fix applied"` and returns without ever reaching `renderGuardianVerdict`. Added `fixActStep` import.

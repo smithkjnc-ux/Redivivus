@@ -40,7 +40,11 @@ export function renderMessages(conversation: ChatMessage[]): string {
       if (editB64) {
         let text = '';
         try { text = Buffer.from(editB64, 'base64').toString('utf-8'); } catch { text = ''; }
-        editor = `<textarea class="plan-edit" data-plan-id="${pid}" rows="8" spellcheck="false" style="width:100%;box-sizing:border-box;margin:6px 0 10px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:8px;padding:10px 12px;color:var(--vscode-foreground);font-family:var(--vscode-editor-font-family,monospace);font-size:12px;line-height:1.5;resize:vertical;outline:none;">${escapeHtml(text)}</textarea>`;
+        // [FIX] Use &#10; instead of raw \n — line 155 does a global \n→<br> on the full HTML
+        // string, which converts textarea newlines to literal "<br>" text visible to the user.
+        // &#10; survives the substitution and the browser renders it as a newline inside textarea.
+        const safeText = escapeHtml(text).replace(/\n/g, '&#10;');
+        editor = `<textarea class="plan-edit" data-plan-id="${pid}" rows="8" spellcheck="false" style="width:100%;box-sizing:border-box;margin:6px 0 10px;background:var(--vscode-input-background);border:1px solid var(--vscode-input-border);border-radius:8px;padding:10px 12px;color:var(--vscode-foreground);font-family:var(--vscode-editor-font-family,monospace);font-size:12px;line-height:1.5;resize:vertical;outline:none;">${safeText}</textarea>`;
       }
       const approveLabel = editB64 ? 'Approve &amp; run' : 'Approve Plan';
       const reviseBtn = editB64 ? '' : `<button class="plan-revise-btn" data-plan-id="${pid}" style="padding:8px 16px;border:1px solid #fbbf24;border-radius:8px;background:transparent;color:#fbbf24;cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;">Revise</button>`;
