@@ -1087,3 +1087,19 @@ Auto-managed by Redivivus. Append-only session history.
 ### [NEXT] After retest
 - If single-pass clean: roll two-layer Guardian into Agent pipeline + build pipeline
 - Rule 9 split queue: chatPanelMsgFixGuardianPhase.ts (239 lines), chatPanelMsgFix.ts (279), chatPanelMsgFixEscalation.ts (202), chatPanelMsgFixEscalationUtils.ts (202)
+
+### Guardian rollout to other pipelines — same session
+
+**Extension: `guardianRetryHandler.ts`** (commit 4890ac8)
+- Build pipeline + Agent pipeline now use Code Inspector (mode='inspect') instead of legacy single-pass Guardian
+- Layer 1 (Compliance Verifier) intentionally NOT applied — no Supervisor prescription in build pipeline
+- One-line change: added `undefined, 'inspect'` to `routing.guardianReview()` call
+- Covers all callers of `runGuardianWithRetry`: build pipeline + orchestrated agent builds
+
+### Guardian architecture — complete summary
+- Fix pipeline: Layer 1 (Compliance Verifier) + Layer 2 (Code Inspector) — two sequential layers
+- Build pipeline: Layer 2 (Code Inspector) only — no prescription to verify
+- Agent pipeline: Layer 2 (Code Inspector) only — same code path as build
+
+### [NEXT]
+- Rule 9 split queue: chatPanelMsgFixGuardianPhase.ts (239), chatPanelMsgFix.ts (279), chatPanelMsgFixEscalation.ts (202), chatPanelMsgFixEscalationUtils.ts (202)
