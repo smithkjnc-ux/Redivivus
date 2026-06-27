@@ -1,12 +1,44 @@
 // [SCOPE] Orchestrated build utilities — shared helpers for the multi-AI orchestration pipeline
 // Extracted from chatPanelBuildOrchestrated.ts to comply with Rule 9 (200-line limit).
 
+import * as fs from 'fs';
+import * as path from 'path';
 import type { PlanStep } from '../../features/ai/data/supervisorOrchestrator.js';
 import { reviewLayer } from '../../features/ai/data/supervisorLayerReview.js';
 import type { AIResponse } from '../../features/ai/data/routingTypes.js';
 import type { RoleTemperatures } from '../../features/ai/data/roleTemperature.js';
 import type { BuildPlan } from './services/buildOrchestrator.js';
 import type { OrchestratorDeps } from './chatPanelOrchestrator.js';
+
+/**
+ * Reads the project's HTML entry point and build config (Vite, Webpack, etc.) and returns them
+ * as a compact context block. Injected into the supervisor prompt so it can verify that CSS/JS
+ * files referenced in HTML are actually served at those paths given the build config's root setting.
+ * Without this, supervisors plan visual changes on files that aren't even loading in the browser.
+ */
+export function buildProjectWiringContext(root: string): string {
+  const parts: string[] = [];
+  const cap = (s: string, n: number) => s.length > n ? s.slice(0, n) + '\n...[truncated]' : s;
+
+  for (const htmlPath of ['index.html', 'public/index.html', 'src/index.html']) {
+    const full = path.join(root, htmlPath);
+    if (fs.existsSync(full)) {
+      parts.push(`=== ${htmlPath} ===\n${cap(fs.readFileSync(full, 'utf8'), 3000)}`);
+      break;
+    }
+  }
+
+  for (const cfgPath of ['vite.config.js', 'vite.config.ts', 'webpack.config.js', 'next.config.js', 'next.config.ts']) {
+    const full = path.join(root, cfgPath);
+    if (fs.existsSync(full)) {
+      parts.push(`=== ${cfgPath} ===\n${cap(fs.readFileSync(full, 'utf8'), 1000)}`);
+      break;
+    }
+  }
+
+  if (parts.length === 0) { return ''; }
+  return `PROJECT WIRING (entry points + build config — verify all <link>/<script> paths resolve before planning):\n${parts.join('\n\n')}`;
+}
 
 export const AI_LABELS: Record<string, string> = {
   gemini: 'Gemini', claude: 'Claude', openai: 'GPT-4o', groq: 'Groq', xai: 'Grok', kimi: 'Kimi', deepseek: 'DeepSeek',

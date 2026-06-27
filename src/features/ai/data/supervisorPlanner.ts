@@ -106,6 +106,11 @@ ${getWorkerRules()}
 ${stepDirective} Each step produces code.
 
 ARCHITECTURAL REASONING (Follow these steps before generating the plan):
+0. Current State Check: If EXISTING PROJECT FILES and/or PROJECT WIRING are provided above, READ THEM FIRST.
+   (a) Wiring: every <link href="..."> CSS and <script src="..."> JS in the HTML — do those paths resolve given the build config? For Vite: if root:'public/', browser resolves '../src/x.css' to '/src/x.css' which Vite looks for at 'public/src/x.css' — if that path doesn't exist, the file never loads.
+   (b) Selector match: do CSS class selectors (.foo) match the actual HTML attributes (id="foo" won't match .foo)?
+   (c) What already exists: before creating files, check EXISTING PROJECT FILES so you don't overwrite working code with scaffolding, or add a step that duplicates what's already there.
+   If broken wiring is found: fix it FIRST before content changes. Always plan based on what IS there, not what should be.
 1. Environment Assessment: Evaluate the runtime environment. If there is no build tool (e.g. Vite, Webpack) prescribed in the blueprint, you MUST use natively executable languages (e.g. standard HTML, CSS, Vanilla JS) for browsers. Do NOT use TypeScript or JSX unless you also prescribe the build configuration to compile it.
 2. Infrastructure First: If the request requires a modern framework, your first step must establish the infrastructure (e.g. package.json, config files).
 3. Logical Decomposition: Break the project down into logical layers (e.g. State, Engine, UI, Styling) rather than arbitrary files.

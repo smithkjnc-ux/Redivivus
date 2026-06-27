@@ -17,7 +17,9 @@ import { readProjectRules } from '../fix/chatPanelMsgFixUtils.js';
 import { generatePlanId, formatOrchestratedPlanForApproval, awaitPlanApproval } from './chatPanelBuildPlanGate.js';
 import { appendWalkthroughToConversation } from './chatPanelBuildWalkthrough.js';
 import { log } from '../../features/logging/data/redivivusLogger.js';
-import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown, pushReviewOutcome, runLayerReview } from './chatPanelBuildOrchestratedUtils.js';
+import { AI_LABELS, isOrchestratedAvailable, buildPhaseTask, parseFileMarkers, formatPlanBreakdown, pushReviewOutcome, runLayerReview, buildProjectWiringContext } from './chatPanelBuildOrchestratedUtils.js';
+import { buildExistingSourceContext } from './chatPanelBuildContextReader.js';
+import { runBuildCompileCheck, runBuildVisualCheck } from './chatPanelBuildPostVerify.js';
 
 // Re-export utilities so existing importers don't break
 export { isOrchestratedAvailable, buildPhaseTask } from './chatPanelBuildOrchestratedUtils.js';
@@ -44,8 +46,9 @@ export async function runOrchestratedPhaseBuild(
   const callAI = (ai: string, prompt: string, temperature?: number) => callProvider(ai, prompt, fetchFn, undefined, undefined, undefined, undefined, temperature);
 
   const phaseTask = buildPhaseTask(phase, plan);
-  const [_de, _pr] = [readProjectDeadEnds(root), readProjectRules(root)];
-  const context = [blueprintContext||'', _de?`PREVIOUSLY FAILED APPROACHES:\n${_de}`:'', _pr?`PROJECT RULES:\n${_pr}`:''].filter(Boolean).join('\n\n');
+  // [Gap 1 fix] Read current file contents BEFORE planning — supervisor sees what IS there, not just what should be.
+  const [_de, _pr, _wiring, _src] = [readProjectDeadEnds(root), readProjectRules(root), buildProjectWiringContext(root), buildExistingSourceContext(root, phase.outputs)];
+  const context = [blueprintContext||'', _wiring, _src, _de?`PREVIOUSLY FAILED APPROACHES:\n${_de}`:'', _pr?`PROJECT RULES:\n${_pr}`:''].filter(Boolean).join('\n\n');
   // Guardian + profiles set up before the loop — used in per-layer review and integration check.
   const profiles = buildCapabilityProfiles(ranked);
   const guardianAI = selectGuardianAI(ranked[0], keyMap);
@@ -166,6 +169,10 @@ export async function runOrchestratedPhaseBuild(
     timestamp: Date.now(),
   });
   deps.refresh();
+
+  // [Gap 2 + Visual fix] Post-write: compile check then vision AI check. Both non-blocking.
+  await runBuildCompileCheck(deps, root, writtenFiles);
+  await runBuildVisualCheck(deps, root, phaseTask, writtenFiles);
 
   // [FIX] Walkthrough Handoff — generate a structured summary of the orchestrated build
   try {
