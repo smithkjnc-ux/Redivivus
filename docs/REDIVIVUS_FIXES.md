@@ -1,6 +1,11 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-27 — Guardian inconclusive label fix**
+- **Bug**: `renderGuardianVerdict` fired `[!] Final review found issues — improving` BEFORE the format-mismatch check ran, making the activity panel show "improving" even when the pipeline immediately shipped the fix as inconclusive (no retry ever happened). The label was a lie.
+- **Fix** `chatPanelMsgFixGuardianPhase.ts`: Extract `critique` and check for format-mismatch BEFORE calling `renderGuardianVerdict`. Format-mismatch case now calls `fixActStep` directly with label `"Guardian: inconclusive — no reason given, fix applied"` and returns without ever reaching `renderGuardianVerdict`. Added `fixActStep` import.
+- **Still pending (server-side)**: Guardian at `/guardian` endpoint emits bare `GUARDIAN_FAIL` with no `GUARDIAN_ISSUES:` block — the client never gets a reason to show. Needs server-side Guardian prompt to enforce structured output.
+
 **2026-06-27 — Guardian trust-and-verify: three gaps closed**
 - **Gap 2** `chatPanelMsgFixGuardianPhase.ts`: `buildContext` (pre-fix runtime errors) now included in `guardianContext` as "PRE-FIX RUNTIME STATE". Guardian sees what was broken before, not just the Worker's code text.
 - **Gap 3** `chatPanelMsgFixGuardianPhase.ts`: Format instructions added asking Guardian to prefix rejection issues with `[FILE: path/to/file.ext]`. Re-prescription now receives file-specific failure targets.

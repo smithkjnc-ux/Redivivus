@@ -4,6 +4,7 @@
 import type { MessageHandlerDeps } from '../chat/logic/chatPanelMessages.js';
 import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { renderGuardianVerdict, represcribeAfterRejection, isTruncationText, type EscalationResult } from './chatPanelMsgFixEscalationUtils.js';
+import { fixActStep } from './fixActivityPanel.js';
 
 export type GuardianPhaseResult = 
   | { action: 'return', payload: EscalationResult }
@@ -79,6 +80,20 @@ export async function runGuardianPhase(params: {
       ? guardianResult.guardianAI
       : ((() => { try { return deps.routing.selectSupervisorAndWorker().supervisor; } catch { return ''; } })() || workerLabel || 'claude');
 
+    // [FIX] Extract critique BEFORE renderGuardianVerdict so format-mismatch cases never show
+    // "[!] Final review found issues — improving" — that label fired even when we immediately
+    // shipped the fix as inconclusive, making it look like a retry happened when it didn't.
+    const critique = guardianResult.issues?.join('; ') || 'Unknown issue';
+    const _isFormatMismatch = !guardianResult.passed && (critique.includes('no structured reason') || critique.includes('format mismatch'));
+
+    if (_isFormatMismatch) {
+      fixActStep({ phase: 'guardian', status: 'failover', label: `Guardian (${guardianProvider}): inconclusive — no reason given, fix applied`, model: guardianProvider });
+      deps.usageTracker?.recordUsage(Math.ceil(workerResponse.length / 4), 0, guardianProvider, guardianResult.inputTokens, guardianResult.outputTokens, 'guardian', require('path').basename(root));
+      guardianNote = `Guardian (${guardianProvider}): inconclusive — no reason given, fix applied`;
+      fixLog('Guardian format-mismatch: returned GUARDIAN_FAIL with no extractable reason — shipping fix as inconclusive');
+      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianProvider || 'Guardian', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles } };
+    }
+
     const verdict = renderGuardianVerdict({ guardianRan, guardianResult, guardianProvider, workerResponse, root, deps });
     guardianLabel = verdict.guardianLabel;
     scopeNote = verdict.scopeNote;
@@ -106,19 +121,6 @@ export async function runGuardianPhase(params: {
       guardianNote = `Guardian: skipped (${guardianResult.issues?.[0]?.slice(0, 120) || 'all providers unavailable'})`;
       fixLog('Guardian SKIPPED — infrastructure failure, not a code rejection. Fix applied unreviewed.');
       return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: 'skipped (unavailable)', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
-    }
-
-    // Guardian rejected WITHOUT corrected text — accumulate critique and retry
-    const critique = guardianResult.issues?.join('; ') || 'Unknown issue';
-
-    // [FIX] Format-mismatch: Guardian returned GUARDIAN_FAIL with no extractable reason.
-    // Re-prescribing with "possible format mismatch" as the critique gives the Worker nothing actionable
-    // and burns 2 retry loops (2 Supervisor + 2 Worker calls) for zero gain.
-    // Treat as inconclusive and ship with a note — the code itself was correct.
-    if (critique.includes('no structured reason') || critique.includes('format mismatch')) {
-      guardianNote = `Guardian: inconclusive (response format mismatch — fix applied, verify manually)`;
-      fixLog('Guardian format-mismatch rejection — treating as inconclusive, skipping retry loop');
-      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianLabel || 'Guardian', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical } };
     }
 
     // [GAP1] Guardian rejected — rollback pre-applied changes so the next Worker attempt starts clean
