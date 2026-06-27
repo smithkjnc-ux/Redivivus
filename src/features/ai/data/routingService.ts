@@ -15,6 +15,8 @@ import { logTelemetry } from '../../../features/api/data/apiClientTelemetry.js';
 import { logAICall } from './aiCallLogger.js';
 import { promptCheapImpl } from './routingServiceCheap.js';
 import { recordQuotaError } from './providerTierState.js';
+import { shouldSkipProvider, getSkipInfo, recordUnavailable } from './providerQuotaTracker.js';
+import { isSustainedFailure, describeProviderError } from './agentFailoverReason.js';
 
 import {
   selectSupervisorAndWorker,
@@ -91,6 +93,14 @@ export class RoutingService {
     let lastError = '';
     for (let i = 0; i < ranked.length; i++) {
       const ai = ranked[i];
+      // Skip providers that are rate-limited or out of credits (persisted across reloads)
+      if (shouldSkipProvider(ai)) {
+        const info = getSkipInfo(ai);
+        const eta = info ? Math.ceil((info.resumesAt - Date.now()) / 60_000) + 'm' : 'later';
+        lastError = `${ai} skipped — ${info?.reason ?? 'unavailable'} (resumes in ~${eta})`;
+        if (i < ranked.length - 1 && this.promptFailoverCallback) { this.promptFailoverCallback(ai, ranked[i + 1]); }
+        continue;
+      }
       const fetchFn = (url: string, opts: RequestInit) => this.fetchWithTimeout(url, opts, timeoutMs);
       // [FIX] Hard full-call deadline. fetchWithTimeout's AbortController aborts the CONNECTION but NOT
       // the body read in Electron's fetch — so a provider that connects then hangs mid-response would
@@ -133,6 +143,8 @@ export class RoutingService {
         || err.includes('402') || err.includes('insufficient') || err.includes('overloaded')
         || err.includes('capacity') || err.includes('billing');
       if (isCapacityError) { recordQuotaError(ai); }
+      // Persist sustained failures (out of credits / bad key) across reloads via quota tracker
+      if (isSustainedFailure(result.error)) { recordUnavailable(ai, describeProviderError(result.error)); }
 
       // Notify caller about the failover so the chat can show "Claude stalled -> trying Gemini".
       if (i < ranked.length - 1 && this.promptFailoverCallback) {

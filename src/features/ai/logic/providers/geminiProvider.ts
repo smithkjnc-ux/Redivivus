@@ -28,12 +28,18 @@ export async function executeGemini(
     const body = JSON.stringify({ ..._sysInstruction, contents: [{ role: 'user', parts: _parts }], generationConfig: { maxOutputTokens: 65536, temperature: clampTemp('gemini', temperature ?? 0.2) } });
     const res = await fetchWithTimeout(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
     const data = await res.json() as any;
-    if (!res.ok) {return { text: '', model, success: false, error: `Gemini API error ${res.status}: ${data.error?.message || res.statusText}` };}
+    if (!res.ok) {
+      const errMsg = `Gemini API error ${res.status}: ${data.error?.message || res.statusText}`;
+      if (res.status === 429) { recordRateLimit('gemini', parseGenericRateLimit(res.headers, data.error?.message || '')); }
+      else if (res.status === 402 || /quota|billing/i.test(data.error?.message || '')) { recordUnavailable('gemini', 'out of API credits'); }
+      return { text: '', model, success: false, error: errMsg };
+    }
     // [WARN] Check finishReason — MAX_TOKENS means the response was truncated
     const finishReason = data.candidates?.[0]?.finishReason;
     const responseText = (data.candidates?.[0]?.content?.parts?.[0]?.text || '').trim();
     const inputTokens  = data.usageMetadata?.promptTokenCount    ?? undefined;
     const outputTokens = data.usageMetadata?.candidatesTokenCount ?? undefined;
+    recordSuccess('gemini', inputTokens ?? 0, outputTokens ?? 0);
     if (finishReason === 'MAX_TOKENS') {
       return { text: responseText, model, success: false, error: `Gemini response was truncated (hit output token limit). Response may be incomplete.`, inputTokens, outputTokens };
     }

@@ -9,6 +9,7 @@ import { AI_RANK } from './guardianAI.js';
 import { redivivusLog } from '../../../features/logging/data/redivivusLogger.js';
 import { logTelemetry } from '../../../features/api/data/apiClientTelemetry.js';
 import { logAICall } from './aiCallLogger.js';
+import { shouldSkipProvider, getSkipInfo } from './providerQuotaTracker.js';
 import type { RoutingService } from './routingService.js';
 import type { AIResponse } from './routingTypes.js';
 
@@ -49,6 +50,13 @@ export async function promptCheapImpl(
   let lastError = '';
   for (let i = 0; i < ranked.length; i++) {
     const ai = ranked[i];
+    if (shouldSkipProvider(ai)) {
+      const info = getSkipInfo(ai);
+      const eta = info ? Math.ceil((info.resumesAt - Date.now()) / 60_000) + 'm' : 'later';
+      lastError = `${ai} skipped — ${info?.reason ?? 'unavailable'} (resumes in ~${eta})`;
+      if (i < ranked.length - 1 && (svc as any).promptFailoverCallback) { (svc as any).promptFailoverCallback(ai, ranked[i + 1]); }
+      continue;
+    }
     const startTime = Date.now();
     const fetchFn = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, timeoutMs);
 
