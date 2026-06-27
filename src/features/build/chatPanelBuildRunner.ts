@@ -148,6 +148,7 @@ export async function runBuildAfterGates(
   try {
     const result = await callCloudBuild(buildTask, root, deps, { isFix: isFixRequest, onProgress: updateProgress, onChunk, onStep, onCode, onFileComplete });
     buildOk = !!result.success;
+    require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[build] callCloudBuild returned success=${result.success} error=${result.error || 'none'} preferred=${require('../../api/data/apiClient.js').getPreferred?.() || '?'}\n`);
 
     if (!result.success) {
       if (result.error === 'NOT_AUTHENTICATED') {
@@ -183,6 +184,12 @@ export async function runBuildAfterGates(
 
     // [DONE] Build success handling moved to chatPanelBuildRunnerHelpers.ts (Rule 9 split)
     await handleBuildSuccess(result, root!, task, workingTs, deps, isFixRequest);
+  } catch (err: any) {
+    const msg = err?.message || String(err);
+    require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[build] callCloudBuild THREW: ${msg}\n`);
+    removeWorkingMessage();
+    deps.conversation.push({ role: 'assistant', content: `❌ **Build error:** ${msg}\n\n_Try again or check your network connection._`, timestamp: Date.now() });
+    deps.refresh();
   } finally {
     // Mark the activity panel finished exactly once, with the real outcome (false if the build threw).
     try { activity?.finish(buildOk ?? false); } catch {}

@@ -95,6 +95,7 @@ export async function callCloudBuild(
       try {
         const errBody = await instructionRes.text();
         console.error(`[Redivivus] Build API ${instructionRes.status} body: ${errBody.slice(0, 500)}`);
+        require('fs').appendFileSync(require('os').homedir()+'/redivivus_debug.log', `[build] /build failed status=${instructionRes.status} preferred=${preferred} body=${errBody.slice(0, 300)}\n`);
         try { errMsg = (JSON.parse(errBody) as any).error || errMsg; } catch { errMsg = errBody.slice(0, 120) || errMsg; }
       } catch {}
       console.error(`[Redivivus] Build API failed: status=${instructionRes.status}, bodyLen=${requestBody.length}`);
