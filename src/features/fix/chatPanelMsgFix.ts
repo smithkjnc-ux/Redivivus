@@ -75,6 +75,20 @@ export async function handleFixRequest(userText: string, deps: MessageHandlerDep
   let filesBlock = sourceFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
   const activePatterns = detectPatterns(filesBlock, userText);
 
+  // [STRUCTURAL WIRING GATE] patternNotes and context hints are deprioritized by GPT-4o when the user
+  // request is clearly visual. Intercept userText itself so the Supervisor treats the structural issue
+  // as the primary task — not an optional suggestion buried in context.
+  const _hasNonDefaultViteRoot = /root:\s*['"][^.'"]/.test(filesBlock);
+  const _hasAboveRootLinks = /<(?:link|script)[^>]+(?:href|src)=["']\.\.\//.test(filesBlock);
+  if (_hasNonDefaultViteRoot && _hasAboveRootLinks) {
+    const _viteRoot = filesBlock.match(/root:\s*['"]([^.'"'][^'"]*)['"]/)?.[1] || 'custom-folder';
+    userText = `STRUCTURAL BUG — FIX THIS FIRST, BEFORE ANY VISUAL CHANGES:\n` +
+      `vite.config.js has root:'${_viteRoot}'. HTML asset paths use "../" which goes ABOVE the Vite root. CSS/JS are silently 404 — the app looks unstyled even when CSS content is correct.\n` +
+      `REQUIRED: (1) set root:'.' in vite.config.js, (2) change HTML <link>/<script> "../src/..." paths to "./src/...", (3) fix any CSS .class selectors that should be class= not id=.\n` +
+      `AFTER the wiring is fixed: ${userText}`;
+    fixLog('[WIRING-GATE] Structural path mismatch detected — userText prefixed with structural fix instruction');
+  }
+
   // [PREVIEW-AUTOFIX Phase 1] Pre-flight Run-Check
   // If the user hasn't explicitly opened the preview, the runtime reports buffer is empty.
   // We must actually load the app headlessly so the AI can see the real errors before diagnosing.
