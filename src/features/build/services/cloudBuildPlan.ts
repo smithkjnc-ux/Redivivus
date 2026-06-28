@@ -82,12 +82,20 @@ export async function runBuildPlanStep(
       // [FIX] If the Supervisor fell back to a different provider, use that provider for Worker files too.
       // Otherwise preferred='claude' goes in the /build body and the server retries the failed provider.
       const effectivePreferred = plan.supervisorProvider || preferred || '';
-      if (plan.files && plan.files.length > 1) {
-        _planLog(`-> multi-file path (executeMultiFileBuild) preferred=${effectivePreferred}`);
+      // [THRESHOLD] Projects with > COHESIVE_THRESHOLD files use per-file Workers (multi-AI orchestration).
+      // Small projects use a single cohesive Worker call instead — one AI writes all files in one shot,
+      // keeping element IDs, imports, and CSS class names consistent across the entire codebase.
+      // Motivation: multi-Worker distribution was producing ID mismatches (HTML ids ≠ JS selectors)
+      // because each Worker invented its own names without seeing what sibling Workers would write.
+      const COHESIVE_THRESHOLD = 5;
+      if (plan.files && plan.files.length > COHESIVE_THRESHOLD) {
+        _planLog(`-> multi-file path (${plan.files.length} files > threshold ${COHESIVE_THRESHOLD})`);
         const early = await executeMultiFileBuild(task, root, context, keyHeaders, token, base, effectivePreferred, plan.files, deps, plan.prescription ?? null, plan.supervisorModel ?? null, plan.supervisorProvider ?? null, plan.supervisorInputTokens ?? 0, plan.supervisorOutputTokens ?? 0, opts.onProgress, opts.onStep, opts.onCode, opts.onFileComplete);
         return { early };
       }
-      _planLog(`-> single-file path (plan returned <=1 file)`);
+      // Small project (≤ threshold files): fall through to single cohesive Worker call.
+      // The prescription is forwarded so the Worker knows exactly what each file must contain.
+      _planLog(`-> cohesive single-AI path (${plan.files?.length ?? 0} files ≤ threshold ${COHESIVE_THRESHOLD})`);
       return { prescription: plan.prescription ?? undefined, supervisor };
     } else {
       _planLog(`NOT ok status=${planRes?.status} -> single-file path`);
