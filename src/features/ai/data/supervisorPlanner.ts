@@ -95,6 +95,15 @@ ${aiSpecs(profiles)}
 
 ${strategyBlock(profiles)}
 
+FILE STRUCTURE — HARD CONSTRAINT (check this FIRST):
+If the user's request names specific files (e.g. "File structure: index.html, src/styles/main.css, src/js/app.js"), you MUST produce EXACTLY those files — no more, no fewer.
+- Do NOT split a requested CSS file into sub-modules (base.css, layout.css, components.css, etc.)
+- Do NOT add JS modules beyond what was listed (state.js, animation.js, navigation.js, etc.)
+- Do NOT create folders or files the user did not ask for
+- The user's file list is a HARD CONSTRAINT, not a starting point for your own architecture
+If no file structure is specified: use the minimum viable number of files. Never split a file "for architecture" unless a single file would exceed the worker's output budget.
+Violation of this rule is worse than a broken build — it means you built the wrong thing.
+
 ASSIGNMENT RULES:
 - Match step difficulty to worker capability: give reasoning-heavy or architecturally critical steps to your highest-capability worker; give simple/boilerplate steps to your cheapest capable worker to save the user money.
 - NEVER assign a step whose output file would exceed a worker's output budget (the ~Nk output above). If a file is large, split it into steps or use a worker with a bigger output budget.
