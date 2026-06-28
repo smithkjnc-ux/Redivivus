@@ -2,6 +2,7 @@
 // Ranked failover loop: tries each AI in capability order, skips quota-blocked providers,
 // persists sustained failures, and notifies callers of failover events via callbacks.
 
+import * as vscode from 'vscode';
 import { callProvider } from '../logic/providers/providerFactory.js';
 import { AI_RANK } from './guardianAI.js';
 import { redivivusLog } from '../../../features/logging/data/redivivusLogger.js';
@@ -13,6 +14,9 @@ import { fmtMs } from './parseRateLimitInfo.js';
 import { isSustainedFailure, describeProviderError } from './agentFailoverReason.js';
 import type { RoutingService } from './routingService.js';
 import type { AIResponse } from './routingTypes.js';
+
+// Per-session Set — prevents repeated popups for the same blocked provider each call.
+const _notifiedSkipped = new Set<string>();
 
 export async function promptImpl(
   svc: RoutingService,
@@ -51,6 +55,14 @@ export async function promptImpl(
     const _skipInfo = getSkipInfo(ai);
     if (_skipInfo) {
       lastError = `${ai} skipped — ${_skipInfo.reason} (resumes in ${fmtMs(_skipInfo.resumesAt - Date.now())})`;
+      // [FIX] Notify once per session when the top-ranked provider is being skipped silently.
+      if (i === 0 && !_notifiedSkipped.has(ai)) {
+        _notifiedSkipped.add(ai);
+        vscode.window.showWarningMessage(
+          `⚠️ ${ai} is blocked (${_skipInfo.reason}) — using next available provider. After topping up, click below to restore it.`,
+          'Clear Block Now'
+        ).then(choice => { if (choice === 'Clear Block Now') { vscode.commands.executeCommand('redivivus.clearProviderQuota'); } });
+      }
       if (i < ranked.length - 1 && svc.promptFailoverCallback) { svc.promptFailoverCallback(ai, ranked[i + 1]); }
       continue;
     }

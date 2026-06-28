@@ -86,15 +86,26 @@ export function recordRateLimit(provider: string, hit: {
   save(store);
 }
 
+// Credit errors: user can top up in minutes — 30 min block. Bad key / auth: 8 hours.
+const CREDIT_BLOCK_MS = 30 * 60 * 1_000;
+const SUSTAINED_BLOCK_MS = 8 * 60 * 60 * 1_000;
+const isCreditError = (r: string) => /credit|balance|insufficient/i.test(r);
+
 /** Record a sustained outage (out of credits, bad key) — persists across extension reloads. */
-export function recordUnavailable(provider: string, reason: string, durationMs = 8 * 60 * 60 * 1_000): void {
+export function recordUnavailable(provider: string, reason: string, durationMs?: number): void {
   if (!provider) { return; }
+  const blockMs = durationMs ?? (isCreditError(reason) ? CREDIT_BLOCK_MS : SUSTAINED_BLOCK_MS);
   const store = load();
   const st = store[provider] ?? {};
-  st.unavailableUntilMs = Date.now() + durationMs;
+  st.unavailableUntilMs = Date.now() + blockMs;
   st.unavailableReason = reason;
   store[provider] = st;
   save(store);
+  const resumeMin = Math.round(blockMs / 60_000);
+  vscode.window.showWarningMessage(
+    `⚠️ ${provider} blocked — ${reason}. Auto-skipping for ${resumeMin} min.`,
+    'Clear Block Now'
+  ).then(choice => { if (choice === 'Clear Block Now') { clearProviderQuota(provider); } });
 }
 
 /** Clear rate-limit / outage flags for a provider (e.g. user re-entered key or topped up credits). */
