@@ -119,7 +119,15 @@ export async function runPhase2Worker(
       if (!res.ok) { const err: any = await res.json().catch(() => ({})); lastError = err.error || `Worker API ${res.status}`; continue; }
       if (res.body) {
         const reader = res.body.getReader(); const decoder = new TextDecoder();
-        while (true) { const { done, value } = await reader.read(); if (done) break; const chunk = decoder.decode(value, { stream: true }); attempt += chunk; if (onChunk) onChunk(chunk); }
+        const _SENT_RE = /\n?\[WORKER_TOKENS:\{[^}]+\}\]\s*$/;
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          attempt += chunk;
+          // Strip the cost sentinel from live display — it's control data, not code output
+          if (onChunk) { const display = chunk.replace(_SENT_RE, ''); if (display) onChunk(display); }
+        }
       }
     } catch (err: any) { lastError = err?.message || 'unknown'; continue; }
     const em = attempt.match(_ErrTail);
@@ -131,9 +139,19 @@ export async function runPhase2Worker(
   if (!workerResponse.trim()) {
     throw new Error(`Every available AI failed. Last error: ${lastError || 'unknown'}`);
   }
-  // [COST] Estimate Worker tokens from actual bytes — streamed response carries no token frame.
-  const _wkInTok = Math.ceil((diagnosis.length + files.reduce((s, f) => s + (f.content?.length || 0), 0)) / 4) + 600;
-  const _wkOutTok = Math.ceil(workerResponse.length / 4);
+  // [COST] Parse actual token counts from the sentinel appended by the backend stream.
+  // Falls back to character-count estimate when sentinel is absent (older backend versions).
+  const _META = /\n?\[WORKER_TOKENS:\{"in":(\d+),"out":(\d+)\}\]\s*$/;
+  const _metaMatch = workerResponse.match(_META);
+  let _wkInTok: number, _wkOutTok: number;
+  if (_metaMatch) {
+    _wkInTok = parseInt(_metaMatch[1], 10);
+    _wkOutTok = parseInt(_metaMatch[2], 10);
+    workerResponse = workerResponse.replace(_META, '').trim();
+  } else {
+    _wkInTok = Math.ceil((diagnosis.length + files.reduce((s, f) => s + (f.content?.length || 0), 0)) / 4) + 600;
+    _wkOutTok = Math.ceil(workerResponse.length / 4);
+  }
   deps.usageTracker?.recordUsage(_wkInTok + _wkOutTok, 0, providerUsed, _wkInTok, _wkOutTok, 'worker', path.basename(root));
   return { workerResponse: workerResponse.trim(), workerLabel: modelLabel(providerUsed) };
 }
