@@ -131,12 +131,28 @@ export async function runFixFinalize(params: {
       const { runVisualVerification, runDomVisualVerification } = await import('../chat/ui/chatPanelVisualVerify.js');
       const { getRuntimeReports } = await import('../chat/ui/chatPanelPreview.js');
       let vv = await runVisualVerification(root, userText, deps.routing, 3500);
-      // [FIX] If screenshot is unavailable (html2canvas CDN blocked in VS Code webview), fall back to
-      // DOM HTML analysis — the capture script beacons the page innerHTML as 'dom-html' when CDN fails.
+      // [FIX] Three-tier fallback for non-canvas web projects where html2canvas CDN is blocked:
+      //   1. dom-html beacon from the capture script (arrives ~1.5s after page load)
+      //   2. Read the HTML file directly from disk (most reliable — no preview server needed)
+      // The beacon path depends on VS Code webview iframe networking; the disk path always works.
       if (vv.applicable && !vv.snapshot && vv.passed === null) {
         const domReport = getRuntimeReports().find((r: any) => r.kind === 'dom-html' && r.image);
         if (domReport?.image) {
+          fixLog('[VISUAL_CHECK] dom-html beacon received — running DOM analysis');
           vv = await runDomVisualVerification(domReport.image, userText, deps.routing);
+        } else {
+          // Beacon didn't arrive (VS Code webview iframe networking blocked) — read HTML from disk
+          try {
+            const fs = require('fs');
+            const nodePath = require('path');
+            const htmlWritten = written.find((f: string) => /\.html?$/i.test(f));
+            const htmlPath = htmlWritten ? nodePath.join(root, htmlWritten) : null;
+            if (htmlPath && fs.existsSync(htmlPath)) {
+              const diskHtml = fs.readFileSync(htmlPath, 'utf-8').slice(0, 8000);
+              fixLog(`[VISUAL_CHECK] Using disk HTML fallback for ${htmlWritten}`);
+              vv = await runDomVisualVerification(diskHtml, userText, deps.routing);
+            }
+          } catch (e) { fixLog(`[VISUAL_CHECK] Disk fallback failed: ${String(e).slice(0, 80)}`); }
         }
       }
       if (vv.applicable) {

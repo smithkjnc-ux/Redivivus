@@ -37,7 +37,9 @@ export async function classifyRoute(
     const data = await res.json().catch(() => null);
     // [COST] Count this classifier call too — small (flash, ~50 tokens) but real; it was uncounted.
     if (data && (data.inputTokens || data.outputTokens)) {
-      try { deps.usageTracker?.recordUsage((data.inputTokens || 0) + (data.outputTokens || 0), 0, model, data.inputTokens, data.outputTokens, 'supervisor', undefined); } catch { /* best-effort */ }
+      // [FIX] Record as 'qa' not 'supervisor' — this is a 50-token pre-classification, not the Supervisor.
+      // Using 'supervisor' caused it to appear as a second "Supervisor (deepseek-chat)" in the pipeline label.
+      try { deps.usageTracker?.recordUsage((data.inputTokens || 0) + (data.outputTokens || 0), 0, model, data.inputTokens, data.outputTokens, 'qa', undefined); } catch { /* best-effort */ }
     }
     const t = data && String(data.tier || '').toLowerCase();
     if (t === 'flash' || t === 'pro' || t === 'ultra') {

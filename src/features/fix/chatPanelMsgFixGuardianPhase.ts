@@ -141,8 +141,13 @@ export async function runGuardianPhase(params: {
       }
     } catch (e) { fixLog(`[PRE-APPLY] Skipped (non-blocking): ${String(e).slice(0, 80)}`); }
 
+    // [FIX] Force Code Inspector to the same provider as Compliance Verifier (verifyProvider).
+    // Both calls use deps.routing.guardianReview which picks independently each time — causing
+    // Gemini for layer 1 and Claude for layer 2, showing "Guardian (Gemini/Claude)" in the label.
+    // The user overrides take priority; fallback is the provider that already succeeded on layer 1.
     const guardianResult = await deps.routing.guardianReview(
-      inspectorContext, workerResponse, guardianWorkerHint, refreshedBlueprint, deps.routingOverrides?.guardian, 'inspect'
+      inspectorContext, workerResponse, guardianWorkerHint, refreshedBlueprint,
+      deps.routingOverrides?.guardian || (verifyRan ? verifyProvider : undefined), 'inspect'
     );
     fixLog(`Code Inspector result`, { passed: guardianResult.passed, issueCount: guardianResult.issues?.length || 0 });
 
