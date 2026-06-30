@@ -10,7 +10,7 @@
 // the verdict is 'inconclusive' and the build proceeds unblocked.
 
 import { verifyPreviewRuns } from './chatPanelPreviewVerify.js';
-import { getRuntimeReports } from './chatPanelPreview.js';
+import { getRuntimeReports, clearRuntimeReports } from './chatPanelPreview.js';
 import type { RoutingService } from '../../ai/data/routingService.js';
 
 export interface VisualVerifyResult {
@@ -36,16 +36,27 @@ export async function runVisualVerification(
   routing: RoutingService,
   waitMs = 3500,
 ): Promise<VisualVerifyResult> {
-  // Step 1: run the headless preview so the capture script can take a screenshot
-  let runResult: Awaited<ReturnType<typeof verifyPreviewRuns>>;
-  try {
-    runResult = await verifyPreviewRuns(root, waitMs);
-  } catch {
-    return _inconclusive('Preview server failed to start — visual check skipped.');
-  }
+  // [FIX] The prior "Ran the preview" step calls verifyPreviewRuns() which captures a snapshot at
+  // 1500ms. If we call verifyPreviewRuns() again here, it clears those reports immediately and the
+  // __rdvCaptureInstalled guard prevents a second capture — leaving us with no snapshot.
+  // Solution: reuse the existing snapshot if one was already captured; only do a fresh run if there
+  // isn't one.
+  const priorReports = getRuntimeReports();
+  const priorSnapshot = priorReports.find(r => r.kind === 'snapshot' && r.image);
 
-  if (!runResult.applicable) {
-    return _inconclusive('Not a web preview project — visual check not applicable.');
+  if (!priorSnapshot?.image) {
+    // No prior snapshot — do a fresh headless run to capture one.
+    // Clear stale reports first so the fresh capture isn't contaminated by old data.
+    clearRuntimeReports();
+    let runResult: Awaited<ReturnType<typeof verifyPreviewRuns>>;
+    try {
+      runResult = await verifyPreviewRuns(root, waitMs);
+    } catch {
+      return _inconclusive('Preview server failed to start — visual check skipped.');
+    }
+    if (!runResult.applicable) {
+      return _inconclusive('Not a web preview project — visual check not applicable.');
+    }
   }
 
   // Step 2: find the html2canvas snapshot beaconed by the capture script
@@ -53,9 +64,9 @@ export async function runVisualVerification(
   const reports = getRuntimeReports();
   const snapshotReport = reports.find(r => r.kind === 'snapshot' && r.image);
   if (!snapshotReport?.image) {
-    // No screenshot captured — report runtime errors but can't do visual check
-    const runtimeSummary = runResult.ok ? 'No visual errors.' : runResult.summary;
-    return { applicable: true, snapshot: false, passed: null, aiVerdict: `Screenshot not captured — ${runtimeSummary}` };
+    // No screenshot captured — report any runtime errors we saw
+    const errReport = priorReports.find(r => r.kind === 'error' || r.kind === 'rejection' || r.kind === 'probe');
+    return { applicable: true, snapshot: false, passed: null, aiVerdict: `Screenshot not captured — ${errReport?.msg ?? 'html2canvas did not beacon back (CDN may be unavailable).'}` };
   }
 
   // Strip the data URL prefix to get raw base64 (routing.prompt expects raw base64)
