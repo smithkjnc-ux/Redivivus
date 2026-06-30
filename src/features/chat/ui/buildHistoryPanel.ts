@@ -50,6 +50,10 @@ export function showBuildHistoryPanel(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand('vscode.diff', vscode.Uri.file(tempPath), vscode.Uri.file(currentPath), `${path.basename(relPath)}: "${label}" vs Current`);
     } else if (msg.type === 'undo-build') {
       const snap = new SnapshotService(root);
+      // Snapshot current state BEFORE restoring so the revert itself can be undone ("Unrevert").
+      // Every revert — including an unrevert — captures what it's overwriting, creating a natural undo chain.
+      const snapMeta = snap.listSnapshots().find(s => s.id === msg.snapshotId);
+      const preRevertSnapId = snap.prepare(`pre-revert: ${snapMeta?.task ?? 'previous state'}`, snapMeta?.files ?? []);
       // restore() automatically falls through to archive if snapshot directory is gone
       const { restored, deleted, error } = snap.restore(msg.snapshotId);
       if (error) {
@@ -58,9 +62,9 @@ export function showBuildHistoryPanel(context: vscode.ExtensionContext): void {
       } else {
         const hist = new BuildHistoryService(root);
         hist.markUndone(msg.snapshotId);
-        _panel?.webview.postMessage({ type: 'undo-result', snapshotId: msg.snapshotId, success: true, restored, deleted });
+        _panel?.webview.postMessage({ type: 'undo-result', snapshotId: msg.snapshotId, success: true, restored, deleted, preRevertSnapId });
         const src = msg.snapshotId.startsWith('init_') ? 'first build baseline' : (restored > 0 ? `${restored} file(s) restored` : `${deleted} new file(s) removed`);
-        vscode.window.showInformationMessage(`Reverted — ${src}.`);
+        vscode.window.showInformationMessage(`Reverted — ${src}. Click "↩ Unrevert" in History to undo this.`);
       }
     }
   });

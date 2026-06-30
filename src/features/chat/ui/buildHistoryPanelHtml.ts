@@ -28,6 +28,8 @@ export function buildHistoryHtml(): string {
   .btn:hover{background:var(--vscode-list-hoverBackground);}
   .btn-danger{border-color:rgba(224,85,85,0.4);color:#e05555;}
   .btn-danger.armed{background:rgba(224,85,85,0.2);border-color:rgba(224,85,85,0.8);}
+  .btn-unrevert{border-color:rgba(100,200,100,0.4);color:#6ec96e;}
+  .btn-unrevert.armed{background:rgba(100,200,100,0.2);border-color:rgba(100,200,100,0.8);}
   .empty{text-align:center;padding:40px 20px;color:var(--vscode-descriptionForeground);}
   .legend{font-size:11px;color:var(--vscode-descriptionForeground);margin-bottom:12px;padding:8px 10px;background:var(--vscode-input-background);border-radius:4px;line-height:1.8;}
 </style>
@@ -122,8 +124,23 @@ export function buildHistoryHtml(): string {
     } else if (msg.type === 'undo-result') {
       const entry = document.getElementById('entry-' + msg.snapshotId);
       const btn = document.getElementById('undo-' + msg.snapshotId);
-      if (!msg.success) { if (btn) { btn.textContent = 'Failed'; } }
-      else { if (entry) { entry.classList.add('undone'); } if (btn) { btn.textContent = 'Reverted'; btn.disabled = true; } }
+      if (!msg.success) {
+        if (btn) { btn.textContent = 'Failed'; }
+      } else {
+        if (entry) { entry.classList.add('undone'); }
+        if (btn) { btn.textContent = 'Reverted'; btn.disabled = true; }
+        if (msg.preRevertSnapId && entry) {
+          const btnRow = entry.querySelector('.btn-row');
+          if (btnRow && !btnRow.querySelector('.btn-unrevert')) {
+            const u = document.createElement('button');
+            u.className = 'btn btn-unrevert';
+            u.textContent = '↩ Unrevert';
+            u.dataset.id = msg.preRevertSnapId;
+            u.onclick = function() { undoBuild(this.dataset.id, this); };
+            btnRow.appendChild(u);
+          }
+        }
+      }
     }
   });
 
