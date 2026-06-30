@@ -120,8 +120,11 @@ export async function autoCaptureFiles(
   callAI?: (prompt: string) => Promise<AIResponse>
 ): Promise<CaptureResult> {
   const total: CaptureResult = { newItems: 0, skippedDupes: 0, totalExtracted: 0, failed: false, savedNames: [] };
-  for (const p of absPaths) {
-    const r = await autoCaptureFile(p, projectName, vault, buildPrompt, callAI);
+  // [FIX] Parallel capture — each file's AI quality-gate calls run concurrently instead of serially.
+  // For a 9-file build this cuts 2+ minutes of blocking post-build work. Files have different content
+  // hashes so content-hash duplicate detection is race-safe across parallel runs.
+  const results = await Promise.all(absPaths.map(p => autoCaptureFile(p, projectName, vault, buildPrompt, callAI)));
+  for (const r of results) {
     total.newItems += r.newItems;
     total.skippedDupes += r.skippedDupes;
     total.totalExtracted += r.totalExtracted;
