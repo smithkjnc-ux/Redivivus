@@ -70,9 +70,12 @@ export async function handleBuildSuccess(result: CloudBuildResult, root: string,
 
   const files = result.files ?? [];
   const fileList = files.map((f: any) => `- \`${f.path}\``).join('\n');
-  const _rootInOpenWs = !!root && !!vscode.workspace.workspaceFolders?.some(wf =>
-    root === wf.uri.fsPath || root.startsWith(wf.uri.fsPath + path.sep));
-  const openWorkspaceToken = files.length > 0 && root && !_rootInOpenWs
+  // Show the Open Project button unless this root IS the workspace root exactly.
+  // Being a subfolder of the container workspace is not "already open" — the user still
+  // needs a way to navigate to the project. startsWith suppression was hiding the button
+  // for every project built inside the /projects container, which is the common case.
+  const _rootIsWsRoot = !!root && !!vscode.workspace.workspaceFolders?.some(wf => root === wf.uri.fsPath);
+  const openWorkspaceToken = files.length > 0 && root && !_rootIsWsRoot
     ? `\n${TOK_OPEN_WORKSPACE}${root}${DELIM}${TOK_OPEN_WORKSPACE_END}` : '';
 
   const htmlFiles = files.filter((f: any) => f.path.endsWith('.html'));
@@ -98,6 +101,16 @@ export async function handleBuildSuccess(result: CloudBuildResult, root: string,
 
   deps.conversation.push({ role: 'assistant', content: `__RESULT_CARD__\n✅ Done! Built ${files.length} file${files.length !== 1 ? 's' : ''} in ${elapsedStr}\n\n${fileList}${narration}${modelLine}${result.captureCount ? `\nSaved to vault: ${result.captureCount} new piece${result.captureCount !== 1 ? 's' : ''}` : ''}\n__END_RESULT_CARD__${openWorkspaceToken}${previewToken}${runToken}${readinessToken}${breakdownToken}`, timestamp: Date.now() });
   deps.refresh();
+
+  // Auto-add the built project to the workspace so Explorer shows it immediately.
+  // updateWorkspaceFolders is non-destructive — no reload, just adds a root to the multi-root workspace.
+  // Only fires when the project is a new subfolder inside the container (not already open as its own root).
+  if (root && files.length > 0 && !isFixRequest && !_rootIsWsRoot) {
+    const alreadyRoot = vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === root);
+    if (!alreadyRoot) {
+      vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(root) });
+    }
+  }
 
   // Auto-launch browser preview for HTML projects immediately after build
   if (htmlFile && root) {
