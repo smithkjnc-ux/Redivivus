@@ -77,12 +77,12 @@ export async function runVisualVerification(
 
 TASK THAT WAS BUILT: "${task}"
 
-Look at the screenshot and answer these three things concisely:
-1. PASS or FAIL — does the rendered output look like a working result for this task?
-2. What do you actually see on screen? (describe in 1-2 sentences)
-3. What is wrong, if anything? (blank page, missing elements, unstyled HTML, broken layout, wrong colors, elements not visible)
+CRITICAL: Your VERY FIRST WORD must be PASS or FAIL (all caps, nothing before it).
+- PASS: the rendered output looks like a working result for this task
+- FAIL: the screen shows a blank page, blank content area, missing elements, or the task clearly didn't work
 
-Be specific. One short paragraph. No bullet points.`;
+After PASS or FAIL, describe in 1-2 sentences: what you see, and what is wrong (if anything).
+No bullet points. Signs of FAIL: blank white boxes where content should appear, no text visible in content areas, placeholder layout with no data.`;
 
   try {
     const res = await routing.prompt(visionPrompt, 30_000, raw, 'image/jpeg');
@@ -115,15 +115,18 @@ export async function runDomVisualVerification(
 TASK THAT WAS FIXED: "${task}"
 
 The screenshot capture was unavailable, so you are analyzing the raw page HTML instead.
-Below is the DOM content of the rendered page. Based on this HTML, determine:
-1. PASS or FAIL — does the page appear to contain the content/elements needed for this task?
-2. What content is present? (describe in 1-2 sentences)
-3. What is missing or broken, if anything?
+Examine the DOM content and answer: did the fix produce visible, working content?
+
+CRITICAL: Your VERY FIRST WORD must be PASS or FAIL (all caps, nothing before it).
+- PASS: the page has the expected content and structure for this task
+- FAIL: content is blank/empty, elements are missing, or the task clearly didn't work
+
+Signs of FAIL: empty inner content (no text between tags), placeholder text only, elements with no children where content is expected, card/game/UI elements that should show data but are empty.
+
+After PASS or FAIL, one sentence describing what you see.
 
 PAGE HTML (first 5000 chars):
-${domHtml.slice(0, 5000)}
-
-Be specific. One short paragraph. Start with PASS or FAIL.`;
+${domHtml.slice(0, 5000)}`;
 
   try {
     const res = await routing.prompt(domPrompt, 20_000);
@@ -131,8 +134,11 @@ Be specific. One short paragraph. Start with PASS or FAIL.`;
       return { applicable: true, snapshot: false, passed: null, aiVerdict: 'DOM analysis failed — check visually.' };
     }
     const verdict = res.text.trim();
-    const passed = /^(pass|yes|looks (correct|good|right))/i.test(verdict) || /\bPASS\b/.test(verdict);
-    const failed = /^(fail|no,|blank|broken|missing|wrong)/i.test(verdict) || /\bFAIL\b/.test(verdict);
+    // Stronger detection: leading PASS/FAIL, blank/empty content keywords, or mid-text keywords
+    const passed = /^PASS\b/i.test(verdict) || /^(yes|looks (correct|good|right))/i.test(verdict);
+    const failed = /^FAIL\b/i.test(verdict)
+      || /^(no,|blank|broken|missing|wrong|empty)/i.test(verdict)
+      || /\b(blank card|empty card|no content|no question|no answer|shows nothing|white box|card is empty|content is missing)\b/i.test(verdict);
     return {
       applicable: true,
       snapshot: false,
