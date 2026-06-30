@@ -10,6 +10,7 @@ import { validateOutputFiles } from './chatPanelMsgFixPatterns.js';
 import { BuildHistoryService, makeBuildHistoryEntry } from '../build/services/buildHistoryService.js';
 import { recordFix, learnFromFile } from '../chat/logic/userMemoryService.js';
 import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
+import { modelLabel } from './chatPanelMsgFixUtils.js';
 
 function extractPlain(diagnosis: string): string {
   return diagnosis.match(/^PLAIN:\s*(.+?)(?:\n|$)/m)?.[1]?.trim() ?? '';
@@ -115,22 +116,30 @@ export async function presentFixResult(params: {
     try {
       const report = deps.usageTracker.getReport(path.basename(root));
       if (report && report.session && report.session.byAI) {
-        // [FIX] Break each AI's usage down by pipeline ROLE (Supervisor/Worker/Guardian) instead of one lump sum.
-        // The data was always in report...byAI[].byRole — it just wasn't rendered. When all three roles run on one
-        // provider (e.g. Gemini doing everything), the flat "gemini: N tokens" hid who spent what.
+        // Flatten all role entries from every AI, convert provider keys to display names,
+        // then sort by role order — so the usage section reads in the same left-to-right
+        // order as the pipeline line ("Supervisor → Worker → Guardian") and uses the same
+        // friendly names ("GPT-4o", "Claude", "Gemini") instead of internal keys ("openai").
         const ROLE_ORDER: Record<string, number> = { supervisor: 0, worker: 1, guardian: 2, qa: 3, solo: 4 };
         const ROLE_LABEL: Record<string, string> = { supervisor: 'Supervisor', worker: 'Worker', guardian: 'Guardian', qa: 'Q&A', solo: 'Solo' };
-        const aiStats = report.session.byAI.map((ai: any) => {
-          const head = `- ${ai.aiProvider}: ${ai.tokens.toLocaleString()} tokens ($${ai.cost.toFixed(4)})`;
-          const roles = (ai.byRole || []).slice()
-            .sort((a: any, b: any) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9))
-            .map((r: any) => `    - ${ROLE_LABEL[r.role] || r.role}: ${r.tokens.toLocaleString()} tokens ($${r.cost.toFixed(4)})`)
-            .join('\n');
-          return roles ? `${head}\n${roles}` : head;
-        }).join('\n');
-        aiLabels += `\n\n**Pipeline Usage:**\n${aiStats}\n**Total Session Cost:** $${report.session.cost.toFixed(4)}`;
+        const entries: { role: string; display: string; tokens: number; cost: number }[] = [];
+        for (const ai of report.session.byAI) {
+          const display = modelLabel(ai.aiProvider);
+          for (const r of (ai.byRole || [])) {
+            entries.push({ role: r.role, display, tokens: r.tokens, cost: r.cost });
+          }
+          // If no byRole breakdown, show the AI-level total under a generic role
+          if (!(ai.byRole || []).length) {
+            entries.push({ role: 'solo', display, tokens: ai.tokens, cost: ai.cost });
+          }
+        }
+        entries.sort((a, b) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9));
+        const aiStats = entries.map(e =>
+          `- ${ROLE_LABEL[e.role] || e.role} (${e.display}): ${e.tokens.toLocaleString()} tokens ($${e.cost.toFixed(4)})`
+        ).join('\n');
+        aiLabels += `\n\n**Usage:**\n${aiStats}\n**Total:** $${report.session.cost.toFixed(4)}`;
       }
-    } catch (e) {
+    } catch {
       // Ignore if usage tracker fails
     }
   }
