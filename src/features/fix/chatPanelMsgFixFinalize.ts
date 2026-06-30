@@ -134,7 +134,8 @@ export async function runFixFinalize(params: {
         const { BuildActivityPanel } = await import('../chat/ui/buildActivity/buildActivityPanel.js');
         const icon = vv.passed === true ? '✅' : vv.passed === false ? '⚠️' : '🔍';
         const label = vv.passed === true ? 'Visual check passed' : vv.passed === false ? 'Visual issue — may need another pass' : 'Visual check inconclusive';
-        BuildActivityPanel.current?.step({ phase: 'guardian', status: vv.passed === true ? 'pass' : vv.passed === false ? 'fix' : 'running', label });
+        // [FIX] Use 'failover' (settled amber [>>]) for inconclusive — not 'running' which leaves an infinite spinner
+        BuildActivityPanel.current?.step({ phase: 'guardian', status: vv.passed === true ? 'pass' : vv.passed === false ? 'fix' : 'failover', label });
         if (vv.passed === false) {
           conversation.push({ role: 'assistant', content: `${icon} **${label}**\n\n${vv.aiVerdict}\n\n_The code was changed but the visual result may not match your request. Review or click Fix again._`, timestamp: Date.now() });
           refresh();
