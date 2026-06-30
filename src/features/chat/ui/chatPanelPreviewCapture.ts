@@ -54,11 +54,20 @@ export function getCaptureScript(): string {
         else if(!loopSeen){ send('probe','no animation loop (requestAnimationFrame/setInterval) ever started', b64); }
         else if(b64){ send('snapshot','visual snapshot', b64); }
       } else {
-        // No canvas — HTML-rendered page (div/span UI, chess boards, DOM games).
-        // Use html2canvas to capture the visible DOM as a JPEG and beacon it back.
+        // No canvas -- HTML-rendered page (div/span UI, chess boards, DOM games).
+        // Try html2canvas for a real screenshot. If CDN is blocked (VS Code webview CSP),
+        // fall back to beaconing the DOM as text so the vision AI can still analyze content.
+        var _domFallback=function(){
+          try{
+            // Send DOM HTML in the image field (no 400-char truncation) so visual verify can analyze it
+            var _html=document.body.innerHTML.slice(0,8000);
+            send('dom-html','dom-snapshot-available',_html);
+          }catch(e){}
+        };
         try{
           var s=document.createElement('script');
           s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+          s.onerror=function(){ _domFallback(); };
           s.onload=function(){
             try{
               (window as any).html2canvas(document.body,{
@@ -70,12 +79,14 @@ export function getCaptureScript(): string {
                 try{
                   var img=cv.toDataURL('image/jpeg',0.6);
                   send('snapshot','html visual snapshot',img);
-                }catch(e){}
-              }).catch(function(){});
-            }catch(e){}
+                }catch(e){ _domFallback(); }
+              }).catch(function(){ _domFallback(); });
+            }catch(e){ _domFallback(); }
           };
           document.head.appendChild(s);
-        }catch(e){}
+          // If html2canvas hasn't loaded within 3s, CDN is blocked -- use DOM fallback
+          setTimeout(function(){ if(!(window as any).html2canvas){ _domFallback(); } }, 3000);
+        }catch(e){ _domFallback(); }
       }
     }catch(e){}
   }, 1500);

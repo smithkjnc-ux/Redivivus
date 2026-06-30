@@ -103,3 +103,43 @@ Be specific. One short paragraph. No bullet points.`;
     return { applicable: true, snapshot: true, passed: null, aiVerdict: 'Vision AI unavailable — check visually.', imageBase64: raw };
   }
 }
+
+/** DOM-text fallback: ask the AI to assess page content from raw HTML when screenshot is unavailable. */
+export async function runDomVisualVerification(
+  domHtml: string,
+  task: string,
+  routing: RoutingService,
+): Promise<VisualVerifyResult> {
+  const domPrompt = `You are a QA reviewer checking whether a web app fix worked correctly.
+
+TASK THAT WAS FIXED: "${task}"
+
+The screenshot capture was unavailable, so you are analyzing the raw page HTML instead.
+Below is the DOM content of the rendered page. Based on this HTML, determine:
+1. PASS or FAIL — does the page appear to contain the content/elements needed for this task?
+2. What content is present? (describe in 1-2 sentences)
+3. What is missing or broken, if anything?
+
+PAGE HTML (first 5000 chars):
+${domHtml.slice(0, 5000)}
+
+Be specific. One short paragraph. Start with PASS or FAIL.`;
+
+  try {
+    const res = await routing.prompt(domPrompt, 20_000);
+    if (!res.success || !res.text?.trim()) {
+      return { applicable: true, snapshot: false, passed: null, aiVerdict: 'DOM analysis failed — check visually.' };
+    }
+    const verdict = res.text.trim();
+    const passed = /^(pass|yes|looks (correct|good|right))/i.test(verdict) || /\bPASS\b/.test(verdict);
+    const failed = /^(fail|no,|blank|broken|missing|wrong)/i.test(verdict) || /\bFAIL\b/.test(verdict);
+    return {
+      applicable: true,
+      snapshot: false,
+      passed: failed ? false : passed ? true : null,
+      aiVerdict: `[DOM analysis] ${verdict}`,
+    };
+  } catch {
+    return { applicable: true, snapshot: false, passed: null, aiVerdict: 'DOM analysis unavailable — check visually.' };
+  }
+}

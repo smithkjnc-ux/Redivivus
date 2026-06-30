@@ -128,8 +128,17 @@ export async function runFixFinalize(params: {
   // [Gap 2b — fix pipeline] Vision AI reviews screenshot for visual correctness after the preview runs
   if (written.length > 0) {
     try {
-      const { runVisualVerification } = await import('../chat/ui/chatPanelVisualVerify.js');
-      const vv = await runVisualVerification(root, userText, deps.routing, 3500);
+      const { runVisualVerification, runDomVisualVerification } = await import('../chat/ui/chatPanelVisualVerify.js');
+      const { getRuntimeReports } = await import('../chat/ui/chatPanelPreview.js');
+      let vv = await runVisualVerification(root, userText, deps.routing, 3500);
+      // [FIX] If screenshot is unavailable (html2canvas CDN blocked in VS Code webview), fall back to
+      // DOM HTML analysis — the capture script beacons the page innerHTML as 'dom-html' when CDN fails.
+      if (vv.applicable && !vv.snapshot && vv.passed === null) {
+        const domReport = getRuntimeReports().find((r: any) => r.kind === 'dom-html' && r.image);
+        if (domReport?.image) {
+          vv = await runDomVisualVerification(domReport.image, userText, deps.routing);
+        }
+      }
       if (vv.applicable) {
         const { BuildActivityPanel } = await import('../chat/ui/buildActivity/buildActivityPanel.js');
         const icon = vv.passed === true ? '✅' : vv.passed === false ? '⚠️' : '🔍';
