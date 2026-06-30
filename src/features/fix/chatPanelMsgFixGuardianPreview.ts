@@ -12,6 +12,7 @@ export interface PreApplyResult {
   runtimeSummary: string;   // plain-English description of app state after fix is applied
   appliedFiles: string[];   // relative paths of files written to disk
   rollback: () => void;     // restores all files to their pre-apply state
+  snapId?: string;          // snapshot ID from takeSnapshot — passed to Phase23 so history entry gets a real ID
 }
 
 /** Applies `workerResponse` to disk, runs the preview, and returns a rollback function.
@@ -86,5 +87,5 @@ export async function runPreApplyCapture(
     if (result.applicable) { runtimeSummary = result.summary; }
   } catch { /* preview check is best-effort — never block the pipeline */ }
 
-  return { runtimeSummary, appliedFiles: applyRes.written, rollback };
+  return { runtimeSummary, appliedFiles: applyRes.written, rollback, snapId: applyRes.fixSnapId || undefined };
 }

@@ -53,8 +53,10 @@ Does this fix LOGICALLY achieve what you diagnosed? Does the code change actuall
       // Verification failed to run — pass through (don't block the pipeline)
       return { passed: true, issues: [] };
     }
-    // [FIX] 'guardian' — this is the Compliance Verifier (Layer 1 Guardian), not the Supervisor
-    deps.usageTracker?.recordUsage(Math.ceil((verifyPrompt.length + (res.text?.length || 0)) / 4), 0, (res.model && res.model !== 'none') ? res.model : 'claude', res.inputTokens, res.outputTokens, 'guardian', require('path').basename(root));
+    // [FIX] 'qa' — runSupervisorVerify is a pre-guardian logic check (Supervisor reviewing its own
+    // prescription), not one of the two real guardian layers (Compliance Verifier + Code Inspector).
+    // Recording as 'guardian' created a second Guardian provider entry in the pipeline display.
+    deps.usageTracker?.recordUsage(Math.ceil((verifyPrompt.length + (res.text?.length || 0)) / 4), 0, (res.model && res.model !== 'none') ? res.model : 'claude', res.inputTokens, res.outputTokens, 'qa', require('path').basename(root));
 
     const answer = res.text.trim();
     if (answer.startsWith('PASS') || answer.toLowerCase().startsWith('pass')) {

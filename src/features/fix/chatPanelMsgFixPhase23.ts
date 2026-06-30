@@ -70,8 +70,8 @@ export async function runFixPhase23(p: FixPhase23Params): Promise<void> {
       // [GAP1] Guardian pre-applied the fix before reviewing — skip disk write to avoid double-apply.
       // preAppliedFiles carries the written list so PRESCRIPTION_CHECK still works correctly.
       if (escalation.preApplied && escalation.preAppliedFiles?.length) {
-        written = escalation.preAppliedFiles; failed = []; skipped = []; fixSnapId = undefined;
-        fixLog('[PRE-APPLY] Skipping applyFixContent — Guardian already applied and approved this fix', { written });
+        written = escalation.preAppliedFiles; failed = []; skipped = []; fixSnapId = escalation.preAppliedSnapId;
+        fixLog('[PRE-APPLY] Skipping applyFixContent — Guardian already applied and approved this fix', { written, snapId: fixSnapId });
       } else {
         const { applyFixContent } = await import('./chatPanelMsgFixApply.js');
         const applyRes = await applyFixContent(finalResponse, root, allowedRels, userText);

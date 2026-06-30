@@ -164,7 +164,7 @@ export async function runGuardianPhase(params: {
       deps.usageTracker?.recordUsage(Math.ceil(workerResponse.length / 4), 0, guardianProvider, guardianResult.inputTokens, guardianResult.outputTokens, 'guardian', require('path').basename(root));
       guardianNote = `Code Inspector (${guardianProvider}): inconclusive — no reason given, fix applied`;
       fixLog('Code Inspector format-mismatch: returned GUARDIAN_FAIL with no extractable reason — shipping fix as inconclusive');
-      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianProvider || 'Inspector', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles } };
+      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel: guardianProvider || 'Inspector', guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles, preAppliedSnapId: _preApply?.snapId } };
     }
 
     const verdict = renderGuardianVerdict({ guardianRan, guardianResult, guardianProvider, workerResponse, root, deps, layerName: 'Code Inspector' });
@@ -181,7 +181,7 @@ export async function runGuardianPhase(params: {
     if (guardianResult.passed) {
       guardianNote = guardianRan ? `Code Inspector (${guardianLabel}): Approved` : `Code Inspector: skipped (no reviewer available — fix applied without review)`;
       fixLog(guardianRan ? `Code Inspector APPROVED the fix` : `Code Inspector SKIPPED — fix applied unreviewed`);
-      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles } };
+      return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote, scopeNote, needsAgentHandoff, retryCount: attempt, escalated, forceSurgical, preApplied: !!_preApply, preAppliedFiles: _preApply?.appliedFiles, preAppliedSnapId: _preApply?.snapId } };
     }
 
     if (!guardianRan && guardianResult.guardianAI === 'none') {

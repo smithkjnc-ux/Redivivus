@@ -22,6 +22,7 @@ export interface EscalationResult {
   // [GAP1] Set when Guardian approved a pre-applied fix — Phase23 skips re-apply
   preApplied?: boolean;
   preAppliedFiles?: string[];
+  preAppliedSnapId?: string; // snapshot ID taken during pre-apply — used so history entry gets a real undo ID
 }
 
 /** Truncation/cut-off detector — when a critique looks like the output was cut off, the retry switches

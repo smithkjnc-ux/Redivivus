@@ -121,3 +121,23 @@
 - **`src/core/routing/chatPanelMsgFixVerifyPhase.ts`**: Created extracted Verify Phase logic for escalation loop.
 - **`src/core/routing/chatPanelMsgFixGuardianPhase.ts`**: Created extracted Guardian Phase logic for escalation loop.
 - **`src/core/routing/chatPanelMsgFixSelfFix.ts`**: Fixed escaped template literal syntax error from generation.
+
+### 2026-06-30 — Fix: AI role mis-classification in pipeline display (multi-Supervisor / multi-Guardian)
+
+- **`src/features/build/chatPanelBuildInference.ts`** (`isModificationRequest`, `isConversationalQuestion`, `deriveFileBase`): Changed `recordUsage` role from `'supervisor'` to `'qa'` on all three intent-classifier calls. These are pre-pipeline AI lookups (flash model, ~50 tokens each) that determine request intent — not the actual Supervisor diagnosis. Recording them as 'supervisor' caused "Supervisor (deepseek-chat)" to appear as a second Supervisor entry in the Build Activity pipeline label.
+
+- **`src/features/fix/chatPanelMsgFixVerify.ts`** (`runSupervisorVerify`): Changed `recordUsage` role from `'guardian'` to `'qa'`. This is the Supervisor cross-checking its own prescription against the Worker's output — a lightweight logic gate, not one of the two real guardian layers (Compliance Verifier + Code Inspector). Recording it as 'guardian' caused a second "Guardian (Claude)" entry in the pipeline display alongside the Gemini guardian layers.
+
+**Net result**: Each fix run now shows exactly one Supervisor and one Guardian provider in the pipeline label unless a retry loop fires.
+
+### 2026-06-30 — Fix: history entries getting fake `fix-${Date.now()}` snapshot IDs (Undo shows "Failed")
+
+**Root cause**: When the Guardian uses the pre-apply path (`runPreApplyCapture`), it calls `applyFixContent` internally which creates a real snapshot on disk. But `PreApplyResult` never returned `fixSnapId` from `applyFixContent`, so the snapshot ID was dropped. `EscalationResult.preAppliedSnapId` didn't exist, and `chatPanelMsgFixPhase23.ts` hard-coded `fixSnapId = undefined` for the pre-apply path. `presentFixResult` then fell back to `snapshotId: fixSnapId || \`fix-\${Date.now()}\``, creating a history entry with a fake ID that matched no `.json.gz` file. Every "Undo this fix" on pre-apply history entries failed with "Snapshot not found" and the button showed "Failed".
+
+**Fix**:
+- **`chatPanelMsgFixGuardianPreview.ts`**: Added `snapId?: string` to `PreApplyResult`; return `applyRes.fixSnapId` as `snapId`.
+- **`chatPanelMsgFixEscalationUtils.ts`**: Added `preAppliedSnapId?: string` to `EscalationResult`.
+- **`chatPanelMsgFixGuardianPhase.ts`**: Passed `preAppliedSnapId: _preApply?.snapId` in both `action: 'return'` payloads (format-mismatch + approved paths).
+- **`chatPanelMsgFixPhase23.ts`**: Changed `fixSnapId = undefined` to `fixSnapId = escalation.preAppliedSnapId` for the pre-apply skip path.
+
+**Net result**: History entries from pre-apply runs now get a real snapshot ID → "Undo this fix" works correctly.
