@@ -34,6 +34,17 @@ export async function runOrchestratedPhaseBuild(
 ): Promise<string[]> {
   const { routing, blueprintContext } = deps;
 
+  // [FIX] Wait for SecretStorage to finish loading API keys before ranking providers.
+  // Without this wait, the Claude key may not yet appear in keyMap during early-startup builds,
+  // causing a lower-ranked provider (GPT-4o, Groq) to win the Supervisor slot instead of Claude.
+  try {
+    const { onSecretKeyStoreReady } = await import('../ai/data/secretKeyStore.js');
+    await Promise.race([
+      new Promise<void>(resolve => onSecretKeyStoreReady(() => resolve())),
+      new Promise<void>(resolve => setTimeout(resolve, 6000)),
+    ]);
+  } catch { /* non-blocking — proceed with whatever keys are available */ }
+
   const keyMap = routing.getKeyMap();
   const ranked = Object.entries(AI_RANK)
     .filter(([ai]) => keyMap[ai]?.())
@@ -69,6 +80,25 @@ export async function runOrchestratedPhaseBuild(
   });
 
   const planSteps = await createPlan(phaseTask, ranked, context, callAI, roleTemps);
+
+  // [FIX] Upgrade any steps assigned to low-output providers (outputK < 16K) to the next capable
+  // provider. Groq's hard 8K output cap causes cascading truncations on file-sized tasks, each
+  // truncation triggering a continuation that still fails, then an expensive o3/Claude rescue call.
+  // Build steps always produce full files — no provider with outputK < 16 should get one.
+  const _profiles = buildCapabilityProfiles(ranked);
+  const _lowOutput = new Set(_profiles.filter(p => p.outputK < 16).map(p => p.ai));
+  if (_lowOutput.size > 0) {
+    const _upgrade = ranked.find(ai => !_lowOutput.has(ai));
+    if (_upgrade) {
+      const _upgradeCap = (await import('../ai/data/guardianAI.js')).AI_CAPABILITIES[_upgrade];
+      for (const step of planSteps) {
+        if (_lowOutput.has(step.assignedAI)) {
+          step.assignedAI    = _upgrade;
+          step.assignedLabel = _upgradeCap?.label || _upgrade;
+        }
+      }
+    }
+  }
 
   deps.conversation.push({
     role: 'assistant',
