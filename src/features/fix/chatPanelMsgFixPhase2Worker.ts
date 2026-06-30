@@ -62,23 +62,31 @@ export async function runPhase2Worker(
   let workerResponse = '';
   let providerUsed = workerAI;
   let lastError = '';
-  // [FIX] Deterministic Tiering — Worker complexity is evaluated based on the files being fixed.
+  // [FIX] Supervisor-directed tiering: read WORKER_TIER from diagnosis first (Supervisor knows best).
+  // Fall back to heuristics only when the Supervisor didn't specify.
+  // Ultra threshold raised: >150 lines was too aggressive — a 160-line app.js triggered o3 for a
+  // simple dropdown addition. Ultra is reserved for genuinely complex codebases (>300 lines or
+  // architecture-level keywords), not ordinary JS with a few dozen functions.
   function determineFixWorkerTier(fixFiles: { path: string, content: string }[]): 'flash' | 'pro' | 'ultra' {
+    // Priority 1: Supervisor directive in the diagnosis
+    const supervisorTier = diagnosis.match(/WORKER_TIER:\s*(flash|pro|ultra)/i)?.[1]?.toLowerCase() as 'flash' | 'pro' | 'ultra' | undefined;
+    if (supervisorTier) { return supervisorTier; }
+
+    // Priority 2: Heuristic based on file complexity
     let hasLogic = false;
     let needsUltra = false;
-    const complexKeywords = /physics|engine|state|game|algorithm|canvas|core|manager|router|auth|store|database/i;
+    const complexKeywords = /physics|engine|canvas|core.*manager|router|auth|store|database/i;
 
     for (const f of fixFiles) {
       if (/\.(js|ts|jsx|tsx|py|go|rs|java|c|cpp|cs|php|rb)$/i.test(f.path)) {
         hasLogic = true;
-        // Upgrade to ultra if the file is large (>150 lines) or has complex keywords
-        if (f.content.split('\n').length > 150 || complexKeywords.test(f.path)) {
+        if (f.content.split('\n').length > 300 || complexKeywords.test(f.path)) {
           needsUltra = true;
         }
       }
     }
-    
-    if (!hasLogic) return 'flash'; // pure CSS/HTML/Markdown
+
+    if (!hasLogic) return 'flash';
     return needsUltra ? 'ultra' : 'pro';
   }
   

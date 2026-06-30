@@ -118,47 +118,40 @@ export async function represcribeAfterRejection(p: {
   const { attempt, maxRetries, userText, root, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, deps } = p;
   let filesBlock = p.filesBlock;
   let currentDiagnosis = p.currentDiagnosis;
-  if (attempt < maxRetries && userText) {
-    fixLog(`[RE-PRESCRIBE] Guardian rejected attempt ${attempt + 1} — calling Supervisor for new prescription`);
+  // [FIX] Do NOT re-call the Supervisor on Guardian rejection. The original prescription is still
+  // correct — the Worker just needs to implement it more carefully. Calling the Supervisor again
+  // adds 10K+ tokens per retry (3 retries = 3x Supervisor cost) for no benefit, since the
+  // Supervisor doesn't know what the Worker wrote wrong. Instead, inject the Guardian's critique
+  // directly into the diagnosis so the Worker sees EXACTLY what failed and avoids repeating it.
+  if (attempt < maxRetries) {
+    const lastCritique = accumulatedCritiques[accumulatedCritiques.length - 1] || '';
+    const verifySuggestions = accumulatedCritiques
+      .filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'))
+      .map(s => s.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 300))
+      .join('\n- ');
+
+    const correctionBlock = [
+      `\n\n⚠️ PREVIOUS ATTEMPT FAILED — DO NOT REPEAT THE SAME APPROACH:`,
+      lastCritique ? `Guardian critique: ${lastCritique.slice(0, 600)}` : '',
+      verifySuggestions ? `Suggested correct approach:\n- ${verifySuggestions}` : '',
+      `Make SURGICAL changes matching the prescription exactly. Do not rename variables or restructure code beyond what is prescribed.`,
+    ].filter(Boolean).join('\n');
+
+    currentDiagnosis = currentDiagnosis + correctionBlock;
+    fixLog(`[RE-PRESCRIBE] Injecting Guardian critique into diagnosis for retry ${attempt + 1} — skipping Supervisor re-call`);
+
+    // Re-read files from disk so the Worker sees the current state, not the pre-attempt snapshot
     try {
       const { resolveSourceFiles } = await import('./chatPanelMsgFixContext.js');
-      const refreshedFiles = await resolveSourceFiles(root, userText, deps);
-      if (refreshedFiles && refreshedFiles.length > 0) {
-        filesBlock = refreshedFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
-        fixLog(`[RE-PRESCRIBE] Refreshed file contents for re-prescription (${refreshedFiles.length} files)`);
-      }
-      // Separate positive Verify suggestions from failure critiques — treat them differently
-      const verifySuggestions = accumulatedCritiques.filter(c => c.startsWith('[VERIFY SUGGESTED APPROACH]'));
-      const failureCritiques = accumulatedCritiques.filter(c => !c.startsWith('[VERIFY SUGGESTED APPROACH]'));
-      const sessionDeadEnds = failureCritiques
-        .map((c, i) => {
-          // Extract prescriptive guidance from the critique — sentences that tell us WHAT TO DO.
-          const prescriptiveLines = c.split(/(?<=[.!])\s+/)
-            .filter(s => /correct fix should|should (?:instead|only|be)|needs? (?:a |to )|use .+instead|canvas itself needs|try instead|correct approach/i.test(s))
-            .join(' ').trim();
-          const hintBlock = prescriptiveLines ? `\n- CORRECT APPROACH HINT (from Verify): ${prescriptiveLines.slice(0, 400)}` : '';
-          return `## Attempt ${i + 1} failed\n- What was tried: ${currentDiagnosis.slice(0, 100).replace(/\n/g, ' ')}...\n- Why it failed: ${c.slice(0, 400)}\n- Do NOT repeat this approach${hintBlock}`;
-        })
-        .join('\n\n');
-      const verifyHintBlock = verifySuggestions.length > 0
-        ? `## Verify AI suggested these approaches (use as guidance):\n${verifySuggestions.map(s => `- ${s.replace('[VERIFY SUGGESTED APPROACH] ', '').slice(0, 300)}`).join('\n')}`
-        : '';
-      const enrichedDeadEnds = [projectDeadEnds, sessionDeadEnds, verifyHintBlock].filter(Boolean).join('\n\n---\n\n');
-
-      const { runPhase1Supervisor } = await import('./chatPanelMsgFixPhases.js');
-      const rePrescription = await runPhase1Supervisor(
-        userText, filesBlock, buildContext || '', activePatterns, enrichedDeadEnds, projectRules || '', deps, root, undefined, undefined, true,
-      );
-      if (rePrescription && rePrescription.diagnosis) {
-        const oldDiagnosis = currentDiagnosis.slice(0, 80);
-        currentDiagnosis = rePrescription.diagnosis;
-        fixLog(`[RE-PRESCRIBE] New prescription received`, { oldPreview: oldDiagnosis + '...', newPreview: currentDiagnosis.substring(0, 200) + '...' });
-        return { filesBlock, diagnosis: currentDiagnosis, supervisorLabel: rePrescription.supervisorLabel };
-      } else {
-        fixLog(`[RE-PRESCRIBE] Supervisor returned no new diagnosis, continuing with original prescription`);
+      if (userText) {
+        const refreshedFiles = await resolveSourceFiles(root, userText, deps);
+        if (refreshedFiles && refreshedFiles.length > 0) {
+          filesBlock = refreshedFiles.map((f: { rel: string; content: string }) => `// === FILE: ${f.rel} ===\n${f.content}`).join('\n\n');
+          fixLog(`[RE-PRESCRIBE] Refreshed ${refreshedFiles.length} files from disk for retry ${attempt + 1}`);
+        }
       }
     } catch (err) {
-      fixLog(`[RE-PRESCRIBE] Re-prescription failed, continuing with original prescription`, { err: err instanceof Error ? err.message : String(err) });
+      fixLog(`[RE-PRESCRIBE] File refresh skipped (non-blocking): ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   return { filesBlock, diagnosis: currentDiagnosis };
