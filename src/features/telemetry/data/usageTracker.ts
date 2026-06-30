@@ -85,7 +85,7 @@ export class UsageTracker {
   async recordUsage(tokens: number, _cost: number, aiProvider: string, inputTokens?: number, outputTokens?: number, role?: UsageEntry['role'], project?: string): Promise<void> {
     const actualIn  = inputTokens  ?? Math.ceil(tokens * 0.6);  // estimate 60/40 split if not provided
     const actualOut = outputTokens ?? Math.ceil(tokens * 0.4);
-    const cost = calcCost(aiProvider, actualIn, actualOut);
+    const cost = calcCost(aiProvider, actualIn, actualOut, role);
     const entry: UsageEntry = {
       timestamp: Date.now(),
       tokens: actualIn + actualOut,

@@ -6,9 +6,9 @@ import { fixLog } from '../../features/logging/data/fixPipelineLogger.js';
 import { renderGuardianVerdict, represcribeAfterRejection, isTruncationText, type EscalationResult } from './chatPanelMsgFixEscalationUtils.js';
 import { fixActStep } from './fixActivityPanel.js';
 
-export type GuardianPhaseResult = 
+export type GuardianPhaseResult =
   | { action: 'return', payload: EscalationResult }
-  | { action: 'continue', forceSurgical: boolean, filesBlock: string, currentDiagnosis: string }
+  | { action: 'continue', forceSurgical: boolean, filesBlock: string, currentDiagnosis: string, supervisorLabel?: string }
   | { action: 'error', guardianNote: string, guardianLabel: string };
 
 export async function runGuardianPhase(params: {
@@ -100,7 +100,7 @@ export async function runGuardianPhase(params: {
       for (const c of accumulatedCritiques) { const matches = c.matchAll(/(?:leaving|unchanged|do not (?:touch|modify)|should not (?:touch|modify)|must not (?:touch|modify)|only involve[^,]+,\s*leaving)\s+[`']?([\w./\\-]+\.[a-zA-Z0-9]{1,6})[`']?/gi); for (const m of matches) { if (!doNotFiles.includes(m[1])) { doNotFiles.push(m[1]); } } }
       if (doNotFiles.length > 0) { currentDiagnosis = currentDiagnosis + `\n\n[WORKER CONSTRAINTS — ABSOLUTE]\nDO NOT MODIFY: ${doNotFiles.join(', ')}`; }
       if (/\[AGENT_HANDOFF\]/i.test(currentDiagnosis)) { return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote: 'Re-prescription routed to Agent pipeline', scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated } }; }
-      return { action: 'continue', forceSurgical, filesBlock, currentDiagnosis };
+      return { action: 'continue', forceSurgical, filesBlock, currentDiagnosis, supervisorLabel: rp.supervisorLabel };
     }
 
     // ── LAYER 2: Code Inspector ──────────────────────────────────────────────
@@ -231,7 +231,7 @@ export async function runGuardianPhase(params: {
       return { action: 'return', payload: { finalResponse: workerResponse, workerLabel, guardianLabel, guardianNote: 'Re-prescription routed to Agent pipeline', scopeNote, needsAgentHandoff: true, retryCount: attempt, escalated } };
     }
 
-    return { action: 'continue', forceSurgical, filesBlock, currentDiagnosis };
+    return { action: 'continue', forceSurgical, filesBlock, currentDiagnosis, supervisorLabel: rp.supervisorLabel };
   } catch {
     return { action: 'error', guardianNote: 'Guardian: skipped (error)', guardianLabel: 'skipped (error)' };
   }

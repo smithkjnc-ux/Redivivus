@@ -92,14 +92,20 @@ export function buildActivityHtml(task: string, expandByDefault = true): string 
     // the moment a later step arrives. Flip those lingering rows to done so nothing stays "running"
     // after the build completes.
     function settlePrior() {
-      // First flip any running markers to done
+      // Flip running markers to done. className= replaces ALL classes including 'open', so capture
+      // whether the row was open BEFORE wiping className, then fix the hint text immediately after.
       var live = timeline.querySelectorAll('.row.running, .row.continue');
       for (var i = 0; i < live.length; i++) {
+        var wasOpen = live[i].classList.contains('open');
         live[i].className = 'row done';
         var mk = live[i].querySelector('.mark');
         if (mk) { mk.className = 'mark done'; mk.innerHTML = '[OK]'; }
+        if (wasOpen) {
+          var hint = live[i].querySelector('.hint');
+          if (hint) hint.textContent = '[+] view';
+        }
       }
-      // Then collapse all previously opened rows to act as an accordion
+      // Collapse any other open rows (non-running ones)
       var allOpen = timeline.querySelectorAll('.row.open');
       for (var j = 0; j < allOpen.length; j++) {
         allOpen[j].classList.remove('open');

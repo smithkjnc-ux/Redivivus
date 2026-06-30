@@ -114,7 +114,7 @@ export function renderGuardianVerdict(p: {
 export async function represcribeAfterRejection(p: {
   attempt: number; maxRetries: number; userText?: string; root: string; filesBlock: string; currentDiagnosis: string;
   accumulatedCritiques: string[]; projectDeadEnds?: string; buildContext?: string; activePatterns: any[]; projectRules?: string; deps: MessageHandlerDeps;
-}): Promise<{ filesBlock: string; diagnosis: string }> {
+}): Promise<{ filesBlock: string; diagnosis: string; supervisorLabel?: string }> {
   const { attempt, maxRetries, userText, root, accumulatedCritiques, projectDeadEnds, buildContext, activePatterns, projectRules, deps } = p;
   let filesBlock = p.filesBlock;
   let currentDiagnosis = p.currentDiagnosis;
@@ -153,6 +153,7 @@ export async function represcribeAfterRejection(p: {
         const oldDiagnosis = currentDiagnosis.slice(0, 80);
         currentDiagnosis = rePrescription.diagnosis;
         fixLog(`[RE-PRESCRIBE] New prescription received`, { oldPreview: oldDiagnosis + '...', newPreview: currentDiagnosis.substring(0, 200) + '...' });
+        return { filesBlock, diagnosis: currentDiagnosis, supervisorLabel: rePrescription.supervisorLabel };
       } else {
         fixLog(`[RE-PRESCRIBE] Supervisor returned no new diagnosis, continuing with original prescription`);
       }

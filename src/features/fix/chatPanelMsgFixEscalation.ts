@@ -38,7 +38,8 @@ export async function runEscalationLoop(params: {
   projectDeadEnds?: string; // existing dead ends from dead_ends.md
   projectRules?: string;    // project rules for Supervisor
 }): Promise<EscalationResult> {
-  const { diagnosis, fileNames, filesBlock: initialFilesBlock, activePatterns, deps, root, supervisorLabel, forceSurgical: initialForceSurgical } = params;
+  const { diagnosis, fileNames, filesBlock: initialFilesBlock, activePatterns, deps, root, forceSurgical: initialForceSurgical } = params;
+  let supervisorLabel = params.supervisorLabel; // may be updated if re-prescription uses a different provider
   const { userText, buildContext, projectDeadEnds, projectRules } = params;
   const maxRetries = params.maxRetries ?? 2;
   const { routing, conversation, refresh } = deps;
@@ -137,6 +138,7 @@ export async function runEscalationLoop(params: {
         forceSurgical = guardianPhaseResult.forceSurgical;
         filesBlock = guardianPhaseResult.filesBlock;
         currentDiagnosis = guardianPhaseResult.currentDiagnosis;
+        if (guardianPhaseResult.supervisorLabel) { supervisorLabel = guardianPhaseResult.supervisorLabel; }
       }
 
       // If we've exhausted Worker retries — have the Supervisor write the fix directly
