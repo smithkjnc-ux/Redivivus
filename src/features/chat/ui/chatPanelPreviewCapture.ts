@@ -55,22 +55,23 @@ export function getCaptureScript(): string {
         else if(b64){ send('snapshot','visual snapshot', b64); }
       } else {
         // No canvas -- HTML-rendered page (div/span UI, chess boards, DOM games).
-        // Try html2canvas for a real screenshot. If CDN is blocked (VS Code webview CSP),
-        // fall back to beaconing the DOM as text so the vision AI can still analyze content.
-        var _domFallback=function(){
-          try{
-            // Send DOM HTML in the image field (no 400-char truncation) so visual verify can analyze it
-            var _html=document.body.innerHTML.slice(0,8000);
-            send('dom-html','dom-snapshot-available',_html);
-          }catch(e){}
-        };
+        // [FIX] Two bugs fixed:
+        // 1. (window as any) is TypeScript syntax — invalid JS inside injected script string.
+        //    Changed to window.html2canvas (runtime property access).
+        // 2. DOM fallback only fired after a 3s CDN timeout (= 4.5s total from page load).
+        //    The verifyPreviewRuns panel is disposed at 2.8-3.5s, so dom-html NEVER arrived.
+        //    Fix: send dom-html IMMEDIATELY, then try html2canvas as an upgrade screenshot.
+        //    Visual check now always has content to analyze for non-canvas web projects.
+        try{
+          var _html=document.body.innerHTML.slice(0,8000);
+          send('dom-html','dom-snapshot-available',_html);
+        }catch(e){}
         try{
           var s=document.createElement('script');
           s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-          s.onerror=function(){ _domFallback(); };
           s.onload=function(){
             try{
-              (window as any).html2canvas(document.body,{
+              window.html2canvas(document.body,{
                 scale:0.5, useCORS:true, allowTaint:true,
                 width:Math.min(document.body.scrollWidth,900),
                 height:Math.min(document.body.scrollHeight,700),
@@ -79,14 +80,12 @@ export function getCaptureScript(): string {
                 try{
                   var img=cv.toDataURL('image/jpeg',0.6);
                   send('snapshot','html visual snapshot',img);
-                }catch(e){ _domFallback(); }
-              }).catch(function(){ _domFallback(); });
-            }catch(e){ _domFallback(); }
+                }catch(e){}
+              }).catch(function(){});
+            }catch(e){}
           };
           document.head.appendChild(s);
-          // If html2canvas hasn't loaded within 3s, CDN is blocked -- use DOM fallback
-          setTimeout(function(){ if(!(window as any).html2canvas){ _domFallback(); } }, 3000);
-        }catch(e){ _domFallback(); }
+        }catch(e){}
       }
     }catch(e){}
   }, 1500);

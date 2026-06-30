@@ -43,9 +43,13 @@ export async function runVisualVerification(
   // isn't one.
   const priorReports = getRuntimeReports();
   const priorSnapshot = priorReports.find(r => r.kind === 'snapshot' && r.image);
+  // [FIX] Also accept a prior dom-html beacon as sufficient — the capture script now sends dom-html
+  // immediately (within 1.5s) for non-canvas pages. Checking only for 'snapshot' caused a redundant
+  // second preview run every time, since dom-html is the normal path for HTML/CSS/JS projects.
+  const priorDomHtml = priorReports.find(r => r.kind === 'dom-html' && r.image);
 
-  if (!priorSnapshot?.image) {
-    // No prior snapshot — do a fresh headless run to capture one.
+  if (!priorSnapshot?.image && !priorDomHtml?.image) {
+    // No prior capture — do a fresh headless run to capture one.
     // Clear stale reports first so the fresh capture isn't contaminated by old data.
     clearRuntimeReports();
     let runResult: Awaited<ReturnType<typeof verifyPreviewRuns>>;
@@ -90,6 +94,8 @@ No bullet points. Signs of FAIL: blank white boxes where content should appear, 
       return { applicable: true, snapshot: true, passed: null, aiVerdict: 'Vision AI call failed — check visually.', imageBase64: raw };
     }
     const verdict = res.text.trim();
+    // [DEBUG] Log verdict so inconclusive results can be diagnosed without guessing
+    try { require('../../logging/data/fixPipelineLogger.js').fixLog(`[VISUAL_CHECK] snapshot verdict: ${verdict.slice(0, 200)}`); } catch { /* non-blocking */ }
     const passed = /^(pass|yes|looks (correct|good|right|like a working))/i.test(verdict) || /\bPASS\b/.test(verdict);
     const failed = /^(fail|no,|blank|broken|missing|unstyled|wrong)/i.test(verdict) || /\bFAIL\b/.test(verdict);
     return {
@@ -134,6 +140,7 @@ ${domHtml.slice(0, 5000)}`;
       return { applicable: true, snapshot: false, passed: null, aiVerdict: 'DOM analysis failed — check visually.' };
     }
     const verdict = res.text.trim();
+    try { require('../../logging/data/fixPipelineLogger.js').fixLog(`[VISUAL_CHECK] dom verdict: ${verdict.slice(0, 200)}`); } catch { /* non-blocking */ }
     // Stronger detection: leading PASS/FAIL, blank/empty content keywords, or mid-text keywords
     const passed = /^PASS\b/i.test(verdict) || /^(yes|looks (correct|good|right))/i.test(verdict);
     const failed = /^FAIL\b/i.test(verdict)
