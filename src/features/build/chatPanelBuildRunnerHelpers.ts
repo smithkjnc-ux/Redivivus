@@ -103,9 +103,14 @@ export async function handleBuildSuccess(result: CloudBuildResult, root: string,
   deps.refresh();
 
   // Auto-add the built project to the workspace so Explorer shows it immediately.
-  // updateWorkspaceFolders is non-destructive — no reload, just adds a root to the multi-root workspace.
-  // Only fires when the project is a new subfolder inside the container (not already open as its own root).
-  if (root && files.length > 0 && !isFixRequest && !_rootIsWsRoot) {
+  // [WARN] Skip when the project is already accessible as a subdirectory of an existing workspace root
+  // (the /projects container case). Adding a subfolder to a single-folder workspace converts it to
+  // multi-root, which forces a full VS Code window reload — exactly what we don't want mid-build.
+  // The "Open Project" button in the result card gives the user a manual path if they want to switch.
+  const _isInsideExistingRoot = vscode.workspace.workspaceFolders?.some(
+    wf => root.startsWith(wf.uri.fsPath + path.sep)
+  );
+  if (root && files.length > 0 && !isFixRequest && !_rootIsWsRoot && !_isInsideExistingRoot) {
     const alreadyRoot = vscode.workspace.workspaceFolders?.some(wf => wf.uri.fsPath === root);
     if (!alreadyRoot) {
       vscode.workspace.updateWorkspaceFolders(0, 0, { uri: vscode.Uri.file(root) });

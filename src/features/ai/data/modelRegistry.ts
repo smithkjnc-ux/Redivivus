@@ -19,7 +19,7 @@ export interface ModelDef {
 
 export const MODEL_REGISTRY: ModelDef[] = [
   // ── Claude (Anthropic) ──────────────────────────────────────────────────
-  { provider: 'claude', modelId: 'claude-opus-4-8',         label: 'Claude Opus 4.8',    capability: 10, costTier: 9, contextK: 200,  outputK: 32,  thinking: true,  roles: ['ultra'],          strengths: ['deep reasoning', 'architecture', 'security review', 'complex refactor'] },
+  { provider: 'claude', modelId: 'claude-opus-4-8',         label: 'Claude Opus 4.8',    capability: 10, costTier: 9, contextK: 200,  outputK: 32,  thinking: true,  roles: ['ultra'],          strengths: ['deep reasoning', 'architecture', 'security review', 'complex refactor', 'code generation', 'multi-file'] },
   { provider: 'claude', modelId: 'claude-sonnet-4-6',       label: 'Claude Sonnet 4.6',  capability: 8,  costTier: 5, contextK: 200,  outputK: 64,  thinking: true,  roles: ['ultra', 'pro'],    strengths: ['code generation', 'multi-file', 'planning', 'review'] },
   { provider: 'claude', modelId: 'claude-haiku-4-5-20251001', label: 'Claude Haiku 4.5', capability: 5,  costTier: 2, contextK: 200,  outputK: 8,   roles: ['flash'],           strengths: ['fast edits', 'simple tasks', 'structured output'] },
 
