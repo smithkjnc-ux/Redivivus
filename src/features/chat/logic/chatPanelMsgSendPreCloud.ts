@@ -104,7 +104,7 @@ export async function runPreCloudRouting(
       recordRoutingCost(chatResult.inputTokens || 0, chatResult.outputTokens || 0, chatResult.model || '', chatResult.provider || '');
       deps.usageTracker?.recordUsage(
         (chatResult.inputTokens || 0) + (chatResult.outputTokens || 0), 0, chatResult.model,
-        chatResult.inputTokens, chatResult.outputTokens, 'supervisor',
+        chatResult.inputTokens, chatResult.outputTokens, 'qa',
         effectiveRoot ? require('path').basename(effectiveRoot) : undefined,
       );
     } catch { /* usage recording is best-effort */ }

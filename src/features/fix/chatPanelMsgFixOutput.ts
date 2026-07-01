@@ -120,7 +120,7 @@ export async function presentFixResult(params: {
       const report = deps.usageTracker.getReport(path.basename(root));
       if (report && report.session && report.session.byAI) {
         const ROLE_ORDER: Record<string, number> = { supervisor: 0, worker: 1, guardian: 2, qa: 3, solo: 4 };
-        const ROLE_LABEL: Record<string, string> = { supervisor: 'Supervisor', worker: 'Worker', guardian: 'Guardian', qa: 'Q&A', solo: 'Solo' };
+        const ROLE_LABEL: Record<string, string> = { supervisor: 'Supervisor', worker: 'Worker', guardian: 'Guardian', qa: 'QA', solo: 'Solo' };
         const entries: { role: string; display: string; tokens: number; cost: number }[] = [];
         for (const ai of report.session.byAI) {
           const display = modelLabel(ai.aiProvider);

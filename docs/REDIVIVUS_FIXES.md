@@ -141,3 +141,8 @@
 - **`chatPanelMsgFixPhase23.ts`**: Changed `fixSnapId = undefined` to `fixSnapId = escalation.preAppliedSnapId` for the pre-apply skip path.
 
 **Net result**: History entries from pre-apply runs now get a real snapshot ID → "Undo this fix" works correctly.
+
+### 2026-06-30 — Fix: cloud pre-pass showing as Supervisor; QA label typo
+
+- **`src/features/chat/logic/chatPanelMsgSendPreCloud.ts`**: Changed `recordUsage` role from `'supervisor'` to `'qa'` for the cloudChat intent pre-pass. This is a backend routing/classification call (determines intent before the fix pipeline starts) — same category as `isModificationRequest` and the route classifier. It was causing "Supervisor (deepseek-chat)" to appear as a second Supervisor entry.
+- **`src/features/fix/chatPanelMsgFixOutput.ts`**: Changed `ROLE_LABEL.qa` from `'Q&A'` to `'QA'` for correct display.
