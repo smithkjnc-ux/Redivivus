@@ -4,6 +4,32 @@ Auto-managed by Redivivus. Append-only session history.
 
 ---
 
+## [2026-07-01]
+- **Session** — AI-layer audit fixes (branch `ai-audit-fixes`, AI: Opus 4.8)
+- Goal: fix 9 findings from the AI-layer audit; assess a 10th (classifier consolidation).
+- Per-item commits (all compile + lint clean, one commit each):
+  1. Removed dead-but-executing vague-request scope gate in `chatPanelIntent.ts` (was double-asking scope after JobSizer).
+  2. Removed per-message file-listing AI classifier in `chatPanelMsgSendKeywords.ts` (blocking prompt on every message).
+  3. Narrowed 3 greedy keyword-shortcut regexes → exported anchored constants; false positives no longer hijack chat.
+  4. Gave `routeByComplexityImpl` the same failover guards as `promptImpl` (skip-check, deadline, quota recording, logging).
+  5. Removed decommissioned Groq `llama-3.1-70b-versatile`; fixed AI_RANK comment; verified `isSustainedFailure` already correct for dead-model errors (no change).
+  6. Type-safety: made `fetchWithTimeout` public, dropped 4 named `as any` casts, converted safe in-function `require()`s to static imports. Left the broken-path `migrationsGuard` require with a `[WARN]`.
+  7. Added 4 unit-test suites (keyword regexes, `commandInPlan`, jobSizer fast-path, `promptImpl` failover). Harness runs headless: **45 passing**.
+  8. Stopped classifying transient overload ('overloaded'/'capacity') as a quota error in `promptImpl`.
+  9. Added ONE retry (1.8s backoff) to `cloudChat` before the null-fallback path.
+- Item 10 (classifier consolidation): **STOPPED, no code changed.** cloudChat's `ChatResult` doesn't carry jobSize/needsEnvironment, and `adaptiveClassifier` has no live callers — consolidation depends on the backend returning consolidated fields (out of scope). Plan handed to owner.
+- Final gates: `tsc -p ./` 0 errors, `eslint src` 0 errors (487 pre-existing warnings), `vscode-test` 45 passing.
+- Deliberately did NOT run full `npm run compile` — its `postcompile-deploy.js` locally installs the branch build into the running IDE (environment-facing). Owner should run it at merge time.
+
+### [NEXT]
+- Merge `ai-audit-fixes` → main after review (10 commits). Verify item 5 (dead-model) and item 7 test claims against the diff.
+- Backend follow-ups (single AI gateway migration) — see `docs/REDIVIVUS_FIXES.md` 2026-07-01 entries + `AI_AUDIT_FIX_PROMPT.md`: (1) serve model registry from backend; (2) extend cloudClassify to return `{intent,tier,jobSize,needsEnvironment,isVague}`; (3) gateway endpoint + migrate ~67 client call sites; (4) health check + retry; (5) then retire client provider layer + fallback classifiers.
+- After backend follow-up #2 lands, revisit item 10 (thread consolidated fields into TurnContext so jobSizer/adaptiveClassifier skip their own AI calls).
+- Consider consolidating `promptImpl`'s inline `isCapacityError` with the canonical `looksLikeQuotaError` (noted in fix #8).
+- Consider removing the 8 remaining `(x as any).fetchWithTimeout` casts in build/fix files now that the method is public.
+
+---
+
 ## [2026-05-13]
 - **Session Start** — ID: 20260513_fixbugs
 - AI: Gemini
