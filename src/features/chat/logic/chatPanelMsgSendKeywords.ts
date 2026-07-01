@@ -7,6 +7,15 @@ import { ProjectOperations } from '../../project/logic/projectOperations.js';
 import { _scanRedivivusProjects } from '../../workspace/data/redivivusProjectScanner.js';
 import { markProjectClosed } from '../../project/logic/closeMarker.js';
 
+// [SCOPE] Keyword-shortcut match patterns — exported so unit tests exercise the REAL regexes, not copies.
+// [FIX] AI-layer audit: originals used bare `.*` (e.g. `show.*project`) that hijacked sentences like
+// "show me how this project handles errors". Anchored to fire ONLY on short imperative commands; any
+// fuzzier phrasing falls through to the cloudChat classifier (the real intent router).
+export const TEMPLATES_SHORTCUT_RE = /^what\s+templates\b|^(?:show|list)\s+(?:me\s+)?(?:the\s+|your\s+|available\s+)?templates?\b|^what\s+can\s+you\s+build\b|^what\s+(?:type|types|kind|kinds)\s+of\b[\w\s]*\bbuild\b|\btemplates?\s+(?:do\s+you\s+have|are\s+available)\b/i;
+export const PROJECT_SCAN_SHORTCUT_RE = /^scan\b[\w\s]*\b(?:problems?|issues?|errors?|bugs?|warnings?)\b|^(?:analyze|check|scan)\s+(?:my\s+|the\s+|this\s+)?project\b|^find\s+(?:the\s+)?problems\b|^run\s+(?:a\s+)?scan\b|\bproject\s+health\b/i;
+// End-anchored so mid-sentence "project" nouns ("change the project background color") never match.
+export const PROJECT_LIST_SHORTCUT_RE = /^(?:list|show|see|view|open|switch|change)\s+(?:my\s+|the\s+|all\s+|available\s+)?projects?\??$|^(?:my|available)\s+projects?\??$|^open\s+(?:the\s+)?.+\s+projects?\??$/i;
+
 export async function handleKeywordShortcuts(
   userText: string,
   lowerText: string,
@@ -14,7 +23,7 @@ export async function handleKeywordShortcuts(
 ): Promise<boolean> {
   const { conversation, refresh, panel, redivivus } = deps;
 
-  if (/what\s+templates|show.*templates|list.*templates|templates.*available|templates.*do\s+you\s+have|what\s+can\s+you\s+build|what\s+types.*build|what.*project.*types/i.test(lowerText)) {
+  if (TEMPLATES_SHORTCUT_RE.test(lowerText)) {
     try {
       const { TEMPLATE_CATEGORIES } = await import('../../project/logic/templateRegistry.js');
       const lines = ['**Redivivus Template Library** -- here\'s what I can build:\n', ...TEMPLATE_CATEGORIES.flatMap(cat => [`**${cat.label}** -- ${cat.description}`, ...cat.subcategories.map(sub => `  - **${sub.label}**: ${sub.description}${sub.tags?.length ? ' (' + sub.tags.slice(0, 3).join(', ') + ')' : ''}`)]), '\nJust say **"build me a [type]"** and I\'ll walk you through it.'];
@@ -41,7 +50,7 @@ export async function handleKeywordShortcuts(
     }
   }
 
-  if (/scan.*for\s+(problems?|issues?|errors?|bugs?|warnings?)|analyze\s+(the\s+)?project|check\s+(my\s+|the\s+)?project|find.*problems|project.*health|run\s+scan|scan\s+project/i.test(lowerText)) {
+  if (PROJECT_SCAN_SHORTCUT_RE.test(lowerText)) {
     conversation.push({ role: 'assistant', content: 'Running project scan now -- opening the Recommendations panel...', timestamp: Date.now() });
     refresh(); await vscode.commands.executeCommand('redivivus.analyze'); return true;
   }
@@ -86,7 +95,7 @@ export async function handleKeywordShortcuts(
     }
   }
 
-  if (/list.*project|show.*project|available.*project|my.*project|open.*project|switch.*project|change.*project/i.test(lowerText)) {
+  if (PROJECT_LIST_SHORTCUT_RE.test(lowerText)) {
     const projects = _scanRedivivusProjects();
     // Try to match a specific project name if mentioned
     const nameMatch = lowerText.match(/open\s+(?:the\s+)?(.+?)\s+project/i);

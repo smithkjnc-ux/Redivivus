@@ -1,6 +1,9 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-07-01 — AI audit fix #3: narrow greedy keyword-shortcut regexes**
+- `src/features/chat/logic/chatPanelMsgSendKeywords.ts`: Three shortcut regexes used bare `.*` wildcards (`show.*project`, `list.*templates`, `check.*project`, etc.) that hijacked ordinary sentences — e.g. "show me how this project handles errors" popped the projects modal, "change the project background color" tried to switch projects. Extracted them to exported constants `TEMPLATES_SHORTCUT_RE`, `PROJECT_SCAN_SHORTCUT_RE`, `PROJECT_LIST_SHORTCUT_RE` (so unit tests exercise the real patterns) and anchored them: start-anchored verbs, end-anchored project-list form so mid-sentence "project" nouns never match. Validated 20 cases (5 false positives rejected, 15 legit commands still match). Fuzzier phrasing now falls through to cloudChat. File trimmed to 193 lines (Rule 9).
+
 **2026-07-01 — AI audit fix #2: remove per-message file-listing AI classifier**
 - `src/features/chat/logic/chatPanelMsgSendKeywords.ts`: A YES/NO `routing.prompt(..., 12_000)` fired on EVERY message reaching the end of `handleKeywordShortcuts()` — before the main cloudChat classifier — just to catch the rare "explain my project files" intent. Same anti-pattern the project already removed as `looksLikeBugReport` (see `[DEAD]` in `chatPanelMsgSendPreCloud.ts`): a blocking network round-trip on the fast path. Removed the block (replaced with `[DEAD]` tag) and dropped the now-unused `routing` destructure. Those requests now fall through to cloudChat. `chatPanelFileExplainer.ts` left intact for future direct callers.
 
