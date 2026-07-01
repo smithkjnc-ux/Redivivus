@@ -2,7 +2,7 @@
   "name": "redivivus",
   "displayName": "Redivivus",
   "description": "AI-agnostic coding protocol for VS Code \u2014 the frame everything bolts to",
-  "version": "0.4.13",
+  "version": "0.4.14",
   "publisher": "papajoe",
   "license": "MIT",
   "repository": {
@@ -737,7 +737,10 @@
         "redivivus.progressStyle": {
           "type": "string",
           "default": "plain",
-          "enum": ["plain", "technical"],
+          "enum": [
+            "plain",
+            "technical"
+          ],
           "enumDescriptions": [
             "Plain English \u2014 'Reading your code... figuring out what needs to change.' Best for non-technical users.",
             "Technical \u2014 'Supervisor (Claude): done / Worker: fix written / Guardian: approved'. Best for developers who want pipeline visibility."
