@@ -1,6 +1,14 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-07-01 — AI audit fix #7: unit tests for pure AI logic**
+- Added four test files under `src/tests/core/ai/` following the existing `routing.test.ts`/mocha conventions:
+  - `keywordShortcuts.test.ts` — message corpus proving the fix #3 regexes reject the greedy false positives ("show me how this project handles errors" etc.) while legit short commands still match; plus a `fallbackClassify` intent corpus.
+  - `toolGap.test.ts` — `commandInPlan`: exact match, verb-phrase match, `npm ci` ≠ `npm install`, empty plan → gap, empty command, path-strip, verb-phrase mismatch.
+  - `jobSizer.test.ts` — fast-path tiers resolve with NO AI call (injected routing throws if consulted); `tierToMaxQuestions` mapping.
+  - `promptFailover.test.ts` — `promptImpl` with a fake RoutingService + stubbed `fetchWithTimeout`: first-fails→next-succeeds (usingFallback set), quota-blocked provider skipped, all-fail → error. Uses openai+deepseek (shared OpenAI-compatible parse).
+- **Ran the harness (`npx vscode-test`): 45 passing, exit 0, stable across 3 runs.** The harness runs headless in this environment after `npx tsc -p ./` emits the test JS to `out/`. Pure-logic assertions were also cross-checked against the compiled functions via Node before running.
+
 **2026-07-01 — AI audit fix #6: type-safety hygiene (no behavior change)**
 - `src/features/ai/data/routingService.ts`: Made `fetchWithTimeout` public (was `private`) so extracted routing impls can type it. Converted the two in-function `require('./guardianAI.js')` calls (`isGuardianActive`, `getGuardianFor`) to a top-level static import — verified guardianAI does not import routingService (no cycle).
 - Removed the four named `(x as any).fetchWithTimeout` / `(x as any).prompt` casts: `routingComplexity.ts`, `routingServicePrompt.ts` (both `svc.fetchWithTimeout`), `routeClassifier.ts` (`deps.routing.fetchWithTimeout`), `chatPanelIntent.ts` (`deps.routing.prompt`). Dropping the routeClassifier cast surfaced a real type (res.json no longer implicitly `any`) — annotated `const data: any` locally; behavior unchanged.
