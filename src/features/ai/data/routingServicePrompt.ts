@@ -86,11 +86,13 @@ export async function promptImpl(
     lastError = result.error || 'Unknown error';
     const err = lastError.toLowerCase();
 
-    // Feed free-tier downshift detector
+    // Feed free-tier downshift detector.
+    // [FIX] AI-audit: 'overloaded' / 'capacity' removed — Anthropic 529-style overload is transient
+    // (seconds), not a billing/quota exhaustion, so it must NOT constrain a free-tier provider toward
+    // downshift. Plain failover already retries the transient case.
     const isCapacityError = err.includes('credit') || err.includes('balance') || err.includes('quota')
       || err.includes('rate limit') || err.includes('rate_limit') || err.includes('429')
-      || err.includes('402') || err.includes('insufficient') || err.includes('overloaded')
-      || err.includes('capacity') || err.includes('billing');
+      || err.includes('402') || err.includes('insufficient') || err.includes('billing');
     if (isCapacityError) { recordQuotaError(ai); }
 
     // Persist sustained failures (out of credits / bad key) so they survive extension reloads

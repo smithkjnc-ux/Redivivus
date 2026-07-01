@@ -1,6 +1,9 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-07-01 — AI audit fix #8: don't classify transient overload as a quota error**
+- `src/features/ai/data/routingServicePrompt.ts`: `promptImpl`'s inline `isCapacityError` included `'overloaded'` and `'capacity'`, feeding Anthropic 529-style transient overload into `recordQuotaError`. Confirmed via `providerTierState.ts` that `recordQuotaError` only affects free-tier providers (groq/gemini) and drives the downshift-to-free constraint after repeated quota errors — so counting transient overload there wrongly nudges a downshift. Removed the two tokens; plain failover already retries transient overload. **Observation (follow-up, not changed):** this inline check diverges from the canonical `looksLikeQuotaError` in providerTierState.ts (which also lacks overloaded/capacity but adds 'resource has been exhausted'). Consolidating them later would remove the duplication — left out of this pass to stay surgical.
+
 **2026-07-01 — AI audit fix #7: unit tests for pure AI logic**
 - Added four test files under `src/tests/core/ai/` following the existing `routing.test.ts`/mocha conventions:
   - `keywordShortcuts.test.ts` — message corpus proving the fix #3 regexes reject the greedy false positives ("show me how this project handles errors" etc.) while legit short commands still match; plus a `fallbackClassify` intent corpus.
