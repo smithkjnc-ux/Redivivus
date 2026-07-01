@@ -99,14 +99,13 @@ export async function runPreCloudRouting(
   // [COST] Record the cloudChat intent pre-pass usage — runs a real model on every message but is
   // never returned by /build, so it was invisible in the build card and causing billing discrepancies.
   // recordRoutingCost stores it for chatPanelBuildRunner to pick up and add a Routing row to the card.
+  // [FIX] Only record routing cost — not usageTracker. usageTracker is for the AI pipeline roles
+  // (supervisor/worker/guardian/qa). cloudChat is infrastructure routing overhead, already captured
+  // by recordRoutingCost for the build card "Routing" row. Recording it in usageTracker too
+  // produces a phantom "QA (deepseek-chat)" entry in every fix pipeline usage breakdown.
   if (chatResult && (chatResult.inputTokens || chatResult.outputTokens)) {
     try {
       recordRoutingCost(chatResult.inputTokens || 0, chatResult.outputTokens || 0, chatResult.model || '', chatResult.provider || '');
-      deps.usageTracker?.recordUsage(
-        (chatResult.inputTokens || 0) + (chatResult.outputTokens || 0), 0, chatResult.model,
-        chatResult.inputTokens, chatResult.outputTokens, 'qa',
-        effectiveRoot ? require('path').basename(effectiveRoot) : undefined,
-      );
     } catch { /* usage recording is best-effort */ }
   }
 

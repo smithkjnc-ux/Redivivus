@@ -1,6 +1,16 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-06-30 — Backend env vars missing → telemetry dead since Jun 17**
+- **Root cause**: Cloud Run service `redivivus-backend` had NO environment variables set. All routes fell through to `|| 'https://dummy.supabase.co'` / `|| 'dummy'` hardcoded fallbacks → every DB insert returned `ENOTFOUND dummy.supabase.co` → 500s → silently swallowed by `.catch(() => {})` in `logTelemetry`.
+- **Fix**: Set `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` on Cloud Run via `gcloud run services update --set-env-vars`. Verified: `/telemetry/` now returns `{"success":true}`.
+- **Extension fix** `apiClientTelemetry.ts`: changed `/telemetry` → `/telemetry/` (backend redirects non-slash URL with 308; avoids the round-trip). Added non-200 response logging to `fixLog` so future backend failures are visible.
+- **NOTE**: Also check other routes (guardian, vault, build, etc.) — ALL use the same `|| 'dummy'` pattern and need the same env vars, which are now set at the service level.
+
+**2026-06-30 — Remove phantom QA from cloudChat pre-pass + fix visual check false positives**
+- **Bug 1** `chatPanelMsgSendPreCloud.ts`: cloudChat pre-pass was recorded in both `recordRoutingCost` (for the build card "Routing" row) AND `usageTracker.recordUsage` as 'qa'. This produced a phantom "QA (deepseek-chat)" entry in every fix pipeline usage breakdown. Fix: removed the `usageTracker.recordUsage` call — routing overhead is infrastructure, not a pipeline role.
+- **Bug 2** `chatPanelVisualVerify.ts` `runDomVisualVerification`: DOM-based visual check was false-FAILing JS apps because it looked for runtime-populated content in static HTML. A category dropdown or flashcard list populated by JS shows as empty `<div>` in HTML → AI said FAIL. Fix: rewrote the prompt to judge by STRUCTURE (are the right elements present?) not CONTENT (which JS fills at runtime). Also tightened the keyword-fallback FAIL triggers — broad terms like "no content", "no question", "no answer" were matching valid AI descriptions of dynamic apps.
+
 **2026-06-27 — Guardian: binary verification + full file state**
 - **Client** `chatPanelMsgFixGuardianPhase.ts`: Pass `filesBlock` as `guardianBlueprint` (the `blueprintContext` param, previously always `''`). Guardian now receives the complete project file state alongside the Worker's changes — giving it the data to actually look up answers instead of guessing. Capped at 12000 chars to stay within token budget.
 - **Backend** `guardianAIPrompt.ts`: Replaced "uncertain = FAIL" with "uncertain = look it up." Added VERIFICATION RULE: lists specific things the Guardian can always verify by reading the code (class names, imports, function definitions, config values). Things requiring execution/visual render go to GUARDIAN_SCOPE_ALERTS and pass — not blocking rejections. "A suspicion is not a bug. A found, specific, line-referenced problem is a bug."

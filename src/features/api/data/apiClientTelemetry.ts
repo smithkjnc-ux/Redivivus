@@ -39,7 +39,7 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
   getAccountToken().then(async token => {
     if (!token) { return; }
     const uid = userIdFromToken(token);
-    fetch(`${getApiBase()}/telemetry`, {
+    fetch(`${getApiBase()}/telemetry/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(uid ? { 'x-redivivus-user-id': uid } : {}) },
       body: JSON.stringify({
@@ -49,6 +49,12 @@ export function logTelemetry(event: 'ai_prompt' | 'classify_intent', data: {
       }),
     }).then(res => {
       if (res.status === 401) { clearAccountToken().then(() => vscode.commands.executeCommand('redivivus.refreshChat')); }
+      // [WARN] Log non-200 so backend outages don't silently drop all activity tracking.
+      if (!res.ok && res.status !== 401) {
+        res.text().then(body => {
+          try { require('../../logging/data/fixPipelineLogger.js').fixLog(`[TELEMETRY] POST /telemetry/ → ${res.status}: ${body.slice(0, 200)}`); } catch { /* non-blocking */ }
+        }).catch(() => {});
+      }
     }).catch(() => {});
   }).catch(() => {});
 }
@@ -58,7 +64,7 @@ export function logSessionStart(): void {
   getAccountToken().then(token => {
     if (!token) { return; }
     const uid = userIdFromToken(token);
-    fetch(`${getApiBase()}/telemetry`, {
+    fetch(`${getApiBase()}/telemetry/`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(uid ? { 'x-redivivus-user-id': uid } : {}) },
       body: JSON.stringify({

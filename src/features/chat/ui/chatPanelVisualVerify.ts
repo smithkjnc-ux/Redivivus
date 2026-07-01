@@ -121,15 +121,22 @@ export async function runDomVisualVerification(
 TASK THAT WAS FIXED: "${task}"
 
 The screenshot capture was unavailable, so you are analyzing the raw page HTML instead.
-Examine the DOM content and answer: did the fix produce visible, working content?
+Examine the DOM structure and answer: did the fix add/change the right elements for this task?
 
 CRITICAL: Your VERY FIRST WORD must be PASS or FAIL (all caps, nothing before it).
-- PASS: the page has the expected content and structure for this task
-- FAIL: content is blank/empty, elements are missing, or the task clearly didn't work
+- PASS: the HTML structure for the task is present (elements, attributes, layout changes exist)
+- FAIL: no structural changes exist for this task, or the fix clearly wrote the wrong thing
 
-Signs of FAIL: empty inner content (no text between tags), placeholder text only, elements with no children where content is expected, card/game/UI elements that should show data but are empty.
+IMPORTANT — this is a JavaScript web app. Dynamic content (list items, cards, game data, loaded
+text) is populated by JS at runtime and will NOT appear in static HTML. Judge by STRUCTURE only:
+- Does the HTML contain the elements, sections, or attributes the task asked for?
+- Are new UI components (buttons, dropdowns, containers, inputs) present in the DOM?
+- Absence of runtime-populated text/data is NORMAL — do not count it as FAIL.
 
-After PASS or FAIL, one sentence describing what you see.
+Signs of real FAIL: the task asked for a specific HTML element/section that is completely absent,
+or the page has no <body> content at all, or the wrong file was entirely written.
+
+After PASS or FAIL, one sentence describing what structural changes you see.
 
 PAGE HTML (first 5000 chars):
 ${domHtml.slice(0, 5000)}`;
@@ -143,9 +150,12 @@ ${domHtml.slice(0, 5000)}`;
     try { require('../../logging/data/fixPipelineLogger.js').fixLog(`[VISUAL_CHECK] dom verdict: ${verdict.slice(0, 200)}`); } catch { /* non-blocking */ }
     // Stronger detection: leading PASS/FAIL, blank/empty content keywords, or mid-text keywords
     const passed = /^PASS\b/i.test(verdict) || /^(yes|looks (correct|good|right))/i.test(verdict);
+    // [FIX] Keyword fallbacks must be tight — broad terms like "no content" and "no question" fire
+    // on normal AI descriptions of JS apps where dynamic content isn't in the static HTML.
+    // Only trigger on explicit structural failure phrases, not descriptions of runtime state.
     const failed = /^FAIL\b/i.test(verdict)
-      || /^(no,|blank|broken|missing|wrong|empty)/i.test(verdict)
-      || /\b(blank card|empty card|no content|no question|no answer|shows nothing|white box|card is empty|content is missing)\b/i.test(verdict);
+      || /^(no,|blank page|broken|completely wrong)/i.test(verdict)
+      || /\b(completely blank|no body content|wrong file|task not implemented)\b/i.test(verdict);
     return {
       applicable: true,
       snapshot: false,
