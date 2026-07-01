@@ -11,6 +11,15 @@ import { callProvider } from '../logic/providers/providerFactory.js';
 import { getGeminiKey, getClaudeKey, getOpenAIKey, getGroqKey, getXAIKey, getKimiKey, getDeepseekKey } from './routingKeys.js';
 import type { RoutingService } from './routingService.js';
 import { analyzeTask, scoreModels } from './routingEngine.js';
+// [FIX] AI-audit: mirror the reliability guards promptImpl (routingServicePrompt.ts) already has —
+// skip quota-blocked providers, hard deadline, quota/outage recording, success logging. Kept as a
+// local duplication rather than a shared helper: promptImpl builds its chain from AI_RANK with
+// session-scoped skip notifications + failover callbacks that this scored-chain path does not use,
+// so extraction would have been invasive and risked changing promptImpl's behavior.
+import { getSkipInfo, recordUnavailable } from './providerQuotaTracker.js';
+import { recordQuotaError, looksLikeQuotaError } from './providerTierState.js';
+import { isSustainedFailure, describeProviderError } from './agentFailoverReason.js';
+import { logAICall } from './aiCallLogger.js';
 
 export async function routeByComplexityImpl(
   svc: RoutingService,
@@ -49,20 +58,50 @@ export async function routeByComplexityImpl(
     if (!seen.has(m.provider)) { seen.add(m.provider); chain.push(m); }
   }
 
-  let chosenProvider = chain[0].provider;
-  let routingReason = `${chain[0].label} (score ${chain[0].score}: ${chain[0].reason})`;
-  let res = await callProvider(chosenProvider, promptText, fetchFn);
+  // [FIX] AI-audit: walk the scored chain with the same per-provider guards as promptImpl —
+  // skip quota-blocked providers, bound each call with a hard deadline, record quota/outage signals
+  // on failure so future routing avoids the dead provider, and log the successful call.
+  const startTime = Date.now();
+  const deadlineMs = timeoutMs + 3000; // AbortController alone can't cut Electron's body read (see promptImpl)
 
-  // Fallback through remaining providers in scored order (best-fit first, not hardcoded list)
-  for (let i = 1; i < chain.length && !res.success; i++) {
-    routingReason += ` → ${chain[i].provider} failed, trying ${chain[i].provider}`;
-    const prev = chosenProvider;
-    res = await callProvider(chain[i].provider, promptText, fetchFn);
-    if (res.success) {
-      routingReason = routingReason.replace(`→ ${chain[i].provider} failed, trying ${chain[i].provider}`, `→ ${prev} failed, using ${chain[i].label}`);
-      chosenProvider = chain[i].provider;
+  let res: AIResponse = { text: '', model: 'none', success: false, error: 'No provider available' };
+  let chosenProvider = '';
+  let routingReason = '';
+
+  for (let i = 0; i < chain.length; i++) {
+    const { provider, label, score, reason } = chain[i];
+
+    // Skip providers in a rate-limit cooldown or sustained outage (persisted across reloads).
+    const skip = getSkipInfo(provider);
+    if (skip) {
+      routingReason += (routingReason ? ' → ' : '') + `${provider} skipped (${skip.reason})`;
+      continue;
     }
+
+    routingReason += routingReason ? ` → trying ${label}` : `${label} (score ${score}: ${reason})`;
+
+    res = await Promise.race([
+      callProvider(provider, promptText, fetchFn),
+      new Promise<AIResponse>(resolve => setTimeout(
+        () => resolve({ text: '', model: provider, success: false, error: `${provider} timed out after ${deadlineMs}ms (no response)` }),
+        deadlineMs,
+      )),
+    ]);
+
+    if (res.success) {
+      chosenProvider = provider;
+      logAICall({ role: 'chat', model: res.model || provider, prompt: promptText, response: res.text || '', inputTokens: res.inputTokens, outputTokens: res.outputTokens, durationMs: Date.now() - startTime });
+      break;
+    }
+
+    // Feed the free-tier downshift detector and persist sustained failures (out of credits / bad key).
+    if (looksLikeQuotaError(res.error || '')) { recordQuotaError(provider); }
+    if (isSustainedFailure(res.error)) { recordUnavailable(provider, describeProviderError(res.error)); }
+    routingReason += ` — failed (${describeProviderError(res.error)})`;
   }
+
+  // All providers skipped or failed — keep chain[0] for tier/cost display; res carries the error.
+  if (!chosenProvider) { chosenProvider = chain[0].provider; }
 
   const isFree = ['groq', 'gemini'].includes(chosenProvider);
   const estCost = estimateCost(tokens.total, isFree ? 'free' : 'paid');
