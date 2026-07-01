@@ -83,7 +83,7 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
   if (!skipComplex && deps.vault) {
     const allItems = deps.vault.listItems();
     if (allItems.length > 0) {
-      const caller = (prompt: string) => (deps.routing as any).prompt(prompt, 10_000);
+      const caller = (prompt: string) => deps.routing.prompt(prompt, 10_000);
       const withTimeout = (p: Promise<any>) => Promise.race([p, new Promise<null>(r => setTimeout(() => r(null), 12_000))]);
       const match = await withTimeout(semanticVaultSearch(task, allItems, caller)).catch(() => null);
       if (match && match.confidence >= 0.95 && !match.intentMismatch) { semanticHit = true; }

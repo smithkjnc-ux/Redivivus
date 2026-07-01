@@ -26,7 +26,7 @@ export async function classifyRoute(
     const { bestModelForRole } = require('./modelRegistry.js');
     const model = bestModelForRole(supervisor, 'flash')?.modelId || supervisor;
 
-    const fetchFn = (deps.routing as any).fetchWithTimeout || ((...a: any[]) => (globalThis as any).fetch(...a));
+    const fetchFn = deps.routing.fetchWithTimeout || ((...a: any[]) => (globalThis as any).fetch(...a));
     const res = await fetchFn(`${base}/classify-route`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -34,7 +34,9 @@ export async function classifyRoute(
     }, 15_000);
 
     if (!res.ok) { return null; }
-    const data = await res.json().catch(() => null);
+    // [FIX] AI-audit: `any` restored locally — dropping the `(deps.routing as any)` cast propagated
+    // real types so res.json() is no longer implicitly any. Behavior unchanged (this is a JSON blob).
+    const data: any = await res.json().catch(() => null);
     // [COST] Count this classifier call too — small (flash, ~50 tokens) but real; it was uncounted.
     if (data && (data.inputTokens || data.outputTokens)) {
       // [FIX] Record as 'qa' not 'supervisor' — this is a 50-token pre-classification, not the Supervisor.

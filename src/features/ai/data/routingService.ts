@@ -11,6 +11,9 @@ import { supervisorPlanWithFailover } from './routingServiceSupervisor.js';
 import { analyzeFileImpl } from './routingServiceAnalyze.js';
 import { promptCheapImpl } from './routingServiceCheap.js';
 import { promptImpl } from './routingServicePrompt.js';
+// [FIX] AI-audit: static import replacing in-function require() (guardianAI does not import
+// routingService, so no circular dependency).
+import { guardianEnabled, selectGuardianAI } from './guardianAI.js';
 
 import {
   selectSupervisorAndWorker,
@@ -78,7 +81,9 @@ export class RoutingService {
     return callProvider(providerId, text, fetchFn, undefined, imageBase64, imageType);
   }
 
-  private async fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> {
+  // [FIX] AI-audit: public (was private) so the extracted routing impls (routingServicePrompt,
+  // routingComplexity, routeClassifier, etc.) can type it instead of reaching in via `(svc as any)`.
+  async fetchWithTimeout(url: string, options: RequestInit, timeoutMs = 30000): Promise<Response> {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeoutMs);
     try { return await fetch(url, { ...options, signal: controller.signal }); }
@@ -106,11 +111,9 @@ export class RoutingService {
     return guardianReviewImpl(this, originalTask, workerResponse, workerAI, blueprintContext, forceProvider, mode);
   }
   isGuardianActive(): boolean {
-    const { guardianEnabled } = require('./guardianAI.js');
     return guardianEnabled(this.getKeyMap());
   }
   getGuardianFor(workerAI: string): string | null {
-    const { selectGuardianAI } = require('./guardianAI.js');
     return selectGuardianAI(workerAI, this.getKeyMap());
   }
   // [DEAD][M4] Removed `orchestratedBuild()` + `src/services/ai/routingOrchestration.ts` — they had no

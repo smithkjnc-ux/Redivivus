@@ -67,7 +67,7 @@ export async function promptImpl(
       continue;
     }
 
-    const fetchFn = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, timeoutMs);
+    const fetchFn = (url: string, opts: RequestInit) => svc.fetchWithTimeout(url, opts, timeoutMs);
     // [FIX] Hard full-call deadline — AbortController aborts the connection but NOT the body read in
     // Electron's fetch. Promise.race guarantees we always move on. +3s buffer avoids cutting off a
     // slow-but-working provider.

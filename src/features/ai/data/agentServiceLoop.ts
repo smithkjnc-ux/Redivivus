@@ -15,6 +15,10 @@ import { synthesizeCompletion, parseTestSummary, isNoOpFabrication } from './age
 import { nativeAgentCall, appendUserNote } from './agentNativeCall.js';
 import type { AgentMessage, ToolSchema } from './agentNativeCall.js';
 import type { AgentExecutionResult } from './agentService.js';
+// [FIX] AI-audit: static imports replacing in-function require() calls (no circular deps).
+import * as fs from 'fs';
+import * as path from 'path';
+import { recordUnavailable } from './providerQuotaTracker.js';
 
 export interface AgentLoopParams {
   task: string;
@@ -34,7 +38,6 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
   const { task, systemPrompt, messages, toolSchemas, chain, msgsFor, ledger, agentCtx, alog, onUpdate, keysPayload } = p;
   const mcpTools = getAllTools();
   const testFw = detectTestFramework(agentCtx.root);
-  const { recordUnavailable } = require('./providerQuotaTracker.js');
   const MAX_ITERATIONS = 40;
   let iterations = 0;
   let ranCommands = 0; let guardNudges = 0; let wroteUnrunScript = false; let budgetWarned = false;
@@ -137,6 +140,12 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
     if (agentCtx.schemaChanged && !agentCtx.migrationRan && migrationNudges < 3) {
       migrationNudges++;
       let cmd = 'the migration command for your toolchain';
+      // [WARN] This require() path is WRONG (../build/ resolves to features/ai/build/, which does not
+      // exist — the real module is ../../../features/build/services/migrationsGuard.js). It has always
+      // thrown → been swallowed here → cmd falls back to the generic text below. Left as a require (NOT
+      // converted to a static import) on purpose: fixing the path would resurrect long-dead behavior
+      // (a toolchain-specific migrate command in the nudge), which is a behavior change out of this
+      // audit's scope. Flagged for the owner to decide.
       try { const tc = require('../build/migrationsGuard.js').detectToolchain(agentCtx.root); if (tc?.id !== 'none') { cmd = `\`${tc.migrate('the_change')}\``; } } catch { /* */ }
       alog.log(`migration-guard nudge #${migrationNudges} (schema changed, not migrated)`);
       onUpdate('Schema changed but migration has not run -- sending the agent back to migrate.');
@@ -156,7 +165,6 @@ export async function runAgentLoop(p: AgentLoopParams): Promise<AgentExecutionRe
     if (tNudge) { testNudges++; alog.log('proactive-test nudge'); appendUserNote(messages, tNudge); continue; }
 
     alog.done(`final answer after ${iterations} step(s), ${ranCommands} command(s) run`);
-    const fs = require('fs'); const path = require('path');
     const existsOnDisk = (rel: string) => { try { return fs.existsSync(path.join(agentCtx.root, rel)); } catch { return false; } };
     const _activity = { filesModified: [...(agentCtx.modifiedFiles || [])], commands: synthActivity.commands, migrationRan: !!agentCtx.migrationRan, testSummary: synthActivity.testSummary };
     const finalAnswer = synthesizeCompletion(_activity, aiText, existsOnDisk);

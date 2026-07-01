@@ -27,7 +27,7 @@ export async function routeByComplexityImpl(
   promptText: string,
   timeoutMs = 30_000,
 ): Promise<AIResponse & { estimate?: string; tier?: 'free' | 'paid'; routedTo?: string; routingReason?: string }> {
-  const fetchFn = (url: string, opts: RequestInit) => (svc as any).fetchWithTimeout(url, opts, timeoutMs);
+  const fetchFn = (url: string, opts: RequestInit) => svc.fetchWithTimeout(url, opts, timeoutMs);
 
   const keyMap: Record<string, () => string | null> = {
     gemini: getGeminiKey, claude: getClaudeKey, openai: getOpenAIKey,

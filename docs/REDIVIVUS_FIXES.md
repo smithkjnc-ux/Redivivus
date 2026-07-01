@@ -1,6 +1,12 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-07-01 — AI audit fix #6: type-safety hygiene (no behavior change)**
+- `src/features/ai/data/routingService.ts`: Made `fetchWithTimeout` public (was `private`) so extracted routing impls can type it. Converted the two in-function `require('./guardianAI.js')` calls (`isGuardianActive`, `getGuardianFor`) to a top-level static import — verified guardianAI does not import routingService (no cycle).
+- Removed the four named `(x as any).fetchWithTimeout` / `(x as any).prompt` casts: `routingComplexity.ts`, `routingServicePrompt.ts` (both `svc.fetchWithTimeout`), `routeClassifier.ts` (`deps.routing.fetchWithTimeout`), `chatPanelIntent.ts` (`deps.routing.prompt`). Dropping the routeClassifier cast surfaced a real type (res.json no longer implicitly `any`) — annotated `const data: any` locally; behavior unchanged.
+- `src/features/ai/data/agentServiceLoop.ts`: Converted `require('./providerQuotaTracker.js')` (line 37) and `require('fs')`/`require('path')` (line 159) to static top imports. **Left** the `require('../build/migrationsGuard.js')` at line 140 as a require with a new `[WARN]`: that path is wrong (resolves to nonexistent `features/ai/build/`), has always thrown→been swallowed, and fixing it would resurrect long-dead behavior — out of scope. Flagged for the owner.
+- **Scope note:** 8 other `(x as any).fetchWithTimeout` casts exist in `build/` and `fix/` files. Left untouched — outside the four sites this item named and outside the AI-layer scope. Now removable in a follow-up since the method is public.
+
 **2026-07-01 — AI audit fix #5: model registry dead entry + comment; isSustainedFailure verified**
 - `src/features/ai/data/modelRegistry.ts`: Removed the `llama-3.1-70b-versatile` entry (Groq decommissioned it — calls returned a `model_decommissioned` 400 that polluted failover). Only reference was the entry itself. Left a `[DEAD]` tag pointing to `llama-3.3-70b-versatile`.
 - `src/features/ai/data/guardianAI.ts`: `AI_RANK` comment said "Llama 4 Maverick / Llama 3.3 70B" but no Llama 4 entry exists — corrected to "Llama 3.3 70B (guardian/pro) / Llama 3.1 8B (worker/flash)" to match the registry.
