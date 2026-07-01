@@ -1,6 +1,9 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-07-01 — AI audit fix #9: retry cloudChat once before the null-fallback**
+- `src/features/chat/logic/chatPanelMsgSendPreCloud.ts`: `cloudChat(...).catch(() => null)` dropped the message into the degraded null-fallback path (local AI classify → regex) on ANY failure, including transient Cloud Run cold starts / network blips. Hoisted the call options into `_ccOpts` (so both attempts send an identical payload) and added ONE retry with a 1.8s backoff. Exactly one retry — no loop. Both-fail behavior unchanged (existing null-fallback runs). `recordRoutingCost` is untouched and only ever sees the surviving attempt (a failed attempt returns null with no tokens), so usage is never double-counted.
+
 **2026-07-01 — AI audit fix #8: don't classify transient overload as a quota error**
 - `src/features/ai/data/routingServicePrompt.ts`: `promptImpl`'s inline `isCapacityError` included `'overloaded'` and `'capacity'`, feeding Anthropic 529-style transient overload into `recordQuotaError`. Confirmed via `providerTierState.ts` that `recordQuotaError` only affects free-tier providers (groq/gemini) and drives the downshift-to-free constraint after repeated quota errors — so counting transient overload there wrongly nudges a downshift. Removed the two tokens; plain failover already retries transient overload. **Observation (follow-up, not changed):** this inline check diverges from the canonical `looksLikeQuotaError` in providerTierState.ts (which also lacks overloaded/capacity but adds 'resource has been exhausted'). Consolidating them later would remove the duplication — left out of this pass to stay surgical.
 

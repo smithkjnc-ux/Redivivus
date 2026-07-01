@@ -85,7 +85,7 @@ export async function runPreCloudRouting(
     ? require('fs').existsSync(require('path').join(effectiveRoot, '.redivivus', 'config.json'))
     : false;
 
-  const chatResult = await cloudChat(userText, {
+  const _ccOpts = {
     blueprint: _cfgBlueprint,
     recentMessages: conversation.slice(-6).map(m => ({ role: m.role, content: m.content })),
     currentTime: new Date().toLocaleString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', timeZoneName: 'short' }),
@@ -94,7 +94,18 @@ export async function runPreCloudRouting(
     fileList: effectiveRoot ? getWorkspaceFileList(effectiveRoot) : undefined,
     preferred: (msg.manualProvider as string | undefined) || undefined,
     projectOpen: hasProjectOpen,
-  }, msg.tier as 'flash' | 'pro' | 'ultra' | undefined, msg.imageBase64, msg.imageType).catch(() => null);
+  };
+  const _ccTier = msg.tier as 'flash' | 'pro' | 'ultra' | undefined;
+  let chatResult = await cloudChat(userText, _ccOpts, _ccTier, msg.imageBase64, msg.imageType).catch(() => null);
+  // [FIX] AI-audit: ONE retry with a short backoff before dropping to the degraded null-fallback path.
+  // Cloud Run cold starts and transient network blips are seconds-scale and routine — a single miss
+  // shouldn't route the user through the local/regex fallback. Only one retry; if both miss, the
+  // existing null-fallback below runs unchanged. recordRoutingCost only sees the surviving attempt
+  // (a failed attempt returns null and carries no tokens), so usage is never double-counted.
+  if (!chatResult) {
+    await new Promise(res => setTimeout(res, 1800));
+    chatResult = await cloudChat(userText, _ccOpts, _ccTier, msg.imageBase64, msg.imageType).catch(() => null);
+  }
 
   // [COST] Record the cloudChat intent pre-pass usage — runs a real model on every message but is
   // never returned by /build, so it was invisible in the build card and causing billing discrepancies.
