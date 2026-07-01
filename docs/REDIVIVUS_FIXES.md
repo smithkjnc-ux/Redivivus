@@ -1,6 +1,11 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-07-01 — AI audit fix #5: model registry dead entry + comment; isSustainedFailure verified**
+- `src/features/ai/data/modelRegistry.ts`: Removed the `llama-3.1-70b-versatile` entry (Groq decommissioned it — calls returned a `model_decommissioned` 400 that polluted failover). Only reference was the entry itself. Left a `[DEAD]` tag pointing to `llama-3.3-70b-versatile`.
+- `src/features/ai/data/guardianAI.ts`: `AI_RANK` comment said "Llama 4 Maverick / Llama 3.3 70B" but no Llama 4 entry exists — corrected to "Llama 3.3 70B (guardian/pro) / Llama 3.1 8B (worker/flash)" to match the registry.
+- `src/features/ai/data/agentFailoverReason.ts`: **No change — verified already correct.** Traced a decommissioned/model-not-found error through `describeProviderError`: it matches none of the rate-limit/credit/auth/overload branches, falls through to the message extractor, so `isSustainedFailure` returns **false**. A dead model ID therefore does NOT sticky-skip the whole provider. `looksLikeQuotaError` also returns false for it, so no quota downshift either.
+
 **2026-07-01 — AI audit fix #4: give routeByComplexityImpl the same failover safety as promptImpl**
 - `src/features/ai/data/routingComplexity.ts`: `routeByComplexityImpl` called `callProvider` raw, bypassing all the reliability infrastructure `promptImpl` has. Rewrote the scored-chain fallback loop to: skip quota-blocked providers (`getSkipInfo`), bound every call with a `timeoutMs + 3000` hard deadline via `Promise.race` (AbortController can't cut Electron's body read), record quota errors (`looksLikeQuotaError`→`recordQuotaError`) and sustained outages (`isSustainedFailure`→`recordUnavailable`) on failure, and `logAICall` on success. Kept as a **local duplication** (not a shared helper) — noted in code — because promptImpl builds its chain from AI_RANK with session skip-notifications + failover callbacks this scored-chain path doesn't use; extracting would have been invasive and risked changing promptImpl. `promptImpl` untouched. Reused the canonical `looksLikeQuotaError` (which already excludes transient 'overloaded'/'capacity' — aligns with fix #8). Verified no circular imports.
 

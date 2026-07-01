@@ -43,7 +43,8 @@ export const MODEL_REGISTRY: ModelDef[] = [
 
   // ── Groq (hosted inference) ─────────────────────────────────────────────
   { provider: 'groq',   modelId: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B',      capability: 6,  costTier: 1, contextK: 32,   outputK: 8,   roles: ['pro', 'flash'],    strengths: ['fastest inference', 'simple code', 'quick answers'] },
-  { provider: 'groq',   modelId: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B (128K)', capability: 6, costTier: 1, contextK: 128, outputK: 8,   roles: ['pro', 'flash'],    strengths: ['large context', 'general coding', 'fast inference', 'quick answers'] },
+  // [DEAD] Removed 'llama-3.1-70b-versatile' (Groq decommissioned it) — calls returned a
+  // "model_decommissioned" 400 that polluted failover. Use llama-3.3-70b-versatile instead.
   { provider: 'groq',   modelId: 'llama-3.1-8b-instant',    label: 'Llama 3.1 8B',       capability: 4,  costTier: 1, contextK: 128,  outputK: 8,   roles: ['flash'],           strengths: ['ultra-fast', 'structured output', 'simple completions'] },
 
   // ── Kimi (Moonshot) ─────────────────────────────────────────────────────

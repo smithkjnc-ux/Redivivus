@@ -26,7 +26,7 @@ export const AI_RANK: Record<string, number> = {
   gemini:   9,    // Gemini 2.5-Pro (guardian) / 2.5-Flash (worker)
   openai:   8,    // GPT-4o (guardian) / GPT-4o-mini (worker)
   deepseek: 7,    // DeepSeek-Reasoner R1 (guardian) / DeepSeek-Chat V3 (worker) — strong reasoner, low cost
-  groq:     6,    // Llama 4 Maverick / Llama 3.3 70B
+  groq:     6,    // Llama 3.3 70B (guardian/pro) / Llama 3.1 8B (worker/flash)
   xai:      5,    // Grok-3 (guardian) / Grok-3-mini (worker)
   kimi:     4,    // Moonshot 128k (guardian) / 32k (worker)
 };
