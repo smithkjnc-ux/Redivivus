@@ -16,7 +16,9 @@ import { assessComplexity, ComplexityResult, shouldRequireDeepInterview } from '
 import { BuildOrchestrator, BuildBlueprint, BuildPhase } from '../../../features/build/services/buildOrchestrator.js';
 import { BUILD_PHASES } from '../../../features/build/services/buildPhaseDefinitions.js';
 import { generateVagueWarning, getQuestionsForTier, organizeByCategory } from '../../../features/blueprint/logic/expandedInterview.js';
-import { isVagueProjectRequest, askScopeQuestions, parseScopeAnswer, hasPendingScopeQuestion, resolveScopeQuestion } from '../../../features/project/logic/templateScopeService.js';
+// [DEAD] templateScopeService imports (isVagueProjectRequest, askScopeQuestions, parseScopeAnswer,
+// hasPendingScopeQuestion, resolveScopeQuestion) removed — the only consumer was the vague-request
+// scope gate below, now deleted in favor of JobSizer. templateScopeService.ts itself is unchanged.
 import { runBuildAfterGates } from '../../../features/build/chatPanelBuildRunner.js';
 import { autoCreateProject } from '../../../features/build/chatPanelBuildAutoCreate.js';
 import { estimateBuild } from './costEstimatorService.js';
@@ -65,24 +67,15 @@ export async function handleBuildRequest(task: string, deps: BuildRequestDeps, s
   // ── Placement gate — confirm task belongs in this project before running any other gates ──
   if (!skipComplex && deps.buildMode !== 'direct' && await runPlacementGate(task, deps)) { return; }
 
-  // ── Scope clarification — ask 2 questions in chat before doing anything for vague requests ──
-  // [WARN] Only fires on fresh project-type requests with no detail. Never fires on skipComplex=true
-  //        (that's a resumed build that already went through the wizard).
-  // Direct mode: skip scope clarification entirely (auto-approve scope)
-  // Initialized projects: skip scope clarification — user is modifying, not starting fresh
-  // [DEAD] replaced by JobSizer — Stage 2. sizeJob() at intake handles vague-request detection
-  // before handleBuildRequest fires. This guard is now redundant. Do not delete — audit trail.
-  if (!skipComplex && deps.buildMode !== 'direct' && !deps.redivivus?.isInitialized?.() && await isVagueProjectRequest(task, deps.routing)) {
-    const scopeAnswer = await askScopeQuestions(task, deps.postToWebview);
-    if (scopeAnswer) {
-      const { enrichedTask } = await parseScopeAnswer(scopeAnswer, deps.routing);
-      // Note: user's answer is already in conversation (pushed by send-message handler) — don't push again
-      // Continue with enriched task — skipComplex=true so we don't re-run scope check
-      await handleBuildRequest(enrichedTask, deps, true);
-      return;
-    }
-    // Timed out or no answer — fall through with original task
-  }
+  // ── Scope clarification (REMOVED) ──
+  // [DEAD] A vague-request scope-question gate lived here. It ran isVagueProjectRequest() — a live
+  // AI call — then askScopeQuestions()/parseScopeAnswer() to enrich the task and re-entered
+  // handleBuildRequest(). It was marked [DEAD] "replaced by JobSizer" but was STILL EXECUTING:
+  // sizeJob() at intake (Stage 2) already handles vague-request detection BEFORE handleBuildRequest
+  // fires, so this gate was both redundant AND a second scope interview — users could be
+  // scope-questioned twice for one build. Removed per the AI-layer audit. JobSizer is now the single
+  // source of vague-request handling. Do not re-add — audit trail. (Was: an `if` guard on
+  // !skipComplex && buildMode !== 'direct' && !isInitialized && isVagueProjectRequest.)
   // ── Semantic vault signal — silent check, NO UI. Sets semanticHit flag to boost keyword search. ──
   // [DEAD] Previously showed inline code preview + "What would you like to do?" buttons and returned early.
   //        Removed: semantic check must not be a separate UI flow — it feeds into the vault-hit modal only.
