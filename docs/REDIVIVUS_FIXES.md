@@ -1,6 +1,9 @@
 # Redivivus Fixes
 > Log every file change here. See REDIVIVUS_ROADMAP.md for index.
 
+**2026-07-01 — AI audit fix #2: remove per-message file-listing AI classifier**
+- `src/features/chat/logic/chatPanelMsgSendKeywords.ts`: A YES/NO `routing.prompt(..., 12_000)` fired on EVERY message reaching the end of `handleKeywordShortcuts()` — before the main cloudChat classifier — just to catch the rare "explain my project files" intent. Same anti-pattern the project already removed as `looksLikeBugReport` (see `[DEAD]` in `chatPanelMsgSendPreCloud.ts`): a blocking network round-trip on the fast path. Removed the block (replaced with `[DEAD]` tag) and dropped the now-unused `routing` destructure. Those requests now fall through to cloudChat. `chatPanelFileExplainer.ts` left intact for future direct callers.
+
 **2026-07-01 — AI audit fix #1: remove dead-but-executing vague-request scope gate**
 - `src/features/ai/logic/chatPanelIntent.ts`: A scope-clarification gate in `handleBuildRequest()` was marked `[DEAD]` ("replaced by JobSizer") but still executed — it ran `isVagueProjectRequest()` (a live AI call) and could scope-question the user a SECOND time after JobSizer already did at intake. Removed the executing `if` block; kept an extended `[DEAD]` tag as audit trail. Removed the now-unused `templateScopeService` import line (all five named imports were only used by this block or already unused). `templateScopeService.ts` itself untouched.
 

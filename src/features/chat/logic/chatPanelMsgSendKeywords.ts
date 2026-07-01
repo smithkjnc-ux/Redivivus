@@ -12,7 +12,7 @@ export async function handleKeywordShortcuts(
   lowerText: string,
   deps: MessageHandlerDeps,
 ): Promise<boolean> {
-  const { conversation, refresh, panel, redivivus, routing } = deps;
+  const { conversation, refresh, panel, redivivus } = deps;
 
   if (/what\s+templates|show.*templates|list.*templates|templates.*available|templates.*do\s+you\s+have|what\s+can\s+you\s+build|what\s+types.*build|what.*project.*types/i.test(lowerText)) {
     try {
@@ -172,22 +172,13 @@ export async function handleKeywordShortcuts(
     return true;
   }
 
-  // [Rule 18] AI classifier — asks whether the user wants the project file listing explained.
-  // A 50-token call is cheaper and more accurate than any regex for this intent.
-  // Groq-first (free tier); falls through silently on failure.
-  const _exRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (_exRoot) {
-    try {
-      const classifyPrompt = `Reply with YES or NO only. Does this message ask to see, list, or have explained the files and folders inside the current project? Do not answer YES for questions about specific tools, code, or concepts — only YES if the user literally wants to know what files/folders exist.
-Message: "${userText.slice(0, 300)}"`;
-      const result = await routing.prompt(classifyPrompt, 12_000);
-      if (result.success && result.text?.trim().toUpperCase().startsWith('YES')) {
-        const { explainProjectFiles } = await import('../ui/chatPanelFileExplainer.js');
-        conversation.push({ role: 'assistant', content: await explainProjectFiles(_exRoot), timestamp: Date.now() });
-        refresh(); return true;
-      }
-    } catch { /* classifier unavailable — fall through to AI chat */ }
-  }
+  // [DEAD] Per-message "explain project files" AI classifier removed (AI-layer audit). It fired a
+  // blocking routing.prompt(..., 12_000) on EVERY message that reached here — before the main cloudChat
+  // classifier — adding a network round-trip and latency to normal chat just to catch a rare intent.
+  // This is the same anti-pattern already removed as the looksLikeBugReport pre-classifier (see the
+  // [DEAD] note in chatPanelMsgSendPreCloud.ts): pre-classifying before cloudChat defeats the fast path.
+  // "Explain project files" requests now fall through to cloudChat / normal AI chat, which handles them.
+  // chatPanelFileExplainer.ts (explainProjectFiles) is left in place for any future direct caller.
 
   return false;
 }
